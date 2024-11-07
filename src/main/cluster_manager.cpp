@@ -50,20 +50,26 @@ ClusterManager::~ClusterManager() {
 #endif
 }
 
-void ClusterManager::InitAsAdmin() { current_node_role_ = NodeRole::kAdmin; }
+void ClusterManager::InitAsAdmin() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    current_node_role_ = NodeRole::kAdmin;
+}
 
-void ClusterManager::InitAsStandalone() { current_node_role_ = NodeRole::kStandalone; }
+void ClusterManager::InitAsStandalone() {
+    std::unique_lock<std::mutex> lock(mutex_);
+    current_node_role_ = NodeRole::kStandalone;
+}
 
 Status ClusterManager::InitAsLeader(const String &node_name) {
+
+    Config *config_ptr = InfinityContext::instance().config();
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
 
     std::unique_lock<std::mutex> lock(mutex_);
     if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as leader error: already initialized.");
     }
-
-    Config *config_ptr = InfinityContext::instance().config();
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
 
     this_node_ = MakeShared<NodeInfo>(NodeRole::kLeader,
                                       NodeStatus::kAlive,
@@ -73,20 +79,19 @@ Status ClusterManager::InitAsLeader(const String &node_name) {
                                       std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
     current_node_role_ = NodeRole::kLeader;
-
     return Status::OK();
 }
 
 Status ClusterManager::InitAsFollower(const String &node_name, const String &leader_ip, i64 leader_port) {
 
+    Config *config_ptr = InfinityContext::instance().config();
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+
     std::unique_lock<std::mutex> lock(mutex_);
     if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as follower error: already initialized.");
     }
-
-    Config *config_ptr = InfinityContext::instance().config();
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
 
     this_node_ = MakeShared<NodeInfo>(NodeRole::kFollower,
                                       NodeStatus::kAlive,
@@ -109,14 +114,14 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
 
 Status ClusterManager::InitAsLearner(const String &node_name, const String &leader_ip, i64 leader_port) {
 
+    Config *config_ptr = InfinityContext::instance().config();
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+
     std::unique_lock<std::mutex> lock(mutex_);
     if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as learner error: already initialized.");
     }
-
-    Config *config_ptr = InfinityContext::instance().config();
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
 
     this_node_ = MakeShared<NodeInfo>(NodeRole::kLearner,
                                       NodeStatus::kAlive,
@@ -182,6 +187,46 @@ Status ClusterManager::RegisterToLeader() {
 
     this->hb_running_ = true;
     hb_periodic_thread_ = MakeShared<Thread>([this] { this->HeartBeatToLeaderThread(); });
+    return status;
+}
+
+Status ClusterManager::RegisterToLeaderNoLock() {
+    // Register to leader, used by follower and learner
+    Storage *storage_ptr = InfinityContext::instance().storage();
+    SharedPtr<RegisterPeerTask> register_peer_task = nullptr;
+    if (storage_ptr->reader_init_phase() == ReaderInitPhase::kPhase2) {
+        register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name(),
+                                                          this_node_->node_role(),
+                                                          this_node_->node_ip(),
+                                                          this_node_->node_port(),
+                                                          storage_ptr->txn_manager()->CurrentTS());
+    } else {
+        register_peer_task =
+            MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
+    }
+
+    client_to_leader_->Send(register_peer_task);
+    register_peer_task->Wait();
+
+    Status status = Status::OK();
+    if (register_peer_task->error_code_ != 0) {
+        status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
+        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
+        return status;
+    }
+    auto now = std::chrono::system_clock::now();
+    auto time_since_epoch = now.time_since_epoch();
+    leader_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+    leader_node_->set_node_name(register_peer_task->leader_name_);
+    leader_node_->set_node_status(NodeStatus::kAlive);
+    //    client_to_leader_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
+    // Start HB thread.
+    if (register_peer_task->heartbeat_interval_ == 0) {
+        leader_node_->set_heartbeat_interval(1000); // 1000 ms by default
+    } else {
+        leader_node_->set_heartbeat_interval(register_peer_task->heartbeat_interval_);
+    }
+
     return status;
 }
 
@@ -311,46 +356,6 @@ void ClusterManager::CheckHeartBeatThread() {
             }
         }
     }
-}
-
-Status ClusterManager::RegisterToLeaderNoLock() {
-    // Register to leader, used by follower and learner
-    Storage *storage_ptr = InfinityContext::instance().storage();
-    SharedPtr<RegisterPeerTask> register_peer_task = nullptr;
-    if (storage_ptr->reader_init_phase() == ReaderInitPhase::kPhase2) {
-        register_peer_task = MakeShared<RegisterPeerTask>(this_node_->node_name(),
-                                                          this_node_->node_role(),
-                                                          this_node_->node_ip(),
-                                                          this_node_->node_port(),
-                                                          storage_ptr->txn_manager()->CurrentTS());
-    } else {
-        register_peer_task =
-            MakeShared<RegisterPeerTask>(this_node_->node_name(), this_node_->node_role(), this_node_->node_ip(), this_node_->node_port(), 0);
-    }
-
-    client_to_leader_->Send(register_peer_task);
-    register_peer_task->Wait();
-
-    Status status = Status::OK();
-    if (register_peer_task->error_code_ != 0) {
-        status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
-        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
-        return status;
-    }
-    auto now = std::chrono::system_clock::now();
-    auto time_since_epoch = now.time_since_epoch();
-    leader_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
-    leader_node_->set_node_name(register_peer_task->leader_name_);
-    leader_node_->set_node_status(NodeStatus::kAlive);
-    //    client_to_leader_->SetPeerNode(NodeRole::kLeader, register_peer_task->leader_name_, register_peer_task->update_time_);
-    // Start HB thread.
-    if (register_peer_task->heartbeat_interval_ == 0) {
-        leader_node_->set_heartbeat_interval(1000); // 1000 ms by default
-    } else {
-        leader_node_->set_heartbeat_interval(register_peer_task->heartbeat_interval_);
-    }
-
-    return status;
 }
 
 Status ClusterManager::UnregisterToLeaderNoLock() {
