@@ -264,7 +264,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         }
         result.cached_ = true;
     } else if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
-        LOG_TRACE(fmt::format("GetObjCache object {} ref count {}", it->second.obj_key_, obj_stat->ref_count_));
+        LOG_TRACE(fmt::format("GetObjCache object {}, file_path: {}, ref count {}", it->second.obj_key_, file_path, obj_stat->ref_count_));
         String read_path = GetObjPath(result.obj_addr_.obj_key_);
         if (!VirtualStore::Exists(read_path)) {
             obj_stat->cached_ = false;
@@ -406,12 +406,6 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
             return;
         }
     }
-    if (check_ref_count) {
-        if (obj_stat->ref_count_ > 0) {
-            String error_message = fmt::format("CleanupNoLock object {} ref count is {}", object_addr.obj_key_, obj_stat->ref_count_);
-            UnrecoverableError(error_message);
-        }
-    }
     Range orig_range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
     Range range(orig_range);
     auto inst_it = obj_stat->deleted_ranges_.lower_bound(range);
@@ -472,6 +466,12 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
         if (object_addr.obj_key_.empty()) {
             String error_message = fmt::format("Failed to find object key");
             UnrecoverableError(error_message);
+        }
+        if (check_ref_count) {
+            if (obj_stat->ref_count_ > 0) {
+                String error_message = fmt::format("CleanupNoLock object {} ref count is {}", object_addr.obj_key_, obj_stat->ref_count_);
+                UnrecoverableError(error_message);
+            }
         }
         drop_from_remote_keys.emplace_back(object_addr.obj_key_);
         objects_->Invalidate(object_addr.obj_key_);

@@ -52,7 +52,7 @@ if not os.path.isfile(stdout_path):
     print("Error: stdout file not found")
 else:
     if failure:
-        shutil.copy(stdout_path, f"{output_dir}/{random_name}_1.log")
+        shutil.copy(stdout_path, f"{output_dir}/{random_name}_stdout.log")
     print(f"Last {show_lines} lines from {stdout_path}:")
     with open(stdout_path, "r") as f:
         lines = f.readlines()
@@ -63,7 +63,7 @@ if not os.path.isfile(stderror_path):
     print("Error: stderror file not found")
 else:
     if failure:
-        shutil.copy(stderror_path, f"{output_dir}/{random_name}_2.log")
+        shutil.copy(stderror_path, f"{output_dir}/{random_name}_stderror.log")
     print(f"Last {show_lines} lines from {stderror_path}:")
     with open(stderror_path, "r") as f:
         lines = f.readlines()
