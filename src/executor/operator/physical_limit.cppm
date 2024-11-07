@@ -78,7 +78,7 @@ public:
 
 private:
     i64 offset_{};
-    i64 limit_{};
+    Atomic<i64> limit_{};
 };
 
 export class PhysicalLimit final : public PhysicalOperator {
