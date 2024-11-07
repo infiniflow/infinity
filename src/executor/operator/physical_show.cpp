@@ -4786,26 +4786,28 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 break;
             }
             case GlobalVariable::kFollowerNum: {
-                NodeInfo this_node = InfinityContext::instance().cluster_manager()->ThisNode();
-                if (InfinityContext::instance().IsClusterRole() && this_node.node_role_ == NodeRole::kLeader) {
-                    {
-                        // option name
-                        Value value = Value::MakeVarchar(var_name);
-                        ValueExpression value_expr(value);
-                        value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-                    }
-                    {
-                        // option value
-                        SizeT follower_count = InfinityContext::instance().cluster_manager()->GetFollowerNumber();
-                        Value value = Value::MakeVarchar(std::to_string(follower_count));
-                        ValueExpression value_expr(value);
-                        value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-                    }
-                    {
-                        // option description
-                        Value value = Value::MakeVarchar("Follower number for Infinity cluster");
-                        ValueExpression value_expr(value);
-                        value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                if (InfinityContext::instance().IsClusterRole()) {
+                    NodeInfo this_node = InfinityContext::instance().cluster_manager()->ThisNode();
+                    if (this_node.node_role_ == NodeRole::kLeader) {
+                        {
+                            // option name
+                            Value value = Value::MakeVarchar(var_name);
+                            ValueExpression value_expr(value);
+                            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                        }
+                        {
+                            // option value
+                            SizeT follower_count = InfinityContext::instance().cluster_manager()->GetFollowerNumber();
+                            Value value = Value::MakeVarchar(std::to_string(follower_count));
+                            ValueExpression value_expr(value);
+                            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                        }
+                        {
+                            // option description
+                            Value value = Value::MakeVarchar("Follower number for Infinity cluster");
+                            ValueExpression value_expr(value);
+                            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                        }
                     }
                 }
                 break;
