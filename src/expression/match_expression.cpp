@@ -28,6 +28,10 @@ MatchExpression::MatchExpression(const String &fields, const String &matching_te
     : BaseExpression(ExpressionType::kMatch, Vector<SharedPtr<BaseExpression>>()), fields_(fields), matching_text_(matching_text),
       options_text_(options_text) {}
 
+MatchExpression::MatchExpression(const String &fields, const String &matching_text, const String &options_text, const String &index_name)
+    : BaseExpression(ExpressionType::kMatch, Vector<SharedPtr<BaseExpression>>()), fields_(fields), matching_text_(matching_text),
+      options_text_(options_text), index_name_(index_name) {}
+
 String MatchExpression::ToString() const {
     if (!alias_.empty()) {
         return alias_;

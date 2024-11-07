@@ -785,7 +785,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTextExpr(const MatchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
-    auto match_text = MakeShared<MatchExpression>(expr.fields_, expr.matching_text_, expr.options_text_);
+    auto match_text = MakeShared<MatchExpression>(expr.fields_, expr.matching_text_, expr.options_text_, expr.index_name_);
     match_text->optional_filter_ = BuildSearchSubExprOptionalFilter(this, expr.filter_expr_.get(), bind_context_ptr, depth);
     return match_text;
 }
@@ -833,7 +833,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
                                                                      std::move(query_embedding),
                                                                      tensor_column_basic_embedding_dim,
                                                                      expr.options_text_,
-                                                                     std::move(optional_filter));
+                                                                     std::move(optional_filter),
+                                                                     expr.index_name_,
+                                                                     expr.ignore_index_);
     return bound_match_tensor_expr;
 }
 
@@ -865,7 +867,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(MatchSparseExpr
                                                                      expr.query_n_,
                                                                      expr.topn_,
                                                                      std::move(expr.opt_params_),
-                                                                     std::move(optional_filter));
+                                                                     std::move(optional_filter),
+                                                                     expr.index_name_,
+                                                                     expr.ignore_index_);
     return bound_match_sparse_expr;
 }
 
