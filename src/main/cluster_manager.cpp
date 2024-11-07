@@ -51,12 +51,12 @@ ClusterManager::~ClusterManager() {
 }
 
 void ClusterManager::InitAsAdmin() {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     current_node_role_ = NodeRole::kAdmin;
 }
 
 void ClusterManager::InitAsStandalone() {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     current_node_role_ = NodeRole::kStandalone;
 }
 
@@ -66,7 +66,7 @@ Status ClusterManager::InitAsLeader(const String &node_name) {
     auto now = std::chrono::system_clock::now();
     auto time_since_epoch = now.time_since_epoch();
 
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as leader error: already initialized.");
     }
@@ -88,7 +88,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     auto now = std::chrono::system_clock::now();
     auto time_since_epoch = now.time_since_epoch();
 
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as follower error: already initialized.");
     }
@@ -118,7 +118,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     auto now = std::chrono::system_clock::now();
     auto time_since_epoch = now.time_since_epoch();
 
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (this_node_.get() != nullptr) {
         return Status::ErrorInit("Init node as learner error: already initialized.");
     }
@@ -146,7 +146,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
 Status ClusterManager::UnInit(bool not_unregister) {
     if (hb_periodic_thread_.get() != nullptr) {
         {
-            std::lock_guard lock(hb_mutex_);
+            std::lock_guard hb_lock(hb_mutex_);
             hb_running_ = false;
             hb_cv_.notify_all();
         }
@@ -154,7 +154,7 @@ Status ClusterManager::UnInit(bool not_unregister) {
         hb_periodic_thread_.reset();
     }
 
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (!not_unregister) {
         Status status = UnregisterToLeaderNoLock();
     }
@@ -179,7 +179,7 @@ Status ClusterManager::UnInit(bool not_unregister) {
 
 Status ClusterManager::RegisterToLeader() {
     // Register to leader;
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     Status status = RegisterToLeaderNoLock();
     if (!status.ok()) {
         return status;
@@ -256,7 +256,7 @@ void ClusterManager::HeartBeatToLeaderThread() {
         auto hb_time_since_epoch = hb_now.time_since_epoch();
         SharedPtr<HeartBeatPeerTask> hb_task = nullptr;
         {
-            std::unique_lock<std::mutex> cluster_manager_lock(mutex_);
+            std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
             this_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count());
 
             String this_node_name = this_node_->node_name();
@@ -295,7 +295,7 @@ void ClusterManager::HeartBeatToLeaderThread() {
         hb_time_since_epoch = hb_now.time_since_epoch();
 
         {
-            std::unique_lock<std::mutex> cluster_manager_lock(mutex_);
+            std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
             // Update leader info
             leader_node_->set_node_status(NodeStatus::kAlive);
             leader_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count());
@@ -315,7 +315,7 @@ void ClusterManager::HeartBeatToLeaderThread() {
 }
 
 void ClusterManager::CheckHeartBeat() {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (current_node_role_ != NodeRole::kLeader) {
         String error_message = "Invalid node role.";
         UnrecoverableError(error_message);
@@ -412,7 +412,7 @@ Status ClusterManager::GetReadersInfo(Vector<SharedPtr<NodeInfo>> &followers,
                                       Vector<SharedPtr<PeerClient>> &follower_clients,
                                       Vector<SharedPtr<NodeInfo>> &learners,
                                       Vector<SharedPtr<PeerClient>> &learner_clients) {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (current_node_role_ != NodeRole::kLeader) {
         return Status::InvalidNodeRole("Expect leader node");
     }
@@ -438,7 +438,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
 
     String other_node_name = other_node->node_name();
     {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         if (current_node_role_ != NodeRole::kLeader) {
             String error_message = "Non-leader role can't add other node.";
             UnrecoverableError(error_message);
@@ -462,7 +462,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
 
     Status log_sending_status = SyncLogsOnRegistration(other_node, client_to_follower);
     if (log_sending_status.ok()) {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         if (current_node_role_ != NodeRole::kLeader) {
             String error_message = "Non-leader role can't add other node.";
             UnrecoverableError(error_message);
@@ -498,7 +498,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
 
     SharedPtr<PeerClient> client_{nullptr};
     {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         auto node_iter = other_node_map_.find(node_name);
         if (node_iter != other_node_map_.end()) {
             node_iter->second->set_node_status(NodeStatus::kRemoved);
@@ -519,7 +519,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
     change_role_task->Wait();
 
     {
-        std::unique_lock<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         other_node_map_.erase(node_name);
         clients_for_cleanup_.emplace_back(reader_client_map_[node_name]);
         reader_client_map_.erase(node_name);
@@ -536,7 +536,7 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
 
 Status ClusterManager::UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op) {
     // Only used in leader mode.
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
 
     auto iter = other_node_map_.find(node_name);
     if (iter == other_node_map_.end()) {
@@ -583,7 +583,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                                                  i64 &leader_term,
                                                  infinity_peer_server::NodeStatus::type &sender_status) {
     // Used by leader
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     if (current_node_role_ != NodeRole::kLeader) {
         sender_status = infinity_peer_server::NodeStatus::type::kRemoved;
         return Status::InvalidNodeRole(fmt::format("Leader node is already switch to {}", ToString(current_node_role_)));
@@ -860,7 +860,7 @@ Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
 
 Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
     // ADMIN SHOW NODES;
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     Vector<SharedPtr<NodeInfo>> result;
     result.reserve(other_node_map_.size() + 2);
     result.emplace_back(this_node_);
@@ -875,7 +875,7 @@ Vector<SharedPtr<NodeInfo>> ClusterManager::ListNodes() const {
 }
 
 Tuple<Status, SharedPtr<NodeInfo>> ClusterManager::GetNodeInfoByName(const String &node_name) const {
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
 
     if (current_node_role_ == NodeRole::kAdmin or current_node_role_ == NodeRole::kStandalone or current_node_role_ == NodeRole::kUnInitialized) {
         String error_message = "Error node role type";
@@ -903,7 +903,7 @@ Tuple<Status, SharedPtr<NodeInfo>> ClusterManager::GetNodeInfoByName(const Strin
 
 SharedPtr<NodeInfo> ClusterManager::ThisNode() const {
     // ADMIN SHOW NODE;
-    std::unique_lock<std::mutex> lock(mutex_);
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     return this_node_;
 }
 
