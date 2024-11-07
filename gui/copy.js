@@ -7,7 +7,8 @@ const nextStandalonePath = path.join(
   '.next',
   'standalone',
   'public',
-  '_next'
+  '_next',
+  'static'
 );
 
 function copyFolderRecursiveSync(src, dest) {
