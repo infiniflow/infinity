@@ -14,7 +14,7 @@ statement ok
 SET CONFIG result_cache "on";
 
 statement ok
-SET CONFIG result_cache 1;
+SET CONFIG cache_result_capacity 1;
 
 query I
 SHOW GLOBAL VARIABLE cache_result_capacity;
@@ -121,13 +121,13 @@ statement error
 SHOW GLOBAL VARIABLE cache_result_capacity;
 
 statement error
-SET CONFIG result_cache 10000;
+SET CONFIG cache_result_capacity 10000;
 
 statement ok
 SET CONFIG result_cache "on";
 
 statement ok
-SET CONFIG result_cache 10000;
+SET CONFIG cache_result_capacity 10000;
 
 query I
 SHOW GLOBAL VARIABLE cache_result_num;

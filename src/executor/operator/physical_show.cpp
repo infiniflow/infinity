@@ -4428,6 +4428,33 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option description
+                    Value value = Value::MakeVarchar("Result cache capacity");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kCacheResultNum: {
+                const String &result_cache_status = config->ResultCache();
+                if (result_cache_status == "off") {
+                    break;
+                }
+                ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
+                SizeT cache_num_used = cache_mgr->cache_num_used();
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    Value value = Value::MakeVarchar(std::to_string(cache_num_used));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
                     Value value = Value::MakeVarchar("Result cache num");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
