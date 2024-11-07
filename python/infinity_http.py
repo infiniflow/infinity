@@ -225,8 +225,22 @@ class infinity_http:
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
-        print(r.json())
+        # print(r.json())
         return database_result(node_name=r.json()["node"]["name"], node_role=r.json()["node"]["role"], node_status=r.json()["node"]["status"])
+
+    def show_global_variables(self):
+        url = "variables/global"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return r.json()
+
+    def show_global_variable(self, var_name: str):
+        url = f"variables/global/{var_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return r.json()
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
 
