@@ -31,7 +31,6 @@ public:
     NodeInfo(NodeRole role, NodeStatus status, const String &name, const String &ip_addr, i64 port, i64 txn_ts, u64 update_ts);
     NodeInfo(NodeRole role, NodeStatus status, const String &name, const String &ip_addr, i64 port, u64 update_ts);
     NodeInfo(NodeRole role, const String &ip_addr, i64 port);
-    NodeInfo(NodeRole role, NodeStatus status);
 
     void set_heartbeat_interval(i64 heartbeat_interval) { heartbeat_interval_ = heartbeat_interval; }
     i64 heartbeat_interval() const { return heartbeat_interval_; }

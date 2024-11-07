@@ -57,7 +57,6 @@ void ClusterManager::InitAsAdmin() {
 
 void ClusterManager::InitAsStandalone() {
     std::unique_lock<std::mutex> lock(mutex_);
-    this_node_ = MakeShared<NodeInfo>(NodeRole::kStandalone, NodeStatus::kAlive);
     current_node_role_ = NodeRole::kStandalone;
 }
 
