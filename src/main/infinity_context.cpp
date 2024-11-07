@@ -441,12 +441,14 @@ void InfinityContext::SetIndexThreadPool(SizeT thread_num) {
     thread_num = thread_num / 2;
     if (thread_num < 2)
         thread_num = 2;
+    LOG_TRACE(fmt::format("Set index thread pool size to {}", thread_num));
     inverting_thread_pool_.resize(thread_num);
     commiting_thread_pool_.resize(thread_num);
     hnsw_build_thread_pool_.resize(thread_num);
 }
 
 void InfinityContext::RestoreIndexThreadPoolToDefault() {
+    LOG_TRACE("Restore index thread pool size to default");
     inverting_thread_pool_.resize(4);
     commiting_thread_pool_.resize(2);
     hnsw_build_thread_pool_.resize(4);

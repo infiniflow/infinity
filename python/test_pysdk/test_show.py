@@ -141,3 +141,48 @@ class TestInfinity:
         self._test_show_table(suffix)
         self._test_show_columns(suffix)
         self._test_show_big_databases(suffix)
+
+    @pytest.mark.usefixtures("skip_if_local_infinity")
+    @pytest.mark.usefixtures("skip_if_remote_infinity")
+    # @pytest.mark.skip(reason="Cannot show follower number")
+    def test_show_global_variables(self, suffix):
+        vars = self.infinity_obj.show_global_variables()
+        print(vars)
+
+    @pytest.mark.usefixtures("skip_if_local_infinity")
+    @pytest.mark.usefixtures("skip_if_remote_infinity")
+    def test_show_global_variable(self, suffix):
+        var: dict = self.infinity_obj.show_global_variable("cache_result_capacity")
+        assert var["error_code"] == ErrorCode.OK
+        assert "cache_result_capacity" in var
+
+        var = self.infinity_obj.show_global_variable("cache_result_num")
+        assert var["error_code"] == ErrorCode.OK
+        assert "cache_result_num" in var
+
+        var = self.infinity_obj.show_global_variable("result_cache")
+        assert var["error_code"] == ErrorCode.OK
+        assert "result_cache" in var
+
+        try:
+            var = self.infinity_obj.show_global_variable("invalid_variable")
+        except Exception as e:
+            assert e.error_code == ErrorCode.NO_SUCH_SYSTEM_VAR
+        else:
+            raise Exception("Should raise exception")
+
+    @pytest.mark.usefixtures("skip_if_local_infinity")
+    @pytest.mark.usefixtures("skip_if_remote_infinity")
+    def test_set_config(self, suffix):
+        res = self.infinity_obj.set_config({"cache_result_capacity": 100})
+        assert res.error_code == ErrorCode.OK
+
+        res = self.infinity_obj.set_config({"result_cache": "clear"})
+        assert res.error_code == ErrorCode.OK
+
+        try:
+            res = self.infinity_obj.set_config({"invalid_variable": "value"})
+        except Exception as e:
+            assert e.error_code == ErrorCode.INVALID_COMMAND
+        else:
+            raise Exception("Should raise exception")

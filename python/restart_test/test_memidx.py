@@ -162,7 +162,6 @@ class TestMemIdx:
             table_obj1.insert(
                 [{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(6)]
             )
-            table_obj1.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]} for i in range(6)])
 
             infinity_obj.drop_database("db2", conflict_type=ConflictType.Ignore)
             db_obj2 = infinity_obj.create_database("db2")
@@ -177,6 +176,10 @@ class TestMemIdx:
             table_obj2.insert(
                 [{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(6)]
             )
+
+            # wait memidx1 dump
+            time.sleep(1)
+            table_obj1.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]} for i in range(6)])
             table_obj2.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]} for i in range(6)])
 
         part1()
@@ -186,25 +189,25 @@ class TestMemIdx:
             # wait for optimize
             time.sleep(3)
 
-            idx1_files = list(pathlib.Path(data_dir).rglob(f"*{idx1_name}*"))
-            idx2_files = list(pathlib.Path(data_dir).rglob(f"*{idx2_name}*"))
-            assert len(idx1_files) == 1
-            assert len(idx2_files) == 1
+            idx1_dirs = list(pathlib.Path(data_dir).rglob(f"*{idx1_name}*"))
+            idx2_dirs = list(pathlib.Path(data_dir).rglob(f"*{idx2_name}*"))
+            assert len(idx1_dirs) == 1
+            assert len(idx2_dirs) == 1
 
-            idx1_dir = idx1_files[0]
-            idx1_files_in_dir = list(idx1_dir.glob("*"))
-            assert len(idx1_files_in_dir) == 3
+            idx1_dir = idx1_dirs[0]
+            idx1_files = list(idx1_dir.glob("*"))
+            assert len(idx1_files) == 3
 
-            idx2_dir = idx2_files[0]
-            idx2_files_in_dir = list(idx2_dir.glob("*"))
-            assert len(idx2_files_in_dir) == 3
+            idx2_dir = idx2_dirs[0]
+            idx2_files = list(idx2_dir.glob("*"))
+            assert len(idx2_files) == 3
 
             infinity_obj.cleanup()
-            idx1_files_in_dir = list(idx1_dir.glob("*"))
-            assert len(idx1_files_in_dir) == 1
+            idx1_files = list(idx1_dir.glob("*"))
+            assert len(idx1_files) == 1
 
-            idx2_files_in_dir = list(idx2_dir.glob("*"))
-            assert len(idx2_files_in_dir) == 1
+            idx2_files = list(idx2_dir.glob("*"))
+            assert len(idx2_files) == 1
 
         part2()
 
