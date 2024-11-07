@@ -4,7 +4,9 @@
     "dev": "next dev -p 3033",
     "build": "next build",
     "start": "next start -p 3043",
-    "lint": "next lint"
+    "lint": "next lint",
+    "copy": "node copy.js",
+    "deploy": "next build && pnpm run copy"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
