@@ -12,6 +12,7 @@ from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
 
 from test_sdkbase import TestSdk
+from util import RtnThread
 
 TEST_DATA_DIR = "/test/data/"
 kInsertThreadNum = 4
@@ -271,19 +272,15 @@ class TestIndexParallel(TestSdk):
                                                              index.IndexType.FullText),
                                              ConflictType.Ignore)
                 if res.error_code == ErrorCode.OK:
-                    # print(f"thread {thread_id}: index {index_name} created")
-                    logging.info(f"thread {thread_id}: index {index_name} created")
+                    self.logger.info(f"thread {thread_id}: index {index_name} created")
                 else:
-                    # print(f"thread {thread_id}: create_index {index_name} failed: {res.error_msg}")
-                    logging.info(f"thread {thread_id}: create_index {index_name} failed: {res.error_msg}")
+                    self.logger.info(f"thread {thread_id}: create_index {index_name} failed: {res.error_msg}")
                 time.sleep(0.5)
                 res = table_obj.drop_index(index_name, ConflictType.Ignore)
                 if res.error_code == ErrorCode.OK:
-                    # print(f"thread {thread_id}: index {index_name} deleted")
-                    logging.info(f"thread {thread_id}: index {index_name} deleted")
+                    self.logger.info(f"thread {thread_id}: index {index_name} deleted")
                 else:
-                    # print(f"thread {thread_id}: delete_index {index_name} failed: {res.error_msg}")
-                    logging.info(f"thread {thread_id}: delete_index {index_name} failed: {res.error_msg}")
+                    self.logger.info(f"thread {thread_id}: delete_index {index_name} failed: {res.error_msg}")
                 time.sleep(0.5)
 
             connection_pool.release_conn(infinity_obj)
@@ -299,9 +296,8 @@ class TestIndexParallel(TestSdk):
                     value.append({"doctitle": data["doctitle"][i],
                                   "docdate": data["docdate"][i], "body": data["body"][i]})
                 table_obj.insert(value)
-                # print(f"thread {thread_id}: put data")
-                logging.info(f"thread {thread_id}: put data")
-                time.sleep(1)
+                self.logger.info(f"thread {thread_id}: put data")
+                time.sleep(0.1)
 
             connection_pool.release_conn(infinity_obj)
 
@@ -314,11 +310,9 @@ class TestIndexParallel(TestSdk):
                 try:
                     res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
                         "body^5", "harmful chemical", 3).to_pl()
-                    # print(f"thread {thread_id}: check result:\n{res}")
-                    logging.info(f"thread {thread_id}: check result:\n{res}")
+                    self.logger.info(f"thread {thread_id}: check result:\n{res}")
                 except Exception as e:
-                    # print(f"thread {thread_id}: check failed: {e}")
-                    logging.info(f"thread {thread_id}: check failed: {e}")
+                    self.logger.info(f"thread {thread_id}: check failed: {e}")
                 time.sleep(0.5)
 
             connection_pool.release_conn(infinity_obj)
@@ -348,15 +342,15 @@ class TestIndexParallel(TestSdk):
         end_time = time.time() + kRuningTime
 
         for i in range(kThreadNum):
-            threads.append(Thread(target=index_worker, args=[
+            threads.append(RtnThread(target=index_worker, args=[
                 connection_pool, table_name, "body", "body_index", end_time, i]))
 
         for i in range(kThreadNum):
-            threads.append(Thread(target=insert_worker, args=[
+            threads.append(RtnThread(target=insert_worker, args=[
                 connection_pool, table_name, data, end_time, i + kThreadNum]))
 
         for i in range(kThreadNum):
-            threads.append(Thread(target=query_worker, args=[
+            threads.append(RtnThread(target=query_worker, args=[
                 connection_pool, table_name, end_time, i + 2 * kThreadNum]))
 
         try:
@@ -368,6 +362,7 @@ class TestIndexParallel(TestSdk):
                 t.join()
         except Exception as e:
             self.logger.error(f"test_index_creation_deletion_parallel failed: {e}")
+            raise e
         else:
             self.logger.info("test_index_creation_deletion_parallel end")
 
