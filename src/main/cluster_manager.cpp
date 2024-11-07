@@ -50,7 +50,12 @@ ClusterManager::~ClusterManager() {
 
 void ClusterManager::InitAsAdmin() { current_node_role_ = NodeRole::kAdmin; }
 
-void ClusterManager::InitAsStandalone() { current_node_role_ = NodeRole::kStandalone; }
+void ClusterManager::InitAsStandalone() { 
+    this_node_ = MakeShared<NodeInfo>();
+    this_node_->node_role_ = NodeRole::kStandalone;
+    this_node_->node_status_ = NodeStatus::kAlive;
+    current_node_role_ = NodeRole::kStandalone;
+}
 
 Status ClusterManager::InitAsLeader(const String &node_name) {
 
