@@ -21,6 +21,9 @@ SHOW GLOBAL VARIABLE cache_result_capacity;
 ----
 1
 
+statement ok
+SET CONFIG result_cache "clear";
+
 query I
 SHOW GLOBAL VARIABLE cache_result_num;
 ----
