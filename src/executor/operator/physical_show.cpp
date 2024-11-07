@@ -82,6 +82,7 @@ import obj_status;
 import admin_statement;
 import result_cache_manager;
 import peer_task;
+import node_info;
 
 namespace infinity {
 
@@ -3809,7 +3810,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
     GlobalVariable global_var = VarUtil::GetGlobalVarByName(*object_name_);
-    Config* config = query_context->global_config();
+    Config *config = query_context->global_config();
     switch (global_var) {
         case GlobalVariable::kResultCache: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
@@ -4324,8 +4325,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kFollowerNum: {
-            NodeInfo this_node = InfinityContext::instance().cluster_manager()->ThisNode();
-            if (this_node.node_role_ == NodeRole::kLeader) {
+            SharedPtr<NodeInfo> this_node = InfinityContext::instance().cluster_manager()->ThisNode();
+            if (this_node->node_role() == NodeRole::kLeader) {
                 Vector<SharedPtr<ColumnDef>> output_column_defs = {
                     MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
                 };
@@ -4383,7 +4384,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
     for (auto &global_var_pair : VarUtil::global_name_map_) {
         const String &var_name = global_var_pair.first;
         GlobalVariable global_var_enum = global_var_pair.second;
-        Config* config = query_context->global_config();
+        Config *config = query_context->global_config();
         switch (global_var_enum) {
             case GlobalVariable::kResultCache: {
                 const String &result_cache_status = config->ResultCache();
@@ -4910,8 +4911,8 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
             }
             case GlobalVariable::kFollowerNum: {
                 if (InfinityContext::instance().IsClusterRole()) {
-                    NodeInfo this_node = InfinityContext::instance().cluster_manager()->ThisNode();
-                    if (this_node.node_role_ == NodeRole::kLeader) {
+                    SharedPtr<NodeInfo> this_node = InfinityContext::instance().cluster_manager()->ThisNode();
+                    if (this_node->node_role() == NodeRole::kLeader) {
                         {
                             // option name
                             Value value = Value::MakeVarchar(var_name);
