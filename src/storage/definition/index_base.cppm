@@ -58,7 +58,7 @@ public:
 
     virtual ~IndexBase() {
 #ifdef INFINITY_DEBUG
-        GlobalResourceUsage::DecrObjectCount("BaseResult");
+        GlobalResourceUsage::DecrObjectCount("IndexBase");
 #endif
     }
 

@@ -6033,7 +6033,7 @@ void PhysicalShow::ExecuteShowMemoryObjects(QueryContext *query_context, ShowOpe
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
         }
-        if (object_pair.second > 0) {
+        if (object_pair.second != 0) {
 
             {
                 // object_name
