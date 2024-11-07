@@ -86,7 +86,7 @@ def skip_if_local_infinity(request):
     
 @pytest.fixture(scope="function")
 def skip_if_remote_infinity(request):
-    if not request.config.getoption("--local-infinity"):
+    if not request.config.getoption("--local-infinity") and not request.config.getoption("--http"):
         pytest.skip("Skipping remote-infinity test")
 
 @pytest.fixture(scope="function")
