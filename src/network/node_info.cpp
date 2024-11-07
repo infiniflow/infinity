@@ -40,7 +40,7 @@ NodeInfo::NodeInfo(NodeRole role, NodeStatus status, const String &name, const S
 
 NodeInfo::NodeInfo(NodeRole role, const String &ip_addr, i64 port) : node_role_(role), ip_address_(ip_addr), port_(port) {}
 
-NodeInfo::NodeInfo(NodeRole role, NodeStatus status) : node_role(role), node_status_(status) {}
+NodeInfo::NodeInfo(NodeRole role, NodeStatus status) : node_role_(role), node_status_(status) {}
 
 void NodeInfo::set_node_name(const String &new_node_name) {
     std::unique_lock locker(node_mutex_);
