@@ -68,7 +68,13 @@ struct Hash {
 } // namespace detail
 
 export struct IndexReader {
-    ColumnIndexReader *GetColumnIndexReader(u64 column_id) const { return (*column_index_readers_)[column_id].get(); }
+    ColumnIndexReader *GetColumnIndexReader(const u64 column_id) const {
+        if (const auto it = column_index_readers_->find(column_id); it != column_index_readers_->end()) {
+            return it->second.get();
+        }
+        return nullptr;
+    }
+
     const Map<String, String> &GetColumn2Analyzer() const { return *column2analyzer_; }
 
     SharedPtr<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>> column_index_readers_;
