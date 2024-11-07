@@ -128,6 +128,9 @@ private:
     template <typename Iter, typename Index>
     static void InsertVecs(Index &index, Iter &&iter, const HnswInsertConfig &config, SizeT &mem_usage) {
         auto &thread_pool = InfinityContext::instance().GetHnswBuildThreadPool();
+        if (thread_pool.size() == 0) {
+            UnrecoverableError("Hnsw build thread pool is not initialized.");
+        }
         using T = std::decay_t<decltype(index)>;
         if constexpr (!std::is_same_v<T, std::nullptr_t>) {
             SizeT mem1 = index->mem_usage();
