@@ -81,6 +81,7 @@ import cleanup_scanner;
 import obj_status;
 import admin_statement;
 import result_cache_manager;
+import peer_task;
 
 namespace infinity {
 
@@ -4323,7 +4324,8 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             break;
         }
         case GlobalVariable::kFollowerNum: {
-            if (InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
+            NodeInfo this_node = InfinityContext::instance().cluster_manager()->ThisNode();
+            if (this_node.node_role_ == NodeRole::kLeader) {
                 Vector<SharedPtr<ColumnDef>> output_column_defs = {
                     MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
                 };
@@ -4907,8 +4909,8 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 break;
             }
             case GlobalVariable::kFollowerNum: {
-                if (InfinityContext::instance().IsClusterRole() &&
-                    InfinityContext::instance().cluster_manager()->ThisNode()->node_role_ == NodeRole::kLeader) {
+                NodeInfo this_node = InfinityContext::instance().cluster_manager()->ThisNode();
+                if (InfinityContext::instance().IsClusterRole() && this_node.node_role_ == NodeRole::kLeader) {
                     {
                         // option name
                         Value value = Value::MakeVarchar(var_name);

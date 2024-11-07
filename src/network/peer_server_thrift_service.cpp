@@ -62,10 +62,10 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         Status status = InfinityContext::instance().cluster_manager()->AddNodeInfo(non_leader_node_info);
         if (status.ok()) {
             LOG_INFO(fmt::format("Node: {} registered as {}.", request.node_name, infinity_peer_server::to_string(request.node_type)));
-            NodeInfo *leader_node = InfinityContext::instance().cluster_manager()->ThisNode().get();
-            response.leader_name = leader_node->node_name_;
-            response.leader_term = leader_node->leader_term_;
-            response.heart_beat_interval = leader_node->heartbeat_interval_;
+            NodeInfo leader_node = InfinityContext::instance().cluster_manager()->ThisNode();
+            response.leader_name = leader_node.node_name_;
+            response.leader_term = leader_node.leader_term_;
+            response.heart_beat_interval = leader_node.heartbeat_interval_;
         } else {
             response.error_code = static_cast<i64>(status.code());
             response.error_message = status.message();

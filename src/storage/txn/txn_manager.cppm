@@ -58,7 +58,7 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(Txn *txn);
 
-    bool CheckConflict(Txn *txn);
+    bool CheckTxnConflict(Txn *txn);
 
     void SendToWAL(Txn *txn);
 
@@ -103,7 +103,7 @@ public:
     bool InCheckpointProcess(TxnTimeStamp commit_ts);
 
     // Only used by follower and learner when received the replicated log from leader
-    void SetStartTS(TxnTimeStamp new_start_ts) { start_ts_ = new_start_ts; }
+    void SetStartTS(TxnTimeStamp new_start_ts) { current_ts_ = new_start_ts; }
 
 private:
     mutable std::mutex locker_{};
@@ -118,8 +118,8 @@ private:
 
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 
-    Atomic<TxnTimeStamp> start_ts_{};         // The next txn ts
-    TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // cur ckp begin ts, 0 if no ckp is happening
+    Atomic<TxnTimeStamp> current_ts_{};         // The next txn ts
+    TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager
     atomic_bool is_running_{false};

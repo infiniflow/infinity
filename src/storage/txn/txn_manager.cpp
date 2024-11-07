@@ -38,7 +38,7 @@ import global_resource_usage;
 namespace infinity {
 
 TxnManager::TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts)
-    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false) {
+    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), current_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("TxnManager");
 #endif
@@ -65,7 +65,7 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     u64 new_txn_id = ++catalog_ptr->next_txn_id_;
 
     // Record the start ts of the txn
-    TxnTimeStamp begin_ts = start_ts_ + 1;
+    TxnTimeStamp begin_ts = current_ts_ + 1;
     if (ckp_txn) {
         if (ckp_begin_ts_ != UNCOMMIT_TS) {
             // not set ckp_begin_ts_ may not truncate the wal file.
@@ -120,7 +120,7 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
 // Prepare to commit ReadTxn
 TxnTimeStamp TxnManager::GetReadCommitTS(Txn *txn) {
     std::lock_guard guard(locker_);
-    TxnTimeStamp commit_ts = start_ts_ + 1;
+    TxnTimeStamp commit_ts = current_ts_ + 1;
     txn->SetTxnRead();
     return commit_ts;
 }
@@ -128,15 +128,15 @@ TxnTimeStamp TxnManager::GetReadCommitTS(Txn *txn) {
 // Prepare to commit WriteTxn
 TxnTimeStamp TxnManager::GetWriteCommitTS(Txn *txn) {
     std::lock_guard guard(locker_);
-    start_ts_ += 2;
-    TxnTimeStamp commit_ts = start_ts_;
+    current_ts_ += 2;
+    TxnTimeStamp commit_ts = current_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     committing_txns_.emplace(txn);
     txn->SetTxnWrite();
     return commit_ts;
 }
 
-bool TxnManager::CheckConflict(Txn *txn) {
+bool TxnManager::CheckTxnConflict(Txn *txn) {
     TxnTimeStamp commit_ts = txn->CommitTS();
     Vector<SharedPtr<Txn>> candidate_txns;
     TxnTimeStamp min_checking_ts = UNCOMMIT_TS;
@@ -286,13 +286,14 @@ UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
     return MakeUnique<TxnInfo>(iter->first, iter->second->GetTxnText());
 }
 
-TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
+TxnTimeStamp TxnManager::CurrentTS() const { return current_ts_; }
 
-TxnTimeStamp TxnManager::GetNewTimeStamp() { return start_ts_ + 1; }
+TxnTimeStamp TxnManager::GetNewTimeStamp() { return current_ts_ + 1; }
 
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
     std::lock_guard guard(locker_);
-    TxnTimeStamp first_uncommitted_begin_ts = start_ts_;
+    TxnTimeStamp first_uncommitted_begin_ts = current_ts_;
+    // Get earliest txn of the ongoing transactions
     while (!beginned_txns_.empty()) {
         auto first_txn = beginned_txns_.front().lock();
         if (first_txn.get() != nullptr) {
@@ -301,19 +302,23 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
         }
         beginned_txns_.pop_front();
     }
-    TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
-    TxnTimeStamp res = std::min(first_uncommitted_begin_ts, checkpointed_ts);
+
+    // Get the earlier txn ts between current ongoing txn and last checkpoint ts
+    TxnTimeStamp last_checkpoint_ts = wal_mgr_->LastCheckpointTS();
+    TxnTimeStamp least_ts = std::min(first_uncommitted_begin_ts, last_checkpoint_ts);
+
+    // Get the earlier txn ts between current least txn and checking conflict TS
     if (!checking_ts_.empty()) {
-        res = std::min(res, *checking_ts_.begin());
+        least_ts = std::min(least_ts, *checking_ts_.begin());
     }
 
-    LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", res, checkpointed_ts));
-    return res;
+    LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", least_ts, last_checkpoint_ts));
+    return least_ts;
 }
 
 void TxnManager::CleanupTxn(Txn *txn) {
     TxnType txn_type = txn->GetTxnType();
-    switch(txn_type) {
+    switch (txn_type) {
         case TxnType::kRead: {
             // For read-only Txn only remove txn from txn_map
             std::lock_guard guard(locker_);
@@ -323,7 +328,7 @@ void TxnManager::CleanupTxn(Txn *txn) {
         case TxnType::kWrite: {
             // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
             TxnState txn_state = txn->GetTxnState();
-            switch(txn_state) {
+            switch (txn_state) {
                 case TxnState::kCommitting: {
                     txn->SetTxnCommitted();
                     break;
