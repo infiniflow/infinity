@@ -42,6 +42,7 @@ public:
     String options_text_;
     Vector<String> index_names_;
     SharedPtr<BaseExpression> optional_filter_;
+    const String index_name_;
 };
 
 } // namespace infinity
