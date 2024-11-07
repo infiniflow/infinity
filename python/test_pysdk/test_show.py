@@ -166,3 +166,17 @@ class TestInfinity:
             assert e.error_code == ErrorCode.NO_SUCH_SYSTEM_VAR
         else:
             raise Exception("Should raise exception")
+
+    def test_set_config(self, suffix):
+        res = self.infinity_obj.set_config({"cache_result_capacity": 100})
+        assert res.error_code == ErrorCode.OK
+
+        res = self.infinity_obj.set_config({"result_cache": "clear"})
+        assert res.error_code == ErrorCode.OK
+
+        try:
+            res = self.infinity_obj.set_config({"invalid_variable": "value"})
+        except Exception as e:
+            assert e.error_code == ErrorCode.INVALID_COMMAND
+        else:
+            raise Exception("Should raise exception")

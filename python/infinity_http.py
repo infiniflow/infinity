@@ -242,6 +242,14 @@ class infinity_http:
         self.net.raise_exception(r)
         return r.json()
 
+    def set_config(self, config: dict):
+        url = "configs"
+        h = self.net.set_up_header(["accept", "content-type"])
+        d = self.net.set_up_data([], config)
+        r = self.net.request(url, "post", h, d)
+        self.net.raise_exception(r)
+        return database_result()
+
 ####################3####################3####################3####################3####################3####################3####################3####################3
 
 class database_http:
