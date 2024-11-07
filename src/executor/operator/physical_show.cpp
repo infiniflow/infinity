@@ -80,6 +80,7 @@ import infinity_context;
 import cleanup_scanner;
 import obj_status;
 import admin_statement;
+import result_cache_manager;
 import peer_task;
 
 namespace infinity {
@@ -3808,7 +3809,79 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
     GlobalVariable global_var = VarUtil::GetGlobalVarByName(*object_name_);
+    Config* config = query_context->global_config();
     switch (global_var) {
+        case GlobalVariable::kResultCache: {
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                varchar_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+            Value value = Value::MakeVarchar(config->ResultCache());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case GlobalVariable::kCacheResultCapacity: {
+            const String &result_cache_status = config->ResultCache();
+            if (result_cache_status == "off") {
+                operator_state->status_ = Status::NotSupport(fmt::format("Result cache is off"));
+                RecoverableError(operator_state->status_);
+            }
+            ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
+
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                integer_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+            Value value = Value::MakeBigInt(cache_mgr->cache_num_capacity());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case GlobalVariable::kCacheResultNum: {
+            const String &result_cache_status = config->ResultCache();
+            if (result_cache_status == "off") {
+                operator_state->status_ = Status::NotSupport(fmt::format("Result cache is off"));
+                RecoverableError(operator_state->status_);
+            }
+            ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
+
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                integer_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+            Value value = Value::MakeBigInt(cache_mgr->cache_num_used());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
         case GlobalVariable::kQueryCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
@@ -4310,7 +4383,57 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
     for (auto &global_var_pair : VarUtil::global_name_map_) {
         const String &var_name = global_var_pair.first;
         GlobalVariable global_var_enum = global_var_pair.second;
+        Config* config = query_context->global_config();
         switch (global_var_enum) {
+            case GlobalVariable::kResultCache: {
+                const String &result_cache_status = config->ResultCache();
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    Value value = Value::MakeVarchar(result_cache_status);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("Result cache num");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kCacheResultCapacity: {
+                const String &result_cache_status = config->ResultCache();
+                if (result_cache_status == "off") {
+                    break;
+                }
+                ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
+                SizeT cache_num_capacity = cache_mgr->cache_num_capacity();
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    Value value = Value::MakeVarchar(std::to_string(cache_num_capacity));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("Result cache num");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
             case GlobalVariable::kQueryCount: {
                 {
                     // option name

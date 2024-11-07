@@ -48,6 +48,7 @@ import infinity_context;
 import periodic_trigger;
 import bg_task;
 import wal_manager;
+import result_cache_manager;
 
 namespace infinity {
 
@@ -144,8 +145,27 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     GlobalOptionIndex config_index = config->GetOptionIndex(set_command->var_name());
                     switch(config_index) {
                         case GlobalOptionIndex::kResultCache: {
+                            ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
+                            const String &result_cache_status = config->ResultCache();
+                            if (set_command->value_type() == SetVarType::kInteger) {
+                                if (result_cache_status == "off") {
+                                    Status status = Status::InvalidCommand(fmt::format("Result cache manager is off"));
+                                    RecoverableError(status);
+                                }
+                                i64 cache_num = set_command->value_int();
+                                if (cache_num < 0) {
+                                    Status status = Status::InvalidCommand(fmt::format("Attempt to set cache result num: {}", cache_num));
+                                    RecoverableError(status);
+                                }
+                                cache_mgr->ResetCacheNumCapacity(cache_num);
+                                break;
+                            }
                             if (set_command->value_type() != SetVarType::kString) {
                                 Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
+                            if (result_cache_status == "off" && set_command->value_str() != "on") {
+                                Status status = Status::InvalidCommand(fmt::format("Result cache manager is off"));
                                 RecoverableError(status);
                             }
                             if (set_command->value_str() == "on") {
@@ -153,7 +173,16 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 return true;
                             }
                             if (set_command->value_str() == "off") {
+                                cache_mgr->ClearCache();
                                 config->SetCacheResult("off");
+                                return true;
+                            }
+                            if (set_command->value_str() == "suspend") {
+                                config->SetCacheResult("suspend");
+                                return true;
+                            }
+                            if (set_command->value_str() == "clear") {
+                                cache_mgr->ClearCache();
                                 return true;
                             }
                             Status status = Status::SetInvalidVarValue("cache result", "on, off");

@@ -46,6 +46,9 @@ export enum class GlobalVariable {
     kJeProf,                    // global
     kCleanupTrace,              // global
     kFollowerNum,               // global
+    kResultCache,               // global
+    kCacheResultCapacity,       // global
+    kCacheResultNum,            // global
     kInvalid,
 };
 

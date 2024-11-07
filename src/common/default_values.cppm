@@ -198,7 +198,7 @@ export {
     constexpr SizeT INSERT_BATCH_ROW_LIMIT = 8192;
 
     constexpr std::string_view DEFAULT_RESULT_CACHE = "off";
-    constexpr SizeT DEFAULT_CACHE_RESULT_NUM = 10000;
+    constexpr SizeT DEFAULT_CACHE_RESULT_CAPACITY = 10000;
 
     // default persistence parameter
     constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence"; // Empty means disabled
@@ -265,7 +265,7 @@ export {
     constexpr std::string_view TEMP_DIR_OPTION_NAME = "temp_dir";
     constexpr std::string_view MEMINDEX_MEMORY_QUOTA_OPTION_NAME = "memindex_memory_quota";
     constexpr std::string_view RESULT_CACHE_OPTION_NAME = "result_cache";
-    constexpr std::string_view CACHE_RESULT_NUM_OPTION_NAME = "cache_result_num";
+    constexpr std::string_view CACHE_RESULT_CAPACITY_OPTION_NAME = "cache_result_capacity";
 
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
     constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";
@@ -303,6 +303,7 @@ export {
     constexpr std::string_view OPEN_FILE_COUNT_VAR_NAME = "open_file_count";                 // global
     constexpr std::string_view CPU_USAGE_VAR_NAME = "cpu_usage";                             // global
     constexpr std::string_view FOLLOWER_NUMBER = "follower_number";                          // global
+    constexpr std::string_view CACHE_RESULT_NUM_VAR_NAME = "cache_result_num";               // global
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;
