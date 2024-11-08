@@ -35,6 +35,13 @@ SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple anot
 5 4.500000
 
 query I rowsort
+SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc^4.5', 'multiple another " ," " ， " ', 'topn=10');
+----
+2 4.500000
+4 4.500000
+5 4.500000
+
+query I rowsort
 SELECT num, SCORE() FROM ft_keyword SEARCH MATCH TEXT ('doc', 'second default text', 'topn=10');
 ----
 1 1.000000
