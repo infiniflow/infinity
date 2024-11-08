@@ -98,6 +98,7 @@ class TestInfinity:
 
         res = table_obj.delete("c1 = 1")
         assert res.error_code == ErrorCode.OK
+        assert res.deleted_rows == 1
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)})
@@ -105,6 +106,7 @@ class TestInfinity:
 
         res = table_obj.delete()
         assert res.error_code == ErrorCode.OK
+        assert res.deleted_rows == 3
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c3': ()})
@@ -209,7 +211,10 @@ class TestInfinity:
         print(insert_res)
 
         # delete
-        table_obj.delete("c1 = 1")
+        res = table_obj.delete("c1 = 1")
+        assert res.error_code == ErrorCode.OK
+        assert res.deleted_rows == 8192
+
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_delete_table_with_one_block"+suffix, ConflictType.Error)
@@ -249,7 +254,10 @@ class TestInfinity:
         print(insert_res)
 
         # delete
-        table_obj.delete("c1 = 1")
+        res = table_obj.delete("c1 = 1")
+        assert res.error_code == ErrorCode.OK
+        assert res.deleted_rows == 10
+
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_select_before_after_delete"+suffix, ConflictType.Error)
@@ -265,7 +273,10 @@ class TestInfinity:
         table_obj.insert(values)
 
         # delete
-        table_obj.delete("c1 = 1")
+        res = table_obj.delete("c1 = 1")
+        assert res.error_code == ErrorCode.OK
+        assert res.deleted_rows == 10
+
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_delete_insert_data"+suffix, ConflictType.Error)
@@ -286,7 +297,10 @@ class TestInfinity:
         time.sleep(10)
 
         # delete
-        table_obj.delete("c1 = 1")
+        res = table_obj.delete("c1 = 1")
+        assert res.error_code == ErrorCode.OK
+        assert res.deleted_rows == 5
+
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_delete_inserted_long_before_data"+suffix, ConflictType.Error)
@@ -358,7 +372,10 @@ class TestInfinity:
         print(insert_res)
 
         # delete
-        table_obj.delete()
+        res = table_obj.delete()
+        assert res.error_code == ErrorCode.OK
+        assert res.deleted_rows == 8192
+
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
         res = db_obj.drop_table("test_delete_one_block_without_expression"+suffix, ConflictType.Error)
@@ -379,7 +396,10 @@ class TestInfinity:
         print(insert_res)
 
         # delete
-        table_obj.delete()
+        res = table_obj.delete()
+        assert res.error_code == ErrorCode.OK
+        assert res.deleted_rows == 10240
+
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_delete_one_segment_without_expression"+suffix, ConflictType.Error)
@@ -408,7 +428,9 @@ class TestInfinity:
         print(insert_res)
 
         # delete
-        table_obj.delete(filter_list)
+        res = table_obj.delete(filter_list)
+        assert res.error_code == ErrorCode.OK
+
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Error)

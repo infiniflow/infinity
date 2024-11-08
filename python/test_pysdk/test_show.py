@@ -137,10 +137,16 @@ class TestInfinity:
         for i in range(8193):
             self.infinity_obj.drop_database(f"test_show_big_databases_{i}" + suffix, ConflictType.Ignore)
 
+    def _test_show_current_node(self, suffix):
+        res = self.infinity_obj.show_current_node()
+        assert res.error_code == ErrorCode.OK
+        print(res)
+
     def test_show(self, suffix):
         self._test_show_table(suffix)
         self._test_show_columns(suffix)
         self._test_show_big_databases(suffix)
+        self._test_show_current_node(suffix)
 
     @pytest.mark.usefixtures("skip_if_local_infinity")
     @pytest.mark.usefixtures("skip_if_remote_infinity")
