@@ -291,6 +291,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def("ShowBlock", &WrapShowBlock)
         .def("ShowBlocks", &WrapShowBlocks)
         .def("ShowBlockColumn", &WrapShowBlockColumn)
+        .def("ShowCurrentNode", &WrapShowCurrentNode)
 
         .def("Insert", &WrapInsert)
         .def("Import", &WrapImport)

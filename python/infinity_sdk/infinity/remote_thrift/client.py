@@ -22,6 +22,7 @@ from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.errors import ErrorCode
 from infinity.common import InfinityException
 
+
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
         self.session_id = -1
@@ -29,7 +30,7 @@ class ThriftInfinityClient:
         self.transport = None
         self.reconnect()
         self._is_connected = True
-    
+
     def __del__(self):
         if self._is_connected:
             self.disconnect()
@@ -69,7 +70,7 @@ class ThriftInfinityClient:
         # version: 0.4.0.dev4, client_version: 21
         # version: 0.4.0.dev5 and 0.4.0, client_version: 22
         # version: 0.5.0.dev1, client_version: 23
-        res = self.client.Connect(ConnectRequest(client_version=23)) # 0.5.0.dev1
+        res = self.client.Connect(ConnectRequest(client_version=23))  # 0.5.0.dev1
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -83,7 +84,8 @@ class ThriftInfinityClient:
         return self.client.CreateDatabase(CreateDatabaseRequest(session_id=self.session_id,
                                                                 db_name=db_name,
                                                                 db_comment=db_comment,
-                                                                create_option=CreateOption(conflict_type=conflict_type)))
+                                                                create_option=CreateOption(
+                                                                    conflict_type=conflict_type)))
 
     def drop_database(self, db_name: str, conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropDatabase(DropDatabaseRequest(session_id=self.session_id,
@@ -136,7 +138,7 @@ class ThriftInfinityClient:
                                                     table_name=table_name))
 
     def create_index(self, db_name: str, table_name: str, index_name: str, index_info: IndexInfo,
-                     conflict_type: CreateConflict = CreateConflict.Error, index_comment : str = ""):
+                     conflict_type: CreateConflict = CreateConflict.Error, index_comment: str = ""):
         return self.client.CreateIndex(CreateIndexRequest(session_id=self.session_id,
                                                           db_name=db_name,
                                                           table_name=table_name,
@@ -175,8 +177,8 @@ class ThriftInfinityClient:
                                                        fields=fields))
                 return res
             except TTransportException as ex:
-                #import traceback
-                #traceback.print_exc()
+                # import traceback
+                # traceback.print_exc()
                 self.reconnect()
                 inner_ex = ex
                 retry += 1
@@ -289,17 +291,22 @@ class ThriftInfinityClient:
             ShowBlockColumnRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
                                    segment_id=segment_id, block_id=block_id, column_id=column_id))
 
+    def show_current_node(self):
+        return self.client.ShowCurrentNode(ShowCurrentNodeRequest(session_id=self.session_id))
+
     def optimize(self, db_name: str, table_name: str, optimize_opt: ttypes.OptimizeOptions):
         return self.client.Optimize(OptimizeRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
                                                     optimize_options=optimize_opt))
-    
+
     def add_columns(self, db_name: str, table_name: str, column_defs: list):
-        return self.client.AddColumns(AddColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                                                        column_defs=column_defs))
+        return self.client.AddColumns(
+            AddColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                              column_defs=column_defs))
 
     def drop_columns(self, db_name: str, table_name: str, column_names: list):
-        return self.client.DropColumns(DropColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
-                                                          column_names=column_names))
+        return self.client.DropColumns(
+            DropColumnsRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                               column_names=column_names))
 
     def cleanup(self):
         return self.client.Cleanup(CommonRequest(session_id=self.session_id))

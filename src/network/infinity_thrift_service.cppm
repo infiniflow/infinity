@@ -106,7 +106,7 @@ public:
 
     void Explain(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::ExplainRequest &request) final;
 
-    void Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) final;
+    void Delete(infinity_thrift_rpc::DeleteResponse &response, const infinity_thrift_rpc::DeleteRequest &request) final;
 
     void Update(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::UpdateRequest &request) final;
 
@@ -151,6 +151,8 @@ public:
     void ListIndex(infinity_thrift_rpc::ListIndexResponse &response, const infinity_thrift_rpc::ListIndexRequest &request) final;
 
     void ShowIndex(infinity_thrift_rpc::ShowIndexResponse &response, const infinity_thrift_rpc::ShowIndexRequest &request) final;
+
+    void ShowCurrentNode(infinity_thrift_rpc::ShowCurrentNodeResponse &response, const infinity_thrift_rpc::ShowCurrentNodeRequest &request) final;
 
 private:
     Tuple<Infinity *, Status> GetInfinityBySessionID(i64 session_id);
@@ -251,6 +253,9 @@ private:
     ProcessStatus(infinity_thrift_rpc::CommonResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
     static void
+    ProcessStatus(infinity_thrift_rpc::DeleteResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
+
+    static void
     ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
     static void
@@ -280,11 +285,18 @@ private:
     static void
     ProcessStatus(infinity_thrift_rpc::ShowBlockColumnResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
 
+    static void
+    ProcessStatus(infinity_thrift_rpc::ShowCurrentNodeResponse &response, const Status &status, const std::string_view error_header = ErrorMsgHeader);
+
     static void ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response,
                                    const QueryResult &result,
                                    const std::string_view error_header = ErrorMsgHeader);
 
     static void ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response,
+                                   const QueryResult &result,
+                                   const std::string_view error_header = ErrorMsgHeader);
+
+    static void ProcessQueryResult(infinity_thrift_rpc::DeleteResponse &response,
                                    const QueryResult &result,
                                    const std::string_view error_header = ErrorMsgHeader);
 
@@ -321,6 +333,10 @@ private:
                                    const std::string_view error_header = ErrorMsgHeader);
 
     static void ProcessQueryResult(infinity_thrift_rpc::ShowBlockColumnResponse &response,
+                                   const QueryResult &result,
+                                   const std::string_view error_header = ErrorMsgHeader);
+
+    static void ProcessQueryResult(infinity_thrift_rpc::ShowCurrentNodeResponse &response,
                                    const QueryResult &result,
                                    const std::string_view error_header = ErrorMsgHeader);
 };

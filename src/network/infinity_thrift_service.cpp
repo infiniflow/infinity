@@ -953,7 +953,7 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     }
 }
 
-void InfinityThriftService::Delete(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::DeleteRequest &request) {
+void InfinityThriftService::Delete(infinity_thrift_rpc::DeleteResponse &response, const infinity_thrift_rpc::DeleteRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
     if (!infinity_status.ok()) {
         ProcessStatus(response, infinity_status);
@@ -971,7 +971,24 @@ void InfinityThriftService::Delete(infinity_thrift_rpc::CommonResponse &response
     }
 
     const QueryResult result = infinity->Delete(request.db_name, request.table_name, filter);
-    ProcessQueryResult(response, result);
+    if (result.IsOk()) {
+        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+        if (row_count != 1) {
+            String error_message = "Delete: query result is invalid.";
+            UnrecoverableError(error_message);
+        }
+
+        {
+            // delete row count
+            Value value = data_block->GetValue(1, 0);
+            response.deleted_rows = value.value_.big_int;
+        }
+
+        response.__set_error_code((i64)(result.ErrorCode()));
+    } else {
+        ProcessQueryResult(response, result);
+    }
 };
 
 void InfinityThriftService::Update(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::UpdateRequest &request) {
@@ -1670,6 +1687,35 @@ void InfinityThriftService::ShowBlockColumn(infinity_thrift_rpc::ShowBlockColumn
         {
             Value value = data_block->GetValue(1, 5);
             response.extra_file_names = value.GetVarchar();
+        }
+
+        response.__set_error_code((i64)(result.ErrorCode()));
+    } else {
+        ProcessQueryResult(response, result);
+    }
+}
+
+void InfinityThriftService::ShowCurrentNode(infinity_thrift_rpc::ShowCurrentNodeResponse &response,
+                                            const infinity_thrift_rpc::ShowCurrentNodeRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    auto result = infinity->AdminShowCurrentNode();
+
+    if (result.IsOk()) {
+        SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+        if (row_count != 1) {
+            String error_message = "ShowCurrentNode: query result is invalid.";
+            UnrecoverableError(error_message);
+        }
+
+        {
+            Value value = data_block->GetValue(1, 0);
+            response.node_role = value.GetVarchar();
         }
 
         response.__set_error_code((i64)(result.ErrorCode()));
@@ -2930,6 +2976,14 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::CommonResponse &r
     }
 }
 
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::DeleteResponse &response, const Status &status, const std::string_view error_header) {
+    response.__set_error_code((i64)(status.code()));
+    if (!status.ok()) {
+        response.__set_error_msg(status.message());
+        LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+    }
+}
+
 void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowDatabaseResponse &response,
                                           const Status &status,
                                           const std::string_view error_header) {
@@ -3028,6 +3082,16 @@ void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowBlockColumnRe
     }
 }
 
+void InfinityThriftService::ProcessStatus(infinity_thrift_rpc::ShowCurrentNodeResponse &response,
+                                          const Status &status,
+                                          const std::string_view error_header) {
+    response.__set_error_code((i64)(status.code()));
+    if (!status.ok()) {
+        response.__set_error_msg(status.message());
+        LOG_ERROR(fmt::format("{}: {}", error_header, status.message()));
+    }
+}
+
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonResponse &response,
                                                const QueryResult &result,
                                                const std::string_view error_header) {
@@ -3039,6 +3103,16 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::CommonRespon
 }
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::SelectResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::DeleteResponse &response,
                                                const QueryResult &result,
                                                const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));
@@ -3129,6 +3203,16 @@ void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowBlockRes
 }
 
 void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowBlockColumnResponse &response,
+                                               const QueryResult &result,
+                                               const std::string_view error_header) {
+    response.__set_error_code((i64)(result.ErrorCode()));
+    if (!result.IsOk()) {
+        response.__set_error_msg(result.ErrorStr());
+        LOG_ERROR(fmt::format("{}: {}", error_header, result.ErrorStr()));
+    }
+}
+
+void InfinityThriftService::ProcessQueryResult(infinity_thrift_rpc::ShowCurrentNodeResponse &response,
                                                const QueryResult &result,
                                                const std::string_view error_header) {
     response.__set_error_code((i64)(result.ErrorCode()));

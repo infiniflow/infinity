@@ -20,7 +20,8 @@ from typing import List
 
 class LocalQueryResult:
     def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, index_names=None,
-                 column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None, comment=None,
+                 column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None,
+                 comment=None,
                  table_name=None, index_name=None, index_type=None, index_comment=None):
         self.error_code = error_code
         self.error_msg = error_msg
@@ -74,7 +75,9 @@ class LocalInfinityClient:
         if has_index_names:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, index_names=res.names)
         if has_index_info:
-            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, database_name=res.database_name, table_name=res.table_name, index_name=res.index_name, index_comment=res.comment, index_type=res.index_type)
+            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, database_name=res.database_name,
+                                    table_name=res.table_name, index_name=res.index_name, index_comment=res.comment,
+                                    index_type=res.index_type)
 
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
@@ -288,6 +291,11 @@ class LocalInfinityClient:
         if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowBlockColumn(db_name, table_name, segment_id, block_id, column_id))
+
+    def show_current_node(self):
+        if self.client is None:
+            raise Exception("Local infinity is not connected")
+        return self.convert_res(self.client.ShowCurrentNode())
 
     def optimize(self, db_name: str, table_name: str, optimize_opt: WrapOptimizeOptions):
         return self.convert_res(self.client.Optimize(db_name, table_name, optimize_opt))

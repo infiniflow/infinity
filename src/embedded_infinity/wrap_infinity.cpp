@@ -883,6 +883,11 @@ WrapQueryResult WrapShowBlockColumn(Infinity &instance,
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
+WrapQueryResult WrapShowCurrentNode(Infinity &instance) {
+    auto query_result = instance.AdminShowCurrentNode();
+    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+}
+
 WrapQueryResult WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<WrapInsertRowExpr> &insert_rows) {
     if (insert_rows.empty()) {
         return WrapQueryResult(ErrorCode::kInsertWithoutValues, "insert values is empty");
