@@ -39,7 +39,7 @@ def setup_class(request, local_infinity, http):
         request.cls.infinity_obj = infinity_http()
     else:
         uri = common_values.TEST_LOCAL_HOST
-        request.cls.infinity_obj = infinity.connect(uri)
+        request.cls.infinity_obj = infinity_http()
     request.cls.uri = uri
     yield
     request.cls.infinity_obj.disconnect()
@@ -137,7 +137,7 @@ class TestInfinity:
         for i in range(8193):
             self.infinity_obj.drop_database(f"test_show_big_databases_{i}" + suffix, ConflictType.Ignore)
 
-    def _test_show_current_node(self, suffix):
+    def test_show_current_node(self, suffix):
         res = self.infinity_obj.show_current_node()
         assert res.error_code == ErrorCode.OK
         print(res)

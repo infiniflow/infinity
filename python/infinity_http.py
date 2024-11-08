@@ -253,6 +253,14 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result()
 
+    def show_current_node(self):
+        url = f"admin/node/current"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        # print(r.json())
+        return database_result(node_role=r.json()["node"]["role"])
+
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
 
