@@ -81,9 +81,9 @@ connection_pool_size     = 128
 log_filename             = "infinity.log"
 # Directory for the log files.
 log_dir                  = "/var/infinity/log"
-# Controls whether to print the log to the standard output.
+# Controls whether to print the log to the standard output. Defaults to true
 # Range: {true|false} 
-log_to_stdout            = false
+log_to_stdout            = true
 # The maximum size of each log file. Defaults to "1GB".
 # Range: at least 1GB
 log_file_max_size        = "10GB"
@@ -97,7 +97,7 @@ log_level               = "info"
 # Storage configuration
 [storage]
 # The working directory of the persistence manager:
-# - Holds the data that Infintiy saves when using the local disk for storage.
+# - Holds the data that Infinity saves when using the local disk for storage.
 # - Caches the accessed object files when using MinIO/S3 for object storage.
 persistence_dir          = "/var/infinity/persistence"
 
