@@ -12,6 +12,7 @@ from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
 
 from test_sdkbase import TestSdk
+from util import RtnThread
 
 TEST_DATA_DIR = "/test/data/"
 kInsertThreadNum = 4
@@ -348,15 +349,15 @@ class TestIndexParallel(TestSdk):
         end_time = time.time() + kRuningTime
 
         for i in range(kThreadNum):
-            threads.append(Thread(target=index_worker, args=[
+            threads.append(RtnThread(target=index_worker, args=[
                 connection_pool, table_name, "body", "body_index", end_time, i]))
 
         for i in range(kThreadNum):
-            threads.append(Thread(target=insert_worker, args=[
+            threads.append(RtnThread(target=insert_worker, args=[
                 connection_pool, table_name, data, end_time, i + kThreadNum]))
 
         for i in range(kThreadNum):
-            threads.append(Thread(target=query_worker, args=[
+            threads.append(RtnThread(target=query_worker, args=[
                 connection_pool, table_name, end_time, i + 2 * kThreadNum]))
 
         try:
@@ -368,6 +369,7 @@ class TestIndexParallel(TestSdk):
                 t.join()
         except Exception as e:
             self.logger.error(f"test_index_creation_deletion_parallel failed: {e}")
+            raise e
         else:
             self.logger.info("test_index_creation_deletion_parallel end")
 

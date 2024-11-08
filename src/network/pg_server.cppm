@@ -14,12 +14,12 @@
 
 module;
 
+export module pg_server;
+
 import stl;
 import singleton;
 import boost;
 import connection;
-
-export module pg_server;
 
 namespace infinity {
 
@@ -36,8 +36,9 @@ private:
 
     atomic_bool started_{false};
     atomic_u64 running_connection_count_{0};
-    boost::asio::io_service io_service_{};
+    UniquePtr<boost::asio::io_service> io_service_ptr_{};
     UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
+    std::binary_semaphore shutdown_semaphore_{0};
 };
 
 } // namespace infinity
