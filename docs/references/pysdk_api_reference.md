@@ -1,4 +1,4 @@
----
+from example.delete_update_data import infinity_instance---
 sidebar_position: 4
 slug: /python_api_reference
 ---
@@ -1219,6 +1219,34 @@ res = table_object.show_index('my_index')
 
 ---
 
+## show_current_node
+
+```python
+infinity.show_current_node()
+```
+
+Shows connected node role.
+
+### Returns
+
+A structure containing the following attributes:
+
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `role`: `str`
+  One of the five values: `admin`, `standalone`, `leader`, `follower`, and `learner`.
+
+### Examples
+
+```python
+res = infinity_object.show_current_row()
+```
+
+---
+
 ## insert
 
 ```python
@@ -1483,6 +1511,8 @@ A structure containing the following attributes:
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `deleted_rows`: `int`
+  Indicates the number of deleted rows.
 
 ### Examples
 

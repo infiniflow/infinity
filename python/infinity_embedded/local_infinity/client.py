@@ -22,7 +22,7 @@ class LocalQueryResult:
     def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, index_names=None,
                  column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None,
                  comment=None,
-                 table_name=None, index_name=None, index_type=None, index_comment=None):
+                 table_name=None, index_name=None, index_type=None, index_comment=None, deleted_rows=0):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
@@ -39,6 +39,7 @@ class LocalQueryResult:
         self.index_name = index_name
         self.index_type = index_type
         self.index_comment = index_comment
+        self.deleted_rows = deleted_rows
 
 
 class LocalInfinityClient:
@@ -61,7 +62,7 @@ class LocalInfinityClient:
 
     # convert embedded_error code to python error code
     def convert_res(self, res, has_db_names=False, has_table_names=False, has_result_data=False, has_db_name=False,
-                    has_index_names=False, has_index_info=False):
+                    has_index_names=False, has_index_info=False, has_deleted_rows=False):
         if has_db_names:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, db_names=res.names)
         if has_table_names:
@@ -78,6 +79,8 @@ class LocalInfinityClient:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, database_name=res.database_name,
                                     table_name=res.table_name, index_name=res.index_name, index_comment=res.comment,
                                     index_type=res.index_type)
+        if has_deleted_rows:
+            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, deleted_rows=res.deleted_rows)
 
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
@@ -250,7 +253,7 @@ class LocalInfinityClient:
     def delete(self, db_name: str, table_name: str, where_expr):
         if self.client is None:
             raise Exception("Local infinity is not connected")
-        return self.convert_res(self.client.Delete(db_name, table_name, where_expr))
+        return self.convert_res(self.client.Delete(db_name, table_name, where_expr), has_deleted_rows=True)
 
     def update(self, db_name: str, table_name: str, where_expr, update_expr_array):
         if self.client is None:

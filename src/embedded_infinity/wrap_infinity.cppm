@@ -134,6 +134,7 @@ export struct WrapQueryResult {
     String table_name;
     String index_name;
     String index_type;
+    BigIntT deleted_rows;
 
     WrapQueryResult() = default;
     WrapQueryResult(ErrorCode error_code, const char *error_msg) : error_code(error_code) {
@@ -264,7 +265,7 @@ export struct WrapSearchExpr {
 
 export struct WrapParsedExpr {
     WrapParsedExpr() = default;
-    WrapParsedExpr(ParsedExprType expr_type) : type(expr_type){};
+    WrapParsedExpr(ParsedExprType expr_type) : type(expr_type) {};
     ParsedExprType type;
     WrapConstantExpr constant_expr;
     WrapColumnExpr column_expr;
@@ -388,6 +389,8 @@ export WrapQueryResult WrapShowBlockColumn(Infinity &instance,
                                            const SegmentID &segment_id,
                                            const BlockID &block_id,
                                            const SizeT &column_id);
+
+export WrapQueryResult WrapShowCurrentNode(Infinity &instance);
 
 export WrapQueryResult WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<WrapInsertRowExpr> &insert_rows);
 

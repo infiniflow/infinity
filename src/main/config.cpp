@@ -293,7 +293,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
 
         // Log To Stdout
-        bool log_to_stdout = false;
+        bool log_to_stdout = true;
         if (default_config != nullptr) {
             log_to_stdout = default_config->default_log_to_stdout_;
         }
@@ -1077,7 +1077,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         }
                         case GlobalOptionIndex::kLogToStdout: {
                             // Log To Stdout
-                            bool log_to_stdout = false;
+                            bool log_to_stdout = true;
                             if (elem.second.is_boolean()) {
                                 log_to_stdout = elem.second.value_or(log_to_stdout);
                             } else {
@@ -1199,7 +1199,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kLogToStdout) == nullptr) {
                     // Log To Stdout
-                    bool log_to_stdout = false;
+                    bool log_to_stdout = true;
                     if (default_config != nullptr) {
                         log_to_stdout = default_config->default_log_to_stdout_;
                     }

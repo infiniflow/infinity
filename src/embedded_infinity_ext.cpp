@@ -54,7 +54,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("comment", &WrapQueryResult::comment)
         .def_rw("table_name", &WrapQueryResult::table_name)
         .def_rw("index_name", &WrapQueryResult::index_name)
-        .def_rw("index_type", &WrapQueryResult::index_type);
+        .def_rw("index_type", &WrapQueryResult::index_type)
+        .def_rw("deleted_rows", &WrapQueryResult::deleted_rows);
 
     nb::class_<WrapColumnField>(m, "WrapColumnField")
         .def(nb::init<>())

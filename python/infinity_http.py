@@ -14,6 +14,7 @@ import pyarrow as pa
 from infinity.table import ExplainType
 from typing import List
 
+
 class http_network_util:
     header_dict = baseHeader
     response_dict = baseResponse
@@ -96,7 +97,7 @@ class http_network_util:
 
         logging.debug("----------------------------------------------")
         return
-    
+
     def get_database_result(self, resp, expect={}):
         try:
             self.raise_exception(resp, expect)
@@ -104,6 +105,7 @@ class http_network_util:
         except InfinityException as e:
             print(e)
             return database_result(error_code=e.error_code)
+
 
 class infinity_http:
     def __init__(self, *, net: http_network_util = None):
@@ -226,7 +228,8 @@ class infinity_http:
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
         # print(r.json())
-        return database_result(node_name=r.json()["node"]["name"], node_role=r.json()["node"]["role"], node_status=r.json()["node"]["status"])
+        return database_result(node_name=r.json()["node"]["name"], node_role=r.json()["node"]["role"],
+                               node_status=r.json()["node"]["status"])
 
     def show_global_variables(self):
         url = "variables/global"
@@ -249,6 +252,7 @@ class infinity_http:
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
         return database_result()
+
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
 
@@ -351,13 +355,14 @@ class database_http:
         r = self.net.request(url, "get", h)
         self.net.raise_exception(r)
         return table_http(self.net, self.database_name, table_name)
-    
+
     # not implemented, just to pass test
     def show_tables(self):
         self.get_all_tables()
         return database_result(columns=["database", "table", "type", "column_count", "block_count", "block_capacity",
                                         "segment_count", "segment_capacity", "comment"])
-    
+
+
 class table_http:
     def __init__(self, net: http_network_util, database_name: str, table_name: str):
         self.net = net
@@ -420,7 +425,8 @@ class table_http:
             ["accept", "content-type"],
         )
         d = self.net.set_up_data(
-            ["create_option"], {"comment" : index_comment, "fields": fields, "index": create_index_info, "create_option": copt}
+            ["create_option"],
+            {"comment": index_comment, "fields": fields, "index": create_index_info, "create_option": copt}
         )
         r = self.net.request(url, "post", h, d)
         self.net.raise_exception(r)
@@ -575,18 +581,21 @@ class table_http:
         return self.net.get_database_result(r)
 
     def output(
-        self,
-        output=[],
+            self,
+            output=[],
     ):
         return table_http_result(output, self)
-    
+
     def delete(self, filter=""):
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.net.set_up_header(["accept", "content-type"])
         d = self.net.set_up_data([], {"filter": filter})
         r = self.net.request(url, "delete", h, d)
         self.net.raise_exception(r)
-        return database_result()
+        json_res = r.json()
+        error_code = json_res['error_code']
+        delete_rows = json_res['deleted_rows']
+        return database_result(error_code=error_code, deleted_rows=delete_rows)
 
     def update(self, filter_str: str, update: dict[str, Any]):
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
@@ -822,11 +831,11 @@ class table_http_result:
             k1 = k1.replace("+", " ")
             k1 = k1.replace("-", " ")
             cols = k1.split(" ")
-            #print(cols)
+            # print(cols)
 
             function_name = ""
             for col in cols:
-                #print(function_name)
+                # print(function_name)
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
                     df_type[k] = function_return_type(function_name, df_type[k])
@@ -850,7 +859,8 @@ class table_http_result:
 
 
 class database_result():
-    def __init__(self, list=[], database_name: str="", error_code=ErrorCode.OK, columns=[], index_list=[], node_name="", node_role="", node_status="", index_comment=None):
+    def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_list=[],
+                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
@@ -860,6 +870,7 @@ class database_result():
         self.node_role = node_role
         self.node_status = node_status
         self.index_comment = index_comment
+        self.deleted_rows = deleted_rows
 
 
 identifier_limit = 65536

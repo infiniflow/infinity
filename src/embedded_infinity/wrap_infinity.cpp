@@ -970,7 +970,25 @@ WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const Stri
         }
     }
     auto query_result = instance.Delete(db_name, table_name, filter);
-    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    i64 deleted_rows = 0;
+    if (query_result.IsOk()) {
+        SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+        if (row_count != 1) {
+            String error_message = "Delete: query result is invalid.";
+            UnrecoverableError(error_message);
+        }
+
+        {
+            // delete row count
+            Value value = data_block->GetValue(1, 0);
+            deleted_rows = value.value_.big_int;
+        }
+    }
+
+    auto wrap_query_result = WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    wrap_query_result.deleted_rows = deleted_rows;
+    return wrap_query_result;
 }
 
 WrapQueryResult WrapUpdate(Infinity &instance,
