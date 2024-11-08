@@ -49,12 +49,15 @@ void PGServer::Run() {
         return ;
     }
 
-    acceptor_ptr_ = MakeUnique<boost::asio::ip::tcp::acceptor>(io_service_, boost::asio::ip::tcp::endpoint(address, pg_port));
+    running_connection_count_ = 0;
+    io_service_ptr_ = MakeUnique<boost::asio::io_service>();
+    acceptor_ptr_ = MakeUnique<boost::asio::ip::tcp::acceptor>(*io_service_ptr_, boost::asio::ip::tcp::endpoint(address, pg_port));
     CreateConnection();
 
     fmt::print("Run 'psql -h {} -p {}' to connect to the server (SQL is only for test).\n", pg_listen_addr, pg_port);
 
-    io_service_.run();
+    io_service_ptr_->run();
+    shutdown_semaphore_.release();
 }
 
 void PGServer::Shutdown() {
@@ -66,12 +69,15 @@ void PGServer::Shutdown() {
         std::this_thread::yield();
     }
 
-    io_service_.stop();
+    io_service_ptr_->stop();
     acceptor_ptr_->close();
+    shutdown_semaphore_.acquire();
+    acceptor_ptr_.reset();
+    io_service_ptr_.reset();
 }
 
 void PGServer::CreateConnection() {
-    SharedPtr<Connection> connection_ptr = MakeShared<Connection>(io_service_);
+    SharedPtr<Connection> connection_ptr = MakeShared<Connection>(*io_service_ptr_);
     acceptor_ptr_->async_accept(*(connection_ptr->socket()), boost::bind(&PGServer::StartConnection, this, connection_ptr));
 }
 
