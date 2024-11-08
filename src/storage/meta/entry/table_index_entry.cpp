@@ -355,6 +355,10 @@ TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prep
             last_segment_ = segment_index_entry;
         }
         txn_table_store->AddSegmentIndexesStore(this, {segment_index_entry.get()});
+        Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries = segment_index_entry->GetChunks();
+        for (auto &chunk_index_entry : chunk_index_entries) {
+            txn_table_store->AddChunkIndexStore(this, chunk_index_entry.get());
+        }
     }
     return {segment_index_entries, Status::OK()};
 }
