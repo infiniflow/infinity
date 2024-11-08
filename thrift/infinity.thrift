@@ -617,6 +617,12 @@ struct DeleteRequest {
 4:  i64 session_id,
 }
 
+struct DeleteResponse {
+1:  i64 error_code,
+2:  string error_msg,
+3:  i64 deleted_rows,
+}
+
 struct UpdateRequest {
 1:  string db_name,
 2:  string table_name,
@@ -717,6 +723,16 @@ struct ShowBlockColumnResponse {
 8: string extra_file_names,
 }
 
+struct ShowCurrentNodeRequest {
+1: i64 session_id
+}
+
+struct ShowCurrentNodeResponse {
+1: i64 error_code,
+2: string error_msg,
+3: string node_role
+}
+
 // Service
 service InfinityService {
 CommonResponse Connect(1:ConnectRequest request),
@@ -731,7 +747,7 @@ CommonResponse Import(1:ImportRequest request),
 CommonResponse Export(1:ExportRequest request),
 SelectResponse Select(1:SelectRequest request),
 SelectResponse Explain(1:ExplainRequest request),
-CommonResponse Delete(1:DeleteRequest request),
+DeleteResponse Delete(1:DeleteRequest request),
 CommonResponse Update(1:UpdateRequest request),
 
 ListDatabaseResponse ListDatabase(1:ListDatabaseRequest request),
@@ -750,6 +766,7 @@ SelectResponse ShowBlocks(1:ShowBlocksRequest request),
 ShowBlockResponse ShowBlock(1:ShowBlockRequest request),
 
 ShowBlockColumnResponse ShowBlockColumn(1:ShowBlockColumnRequest request),
+ShowCurrentNodeResponse ShowCurrentNode(1:ShowCurrentNodeRequest request),
 
 CommonResponse GetDatabase(1:GetDatabaseRequest request),
 CommonResponse GetTable(1:GetTableRequest request),

@@ -16,6 +16,7 @@ from enum import Enum
 
 from infinity import URI
 
+
 # abstract class
 class InfinityConnection(ABC):
     def __init__(self, uri):
@@ -39,6 +40,10 @@ class InfinityConnection(ABC):
 
     @abstractmethod
     def get_database(self, db_name):
+        pass
+
+    @abstractmethod
+    def show_current_node(self):
         pass
 
     @abstractmethod

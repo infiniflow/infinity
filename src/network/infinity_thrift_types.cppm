@@ -22,7 +22,7 @@ namespace infinity_thrift_rpc {
 
 export using infinity_thrift_rpc::InfinityServiceIf;
 export using infinity_thrift_rpc::ConnectRequest;
-export using infinity_thrift_rpc::CommonResponse;
+
 export using infinity_thrift_rpc::CommonRequest;
 export using infinity_thrift_rpc::CreateDatabaseRequest;
 export using infinity_thrift_rpc::DropDatabaseRequest;
@@ -33,7 +33,6 @@ export using infinity_thrift_rpc::CopyFileType;
 export using infinity_thrift_rpc::ImportRequest;
 export using infinity_thrift_rpc::ExportRequest;
 export using infinity_thrift_rpc::SelectRequest;
-export using infinity_thrift_rpc::SelectResponse;
 export using infinity_thrift_rpc::ExplainRequest;
 export using infinity_thrift_rpc::DeleteRequest;
 export using infinity_thrift_rpc::UpdateRequest;
@@ -57,6 +56,10 @@ export using infinity_thrift_rpc::ShowIndexRequest;
 export using infinity_thrift_rpc::OptimizeRequest;
 export using infinity_thrift_rpc::AddColumnsRequest;
 export using infinity_thrift_rpc::DropColumnsRequest;
+export using infinity_thrift_rpc::ShowCurrentNodeRequest;
+export using infinity_thrift_rpc::CommonResponse;
+export using infinity_thrift_rpc::DeleteResponse;
+export using infinity_thrift_rpc::SelectResponse;
 export using infinity_thrift_rpc::ListDatabaseResponse;
 export using infinity_thrift_rpc::ListTableResponse;
 export using infinity_thrift_rpc::ShowDatabaseResponse;
@@ -66,6 +69,7 @@ export using infinity_thrift_rpc::ShowIndexResponse;
 export using infinity_thrift_rpc::ShowSegmentResponse;
 export using infinity_thrift_rpc::ShowBlockResponse;
 export using infinity_thrift_rpc::ShowBlockColumnResponse;
+export using infinity_thrift_rpc::ShowCurrentNodeResponse;
 export using infinity_thrift_rpc::ColumnDef;
 export using infinity_thrift_rpc::DataType;
 export using infinity_thrift_rpc::Constraint;
