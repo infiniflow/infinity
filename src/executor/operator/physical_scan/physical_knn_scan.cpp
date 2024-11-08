@@ -398,7 +398,10 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
                 }
 
                 // Fill the segment with index
-                index_entry_map = table_index_entry->index_by_segment();
+                {
+                    auto guard = table_index_entry->GetSegmentIndexesGuard();
+                    index_entry_map = guard.index_by_segment_;
+                }
             }
         } else {
             LOG_TRACE(fmt::format("Use index: {}", knn_expression_->using_index_));
@@ -432,7 +435,10 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             }
 
             // Fill the segment with index
-            index_entry_map = table_index_entry->index_by_segment();
+            {
+                auto guard = table_index_entry->GetSegmentIndexesGuard();
+                index_entry_map = guard.index_by_segment_;
+            }
         }
     }
 

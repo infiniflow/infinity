@@ -150,7 +150,7 @@ private:
                 }));
             }
             for (auto &fut : futs) {
-                fut.wait();
+                fut.get();
             }
             SizeT mem2 = index->mem_usage();
             mem_usage = mem2 - mem1;

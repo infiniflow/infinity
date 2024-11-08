@@ -217,7 +217,10 @@ public:
 
     inline const SharedPtr<String> &GetTableComment() const { return table_comment_; }
 
-    TxnTimeStamp max_commit_ts() const { return max_commit_ts_; }
+    TxnTimeStamp max_commit_ts() const { 
+        std::shared_lock lock(rw_locker_);
+        return max_commit_ts_;
+    }
 
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
 

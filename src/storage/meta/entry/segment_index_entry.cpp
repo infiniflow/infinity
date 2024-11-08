@@ -285,7 +285,11 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
         }
     }
     assert(commit_ts >= min_ts_);
-    max_ts_ = commit_ts;
+
+    {
+        std::unique_lock<std::shared_mutex> lck(rw_locker_);
+        max_ts_ = commit_ts;
+    }
 }
 
 void SegmentIndexEntry::MemIndexCommit() {
