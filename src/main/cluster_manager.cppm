@@ -36,6 +36,11 @@ public:
     ClusterManager();
     ~ClusterManager();
 
+    Status UnInitAsAdmin();
+    Status UnInitAsStandalone();
+    Status UnInitAsLeader();
+    Status UnInitAsFollower();
+    Status UnInitAsLearner();
     Status UnInit(bool not_unregister);
     // Used by all nodes ADMIN SHOW NODES
     Vector<SharedPtr<NodeInfo>> ListNodes() const;
