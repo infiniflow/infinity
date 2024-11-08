@@ -27,6 +27,7 @@ import peer_task;
 import infinity_context;
 import cluster_manager;
 import admin_statement;
+import node_info;
 
 namespace infinity {
 
@@ -329,27 +330,23 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
         SizeT node_count = response.other_nodes.size();
         peer_task->other_nodes_.reserve(node_count);
         for (SizeT idx = 0; idx < node_count; ++idx) {
-            SharedPtr<NodeInfo> node_info = MakeShared<NodeInfo>();
+
             auto &other_node = response.other_nodes[idx];
             if (from_node_name_ == other_node.node_name) {
                 continue;
             }
-            node_info->node_name_ = other_node.node_name;
-            node_info->ip_address_ = other_node.node_ip;
-            node_info->port_ = other_node.node_port;
-            node_info->txn_timestamp_ = other_node.txn_timestamp;
-            node_info->heartbeat_count_ = other_node.hb_count;
+            NodeRole node_role = NodeRole::kUnInitialized;
             switch (other_node.node_type) {
                 case infinity_peer_server::NodeType::type::kLeader: {
-                    node_info->node_role_ = NodeRole::kLeader;
+                    node_role = NodeRole::kLeader;
                     break;
                 }
                 case infinity_peer_server::NodeType::type::kFollower: {
-                    node_info->node_role_ = NodeRole::kFollower;
+                    node_role = NodeRole::kFollower;
                     break;
                 }
                 case infinity_peer_server::NodeType::type::kLearner: {
-                    node_info->node_role_ = NodeRole::kLearner;
+                    node_role = NodeRole::kLearner;
                     break;
                 }
                 default: {
@@ -357,13 +354,15 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                     UnrecoverableError(error_message);
                 }
             }
+
+            NodeStatus node_status = NodeStatus::kInvalid;
             switch (other_node.node_status) {
                 case infinity_peer_server::NodeStatus::type::kAlive: {
-                    node_info->node_status_ = NodeStatus::kAlive;
+                    node_status = NodeStatus::kAlive;
                     break;
                 }
                 case infinity_peer_server::NodeStatus::type::kTimeout: {
-                    node_info->node_status_ = NodeStatus::kTimeout;
+                    node_status = NodeStatus::kTimeout;
                     break;
                 }
                 default: {
@@ -371,6 +370,15 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                     UnrecoverableError(error_message);
                 }
             }
+
+            SharedPtr<NodeInfo> node_info = MakeShared<NodeInfo>(node_role,
+                                                                 node_status,
+                                                                 other_node.node_name,
+                                                                 other_node.node_ip,
+                                                                 other_node.node_port,
+                                                                 other_node.txn_timestamp,
+                                                                 0,
+                                                                 other_node.hb_count);
             peer_task->other_nodes_.emplace_back(node_info);
         }
     }

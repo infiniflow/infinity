@@ -272,14 +272,18 @@ class TestIndexParallel(TestSdk):
                                                              index.IndexType.FullText),
                                              ConflictType.Ignore)
                 if res.error_code == ErrorCode.OK:
+                    # print(f"thread {thread_id}: index {index_name} created")
                     self.logger.info(f"thread {thread_id}: index {index_name} created")
                 else:
+                    # print(f"thread {thread_id}: create_index {index_name} failed: {res.error_msg}")
                     self.logger.info(f"thread {thread_id}: create_index {index_name} failed: {res.error_msg}")
                 time.sleep(0.5)
                 res = table_obj.drop_index(index_name, ConflictType.Ignore)
                 if res.error_code == ErrorCode.OK:
+                    # print(f"thread {thread_id}: index {index_name} deleted")
                     self.logger.info(f"thread {thread_id}: index {index_name} deleted")
                 else:
+                    # print(f"thread {thread_id}: delete_index {index_name} failed: {res.error_msg}")
                     self.logger.info(f"thread {thread_id}: delete_index {index_name} failed: {res.error_msg}")
                 time.sleep(0.5)
 
@@ -296,8 +300,9 @@ class TestIndexParallel(TestSdk):
                     value.append({"doctitle": data["doctitle"][i],
                                   "docdate": data["docdate"][i], "body": data["body"][i]})
                 table_obj.insert(value)
+                # print(f"thread {thread_id}: put data")
                 self.logger.info(f"thread {thread_id}: put data")
-                time.sleep(0.1)
+                time.sleep(1)
 
             connection_pool.release_conn(infinity_obj)
 
@@ -310,8 +315,10 @@ class TestIndexParallel(TestSdk):
                 try:
                     res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
                         "body^5", "harmful chemical", 3).to_pl()
+                    # print(f"thread {thread_id}: check result:\n{res}")
                     self.logger.info(f"thread {thread_id}: check result:\n{res}")
                 except Exception as e:
+                    # print(f"thread {thread_id}: check failed: {e}")
                     self.logger.info(f"thread {thread_id}: check failed: {e}")
                 time.sleep(0.5)
 

@@ -26,6 +26,7 @@ import status;
 import infinity_exception;
 import cluster_manager;
 import admin_statement;
+import node_info;
 
 namespace infinity {
 
@@ -33,17 +34,16 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
 
     LOG_TRACE("Get Register request");
     // This must be a leader node.
-    NodeRole server_role = InfinityContext::instance().GetServerRole();
-    if (server_role == NodeRole::kLeader) {
-        SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
-        non_leader_node_info->node_name_ = request.node_name;
+    NodeRole this_server_role = InfinityContext::instance().GetServerRole();
+    if (this_server_role == NodeRole::kLeader) {
+        NodeRole register_node_role = NodeRole::kUnInitialized;
         switch (request.node_type) {
             case infinity_peer_server::NodeType::kFollower: {
-                non_leader_node_info->node_role_ = NodeRole::kFollower;
+                register_node_role = NodeRole::kFollower;
                 break;
             }
             case infinity_peer_server::NodeType::kLearner: {
-                non_leader_node_info->node_role_ = NodeRole::kLearner;
+                register_node_role = NodeRole::kLearner;
                 break;
             }
             default: {
@@ -51,21 +51,23 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
                 UnrecoverableError(error_message);
             }
         }
-        non_leader_node_info->ip_address_ = request.node_ip;
-        non_leader_node_info->port_ = request.node_port;
-        non_leader_node_info->node_status_ = NodeStatus::kAlive;
-        non_leader_node_info->txn_timestamp_ = request.txn_timestamp;
-
         auto now = std::chrono::system_clock::now();
         auto time_since_epoch = now.time_since_epoch();
-        non_leader_node_info->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
-        Status status = InfinityContext::instance().cluster_manager()->AddNodeInfo(non_leader_node_info);
+
+        SharedPtr<NodeInfo> register_node_info = MakeShared<NodeInfo>(register_node_role,
+                                                                      NodeStatus::kAlive,
+                                                                      request.node_name,
+                                                                      request.node_ip,
+                                                                      request.node_port,
+                                                                      request.txn_timestamp,
+                                                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+        Status status = InfinityContext::instance().cluster_manager()->AddNodeInfo(register_node_info);
         if (status.ok()) {
             LOG_INFO(fmt::format("Node: {} registered as {}.", request.node_name, infinity_peer_server::to_string(request.node_type)));
-            NodeInfo leader_node = InfinityContext::instance().cluster_manager()->ThisNode();
-            response.leader_name = leader_node.node_name_;
-            response.leader_term = leader_node.leader_term_;
-            response.heart_beat_interval = leader_node.heartbeat_interval_;
+            SharedPtr<NodeInfo> leader_node = InfinityContext::instance().cluster_manager()->ThisNode();
+            response.leader_name = leader_node->node_name();
+            response.leader_term = leader_node->leader_term();
+            response.heart_beat_interval = leader_node->heartbeat_interval();
         } else {
             response.error_code = static_cast<i64>(status.code());
             response.error_message = status.message();
@@ -80,8 +82,8 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
 
 void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterResponse &response, const infinity_peer_server::UnregisterRequest &request) {
     LOG_TRACE("Get Unregister request");
-    NodeRole server_role = InfinityContext::instance().GetServerRole();
-    if (server_role == NodeRole::kLeader) {
+    NodeRole this_server_role = InfinityContext::instance().GetServerRole();
+    if (this_server_role == NodeRole::kLeader) {
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(request.node_name, UpdateNodeOp::kRemove);
         if (!status.ok()) {
             response.error_code = static_cast<i64>(status.code_);
@@ -97,21 +99,20 @@ void PeerServerThriftService::Unregister(infinity_peer_server::UnregisterRespons
 
 void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse &response, const infinity_peer_server::HeartBeatRequest &request) {
     LOG_DEBUG("Get HeartBeat request");
-    NodeRole server_role = InfinityContext::instance().GetServerRole();
-    if (server_role == NodeRole::kLeader) {
-        SharedPtr<NodeInfo> non_leader_node_info = MakeShared<NodeInfo>();
-        non_leader_node_info->node_name_ = request.node_name;
+    NodeRole this_server_role = InfinityContext::instance().GetServerRole();
+    if (this_server_role == NodeRole::kLeader) {
+        NodeRole non_leader_node_role = NodeRole::kUnInitialized;
         switch (request.node_type) {
             case infinity_peer_server::NodeType::kLeader: {
-                non_leader_node_info->node_role_ = NodeRole::kLeader;
+                non_leader_node_role = NodeRole::kLeader;
                 break;
             }
             case infinity_peer_server::NodeType::kFollower: {
-                non_leader_node_info->node_role_ = NodeRole::kFollower;
+                non_leader_node_role = NodeRole::kFollower;
                 break;
             }
             case infinity_peer_server::NodeType::kLearner: {
-                non_leader_node_info->node_role_ = NodeRole::kLearner;
+                non_leader_node_role = NodeRole::kLearner;
                 break;
             }
             default: {
@@ -119,16 +120,18 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
                 UnrecoverableError(error_message);
             }
         }
-        non_leader_node_info->ip_address_ = request.node_ip;
-        non_leader_node_info->port_ = request.node_port;
-        non_leader_node_info->node_status_ = NodeStatus::kAlive;
-        non_leader_node_info->txn_timestamp_ = request.txn_timestamp;
 
         auto now = std::chrono::system_clock::now();
         auto time_since_epoch = now.time_since_epoch();
-        non_leader_node_info->last_update_ts_ = std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count();
+        SharedPtr<NodeInfo> register_node_info = MakeShared<NodeInfo>(non_leader_node_role,
+                                                                      NodeStatus::kAlive,
+                                                                      request.node_name,
+                                                                      request.node_ip,
+                                                                      request.node_port,
+                                                                      request.txn_timestamp,
+                                                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
-        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeInfoByHeartBeat(non_leader_node_info,
+        Status status = InfinityContext::instance().cluster_manager()->UpdateNodeInfoByHeartBeat(register_node_info,
                                                                                                  response.other_nodes,
                                                                                                  response.leader_term,
                                                                                                  response.sender_status);
@@ -139,7 +142,7 @@ void PeerServerThriftService::HeartBeat(infinity_peer_server::HeartBeatResponse 
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
         response.sender_status = infinity_peer_server::NodeStatus::type::kRemoved;
-        response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(server_role));
+        response.error_message = fmt::format("Attempt to heartbeat from a non-leader node: {}", ToString(this_server_role));
     }
     return;
 }

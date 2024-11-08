@@ -21,21 +21,6 @@ import third_party;
 
 namespace infinity {
 
-String ToString(NodeStatus status) {
-    switch (status) {
-        case NodeStatus::kAlive:
-            return "alive";
-        case NodeStatus::kTimeout:
-            return "timeout";
-        case NodeStatus::kInvalid:
-            return "invalid";
-        case NodeStatus::kLostConnection:
-            return "lost connection";
-        case NodeStatus::kRemoved:
-            return "removed";
-    }
-}
-
 String ToString(PeerTaskType type) {
     switch (type) {
         case PeerTaskType::kRegister: {
