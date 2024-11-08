@@ -85,8 +85,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingleWithFields(const std::string
     } else {
         std::vector<std::unique_ptr<QueryNode>> or_children;
         for (auto &[default_field, boost] : fields) {
-            auto sub_result = ParseSingle(query, &default_field);
-            if (sub_result) {
+            if (auto sub_result = ParseSingle(query, &default_field)) {
                 sub_result->MultiplyWeight(boost);
                 or_children.emplace_back(std::move(sub_result));
             }
@@ -145,7 +144,7 @@ inline TermList GetTermListFromAnalyzer(const std::string &analyzer_name, Analyz
         result.emplace_back(last_term);
     }
     if (result.empty()) {
-        std::cerr << std::format("Analyzer {} analyzes following text as empty terms: {}\n", analyzer_name, query_str);
+        LOG_TRACE(std::format("{}: Analyzer {} analyzes following text as empty terms: {}", __func__, analyzer_name, query_str));
     }
     return result;
 }
@@ -187,7 +186,6 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
         }
         TermList terms = GetTermListFromAnalyzer(default_analyzer_name, analyzer.get(), query);
         if (terms.empty()) {
-            RecoverableError(Status::SyntaxError("Empty query text"));
             return nullptr;
         }
         if (terms.size() == 1 && default_analyzer_name != "keyword") {
@@ -218,7 +216,7 @@ std::unique_ptr<QueryNode>
 SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::string &text, const bool from_quoted, const unsigned long slop) const {
     assert(operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax);
     if (text.empty()) {
-        RecoverableError(Status::SyntaxError("Empty query text"));
+        LOG_TRACE(std::format("{} : Empty query text: {}", __func__, text));
         return nullptr;
     }
     // 1. analyze
@@ -229,7 +227,6 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::stri
     }
     TermList terms = GetTermListFromAnalyzer(analyzer_name, analyzer.get(), text);
     if (terms.empty()) {
-        RecoverableError(Status::SyntaxError("Empty query text"));
         return nullptr;
     }
     if (analyzer_name == "keyword") {
