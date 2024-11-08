@@ -116,6 +116,8 @@ endif ()
 
 message(STATUS "Build type = ${CMAKE_BUILD_TYPE}")
 
+option(ENABLE_SANITIZER_THREAD "Enable multi-thread sanitizer" ON)
+
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 
     set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Ofast -DNDEBUG")
@@ -141,11 +143,21 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     message(STATUS "Code Coverage = ${CODE_COVERAGE}")
 
     if(NOT ENABLE_JEMALLOC)
-        message(STATUS "Enable AddressSanitizer")
+        if (NOT ENABLE_SANITIZER_THREAD)
+            add_compile_options(-fsanitize=address -fsanitize=leak)
+            add_link_options(-fsanitize=address -fsanitize=leak)
+            message(STATUS "Enable Address Sanitizer in target: infinity")
+        else()
+            add_compile_options(-fsanitize=thread)
+            add_link_options(-fsanitize=thread)
+            message(STATUS "Enable Thread Sanitizer in target: infinity")
+        endif()
+
+        message(STATUS "Enable Sanitizer in target: infinity")
 
         set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
-        add_compile_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
-        add_link_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
+        add_compile_options(-fsanitize-recover=all)
+        add_link_options(-fsanitize-recover=all)
 
         add_compile_options("-fno-omit-frame-pointer")
         add_link_options("-fno-omit-frame-pointer")
@@ -153,8 +165,6 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
         #    add_compile_options("-fsanitize=undefined")
         #    add_link_options("-fsanitize=undefined")
 
-        #    add_compile_options("-fsanitize=thread")
-        #    add_link_options("-fsanitize=thread")
     else()
         message(STATUS "Disable AddressSanitizer because jemalloc")
     endif()

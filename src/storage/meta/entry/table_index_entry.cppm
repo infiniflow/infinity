@@ -122,7 +122,7 @@ public:
 
     // MemIndexCommit is blocking.
     // Dump or spill the memory indexer
-    SharedPtr<ChunkIndexEntry> MemIndexDump(Txn *txn, TxnTableStore *txn_table_store, bool spill = false, SizeT *dump_size = nullptr);
+    Vector<SharedPtr<ChunkIndexEntry>> MemIndexDump(Txn *txn, TxnTableStore *txn_table_store, bool spill = false, SizeT *dump_size = nullptr);
 
     // PopulateEntirely is blocking.
     // Populate index entirely for the segment
@@ -166,7 +166,6 @@ private:
     SharedPtr<ColumnDef> column_def_{};
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_{};
-    SharedPtr<SegmentIndexEntry> last_segment_{};
 
 public:
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;

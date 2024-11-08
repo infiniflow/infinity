@@ -749,7 +749,6 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
             table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
         }
     }
-    table_index_entry->last_segment_ = segment_index_entry;
     Vector<SharedPtr<BlockEntry>> block_entries;
     SizeT num_ranges = append_ranges.size();
     SizeT dump_idx = SizeT(-1);
@@ -911,9 +910,6 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
                 segment_index_entry->MemIndexWaitInflightTasks();
                 message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name, segment_id);
                 LOG_INFO(message);
-            }
-            if (segment_id == unsealed_id_) {
-                table_index_entry->last_segment_ = segment_index_entry;
             }
         }
     }

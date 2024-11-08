@@ -295,7 +295,7 @@ void SegmentIndexEntry::MemIndexCommit() {
     {
         // memory index writer by insert / dump. 
         std::lock_guard lck_m(mem_index_locker_);
-        if (mem_indexer != nullptr) {
+        if (memory_indexer_ != nullptr) {
             memory_indexer_->Commit();
         }
     }
