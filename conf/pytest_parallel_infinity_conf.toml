@@ -11,7 +11,7 @@ peer_port                = 23850
 [log]
 log_filename             = "infinity.log"
 log_dir                  = "/var/infinity/log"
-log_to_stdout            = true
+log_to_stdout            = false
 log_level               = "trace"
 
 [storage]
