@@ -3620,7 +3620,7 @@ QueryResult AdminExecutor::ListNodes(QueryContext *query_context, const AdminSta
     QueryResult query_result;
     if (!InfinityContext::instance().IsClusterRole()) {
         query_result.result_table_ = nullptr;
-        query_result.status_ = Status::NotSupport("LIST NODES only works in cluster mode");
+        query_result.status_ = Status::NotSupport("'ADMIN SHOW NODES' only works in cluster mode");
         return query_result;
     }
 
