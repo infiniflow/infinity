@@ -90,10 +90,16 @@ query
 : clause { $$ = std::move($1); }
 | query clause {
     assert(driver.operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax);
-    auto q = std::make_unique<OrQueryNode>();
-    q->Add(std::move($1));
-    q->Add(std::move($2));
-    $$ = std::move(q);
+    if (!($1)) {
+        $$ = std::move($2);
+    } else if (!($2)) {
+        $$ = std::move($1);
+    } else {
+        auto q = std::make_unique<OrQueryNode>();
+        q->Add(std::move($1));
+        q->Add(std::move($2));
+        $$ = std::move(q);
+    }
 }
 | query OR clause {
     auto q = std::make_unique<OrQueryNode>();
@@ -105,18 +111,28 @@ query
 clause
 : term { $$ = std::move($1); }
 | clause AND term {
-    auto query = std::make_unique<AndQueryNode>();
-    query->Add(std::move($1));
-    query->Add(std::move($3));
-    $$ = std::move(query);
+    if (!($1)) {
+        $$ = std::move($3);
+    } else if (!($3)) {
+        $$ = std::move($1);
+    } else {
+        auto query = std::make_unique<AndQueryNode>();
+        query->Add(std::move($1));
+        query->Add(std::move($3));
+        $$ = std::move(query);
+    }
 };
 
 term
 : basic_filter_boost { $$ = std::move($1); }
 | NOT term {
-    auto query = std::make_unique<NotQueryNode>();
-    query->Add(std::move($2));
-    $$ = std::move(query);
+    if (!($2)) {
+        $$ = nullptr;
+    } else {
+        auto query = std::make_unique<NotQueryNode>();
+        query->Add(std::move($2));
+        $$ = std::move(query);
+    }
 }
 | LPAREN query RPAREN { $$ = std::move($2); }
 | LPAREN query RPAREN CARAT {
@@ -130,7 +146,9 @@ basic_filter_boost
 }
 | basic_filter CARAT {
     $$ = std::move($1);
-    $$->MultiplyWeight($2);
+    if ($$) {
+        $$->MultiplyWeight($2);
+    }
 };
 
 basic_filter
