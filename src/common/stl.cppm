@@ -40,6 +40,7 @@ module;
 #include <optional>
 #include <random>
 #include <ranges>
+#include <semaphore>
 #include <set>
 #include <shared_mutex>
 #include <source_location>
@@ -104,6 +105,8 @@ export namespace std {
     using std::lower_bound;
     using std::upper_bound;
 
+    using std::binary_semaphore;
+    using std::counting_semaphore;
     using std::atomic_flag;
     using std::condition_variable;
     using std::lock_guard;
