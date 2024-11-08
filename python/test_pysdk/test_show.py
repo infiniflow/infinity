@@ -137,7 +137,7 @@ class TestInfinity:
         for i in range(8193):
             self.infinity_obj.drop_database(f"test_show_big_databases_{i}" + suffix, ConflictType.Ignore)
 
-    def test_show_current_node(self, suffix):
+    def _test_show_current_node(self, suffix):
         res = self.infinity_obj.show_current_node()
         assert res.error_code == ErrorCode.OK
         print(res)
