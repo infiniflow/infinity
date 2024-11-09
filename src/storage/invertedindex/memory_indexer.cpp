@@ -132,6 +132,10 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
             }
             this->ring_sorted_.Put(task->task_seq_, inverter);
         };
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            inflight_tasks_++;
+        }
         inverting_thread_pool_.push(std::move(func));
     } else {
         PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
@@ -144,11 +148,11 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
             this->ring_inverted_.Put(task->task_seq_, inverter);
             // LOG_INFO(fmt::format("online inverter {} end", id));
         };
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            inflight_tasks_++;
+        }
         inverting_thread_pool_.push(std::move(func));
-    }
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        inflight_tasks_++;
     }
 }
 

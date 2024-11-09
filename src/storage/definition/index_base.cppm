@@ -56,6 +56,14 @@ public:
 #endif
     }
 
+    IndexBase(const IndexBase &other)
+        : index_type_(other.index_type_), index_name_(other.index_name_), index_comment_(other.index_comment_), file_name_(other.file_name_),
+          column_names_(other.column_names_) {
+#ifdef INFINITY_DEBUG
+        GlobalResourceUsage::IncrObjectCount("IndexBase");
+#endif
+    }
+
     virtual ~IndexBase() {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::DecrObjectCount("IndexBase");

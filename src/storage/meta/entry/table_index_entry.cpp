@@ -97,7 +97,6 @@ UniquePtr<TableIndexEntry> TableIndexEntry::Clone(TableIndexMeta *table_index_me
     for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
         ret->index_by_segment_.emplace(segment_id, segment_index_entry->Clone(ret.get()));
     }
-    ret->last_segment_ = ret->index_by_segment_[last_segment_->segment_id()];
     return ret;
 }
 
@@ -286,19 +285,34 @@ Vector<BaseMemIndex *> TableIndexEntry::GetMemIndex() const {
 }
 
 void TableIndexEntry::MemIndexCommit() {
-    if (last_segment_.get() != nullptr) {
-        last_segment_->MemIndexCommit();
+    Vector<SegmentIndexEntry *> segment_index_entries;
+    {
+        std::shared_lock r_lock(rw_locker_);
+        for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+            segment_index_entries.push_back(segment_index_entry.get());
+        }
+    }
+    for (auto *segment_index_entry : segment_index_entries) {
+        segment_index_entry->MemIndexCommit();
     }
 }
 
-SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(Txn *txn, TxnTableStore *txn_table_store, bool spill, SizeT *dump_size) {
-    if (last_segment_.get() == nullptr) {
-        return nullptr;
+// this function is called when memory index used up quota, and need to dump.
+Vector<SharedPtr<ChunkIndexEntry>> TableIndexEntry::MemIndexDump(Txn *txn, TxnTableStore *txn_table_store, bool spill, SizeT *dump_size) {
+    Vector<SegmentIndexEntry *> segment_index_entries;
+    {
+        std::shared_lock r_lock(rw_locker_);
+        for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+            segment_index_entries.push_back(segment_index_entry.get());
+        }
     }
-    auto chunk_index_entry = last_segment_->MemIndexDump(spill, dump_size);
-    txn_table_store->AddChunkIndexStore(this, chunk_index_entry.get());
-    last_segment_->AddWalIndexDump(chunk_index_entry.get(), txn);
-    return chunk_index_entry;
+    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+    for (auto *segment_index_entry : segment_index_entries) {
+        auto chunk_index_entry = segment_index_entry->MemIndexDump(spill, dump_size);
+        txn_table_store->AddChunkIndexStore(this, chunk_index_entry.get());
+        segment_index_entry->AddWalIndexDump(chunk_index_entry.get(), txn);
+    }
+    return chunk_index_entries;
 }
 
 SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config) {
@@ -341,7 +355,6 @@ TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prep
         table_ref->index_index_ = MakeShared<IndexIndex>();
     }
     Vector<SegmentIndexEntry *> segment_index_entries;
-    SegmentID unsealed_id = table_entry->unsealed_id();
     for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
         auto *segment_entry = segment_info.segment_entry_;
         SharedPtr<SegmentIndexEntry> segment_index_entry = SegmentIndexEntry::NewIndexEntry(this, segment_id, txn);
@@ -351,9 +364,6 @@ TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prep
         std::unique_lock w_lock(rw_locker_);
         index_by_segment_.emplace(segment_id, segment_index_entry);
         segment_index_entries.push_back(segment_index_entry.get());
-        if (unsealed_id == segment_id) {
-            last_segment_ = segment_index_entry;
-        }
         txn_table_store->AddSegmentIndexesStore(this, {segment_index_entry.get()});
     }
     return {segment_index_entries, Status::OK()};

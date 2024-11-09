@@ -244,10 +244,9 @@ public:
     static UniquePtr<Catalog> LoadFullCheckpoint(const String &file_name);
     void AttachDeltaCheckpoint(const String &file_name);
 
+    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
-
-    static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
 
     void LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, BufferManager *buffer_mgr);
 

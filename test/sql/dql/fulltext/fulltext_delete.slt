@@ -20,6 +20,13 @@ SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'tex
 3 third text many words 2 0.110856
 
 query I
+SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text ", " "? " ');
+----
+1 first text 0 0.167868
+2 second text multiple 1 0.133531
+3 third text many words 2 0.110856
+
+query I
 SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text') WHERE num != 1;
 ----
 2 second text multiple 1 0.133531
