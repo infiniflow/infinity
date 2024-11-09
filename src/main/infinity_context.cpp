@@ -64,7 +64,10 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     if (!status.ok()) {
         std::exit(static_cast<int>(status.code()));
     }
-    Logger::Initialize(config_.get());
+    status = Logger::Initialize(config_.get());
+    if (!status.ok()) {
+        std::exit(static_cast<int>(status.code()));
+    }
 
     resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
 
