@@ -37,17 +37,9 @@ import infinity_thrift_service;
 
 namespace infinity {
 
-InfinityContext::InfinityContext() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("InfinityContext");
-#endif
-}
+InfinityContext::InfinityContext() = default;
 
-InfinityContext::~InfinityContext() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("InfinityContext");
-#endif
-}
+InfinityContext::~InfinityContext() = default;
 
 NodeRole InfinityContext::GetServerRole() const {
     if (cluster_manager_ == nullptr) {
