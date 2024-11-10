@@ -79,6 +79,24 @@ public:
     Status SetStorageMode(StorageMode mode);
     Status SetReaderStorageContinue(TxnTimeStamp system_start_ts);
 
+    // Used for admin
+    Status InitToAdmin();
+    Status AdminToReader();
+    Status AdminToWriter();
+    Status UnInitFromAdmin();
+
+    // Used for follower and learner
+    Status InitToReader();
+    Status ReaderToAdmin();
+    Status ReaderToWriter();
+    Status UnInitFromReader();
+
+    // Used for standalone and leader
+    Status InitToWriter();
+    Status WriterToAdmin();
+    Status WriterToReader();
+    Status UnInitFromWriter();
+
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
     void LoadFullCheckpoint(const String &checkpoint_path);
     void AttachDeltaCheckpoint(const String &checkpoint_path);
@@ -89,19 +107,31 @@ public:
     void CreateDefaultDB();
 
 private:
+    Status InitWalManagerNolock();
+    Status InitObjectStorageNolock();
+    Status InitPersistenceManagerNolock();
+    Status InitResultCacheManagerNolock();
+    Status InitBufferManagerNolock();
+    Status InitCatalogNolock();
+    Status InitBGMemIndexTracerNolock();
+    Status InitBGTaskProcessorNolock();
+    Status InitCompactionProcessorNolock();
+    Status InitPeriodicTriggerNolock();
+
+private:
     Config *config_ptr_{};
-    UniquePtr<Catalog> new_catalog_{};
+    UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
+    UniquePtr<WalManager> wal_mgr_{};
+    UniquePtr<ObjectStorageProcess> object_storage_processor_{};
+    UniquePtr<PersistenceManager> persistence_manager_{};
+    UniquePtr<ResultCacheManager> result_cache_manager_{};
     UniquePtr<BufferManager> buffer_mgr_{};
+    UniquePtr<Catalog> new_catalog_{};
     UniquePtr<BGMemIndexTracer> memory_index_tracer_{};
     UniquePtr<TxnManager> txn_mgr_{};
-    UniquePtr<WalManager> wal_mgr_{};
-    UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
-    UniquePtr<ObjectStorageProcess> object_storage_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
-    UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
-    UniquePtr<ResultCacheManager> result_cache_manager_{};
 
     mutable std::mutex mutex_;
     StorageMode current_storage_mode_{StorageMode::kUnInitialized};

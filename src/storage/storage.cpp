@@ -68,6 +68,55 @@ Storage::~Storage() {
 #endif
 }
 
+Status Storage::InitToAdmin() {
+    LOG_INFO(fmt::format("Start to initialize storage from un-init mode to admin"));
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (current_storage_mode_ != StorageMode::kUnInitialized) {
+            UnrecoverableError("Unexpected: attempt to init initialized status storage");
+        }
+
+        // Construct wal manager
+        if (wal_mgr_ != nullptr) {
+            UnrecoverableError("WAL manager was initialized before.");
+        }
+
+        wal_mgr_ = MakeUnique<WalManager>(this,
+                                          config_ptr_->WALDir(),
+                                          config_ptr_->DataDir(),
+                                          config_ptr_->WALCompactThreshold(),
+                                          config_ptr_->DeltaCheckpointThreshold(),
+                                          config_ptr_->FlushMethodAtCommit());
+        current_storage_mode_ = StorageMode::kAdmin;
+    }
+    LOG_INFO(fmt::format("Finish initializing storage from un-init mode to admin"));
+    return Status::OK();
+}
+
+Status Storage::AdminToReader() { return Status::OK(); }
+
+Status Storage::AdminToWriter() { return Status::OK(); }
+
+Status Storage::UnInitFromAdmin() { return Status::OK(); }
+
+// Used for follower and learner
+Status Storage::InitToReader() { return Status::OK(); }
+
+Status Storage::ReaderToAdmin() { return Status::OK(); }
+
+Status Storage::ReaderToWriter() { return Status::OK(); }
+
+Status Storage::UnInitFromReader() { return Status::OK(); }
+
+// Used for standalone and leader
+Status Storage::InitToWriter() { return Status::OK(); }
+
+Status Storage::WriterToAdmin() { return Status::OK(); }
+
+Status Storage::WriterToReader() { return Status::OK(); }
+
+Status Storage::UnInitFromWriter() { return Status::OK(); }
+
 ResultCacheManager *Storage::result_cache_manager() const noexcept {
     if (config_ptr_->ResultCache() != "on") {
         return nullptr;
@@ -95,24 +144,7 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from UnInit to UnInit");
             }
 
-            {
-                std::unique_lock<std::mutex> lock(mutex_);
-                current_storage_mode_ = target_mode;
-            }
-
-            // Construct wal manager
-            if (wal_mgr_ != nullptr) {
-                UnrecoverableError("WAL manager was initialized before.");
-            }
-
-            wal_mgr_ = MakeUnique<WalManager>(this,
-                                              config_ptr_->WALDir(),
-                                              config_ptr_->DataDir(),
-                                              config_ptr_->WALCompactThreshold(),
-                                              config_ptr_->DeltaCheckpointThreshold(),
-                                              config_ptr_->FlushMethodAtCommit());
-            LOG_INFO(fmt::format("Set storage from un-init mode to admin"));
-            break;
+            return InitToAdmin();
         }
         case StorageMode::kAdmin: {
             if (target_mode == StorageMode::kAdmin) {
@@ -218,10 +250,6 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             BuiltinFunctions builtin_functions(new_catalog_);
             builtin_functions.Init();
             // Catalog finish init here.
-            if (bg_processor_ != nullptr) {
-                UnrecoverableError("Background processor was initialized before.");
-            }
-            bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
 
             // Construct txn manager
             if (txn_mgr_ != nullptr) {
@@ -242,6 +270,10 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             }
             memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
 
+            if (bg_processor_ != nullptr) {
+                UnrecoverableError("Background processor was initialized before.");
+            }
+            bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
             bg_processor_->Start();
 
             if (target_mode == StorageMode::kWritable) {
