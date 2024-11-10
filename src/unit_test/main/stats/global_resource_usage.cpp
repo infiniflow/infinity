@@ -39,7 +39,7 @@ TEST_F(GlobalResourceUsageTest, usage_test) {
     using namespace infinity;
 
     // Object count
-#ifdef INFINITY_DEBUG
+#ifdef INFINITY_STATS
     GlobalResourceUsage::IncrObjectCount("GlobalResourceUsageTest");
     EXPECT_EQ(GlobalResourceUsage::GetObjectCount(), 1);
 
