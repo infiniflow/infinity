@@ -882,26 +882,32 @@ class TestInfinity:
         table_obj = db_obj.get_table("test_select_strlen"+suffix)
         table_obj.insert(
             [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
-            {"c1": 'abc', "c2": 'abc'}, {"c1": 'bbc', "c2": 'bbc'}, {"c1": 'cbc', "c2": 'cbc'}, {"c1": 'dbc', "c2": 'dbc'}])
+            {"c1": 'abc', "c2": 'abc'}, {"c1": 'shortstr', "c2": 'shortstr'}, {"c1": 'longerthanthirteen', "c2": 'longerstr'}])
 
-        res = table_obj.output(["*"]).filter("strlen(c1) = 1").to_df()
+        res = table_obj.output(["c1", "c2", "strlen(c1) as len_c1"]).filter("strlen(c1) = 3").to_df()
         print(res)
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('a', 'b', 'c', 'd'),
-                                                     'c2': ('a', 'b', 'c', 'd')})
-                                  .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({
+            'c1': ['abc'],
+            'c2': ['abc'],
+            'len_c1': [3]
+        }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'len_c1': dtype('int64')}))
 
-        res = table_obj.output(["*"]).filter("strlen(c1) = 3").to_df()
+        res = table_obj.output(["c1", "c2", "strlen(c1) as len_c1"]).filter("strlen(c1) <= 13").to_df()
         print(res)
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('abc', 'bbc', 'cbc', 'dbc'),
-                                                     'c2': ('abc', 'bbc', 'cbc', 'dbc')})
-                                  .astype({'c1': dtype('O'), 'c2': dtype('O')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({
+            'c1': ['a', 'b', 'c', 'd', 'abc', 'shortstr'],
+            'c2': ['a', 'b', 'c', 'd', 'abc', 'shortstr'],
+            'len_c1': [1, 1, 1, 1, 3, 8]
+        }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'len_c1': dtype('int64')}))
 
-        res = table_obj.output(["*"]).filter("strlen(c1) > 2").to_df()
+        res = table_obj.output(["c1", "c2", "strlen(c1) as len_c1"]).filter("strlen(c1) > 13").to_df()
         print(res)
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('abc', 'bbc', 'cbc', 'dbc'),
-                                                     'c2': ('abc', 'bbc', 'cbc', 'dbc')})
-                                  .astype({'c1': dtype('O'), 'c2': dtype('O')}))
-    
+        pd.testing.assert_frame_equal(res, pd.DataFrame({
+            'c1': ['longerthanthirteen'],
+            'c2': ['longerstr'],
+            'len_c1': [17]
+        }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'len_c1': dtype('int64')}))
+
         res = db_obj.drop_table("test_select_strlen"+suffix)
         assert res.error_code == ErrorCode.OK
 

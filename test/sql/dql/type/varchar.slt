@@ -6,7 +6,7 @@ CREATE TABLE test_varchar_filter (c1 varchar, c2 varchar, c3 integer);
 
 statement ok
 INSERT INTO test_varchar_filter VALUES ('abcddddd', 'abcddddd', 1), ('abcddddc', 'abcddddd', 2),
- ('abcdddde', 'abcddddd', 3), ('abcdddde', 'abcdddde', 4);
+ ('abcdddde', 'abcddddd', 3), ('abcdddde', 'abcdddde', 4), ('longerthanthirteen', 'longerstr', 6);
 
 query I
 SELECT * FROM test_varchar_filter where c1 = c2;
@@ -144,9 +144,29 @@ abcdddde abcddddd 3 1
 abcdddde abcdddde 4 1
 
 query XXI
-SELECT *, strlen(c1) FROM test_varchar_filter WHERE strlen(c1) = 3;
+SELECT *, strlen(c1) 
+FROM test_varchar_filter 
+WHERE strlen(c1) = 3;
 ----
-abc abcd 5
+abc abcd 5 3
+
+query XXII
+SELECT *, strlen(c1) 
+FROM test_varchar_filter 
+WHERE strlen(c1) <= 13;
+----
+abcddddd abcddddd 1 8
+abcddddc abcddddd 2 8
+abcdddde abcddddd 3 8
+abcdddde abcdddde 4 8
+abc abcd 5 3
+
+query XXIII
+SELECT *, strlen(c1) 
+FROM test_varchar_filter 
+WHERE strlen(c1) > 13;
+----
+longerthanthirteen longerstr 6 17
 
 statement ok
 DROP TABLE test_varchar_filter;
