@@ -1301,7 +1301,7 @@ public:
                     DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
                     // Get sum delete rows
                     Value value = data_block->GetValue(1, 0);
-                    json_response["delete_row_count"] = value.value_.big_int;
+                    json_response["deleted_rows"] = value.value_.big_int;
                 } else {
                     json_response["error_code"] = result.ErrorCode();
                     json_response["error_message"] = result.ErrorMsg();
@@ -1320,7 +1320,7 @@ public:
                     DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
                     // Get sum delete rows
                     Value value = data_block->GetValue(1, 0);
-                    json_response["delete_row_count"] = value.value_.big_int;
+                    json_response["deleted_rows"] = value.value_.big_int;
                 } else {
                     json_response["error_code"] = result.ErrorCode();
                     json_response["error_message"] = result.ErrorMsg();

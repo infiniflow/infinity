@@ -65,6 +65,7 @@ private:
     static QueryResult RecoverFromSnapshot(QueryContext* query_context, const AdminStatement* admin_statement);
 
     static Vector<SharedPtr<WalEntry>> GetAllCheckpointEntries(QueryContext* query_context, const AdminStatement* admin_statement);
+    static Vector<String> GetAllCheckpointFiles(QueryContext* query_context, const AdminStatement* admin_statement);
     static Tuple<UniquePtr<Catalog>, Status> LoadCatalogFiles(QueryContext* query_context, const AdminStatement* admin_statement, Vector<SharedPtr<WalEntry>>& ckp_entries);
 };
 
