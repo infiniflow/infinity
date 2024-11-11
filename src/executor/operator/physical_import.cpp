@@ -454,7 +454,7 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
     try {
-        auto column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
+        auto column_vector = MakeShared<ColumnVector>(block_entry->GetColumnVector(buffer_mgr, 0));
 
         i64 row_id = 0;
         while (true) {
@@ -488,7 +488,7 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
                     segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
                 }
                 block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
-                column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
+                column_vector = MakeShared<ColumnVector>(block_entry->GetColumnVector(buffer_mgr, 0));
             }
         }
         auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", nrow));
@@ -520,8 +520,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
         Vector<ColumnVector> column_vectors;
         int column_count = table_entry_->ColumnCount();
         for (int i = 0; i < column_count; ++i) {
-            auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-            column_vectors.emplace_back(block_column_entry->GetColumnVector(buffer_mgr));
+            column_vectors.emplace_back(block_entry->GetColumnVector(buffer_mgr, i));
         }
         parser_context = MakeUnique<ZxvParserCtx>(table_entry_, txn, segment_entry, std::move(block_entry), std::move(column_vectors), delimiter_);
     }
@@ -598,8 +597,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
 
     Vector<ColumnVector> column_vectors;
     for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
-        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
     }
 
     SizeT row_count{0};
@@ -631,8 +629,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
                 block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
                 column_vectors.clear();
                 for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
-                    auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                    column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                    column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
                 }
             }
         } else {
@@ -694,8 +691,7 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
 
     Vector<ColumnVector> column_vectors;
     for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
-        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
     }
 
     if (!json_arr.is_array()) {
@@ -719,8 +715,7 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
             block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
             column_vectors.clear();
             for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
-                auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
             }
         }
         try {
@@ -849,8 +844,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry->ColumnCount(), txn);
         parser_context->column_vectors_.clear();
         for (SizeT i = 0; i < column_count; ++i) {
-            auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-            parser_context->column_vectors_.emplace_back(block_column_entry->GetColumnVector(buffer_mgr));
+            parser_context->column_vectors_.emplace_back(block_entry->GetColumnVector(buffer_mgr, i));
         }
     }
 
@@ -1318,8 +1312,7 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
 
     Vector<ColumnVector> column_vectors;
     for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
-        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
     }
 
     Vector<i64> chunk_idxs(table_entry_->ColumnCount(), 0);
@@ -1354,8 +1347,7 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
             block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
             column_vectors.clear();
             for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
-                auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
             }
         }
     }

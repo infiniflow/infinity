@@ -153,13 +153,15 @@ String BlockColumnEntry::FilePath() const { return Path(*block_entry_->block_dir
 
 SharedPtr<String> BlockColumnEntry::FileDir() const { return block_entry_->block_dir(); }
 
-ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) { return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadWrite); }
-
-ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr) {
-    return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadOnly);
+ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr, SizeT row_count) {
+    return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadWrite, row_count);
 }
 
-ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe) {
+ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr, SizeT row_count) {
+    return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadOnly, row_count);
+}
+
+ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe, SizeT row_count) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
@@ -172,7 +174,7 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
     }
 
     ColumnVector column_vector(column_type_);
-    column_vector.Initialize(buffer_mgr, this, block_entry_->row_count(), tipe);
+    column_vector.Initialize(buffer_mgr, this, row_count, tipe);
     return column_vector;
 }
 
@@ -183,15 +185,6 @@ Vector<String> BlockColumnEntry::FilePaths() const {
         res.push_back(VirtualStore::ConcatenatePath(*FileDir(), outline_file_path));
     }
     return res;
-}
-
-void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input_column_vector_offset, SizeT append_rows, BufferManager *buffer_mgr) {
-    if (buffer_ == nullptr) {
-        String error_message = "Not initialize buffer handle";
-        UnrecoverableError(error_message);
-    }
-    ColumnVector &&column_vector = GetColumnVector(buffer_mgr);
-    column_vector.AppendWith(*input_column_vector, input_column_vector_offset, append_rows);
 }
 
 void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count) {
@@ -346,7 +339,7 @@ void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts
 }
 
 void BlockColumnEntry::FillWithDefaultValue(SizeT row_count, const Value *default_value, BufferManager *buffer_mgr) {
-    ColumnVector column_vector = this->GetColumnVector(buffer_mgr);
+    ColumnVector column_vector = this->GetColumnVector(buffer_mgr, row_count);
 
     for (SizeT i = 0; i < row_count; ++i) {
         column_vector.SetValue(i, *default_value);

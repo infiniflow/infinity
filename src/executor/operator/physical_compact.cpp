@@ -177,8 +177,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
             BlockID block_id = block_entry->block_id();
             Vector<ColumnVector> input_column_vectors;
             for (ColumnID column_id = 0; column_id < column_count; ++column_id) {
-                auto *column_block_entry = block_entry->GetColumnBlockEntry(column_id);
-                input_column_vectors.emplace_back(column_block_entry->GetConstColumnVector(buffer_mgr));
+                input_column_vectors.emplace_back(block_entry->GetConstColumnVector(buffer_mgr, column_id));
             }
             SizeT read_offset = 0;
             while (true) {

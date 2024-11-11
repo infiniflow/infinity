@@ -66,10 +66,10 @@ u32 EMVBIndexInMem::GetRowCount() const {
     return row_count_;
 }
 
-void EMVBIndexInMem::Insert(u16 block_id, BlockColumnEntry *block_column_entry, BufferManager *buffer_manager, u32 row_offset, u32 row_count) {
-    const ColumnVector column_vector = block_column_entry->GetConstColumnVector(buffer_manager);
+void EMVBIndexInMem::Insert(BlockEntry *block_entry, SizeT column_idx, BufferManager *buffer_manager, u32 row_offset, u32 row_count) {
+    const ColumnVector column_vector = block_entry->GetConstColumnVector(buffer_manager, column_idx);
     std::unique_lock lock(rw_mutex_);
-    const auto income_segment_entry = block_column_entry->GetBlockEntry()->GetSegmentEntry();
+    const auto income_segment_entry = block_entry->GetSegmentEntry();
     if (segment_entry_ == nullptr) {
         segment_entry_ = income_segment_entry;
     } else if (segment_entry_ != income_segment_entry) {
