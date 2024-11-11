@@ -59,10 +59,7 @@ void BGTaskProcessor::Process() {
     Deque<SharedPtr<BGTask>> tasks;
     while (running) {
         task_queue_.DequeueBulk(tasks);
-        StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-        if (storage_mode == StorageMode::kUnInitialized) {
-            UnrecoverableError("Uninitialized storage mode");
-        }
+
         for (const auto &bg_task : tasks) {
             switch (bg_task->type_) {
                 case BGTaskType::kStopProcessor: {
@@ -75,6 +72,10 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kForceCheckpoint: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Force checkpoint in background");
                         ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
@@ -98,6 +99,10 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kAddDeltaEntry: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
                     if (storage_mode == StorageMode::kWritable) {
                         auto *task = static_cast<AddDeltaEntryTask *>(bg_task.get());
                         {
@@ -109,6 +114,10 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kCheckpoint: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Checkpoint in background");
                         auto *task = static_cast<CheckpointTask *>(bg_task.get());
@@ -123,6 +132,10 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kCleanup: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
                     if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
                         LOG_DEBUG("Cleanup in background");
                         auto task = static_cast<CleanupTask *>(bg_task.get());
@@ -136,6 +149,10 @@ void BGTaskProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kUpdateSegmentBloomFilterData: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
                     if (storage_mode == StorageMode::kWritable or storage_mode == StorageMode::kReadable) {
                         LOG_DEBUG("Update segment bloom filter");
                         auto *task = static_cast<UpdateSegmentBloomFilterTask *>(bg_task.get());

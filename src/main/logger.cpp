@@ -19,6 +19,7 @@ module logger;
 import stl;
 import config;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -27,20 +28,25 @@ static SharedPtr<spdlog::sinks::rotating_file_sink_mt> rotating_file_sinker = nu
 
 SharedPtr<spdlog::logger> infinity_logger = nullptr;
 
-void Logger::Initialize(Config *config_ptr) {
-
+Status Logger::Initialize(Config *config_ptr) {
 
     SizeT log_file_max_size = config_ptr->LogFileMaxSize();
     SizeT log_file_rotate_count = config_ptr->LogFileRotateCount();
     bool log_stdout = config_ptr->LogToStdout();
 
     if (rotating_file_sinker.get() == nullptr) {
-        rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(config_ptr->LogFilePath(),
-                                                                                log_file_max_size,
-                                                                                log_file_rotate_count); // NOLINT
+        try {
+            rotating_file_sinker = MakeShared<spdlog::sinks::rotating_file_sink_mt>(config_ptr->LogFilePath(),
+                                                                                    log_file_max_size,
+                                                                                    log_file_rotate_count); // NOLINT
+        } catch (const std::exception &e) {
+            String error_message = fmt::format("Error to create log sinker, cause: {}", e.what());
+            fmt::print("{}", error_message);
+            return Status::UnexpectedError(error_message);
+        }
     }
 
-    if(log_stdout) {
+    if (log_stdout) {
         if (stdout_sinker.get() == nullptr) {
             stdout_sinker = MakeShared<spdlog::sinks::stdout_color_sink_mt>(); // NOLINT
         }
@@ -58,10 +64,11 @@ void Logger::Initialize(Config *config_ptr) {
         spdlog::details::registry::instance().register_logger(infinity_logger);
     }
 
-
     SetLogLevel(config_ptr->GetLogLevel());
 
     LOG_TRACE("Logger is initialized.");
+
+    return Status::OK();
 }
 
 void Logger::Initialize(const LoggerConfig &config) {

@@ -145,7 +145,8 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                                                                   config_ptr_->ObjectStorageHttps(),
                                                                   config_ptr_->ObjectStorageAccessKey(),
                                                                   config_ptr_->ObjectStorageSecretKey(),
-                                                                  config_ptr_->ObjectStorageBucket());
+                                                                  config_ptr_->ObjectStorageBucket(),
+                                                                  current_storage_mode_ == StorageMode::kWritable);
                     if (!status.ok()) {
                         {
                             std::unique_lock<std::mutex> lock(mutex_);
