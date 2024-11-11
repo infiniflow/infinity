@@ -19,7 +19,6 @@ module;
 #include <cmath>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <openccxx.h>
 #include <pcre2.h>
 #include <re2/re2.h>
@@ -971,7 +970,6 @@ String RAGAnalyzer::Tokenize(const String &line) {
             ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
             String stem_term;
             stemmer_->Stem(lowercase_term, stem_term);
-            std::cout << lowercase_term << " " << stem_term << std::endl;
             res.push_back(stem_term);
         }
         String ret = Join(res, 0);
