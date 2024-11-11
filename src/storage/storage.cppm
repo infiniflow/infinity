@@ -77,7 +77,7 @@ public:
 
     StorageMode GetStorageMode() const;
     Status SetStorageMode(StorageMode mode);
-    Status SetReaderStorageContinue(TxnTimeStamp system_start_ts);
+    Status AdminToReaderBottom(TxnTimeStamp system_start_ts);
 
     // Used for admin
     Status InitToAdmin();

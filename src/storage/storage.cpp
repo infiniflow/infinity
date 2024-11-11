@@ -94,14 +94,18 @@ Status Storage::InitToAdmin() {
 }
 
 Status Storage::UnInitFromAdmin() {
-    wal_mgr_.reset();
-    LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
-    current_storage_mode_ = StorageMode::kUnInitialized;
+    LOG_INFO(fmt::format("Start to un-initialize storage from admin mode to un-init"));
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        wal_mgr_.reset();
+        current_storage_mode_ = StorageMode::kUnInitialized;
+    }
+    LOG_INFO(fmt::format("Finishing un-initializing storage from admin mode to un-init"));
     return Status::OK();
 }
 
 Status Storage::AdminToReader() {
-
+    std::unique_lock<std::mutex> lock(mutex_);
     switch (config_ptr_->StorageType()) {
         case StorageType::kLocal: {
             // Not init remote store
@@ -162,10 +166,6 @@ Status Storage::AdminToReader() {
     buffer_mgr_->Start();
 
     reader_init_phase_ = ReaderInitPhase::kPhase1;
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        current_storage_mode_ = StorageMode::kReadable;
-    }
     return Status::OK();
 }
 
@@ -607,10 +607,11 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
     return Status::OK();
 }
 
-Status Storage::SetReaderStorageContinue(TxnTimeStamp system_start_ts) {
-    StorageMode current_mode = GetStorageMode();
-    if (current_mode != StorageMode::kReadable) {
-        UnrecoverableError(fmt::format("Expect current storage mode is READER, but it is {}", ToString(current_mode)));
+Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
+
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (reader_init_phase_ != ReaderInitPhase::kPhase1) {
+        UnrecoverableError(fmt::format("Expect current storage mode is READER with Phase1"));
     }
 
     BuiltinFunctions builtin_functions(new_catalog_);
@@ -653,6 +654,7 @@ Status Storage::SetReaderStorageContinue(TxnTimeStamp system_start_ts) {
 
     periodic_trigger_thread_->Start();
     reader_init_phase_ = ReaderInitPhase::kPhase2;
+    current_storage_mode_ = StorageMode::kReadable;
 
     return Status::OK();
 }
