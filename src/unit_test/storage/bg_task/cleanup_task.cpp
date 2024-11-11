@@ -299,13 +299,14 @@ TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
             SizeT row_count = std::numeric_limits<SizeT>::max();
             for (SizeT i = 0; i < column_count; ++i) {
                 auto *column_vector = column_vectors[i].get();
-                auto column_block_entry = block_entry->GetColumnBlockEntry(i);
+                // auto column_block_entry = block_entry->GetColumnBlockEntry(i);
                 if (row_count == std::numeric_limits<SizeT>::max()) {
                     row_count = column_vector->Size();
                 } else {
                     EXPECT_EQ(row_count, column_vector->Size());
                 }
-                column_block_entry->Append(column_vector, 0, row_count, buffer_mgr);
+                ColumnVector col = block_entry->GetColumnVector(buffer_mgr, i);
+                col.AppendWith(*column_vector, 0, row_count);
             }
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
@@ -376,13 +377,13 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
             SizeT row_count = std::numeric_limits<SizeT>::max();
             for (SizeT i = 0; i < column_count; ++i) {
                 auto *column_vector = column_vectors[i].get();
-                auto column_block_entry = block_entry->GetColumnBlockEntry(i);
                 if (row_count == std::numeric_limits<SizeT>::max()) {
                     row_count = column_vector->Size();
                 } else {
                     EXPECT_EQ(row_count, column_vector->Size());
                 }
-                column_block_entry->Append(column_vector, 0, row_count, buffer_mgr);
+                ColumnVector col = block_entry->GetColumnVector(buffer_mgr, i);
+                col.AppendWith(*column_vector, 0, row_count);
             }
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
