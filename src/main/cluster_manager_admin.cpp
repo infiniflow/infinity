@@ -19,16 +19,6 @@ module;
 module cluster_manager;
 
 import stl;
-// import infinity_context;
-// import logger;
-// import infinity_exception;
-// import peer_server_thrift_types;
-// import wal_manager;
-// import wal_entry;
-// import admin_statement;
-// import global_resource_usage;
-// import node_info;
-// import config;
 
 namespace infinity {
 
