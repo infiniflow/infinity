@@ -336,8 +336,8 @@ Status Storage::AdminToWriter() {
 // Used for follower and learner
 Status Storage::InitToReader() { return Status::OK(); }
 
-Status Storage::ReaderToAdmin() {
-    LOG_INFO(fmt::format("Start to change storage from readable mode to admin"));
+Status Storage::UnInitFromReader() {
+    LOG_INFO(fmt::format("Start to change storage from readable mode to un-init"));
     {
         std::unique_lock<std::mutex> lock(mutex_);
         current_storage_mode_ = StorageMode::kAdmin;
@@ -404,17 +404,27 @@ Status Storage::ReaderToAdmin() {
             result_cache_manager_.reset();
         }
 
-        if (persistence_manager_ == nullptr) {
+        if (persistence_manager_ != nullptr) {
             persistence_manager_.reset();
         }
 
-        wal_mgr_ = MakeUnique<WalManager>(this,
-                                          config_ptr_->WALDir(),
-                                          config_ptr_->DataDir(),
-                                          config_ptr_->WALCompactThreshold(),
-                                          config_ptr_->DeltaCheckpointThreshold(),
-                                          config_ptr_->FlushMethodAtCommit());
-        current_storage_mode_ = StorageMode::kAdmin;
+        current_storage_mode_ = StorageMode::kUnInitialized;
+    }
+    LOG_INFO(fmt::format("Finishing changing storage from readable mode to un-init"));
+    return Status::OK();
+}
+
+Status Storage::ReaderToAdmin() {
+    LOG_INFO(fmt::format("Start to change storage from readable mode to admin"));
+
+    Status status = UnInitFromReader();
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = InitToAdmin();
+    if (!status.ok()) {
+        return status;
     }
     LOG_INFO(fmt::format("Finishing changing storage from readable mode to admin"));
     return Status::OK();
@@ -445,8 +455,6 @@ Status Storage::ReaderToWriter() {
     current_storage_mode_ = StorageMode::kWritable;
     return Status::OK();
 }
-
-Status Storage::UnInitFromReader() { return Status::OK(); }
 
 // Used for standalone and leader
 Status Storage::InitToWriter() { return Status::OK(); }
@@ -506,113 +514,20 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             break;
         }
         case StorageMode::kReadable: {
-            if (target_mode == StorageMode::kReadable) {
-                UnrecoverableError("Attempt to set storage mode from Readable to Readable");
-            }
 
-            if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
-
-                if (periodic_trigger_thread_ != nullptr) {
-                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
-                        UnrecoverableError("Error reader init phase");
-                    }
-                    periodic_trigger_thread_->Stop();
-                    periodic_trigger_thread_.reset();
+            switch (target_mode) {
+                case StorageMode::kUnInitialized: {
+                    return UnInitFromReader();
                 }
-
-                if (compact_processor_ != nullptr) {
-                    UnrecoverableError("Compact processor shouldn't be set before");
+                case StorageMode::kAdmin: {
+                    return ReaderToAdmin();
                 }
-
-                if (bg_processor_ != nullptr) {
-                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
-                        UnrecoverableError("Error reader init phase");
-                    }
-                    bg_processor_->Stop();
-                    bg_processor_.reset();
+                case StorageMode::kReadable: {
+                    UnrecoverableError("Attempt to set storage mode from Readable to Readable");
                 }
-
-                new_catalog_.reset();
-
-                memory_index_tracer_.reset();
-
-                if (wal_mgr_ != nullptr) {
-                    wal_mgr_->Stop();
-                    wal_mgr_.reset();
+                case StorageMode::kWritable: {
+                    return ReaderToWriter();
                 }
-
-                switch (config_ptr_->StorageType()) {
-                    case StorageType::kLocal: {
-                        // Not init remote store
-                        break;
-                    }
-                    case StorageType::kMinio: {
-                        if (object_storage_processor_ != nullptr) {
-                            object_storage_processor_->Stop();
-                            object_storage_processor_.reset();
-                            VirtualStore::UnInitRemoteStore();
-                        }
-                        break;
-                    }
-                    default: {
-                        UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
-                    }
-                }
-
-                if (txn_mgr_ != nullptr) {
-                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
-                        UnrecoverableError("Error reader init phase");
-                    }
-                    txn_mgr_->Stop();
-                    txn_mgr_.reset();
-                }
-
-                if (buffer_mgr_ != nullptr) {
-                    buffer_mgr_->Stop();
-                    buffer_mgr_.reset();
-                }
-
-                persistence_manager_.reset();
-
-                if (target_mode == StorageMode::kAdmin) {
-                    // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
-                    wal_mgr_ = MakeUnique<WalManager>(this,
-                                                      config_ptr_->WALDir(),
-                                                      config_ptr_->DataDir(),
-                                                      config_ptr_->WALCompactThreshold(),
-                                                      config_ptr_->DeltaCheckpointThreshold(),
-                                                      config_ptr_->FlushMethodAtCommit());
-                }
-            }
-
-            if (target_mode == StorageMode::kWritable) {
-                if (compact_processor_ != nullptr) {
-                    UnrecoverableError("compact processor was initialized before.");
-                }
-
-                compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
-                compact_processor_->Start();
-
-                periodic_trigger_thread_->Stop();
-                i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
-                i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-                //                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-                i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-                i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
-                periodic_trigger_thread_->full_checkpoint_trigger_ =
-                    MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
-                periodic_trigger_thread_->delta_checkpoint_trigger_ =
-                    MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
-                periodic_trigger_thread_->compact_segment_trigger_ =
-                    MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
-                periodic_trigger_thread_->optimize_index_trigger_ =
-                    MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
-                periodic_trigger_thread_->Start();
-            }
-
-            {
-                std::unique_lock<std::mutex> lock(mutex_);
-                current_storage_mode_ = target_mode;
             }
             break;
         }
