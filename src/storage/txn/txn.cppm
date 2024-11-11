@@ -144,7 +144,10 @@ public:
     Pair<Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 
-    Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
+    Status CreateIndexDo(TableEntry *table_entry,
+                         const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
+                         const String &index_name,
+                         HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
     Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
 
