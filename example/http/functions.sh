@@ -268,6 +268,18 @@ curl --request GET \
         "filter": "body = lower('\'TEST@GMAIL.COM\'')"
      } '
 
+# show the string length of all body fields.
+echo -e '\n\n-- show length of body'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output": ["body"],
+         "filter": "strlen(body)"
+     }'
+
 # show rows of 'tbl1' where ltrim(body) is "this is an example for trim "
 echo -e '\n\n-- show rows of 'tbl1' where ltrim(body) is "this is an example for trim "'
 curl --request GET \

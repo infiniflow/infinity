@@ -59,6 +59,13 @@ print(res)
 res = table_obj.output(["*"]).filter("lower('ABC') = c1").to_df()
 print(res)
 
+#function strlen
+res = table_obj.output(["*"]).filter("strlen(c1)").to_df()
+print(res)
+
+res = table_obj.output(["*"]).filter("strlen(c1) > 5").to_df()
+print(res)
+
 #function ltrim, rtrim, trim
 res = table_obj.output(["*", "ltrim(c1)"]).filter("ltrim(c1) = 'abc'").to_df()
 print(res)

@@ -143,5 +143,10 @@ abcddddc abcddddd 2 1
 abcdddde abcddddd 3 1 
 abcdddde abcdddde 4 1
 
+query XXI
+SELECT *, strlen(c1) FROM test_varchar_filter WHERE strlen(c1) = 3;
+----
+abc abcd 5
+
 statement ok
 DROP TABLE test_varchar_filter;
