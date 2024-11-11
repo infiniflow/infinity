@@ -285,8 +285,7 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
                 {
                     Vector<ColumnVector> column_vectors;
                     for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
-                        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
                     }
 
                     {
@@ -783,8 +782,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                 {
                     Vector<ColumnVector> column_vectors;
                     for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
-                        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
                     }
 
                     {
@@ -950,8 +948,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                 {
                     Vector<ColumnVector> column_vectors;
                     for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
-                        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
                     }
 
                     {
@@ -1107,8 +1104,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                 {
                     Vector<ColumnVector> column_vectors;
                     for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
-                        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
                     }
 
                     {

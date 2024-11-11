@@ -101,7 +101,7 @@ public:
                          BufferManager *buffer_manager,
                          const u32 row_offset,
                          const u32 row_count) override {
-        const auto column_vector = block_column_entry->GetConstColumnVector(buffer_manager);
+        const auto column_vector = block_column_entry->GetConstColumnVector(buffer_manager, row_offset);
         std::unique_lock lock(rw_mutex_);
         if (have_ivf_index_.test(std::memory_order_acquire)) {
             if constexpr (column_logical_type == LogicalType::kEmbedding) {

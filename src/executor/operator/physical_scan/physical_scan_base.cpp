@@ -136,8 +136,7 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
             SizeT column_n = base_table_ref_->column_ids_.size();
             for (SizeT i = 0; i < column_n; ++i) {
                 SizeT column_id = base_table_ref_->column_ids_[i];
-                auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                ColumnVector &&column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
+                ColumnVector &&column_vector = block_entry->GetConstColumnVector(buffer_mgr, column_id);
 
                 output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
             }
