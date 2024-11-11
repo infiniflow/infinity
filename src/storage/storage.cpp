@@ -113,7 +113,7 @@ Status Storage::AdminToReader() {
         }
         case StorageType::kMinio: {
             if (VirtualStore::IsInit()) {
-                UnrecoverableError("remote storage system was initialized before.");
+                VirtualStore::UnInitRemoteStore();
             }
             LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
             Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
@@ -129,7 +129,8 @@ Status Storage::AdminToReader() {
             }
 
             if (object_storage_processor_ != nullptr) {
-                UnrecoverableError("Object storage processor was initialized before.");
+                object_storage_processor_->Stop();
+                object_storage_processor_.reset();
             }
             object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
             object_storage_processor_->Start();
@@ -143,20 +144,22 @@ Status Storage::AdminToReader() {
     String persistence_dir = config_ptr_->PersistenceDir();
     if (!persistence_dir.empty()) {
         if (persistence_manager_ != nullptr) {
-            UnrecoverableError("persistence_manager was initialized before.");
+            persistence_manager_.reset();
         }
         i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
         persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
     }
 
-    SizeT cache_result_num = config_ptr_->CacheResultNum();
-    if (result_cache_manager_ == nullptr) {
-        result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
+    if(result_cache_manager_ != nullptr) {
+        result_cache_manager_.reset();
     }
+    SizeT cache_result_num = config_ptr_->CacheResultNum();
+    result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
 
     // Construct buffer manager
     if (buffer_mgr_ != nullptr) {
-        UnrecoverableError("Buffer manager was initialized before.");
+        buffer_mgr_->Stop();
+        buffer_mgr_.reset();
     }
     buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
                                             MakeShared<String>(config_ptr_->DataDir()),
@@ -181,7 +184,7 @@ Status Storage::AdminToWriter() {
             }
             case StorageType::kMinio: {
                 if (VirtualStore::IsInit()) {
-                    UnrecoverableError("remote storage system was initialized before.");
+                    VirtualStore::UnInitRemoteStore();
                 }
                 LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
                 Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
@@ -197,7 +200,8 @@ Status Storage::AdminToWriter() {
                 }
 
                 if (object_storage_processor_ != nullptr) {
-                    UnrecoverableError("Object storage processor was initialized before.");
+                    object_storage_processor_->Stop();
+                    object_storage_processor_.reset();
                 }
                 object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
                 object_storage_processor_->Start();
@@ -211,20 +215,22 @@ Status Storage::AdminToWriter() {
         String persistence_dir = config_ptr_->PersistenceDir();
         if (!persistence_dir.empty()) {
             if (persistence_manager_ != nullptr) {
-                UnrecoverableError("persistence_manager was initialized before.");
+                persistence_manager_.reset();
             }
             i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
             persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
         }
 
-        SizeT cache_result_num = config_ptr_->CacheResultNum();
-        if (result_cache_manager_ == nullptr) {
-            result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
+        if(result_cache_manager_ != nullptr) {
+            result_cache_manager_.reset();
         }
+        SizeT cache_result_num = config_ptr_->CacheResultNum();
+        result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
 
         // Construct buffer manager
         if (buffer_mgr_ != nullptr) {
-            UnrecoverableError("Buffer manager was initialized before.");
+            buffer_mgr_->Stop();
+            buffer_mgr_.reset();
         }
         buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
                                                 MakeShared<String>(config_ptr_->DataDir()),
@@ -505,7 +511,14 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                     break;
                 }
                 case StorageMode::kReadable: {
-                    return AdminToReader();
+                    Status status = AdminToReader();
+                    if (!status.ok()) {
+                        Status to_admin_status = ReaderToAdmin();
+                        if (!status.ok()) {
+                            UnrecoverableError(fmt::format("Fail to restore to admin status: {}", to_admin_status.message()));
+                        }
+                    }
+                    return status;
                 }
                 case StorageMode::kWritable: {
                     return AdminToWriter();
