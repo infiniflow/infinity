@@ -140,6 +140,11 @@ public:
 
     void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, SharedPtr<MemoryIndexer> &memory_indexer, Txn *txn = nullptr);
 
+    Vector<SharedPtr<ChunkIndexEntry>> GetChunks() const {
+        std::shared_lock lock(rw_locker_);
+        return chunk_index_entries_;
+    }
+
     void RemoveChunkIndexEntry(ChunkIndexEntry *chunk_index_entry);
 
     void ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
