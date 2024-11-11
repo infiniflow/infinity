@@ -42,7 +42,7 @@ If you start up Infinity from DEB or RPM, the configuration file will be in the 
 Infinity embedded does not have an *explicit* configuration file. Its configuration file should meet the following requirements:
 
 - It is in the local folder where Infinity embedded is opened (the path that you specify when calling `connect()`), for example `/var/infinity/`:
-- Its name must exactly matche **infinity_conf.toml**.
+- Its name must exactly match **infinity_conf.toml**.
 
 </TabItem>
 </Tabs>
@@ -148,7 +148,7 @@ buffer_manager_size      = "4GB"
 lru_num                  = 7
 # When the required memory size exceeds the free memory in the buffer manager,
 # the buffer manager dumps some of the its in-use memory to a temporary storage.
-* `temp_dir` specifies the path to this temporary storage. 
+# `temp_dir` specifies the path to this temporary storage. 
 temp_dir                 = "/var/infinity/tmp"
 # The global memory index threshold for triggering a flush to disk
 # When the memory used by all existing in-memory indices in the system exceeds this threshold,
