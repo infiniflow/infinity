@@ -14,12 +14,12 @@ statement ok
 SET CONFIG result_cache "on";
 
 statement ok
-SET CONFIG cache_result_capacity 1;
+SET CONFIG cache_result_capacity 5000;
 
 query I
 SHOW GLOBAL VARIABLE cache_result_capacity;
 ----
-1
+5000
 
 statement ok
 SET CONFIG result_cache "clear";
@@ -104,7 +104,7 @@ SELECT * FROM cache_config_test WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR
 query I
 SHOW GLOBAL VARIABLE cache_result_capacity;
 ----
-1
+5000
 
 # query I
 # SHOW GLOBAL VARIABLE cache_result_num;
