@@ -76,7 +76,8 @@ public:
                                   bool HTTPS = false,
                                   const String &access_key = "minioadmin",
                                   const String &secret_key = "minioadmin",
-                                  const String &bucket = "infinity");
+                                  const String &bucket = "infinity",
+                                  bool create_bucket_if_not_exist = false);
 
     static Status UnInitRemoteStore();
 

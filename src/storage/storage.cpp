@@ -93,11 +93,239 @@ Status Storage::InitToAdmin() {
     return Status::OK();
 }
 
-Status Storage::AdminToReader() { return Status::OK(); }
+Status Storage::UnInitFromAdmin() {
+    wal_mgr_.reset();
+    LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
+    current_storage_mode_ = StorageMode::kUnInitialized;
+    return Status::OK();
+}
 
-Status Storage::AdminToWriter() { return Status::OK(); }
+Status Storage::AdminToReader() {
 
-Status Storage::UnInitFromAdmin() { return Status::OK(); }
+    switch (config_ptr_->StorageType()) {
+        case StorageType::kLocal: {
+            // Not init remote store
+            break;
+        }
+        case StorageType::kMinio: {
+            if (VirtualStore::IsInit()) {
+                UnrecoverableError("remote storage system was initialized before.");
+            }
+            LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
+            Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
+                                                          config_ptr_->ObjectStorageUrl(),
+                                                          config_ptr_->ObjectStorageHttps(),
+                                                          config_ptr_->ObjectStorageAccessKey(),
+                                                          config_ptr_->ObjectStorageSecretKey(),
+                                                          config_ptr_->ObjectStorageBucket(),
+                                                          false);
+            if (!status.ok()) {
+                VirtualStore::UnInitRemoteStore();
+                return status;
+            }
+
+            if (object_storage_processor_ != nullptr) {
+                UnrecoverableError("Object storage processor was initialized before.");
+            }
+            object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
+            object_storage_processor_->Start();
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+        }
+    }
+    // Construct persistence store
+    String persistence_dir = config_ptr_->PersistenceDir();
+    if (!persistence_dir.empty()) {
+        if (persistence_manager_ != nullptr) {
+            UnrecoverableError("persistence_manager was initialized before.");
+        }
+        i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
+        persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
+    }
+
+    SizeT cache_result_num = config_ptr_->CacheResultNum();
+    if (result_cache_manager_ == nullptr) {
+        result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
+    }
+
+    // Construct buffer manager
+    if (buffer_mgr_ != nullptr) {
+        UnrecoverableError("Buffer manager was initialized before.");
+    }
+    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
+                                            MakeShared<String>(config_ptr_->DataDir()),
+                                            MakeShared<String>(config_ptr_->TempDir()),
+                                            persistence_manager_.get(),
+                                            config_ptr_->LRUNum());
+    buffer_mgr_->Start();
+
+    reader_init_phase_ = ReaderInitPhase::kPhase1;
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        current_storage_mode_ = StorageMode::kReadable;
+    }
+    return Status::OK();
+}
+
+Status Storage::AdminToWriter() {
+
+    switch (config_ptr_->StorageType()) {
+        case StorageType::kLocal: {
+            // Not init remote store
+            break;
+        }
+        case StorageType::kMinio: {
+            if (VirtualStore::IsInit()) {
+                UnrecoverableError("remote storage system was initialized before.");
+            }
+            LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
+            Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
+                                                          config_ptr_->ObjectStorageUrl(),
+                                                          config_ptr_->ObjectStorageHttps(),
+                                                          config_ptr_->ObjectStorageAccessKey(),
+                                                          config_ptr_->ObjectStorageSecretKey(),
+                                                          config_ptr_->ObjectStorageBucket(),
+                                                          true);
+            if (!status.ok()) {
+                VirtualStore::UnInitRemoteStore();
+                return status;
+            }
+
+            if (object_storage_processor_ != nullptr) {
+                UnrecoverableError("Object storage processor was initialized before.");
+            }
+            object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
+            object_storage_processor_->Start();
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+        }
+    }
+    // Construct persistence store
+    String persistence_dir = config_ptr_->PersistenceDir();
+    if (!persistence_dir.empty()) {
+        if (persistence_manager_ != nullptr) {
+            UnrecoverableError("persistence_manager was initialized before.");
+        }
+        i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
+        persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
+    }
+
+    SizeT cache_result_num = config_ptr_->CacheResultNum();
+    if (result_cache_manager_ == nullptr) {
+        result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
+    }
+
+    // Construct buffer manager
+    if (buffer_mgr_ != nullptr) {
+        UnrecoverableError("Buffer manager was initialized before.");
+    }
+    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
+                                            MakeShared<String>(config_ptr_->DataDir()),
+                                            MakeShared<String>(config_ptr_->TempDir()),
+                                            persistence_manager_.get(),
+                                            config_ptr_->LRUNum());
+    buffer_mgr_->Start();
+
+    // Must init catalog before txn manager.
+    // Replay wal file wrap init catalog
+    TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
+    if (system_start_ts == 0) {
+        // Init database, need to create default_db
+        LOG_INFO(fmt::format("Init a new catalog"));
+        new_catalog_ = Catalog::NewCatalog();
+    }
+
+    i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
+    if (compact_interval > 0) {
+        LOG_INFO(fmt::format("Init compaction alg"));
+        new_catalog_->InitCompactionAlg(system_start_ts);
+    } else {
+        LOG_INFO(fmt::format("Skip init compaction alg"));
+    }
+
+    BuiltinFunctions builtin_functions(new_catalog_);
+    builtin_functions.Init();
+    // Catalog finish init here.
+    if (bg_processor_ != nullptr) {
+        UnrecoverableError("Background processor was initialized before.");
+    }
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
+
+    // Construct txn manager
+    if (txn_mgr_ != nullptr) {
+        UnrecoverableError("Transaction manager was initialized before.");
+    }
+    txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
+    txn_mgr_->Start();
+
+    // start WalManager after TxnManager since it depends on TxnManager.
+    wal_mgr_->Start();
+
+    if (system_start_ts == 0) {
+        CreateDefaultDB();
+    }
+
+    if (memory_index_tracer_ != nullptr) {
+        UnrecoverableError("Memory index tracer was initialized before.");
+    }
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
+
+    bg_processor_->Start();
+
+    // Compact processor will do in WRITABLE MODE:
+    // 1. Compact segments into a big one
+    // 2. Scan which segments should be merged into one
+    // 3. Save the dumped mem index in catalog
+
+    if (compact_processor_ != nullptr) {
+        UnrecoverableError("compact processor was initialized before.");
+    }
+
+    compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
+    compact_processor_->Start();
+
+    // recover index after start compact process
+    new_catalog_->StartMemoryIndexCommit();
+    new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
+
+    if (periodic_trigger_thread_ != nullptr) {
+        UnrecoverableError("periodic trigger was initialized before.");
+    }
+    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+
+    i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+    i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+    i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+    i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
+
+    periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
+    periodic_trigger_thread_->delta_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
+    periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+    periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
+
+    periodic_trigger_thread_->cleanup_trigger_ =
+        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+
+    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
+    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
+    bg_processor_->Submit(force_ckp_task);
+    force_ckp_task->Wait();
+    txn->SetReaderAllowed(true);
+    txn_mgr_->CommitTxn(txn);
+
+    periodic_trigger_thread_->Start();
+
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        current_storage_mode_ = StorageMode::kWritable;
+    }
+    return Status::OK();
+}
 
 // Used for follower and learner
 Status Storage::InitToReader() { return Status::OK(); }
@@ -147,190 +375,22 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             return InitToAdmin();
         }
         case StorageMode::kAdmin: {
-            if (target_mode == StorageMode::kAdmin) {
-                UnrecoverableError("Attempt to set storage mode from Admin to Admin");
-            }
 
-            if (target_mode == StorageMode::kUnInitialized) {
-                wal_mgr_.reset();
-                LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
-                break;
-            }
-
-            {
-                std::unique_lock<std::mutex> lock(mutex_);
-                current_storage_mode_ = target_mode;
-            }
-
-            switch (config_ptr_->StorageType()) {
-                case StorageType::kLocal: {
-                    // Not init remote store
+            switch (target_mode) {
+                case StorageMode::kUnInitialized: {
+                    return UnInitFromAdmin();
+                }
+                case StorageMode::kAdmin: {
+                    UnrecoverableError("Attempt to set storage mode from Admin to Admin");
                     break;
                 }
-                case StorageType::kMinio: {
-                    if (VirtualStore::IsInit()) {
-                        UnrecoverableError("remote storage system was initialized before.");
-                    }
-                    LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
-                    Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
-                                                                  config_ptr_->ObjectStorageUrl(),
-                                                                  config_ptr_->ObjectStorageHttps(),
-                                                                  config_ptr_->ObjectStorageAccessKey(),
-                                                                  config_ptr_->ObjectStorageSecretKey(),
-                                                                  config_ptr_->ObjectStorageBucket());
-                    if (!status.ok()) {
-                        {
-                            std::unique_lock<std::mutex> lock(mutex_);
-                            current_storage_mode_ = current_mode;
-                        }
-                        VirtualStore::UnInitRemoteStore();
-                        return status;
-                    }
-
-                    if (object_storage_processor_ != nullptr) {
-                        UnrecoverableError("Object storage processor was initialized before.");
-                    }
-                    object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
-                    object_storage_processor_->Start();
-                    break;
+                case StorageMode::kReadable: {
+                    return AdminToReader();
                 }
-                default: {
-                    UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+                case StorageMode::kWritable: {
+                    return AdminToWriter();
                 }
             }
-            // Construct persistence store
-            String persistence_dir = config_ptr_->PersistenceDir();
-            if (!persistence_dir.empty()) {
-                if (persistence_manager_ != nullptr) {
-                    UnrecoverableError("persistence_manager was initialized before.");
-                }
-                i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
-                persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
-            }
-
-            SizeT cache_result_num = config_ptr_->CacheResultNum();
-            if (result_cache_manager_ == nullptr) {
-                result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
-            }
-
-            // Construct buffer manager
-            if (buffer_mgr_ != nullptr) {
-                UnrecoverableError("Buffer manager was initialized before.");
-            }
-            buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
-                                                    MakeShared<String>(config_ptr_->DataDir()),
-                                                    MakeShared<String>(config_ptr_->TempDir()),
-                                                    persistence_manager_.get(),
-                                                    config_ptr_->LRUNum());
-            buffer_mgr_->Start();
-
-            if (current_storage_mode_ == StorageMode::kReadable) {
-                LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
-                reader_init_phase_ = ReaderInitPhase::kPhase1;
-                return Status::OK();
-            }
-
-            // Must init catalog before txn manager.
-            // Replay wal file wrap init catalog
-            TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(target_mode);
-            if (system_start_ts == 0) {
-                // Init database, need to create default_db
-                LOG_INFO(fmt::format("Init a new catalog"));
-                new_catalog_ = Catalog::NewCatalog();
-            }
-
-            i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
-            if (compact_interval > 0 and current_storage_mode_ == StorageMode::kWritable) {
-                LOG_INFO(fmt::format("Init compaction alg"));
-                new_catalog_->InitCompactionAlg(system_start_ts);
-            } else {
-                LOG_INFO(fmt::format("Skip init compaction alg"));
-            }
-
-            BuiltinFunctions builtin_functions(new_catalog_);
-            builtin_functions.Init();
-            // Catalog finish init here.
-
-            // Construct txn manager
-            if (txn_mgr_ != nullptr) {
-                UnrecoverableError("Transaction manager was initialized before.");
-            }
-            txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
-            txn_mgr_->Start();
-
-            // start WalManager after TxnManager since it depends on TxnManager.
-            wal_mgr_->Start();
-
-            if (system_start_ts == 0 && target_mode == StorageMode::kWritable) {
-                CreateDefaultDB();
-            }
-
-            if (memory_index_tracer_ != nullptr) {
-                UnrecoverableError("Memory index tracer was initialized before.");
-            }
-            memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
-
-            if (bg_processor_ != nullptr) {
-                UnrecoverableError("Background processor was initialized before.");
-            }
-            bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
-            bg_processor_->Start();
-
-            if (target_mode == StorageMode::kWritable) {
-                // Compact processor will do in WRITABLE MODE:
-                // 1. Compact segments into a big one
-                // 2. Scan which segments should be merged into one
-                // 3. Save the dumped mem index in catalog
-
-                if (compact_processor_ != nullptr) {
-                    UnrecoverableError("compact processor was initialized before.");
-                }
-
-                compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
-                compact_processor_->Start();
-            }
-
-            // recover index after start compact process
-            new_catalog_->StartMemoryIndexCommit();
-            new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
-
-            if (periodic_trigger_thread_ != nullptr) {
-                UnrecoverableError("periodic trigger was initialized before.");
-            }
-            periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
-
-            i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-            i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-            i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-            i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
-
-            if (target_mode == StorageMode::kWritable) {
-                periodic_trigger_thread_->full_checkpoint_trigger_ =
-                    MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
-                periodic_trigger_thread_->delta_checkpoint_trigger_ =
-                    MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
-                periodic_trigger_thread_->compact_segment_trigger_ =
-                    MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
-                periodic_trigger_thread_->optimize_index_trigger_ =
-                    MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
-            }
-
-            periodic_trigger_thread_->cleanup_trigger_ =
-                MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
-            bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
-
-            if (target_mode == StorageMode::kWritable) {
-                auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
-                auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
-                bg_processor_->Submit(force_ckp_task);
-                force_ckp_task->Wait();
-                txn->SetReaderAllowed(true);
-                txn_mgr_->CommitTxn(txn);
-            } else {
-                reader_init_phase_ = ReaderInitPhase::kPhase2;
-            }
-
-            periodic_trigger_thread_->Start();
             break;
         }
         case StorageMode::kReadable: {

@@ -107,18 +107,6 @@ public:
     void CreateDefaultDB();
 
 private:
-    Status InitWalManagerNolock();
-    Status InitObjectStorageNolock();
-    Status InitPersistenceManagerNolock();
-    Status InitResultCacheManagerNolock();
-    Status InitBufferManagerNolock();
-    Status InitCatalogNolock();
-    Status InitBGMemIndexTracerNolock();
-    Status InitBGTaskProcessorNolock();
-    Status InitCompactionProcessorNolock();
-    Status InitPeriodicTriggerNolock();
-
-private:
     Config *config_ptr_{};
     UniquePtr<CleanupInfoTracer> cleanup_info_tracer_{};
     UniquePtr<WalManager> wal_mgr_{};
