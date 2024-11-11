@@ -417,6 +417,7 @@ AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, T
             local_paths_.push_back(rela_dir / (chunk_index_entry->base_name_ + LENGTH_SUFFIX));
             break;
         }
+        case IndexType::kIVF:
         case IndexType::kHnsw:
         case IndexType::kEMVB:
         case IndexType::kSecondary:
