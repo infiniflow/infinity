@@ -19,7 +19,7 @@ module;
 #include <cmath>
 #include <filesystem>
 #include <fstream>
-
+#include <iostream>
 #include <openccxx.h>
 #include <pcre2.h>
 #include <re2/re2.h>
@@ -79,7 +79,7 @@ static inline i32 DecodeFreq(i32 value) {
     return v1;
 }
 
-void Split(const String &input, const String &split_pattern, std::vector<String> &result, bool keep_delim = false) {
+void Split(const String &input, const String &split_pattern, Vector<String> &result, bool keep_delim = false) {
     re2::RE2 pattern(split_pattern);
     re2::StringPiece leftover(input.data());
     re2::StringPiece last_end = leftover;
@@ -100,7 +100,7 @@ void Split(const String &input, const String &split_pattern, std::vector<String>
     }
 }
 
-void Split(const String &input, const RE2 &pattern, std::vector<String> &result, bool keep_delim = false) {
+void Split(const String &input, const RE2 &pattern, Vector<String> &result, bool keep_delim = false) {
     re2::StringPiece leftover(input.data());
     re2::StringPiece last_end = leftover;
     re2::StringPiece extracted_delim_token;
@@ -220,16 +220,212 @@ private:
     pcre2_code_8 *re_{nullptr};
 };
 
+class MacIntyreContractions {
+public:
+    Vector<String> CONTRACTIONS2 = {R"((?i)\b(can)(?#X)(not)\b)",
+                                    R"((?i)\b(d)(?#X)('ye)\b)",
+                                    R"((?i)\b(gim)(?#X)(me)\b)",
+                                    R"((?i)\b(gon)(?#X)(na)\b)",
+                                    R"((?i)\b(got)(?#X)(ta)\b)",
+                                    R"((?i)\b(lem)(?#X)(me)\b)",
+                                    R"((?i)\b(more)(?#X)('n)\b)",
+                                    R"((?i)\b(wan)(?#X)(na)(?=\s))"};
+    Vector<String> CONTRACTIONS3 = {R"((?i) ('t)(?#X)(is)\b)", R"((?i) ('t)(?#X)(was)\b)"};
+    Vector<String> CONTRACTIONS4 = {R"((?i)\b(whad)(dd)(ya)\b)", R"((?i)\b(wha)(t)(cha)\b)"};
+};
+
+class NLTKWordTokenizer {
+public:
+    // Starting quotes.
+    Vector<Pair<String, String>> STARTING_QUOTES = {{String(R"(([«“‘„]|[`]+))"), String(R"( $1 )")},
+                                                    {String(R"(^\")"), String(R"(``)")},
+                                                    {String(R"((``))"), String(R"( $1 )")},
+                                                    {String(R"(([ \(\[{<])(\"|\'{2}))"), String(R"($1 `` )")},
+                                                    {String(R"((?i)(\')(?!re|ve|ll|m|t|s|d|n)(\w)\b)"), String(R"($1 $2)")}};
+
+    // Ending quotes.
+    Vector<Pair<String, String>> ENDING_QUOTES = {{String(R"(([»”’]))"), String(R"( $1 )")},
+                                                  {String(R"('')"), String(R"( '' )")},
+                                                  {String(R"(")"), String(R"( '' )")},
+                                                  {String(R"(\s+)"), String(R"( )")},
+                                                  {String(R"(([^' ])('[sS]|'[mM]|'[dD]|') )"), String(R"($1 $2 )")},
+                                                  {String(R"(([^' ])('ll|'LL|'re|'RE|'ve|'VE|n't|N'T) )"), String(R"($1 $2 )")}};
+
+    // Punctuation.
+    Vector<Pair<String, String>> PUNCTUATION = {{String(R"(([^\.])(\.)([\]\)}>"\'»”’ ]*)\s*$)"), String(R"($1 $2 $3 )")},
+                                                {String(R"(([:,])([^\d]))"), String(R"( $1 $2)")},
+                                                {String(R"(([:,])$)"), String(R"($1 )")},
+                                                {String(R"(\.{2,})"), String(R"($0 )")},
+                                                {String(R"([;@#$%&])"), String(R"($0 )")},
+                                                {String(R"(([^\.])(\.)([\]\)}>"\']*)\s*$)"), String(R"($1 $2 $3 )")},
+                                                {String(R"([?!])"), String(R"($0 )")},
+                                                {String(R"(([^'])' )"), String(R"($1 ' )")},
+                                                {String(R"([*])"), String(R"($0 )")}};
+
+    // Pads parentheses
+    Pair<String, String> PARENS_BRACKETS = {String(R"([\]\[\(\)\{\}\<\>])"), String(R"( $0 )")};
+
+    Vector<Pair<String, String>> CONVERT_PARENTHESES = {{String(R"(\()"), String("-LRB-")},
+                                                        {String(R"(\))"), String("-RRB-")},
+                                                        {String(R"(\[)"), String("-LSB-")},
+                                                        {String(R"(\])"), String("-RSB-")},
+                                                        {String(R"(\{)"), String("-LCB-")},
+                                                        {String(R"(\})"), String("-RCB-")}};
+
+    Pair<String, String> DOUBLE_DASHES = {String(R"(--)"), String(R"( -- )")};
+
+    // List of contractions adapted from Robert MacIntyre's tokenizer.
+    MacIntyreContractions contractions_;
+    Vector<String> CONTRACTIONS2 = contractions_.CONTRACTIONS2;
+    Vector<String> CONTRACTIONS3 = contractions_.CONTRACTIONS3;
+
+    void Tokenize(const String &text, Vector<String> &tokens, bool convert_parentheses = false) {
+        String result = text;
+
+        for (const auto &[pattern, substitution] : STARTING_QUOTES) {
+            result = ApplyRegex(result, pattern, substitution);
+        }
+
+        for (const auto &[pattern, substitution] : PUNCTUATION) {
+            result = ApplyRegex(result, pattern, substitution);
+        }
+
+        // Handles parentheses.
+        result = ApplyRegex(result, PARENS_BRACKETS.first, PARENS_BRACKETS.second);
+
+        // Optionally convert parentheses
+        if (convert_parentheses) {
+            for (const auto &[pattern, substitution] : CONVERT_PARENTHESES) {
+                result = ApplyRegex(result, pattern, substitution);
+            }
+        }
+
+        // Handles double dash.
+        result = ApplyRegex(result, DOUBLE_DASHES.first, DOUBLE_DASHES.second);
+
+        // Add extra space to make things easier
+        result = " " + result + " ";
+
+        for (const auto &[pattern, substitution] : ENDING_QUOTES) {
+            result = ApplyRegex(result, pattern, substitution);
+        }
+
+        for (const auto &pattern : CONTRACTIONS2) {
+            result = ApplyRegex(result, pattern, R"( $1 $2 )");
+        }
+
+        for (const auto &pattern : CONTRACTIONS3) {
+            result = ApplyRegex(result, pattern, R"( $1 $2 )");
+        }
+
+        // Split the result into tokens
+        size_t start = 0;
+        size_t end = result.find(' ');
+        while (end != String::npos) {
+            if (end != start) {
+                tokens.push_back(result.substr(start, end - start));
+            }
+            start = end + 1;
+            end = result.find(' ', start);
+        }
+        if (start != result.length()) {
+            tokens.push_back(result.substr(start));
+        }
+    }
+
+private:
+    String ApplyRegex(const String &text, const String &pattern, const String &substitution) {
+        pcre2_code *re;
+        PCRE2_SPTR pcre2_pattern = reinterpret_cast<PCRE2_SPTR>(pattern.c_str());
+        PCRE2_SPTR pcre2_subject = reinterpret_cast<PCRE2_SPTR>(text.c_str());
+        PCRE2_SPTR pcre2_replacement = reinterpret_cast<PCRE2_SPTR>(substitution.c_str());
+        int errorcode;
+        PCRE2_SIZE erroroffset;
+        re = pcre2_compile(pcre2_pattern, PCRE2_ZERO_TERMINATED, 0, &errorcode, &erroroffset, nullptr);
+        if (re == nullptr) {
+            std::cerr << "pattern " << pattern << " PCRE2 compilation failed at offset " << erroroffset << ": " << errorcode << std::endl;
+            return text;
+        }
+
+        pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, nullptr);
+        int rc = pcre2_match(re, pcre2_subject, text.length(), 0, 0, match_data, nullptr);
+        if (rc < 0) {
+            pcre2_match_data_free(match_data);
+            pcre2_code_free(re);
+            return text;
+        }
+
+        PCRE2_UCHAR buffer[1024];
+        size_t outlength = sizeof(buffer);
+        pcre2_substitute(re,
+                         pcre2_subject,
+                         text.length(),
+                         0,
+                         PCRE2_SUBSTITUTE_GLOBAL,
+                         match_data,
+                         nullptr,
+                         pcre2_replacement,
+                         PCRE2_ZERO_TERMINATED,
+                         buffer,
+                         &outlength);
+
+        pcre2_match_data_free(match_data);
+        pcre2_code_free(re);
+
+        return String(reinterpret_cast<char *>(buffer), outlength);
+    }
+};
+
+void SentenceSplitter(const String &text, Vector<String> &result) {
+    int error_code;
+    PCRE2_SIZE error_offset;
+    const char *pattern = R"( *[\.\?!]['"\)\]]* *)";
+
+    pcre2_code *re = pcre2_compile((PCRE2_SPTR)pattern, PCRE2_ZERO_TERMINATED, 0, &error_code, &error_offset, nullptr);
+
+    if (re == nullptr) {
+        PCRE2_UCHAR buffer[256];
+        pcre2_get_error_message(error_code, buffer, sizeof(buffer));
+        std::cerr << "PCRE2 compilation failed at offset " << error_offset << ": " << buffer << std::endl;
+        return;
+    }
+
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, nullptr);
+
+    PCRE2_SIZE start_offset = 0;
+    while (start_offset < text.size()) {
+        int rc = pcre2_match(re, (PCRE2_SPTR)text.c_str(), text.size(), start_offset, 0, match_data, nullptr);
+
+        if (rc < 0) {
+            result.push_back(text.substr(start_offset));
+            break;
+        }
+
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+        PCRE2_SIZE match_start = ovector[0];
+        PCRE2_SIZE match_end = ovector[1];
+
+        if (match_start > start_offset) {
+            result.push_back(text.substr(start_offset, match_end - start_offset));
+        }
+
+        start_offset = match_end;
+    }
+
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+}
+
 RAGAnalyzer::RAGAnalyzer(const String &path)
     : dict_path_(path), stemmer_(MakeUnique<Stemmer>()), lowercase_string_buffer_(term_string_buffer_limit_),
-      regex_tokenizer_(MakeUnique<RegexTokenizer>()) {
+      nltk_tokenizer_(MakeUnique<NLTKWordTokenizer>()) {
     InitStemmer(STEM_LANG_ENGLISH);
 }
 
 RAGAnalyzer::RAGAnalyzer(const RAGAnalyzer &other)
     : own_dict_(false), trie_(other.trie_), pos_table_(other.pos_table_), lemma_(other.lemma_), stemmer_(MakeUnique<Stemmer>()),
       opencc_(other.opencc_), lowercase_string_buffer_(term_string_buffer_limit_), fine_grained_(other.fine_grained_),
-      regex_tokenizer_(MakeUnique<RegexTokenizer>()) {
+      nltk_tokenizer_(MakeUnique<NLTKWordTokenizer>()) {
     InitStemmer(STEM_LANG_ENGLISH);
 }
 
@@ -603,7 +799,60 @@ void RAGAnalyzer::EnglishNormalize(const Vector<String> &tokens, Vector<String> 
 void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) {
     auto [tks, s] = MaxForward(L);
     auto [tks1, s1] = MaxBackward(L);
+#if 0
+    std::size_t i = 0, j = 0, _i = 0, _j = 0, same = 0;
+    while ((i + same < tks1.size()) && (j + same < tks.size()) && tks1[i + same] == tks[j + same]) {
+        same++;
+    }
+    if (same > 0) {
+        res.push_back(Join(tks, j, j + same));
+    }
+    _i = i + same;
+    _j = j + same;
+    j = _j + 1;
+    i = _i + 1;
+    while (i < tks1.size() && j < tks.size()) {
+        String tk1 = Join(tks1, _i, i, "");
+        String tk = Join(tks, _j, j, "");
+        if (tk1 != tk) {
+            if (tk1.length() > tk.length()) {
+                j++;
+            } else {
+                i++;
+            }
+            continue;
+        }
+        if (tks1[i] != tks[j]) {
+            i++;
+            j++;
+            continue;
+        }
+        Vector<Pair<String, int>> pre_tokens;
+        Vector<Vector<Pair<String, int>>> token_list;
+        Vector<String> best_tokens;
+        double max_score = -100.0F;
+        DFS(Join(tks, _j, j, ""), 0, pre_tokens, token_list, best_tokens, max_score, false);
+        res.push_back(Join(best_tokens, 0));
 
+        same = 1;
+        while (i + same < tks1.size() && j + same < tks.size() && tks1[i + same] == tks[j + same])
+            same++;
+        res.push_back(Join(tks, j, j + same));
+        _i = i + same;
+        _j = j + same;
+        j = _j + 1;
+        i = _i + 1;
+    }
+    if (_i < tks1.size()) {
+        Vector<Pair<String, int>> pre_tokens;
+        Vector<Vector<Pair<String, int>>> token_list;
+        Vector<String> best_tokens;
+        double max_score = -100.0F;
+        DFS(Join(tks, _j, tks.size(), ""), 0, pre_tokens, token_list, best_tokens, max_score, false);
+        res.push_back(Join(best_tokens, 0));
+    }
+
+#else
     Vector<int> diff(std::max(tks.size(), tks1.size()), 0);
     for (std::size_t i = 0; i < std::min(tks.size(), tks1.size()); ++i) {
         if (tks[i] != tks1[i]) {
@@ -645,6 +894,7 @@ void RAGAnalyzer::TokenizeInner(Vector<String> &res, const String &L) {
         res.push_back(Join(best_tokens, 0));
         i = e + 1;
     }
+#endif
 }
 
 void RAGAnalyzer::SplitLongText(const String &L, u32 length, Vector<String> &sublines) {
@@ -709,15 +959,19 @@ String RAGAnalyzer::Tokenize(const String &line) {
         }
     }
     if (zh_num == 0) {
-        TermList term_list;
-        // tokenizer_.Tokenize(line, term_list);
-        regex_tokenizer_->RegexTokenize(line, term_list);
+        Vector<String> term_list;
+        Vector<String> sentences;
+        SentenceSplitter(line, sentences);
+        for (auto &sentence : sentences) {
+            nltk_tokenizer_->Tokenize(sentence, term_list);
+        }
         for (unsigned i = 0; i < term_list.size(); ++i) {
-            String t = lemma_->Lemmatize(term_list[i].text_);
+            String t = lemma_->Lemmatize(term_list[i]);
             char *lowercase_term = lowercase_string_buffer_.data();
             ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
             String stem_term;
             stemmer_->Stem(lowercase_term, stem_term);
+            std::cout << lowercase_term << " " << stem_term << std::endl;
             res.push_back(stem_term);
         }
         String ret = Join(res, 0);
@@ -732,6 +986,7 @@ String RAGAnalyzer::Tokenize(const String &line) {
             res.push_back(L);
             continue;
         }
+
         if (length > MAX_SENTENCE_LEN) {
             Vector<String> sublines;
             SplitLongText(L, length, sublines);
@@ -739,9 +994,9 @@ String RAGAnalyzer::Tokenize(const String &line) {
                 TokenizeInner(res, l);
             }
         } else
+
             TokenizeInner(res, L);
     }
-
     Vector<String> normalize_res;
     EnglishNormalize(res, normalize_res);
     String r = Join(normalize_res, 0);

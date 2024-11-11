@@ -32,7 +32,7 @@ namespace infinity {
 // C++ reimplementation of
 // https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py
 
-class RegexTokenizer;
+class NLTKWordTokenizer;
 export class RAGAnalyzer : public Analyzer {
 public:
     RAGAnalyzer(const String &path);
@@ -110,7 +110,7 @@ public:
 
     bool fine_grained_{false};
 
-    UniquePtr<RegexTokenizer> regex_tokenizer_;
+    UniquePtr<NLTKWordTokenizer> nltk_tokenizer_;
 
     RE2 pattern1_{"[a-zA-Z_-]+$"};
 
