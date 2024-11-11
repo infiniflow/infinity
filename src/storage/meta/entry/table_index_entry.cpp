@@ -373,6 +373,28 @@ TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prep
     return {segment_index_entries, Status::OK()};
 }
 
+Status TableIndexEntry::CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn) {
+    if (this->index_base_->column_names_.size() != 1) {
+        // TODO
+        Status status = Status::NotSupport("Not implemented");
+        RecoverableError(status);
+    }
+    auto &index_index = table_ref->index_index_;
+    auto iter = index_index->index_snapshots_.find(*index_base_->index_name_);
+    if (iter == index_index->index_snapshots_.end()) {
+        return Status::OK();
+    }
+    auto &segment_index_snapshots = iter->second;
+    for (auto &[segment_id, segment_index_entry] : segment_index_snapshots->segment_index_entries_) {
+        atomic_u64 &create_index_idx = create_index_idxes.at(segment_id);
+        auto status = segment_index_entry->CreateIndexDo(create_index_idx);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status TableIndexEntry::CreateIndexDo(const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
                                       HashMap<SegmentID, atomic_u64> &create_index_idxes,
                                       Txn *txn) {

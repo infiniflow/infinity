@@ -36,8 +36,6 @@ import third_party;
 import logger;
 import wal_manager;
 import infinity_context;
-import table_entry;
-import segment_index_entry;
 
 module physical_create_index_do;
 
@@ -71,13 +69,7 @@ bool PhysicalCreateIndexDo::Execute(QueryContext *query_context, OperatorState *
     auto *create_index_do_state = static_cast<CreateIndexDoOperatorState *>(operator_state);
     auto &create_index_idxes = create_index_do_state->create_index_shared_data_->create_index_idxes_;
 
-    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
-    Map<SegmentID, SegmentIndexEntry *> segment_index_entries ;
-    const auto *index_index = base_table_ref_->index_index_.get();
-    if (auto iter = index_index->index_snapshots_.find(*index_name_); iter != index_index->index_snapshots_.end()) {
-        segment_index_entries = iter->second->segment_index_entries_;
-    }
-    auto status = txn->CreateIndexDo(table_entry, segment_index_entries, *index_name_, create_index_idxes);
+    auto status = txn->CreateIndexDo(base_table_ref_.get(), *index_name_, create_index_idxes);
     if (!status.ok()) {
         operator_state->status_ = status;
         return false;
