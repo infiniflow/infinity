@@ -443,9 +443,9 @@ void InfinityContext::UnInit() {
         cluster_manager_.reset();
     }
 
-    inverting_thread_pool_.stop(true);
-    commiting_thread_pool_.stop(true);
-    hnsw_build_thread_pool_.stop(true);
+//    inverting_thread_pool_.stop(true);
+//    commiting_thread_pool_.stop(true);
+//    hnsw_build_thread_pool_.stop(true);
 
     session_mgr_.reset();
     resource_manager_.reset();
