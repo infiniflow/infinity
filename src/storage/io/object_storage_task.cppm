@@ -25,7 +25,15 @@ import stl;
 
 namespace infinity {
 
-export enum class ObjectStorageTaskType { kDownload, kUpload, kCopy, kRemove, kStopProcessor, kInvalid };
+export enum class ObjectStorageTaskType {
+    kInvalid,
+    kDownload,
+    kUpload,
+    kCopy,
+    kRemove,
+    kStopProcessor,
+    kLocalDrop,
+};
 
 export struct BaseObjectStorageTask {
     BaseObjectStorageTask(ObjectStorageTaskType type) : type_(type) {}
@@ -97,6 +105,15 @@ export struct StopObjectStorageProcessTask final : public BaseObjectStorageTask 
     ~StopObjectStorageProcessTask() = default;
 
     String ToString() const final { return "Stop processor"; }
+};
+
+export struct LocalDropTask final : public BaseObjectStorageTask {
+    LocalDropTask(String drop_path) : BaseObjectStorageTask(ObjectStorageTaskType::kLocalDrop), drop_path_(drop_path) {}
+
+    ~LocalDropTask() = default;
+
+    String ToString() const final { return "Local Drop Task"; }
+    String drop_path_;
 };
 
 } // namespace infinity
