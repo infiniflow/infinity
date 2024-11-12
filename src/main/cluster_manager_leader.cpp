@@ -50,7 +50,29 @@ Status ClusterManager::InitAsLeader(const String &node_name) {
     return Status::OK();
 }
 
-Status ClusterManager::UnInitFromLeaderNoLock() {
+Status ClusterManager::UnInitFromLeader() {
+    if (hb_periodic_thread_.get() != nullptr) {
+        {
+            std::lock_guard hb_lock(hb_mutex_);
+            hb_running_ = false;
+            hb_cv_.notify_all();
+        }
+        hb_periodic_thread_->join();
+        hb_periodic_thread_.reset();
+    }
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
+
+    other_node_map_.clear(); // reset connected clients;
+    this_node_.reset(); // reset this node;
+
+    // Disconnect with connected follower and learner
+    for (const auto &reader_client_pair : reader_client_map_) {
+        clients_for_cleanup_.emplace_back(reader_client_pair.second);
+    }
+    reader_client_map_.clear();
+    logs_to_sync_.clear(); // Logs from WAL manager, ready to sync
+
+    current_node_role_ = NodeRole::kUnInitialized;
 
     return Status::OK();
 }
@@ -81,6 +103,8 @@ void ClusterManager::CheckHeartBeatThread() {
 
         auto now = std::chrono::system_clock::now();
         auto time_since_epoch = now.time_since_epoch();
+
+        std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         this_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
         for (auto &[node_name, other_node] : other_node_map_) {

@@ -28,7 +28,8 @@ void ClusterManager::InitAsAdmin() {
     current_node_role_ = NodeRole::kAdmin;
 }
 
-Status ClusterManager::UnInitFromAdminNoLock() {
+Status ClusterManager::UnInitFromAdmin() {
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     current_node_role_ = NodeRole::kUnInitialized;
     return Status::OK();
 }

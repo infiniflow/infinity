@@ -28,7 +28,8 @@ void ClusterManager::InitAsStandalone() {
     current_node_role_ = NodeRole::kStandalone;
 }
 
-Status ClusterManager::UnInitFromStandaloneNoLock() {
+Status ClusterManager::UnInitFromStandalone() {
+    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
     current_node_role_ = NodeRole::kUnInitialized;
     return Status::OK();
 }

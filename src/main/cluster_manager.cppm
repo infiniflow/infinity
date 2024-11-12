@@ -36,12 +36,13 @@ public:
     ClusterManager();
     ~ClusterManager();
 
-    Status UnInitFromAdminNoLock();
-    Status UnInitFromStandaloneNoLock();
-    Status UnInitFromLeaderNoLock();
-    Status UnInitFromFollowerNoLock();
-    Status UnInitFromLearnerNoLock();
+    Status UnInitFromAdmin();
+    Status UnInitFromStandalone();
+    Status UnInitFromLeader();
+    Status UnInitFromFollower();
+    Status UnInitFromLearner();
     Status UnInit(bool not_unregister);
+    Status UnInit();
     // Used by all nodes ADMIN SHOW NODES
     Vector<SharedPtr<NodeInfo>> ListNodes() const;
     // Used by all nodes ADMIN SHOW NODE node_name;

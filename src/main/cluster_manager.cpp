@@ -50,6 +50,30 @@ ClusterManager::~ClusterManager() {
 #endif
 }
 
+Status ClusterManager::UnInit() {
+    switch (current_node_role_) {
+        case NodeRole::kUnInitialized: {
+            LOG_WARN("Cluster manager is already in UnInitialized role");
+            return Status::OK();
+        }
+        case NodeRole::kAdmin: {
+            return UnInitFromAdmin();
+        }
+        case NodeRole::kStandalone: {
+            return UnInitFromStandalone();
+        }
+        case NodeRole::kLeader: {
+            return UnInitFromLeader();
+        }
+        case NodeRole::kFollower: {
+            return UnInitFromFollower();
+        }
+        case NodeRole::kLearner: {
+            return UnInitFromLearner();
+        }
+    }
+    return Status::OK();
+}
 
 Status ClusterManager::UnInit(bool not_unregister) {
     if (hb_periodic_thread_.get() != nullptr) {
@@ -84,7 +108,6 @@ Status ClusterManager::UnInit(bool not_unregister) {
 
     return Status::OK();
 }
-
 
 Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const String &from_node_name, const String &server_ip, i64 server_port) {
     SharedPtr<PeerClient> client = MakeShared<PeerClient>(from_node_name, server_ip, server_port);
