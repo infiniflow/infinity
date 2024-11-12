@@ -59,7 +59,7 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
     return Status::OK();
 }
 
-Status ClusterManager::UnInitFromFollower() {
+Status ClusterManager::UnInitFromFollower(bool no_need_unregister) {
 
     if (hb_periodic_thread_.get() != nullptr) {
         {
@@ -73,10 +73,15 @@ Status ClusterManager::UnInitFromFollower() {
 
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
 
-    Status status = UnregisterToLeaderNoLock();
-    if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to unregister to leader: {}", status.message()));
+    bool need_unregister = !no_need_unregister;
+    if(need_unregister) {
+        // Removed by leader, no need to unregister again.
+        Status status = UnregisterToLeaderNoLock();
+        if (!status.ok()) {
+            LOG_ERROR(fmt::format("Fail to unregister to leader: {}", status.message()));
+        }
     }
+
     other_node_map_.clear();
     leader_node_.reset();
     this_node_.reset();
@@ -120,7 +125,7 @@ Status ClusterManager::InitAsLearner(const String &node_name, const String &lead
     return Status::OK();
 }
 
-Status ClusterManager::UnInitFromLearner() { return UnInitFromFollower(); }
+Status ClusterManager::UnInitFromLearner(bool no_need_unregister) { return UnInitFromFollower(no_need_unregister); }
 
 Status ClusterManager::RegisterToLeader() {
     // Register to leader;

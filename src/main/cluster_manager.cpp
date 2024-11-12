@@ -50,7 +50,7 @@ ClusterManager::~ClusterManager() {
 #endif
 }
 
-Status ClusterManager::UnInit() {
+Status ClusterManager::UnInit(bool remote_from_leader) {
     switch (current_node_role_) {
         case NodeRole::kUnInitialized: {
             LOG_WARN("Cluster manager is already in UnInitialized role");
@@ -66,10 +66,10 @@ Status ClusterManager::UnInit() {
             return UnInitFromLeader();
         }
         case NodeRole::kFollower: {
-            return UnInitFromFollower();
+            return UnInitFromFollower(remote_from_leader);
         }
         case NodeRole::kLearner: {
-            return UnInitFromLearner();
+            return UnInitFromLearner(remote_from_leader);
         }
     }
     return Status::OK();

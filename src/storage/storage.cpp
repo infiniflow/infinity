@@ -412,6 +412,10 @@ Status Storage::UnInitFromReader() {
             persistence_manager_.reset();
         }
 
+        if (cleanup_info_tracer_ != nullptr) {
+            cleanup_info_tracer_.reset();
+        }
+
         current_storage_mode_ = StorageMode::kUnInitialized;
     }
     LOG_INFO(fmt::format("Finishing changing storage from readable mode to un-init"));
@@ -561,7 +565,17 @@ Status Storage::UnInitFromWriter() {
             buffer_mgr_.reset();
         }
 
-        persistence_manager_.reset();
+        if (result_cache_manager_ != nullptr) {
+            result_cache_manager_.reset();
+        }
+
+        if (persistence_manager_ != nullptr) {
+            persistence_manager_.reset();
+        }
+
+        if (cleanup_info_tracer_ != nullptr) {
+            cleanup_info_tracer_.reset();
+        }
     }
     LOG_INFO(fmt::format("Finishing changing storage from writable mode to un-init"));
     return Status::OK();
@@ -587,7 +601,11 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
         LOG_WARN(fmt::format("Set unchanged mode"));
         return Status::OK();
     }
-    cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
+
+    if (cleanup_info_tracer_ == nullptr) {
+        cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
+    }
+
     switch (current_mode) {
         case StorageMode::kUnInitialized: {
             if (target_mode != StorageMode::kAdmin) {
