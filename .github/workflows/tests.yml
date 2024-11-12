@@ -274,11 +274,14 @@ jobs:
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
+        id: run_pysdk_local_infinity_test
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity/* && cp test/data/config/infinity_conf.toml /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Collect embedded infinity log
         if: ${{ !cancelled() && failure()}} # run this step if previous steps failed
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cat /var/infinity/log/infinity.log"
+        run: |
+          failure="${{ steps.run_pysdk_local_infinity_test.outcome == 'failure'}}"
+          sudo python3 scripts/collect_embedded_log.py --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --log_path=/var/infinity/log/infinity.log
 
       - name: Start minio container
         if: ${{ !cancelled() && !failure() }}
