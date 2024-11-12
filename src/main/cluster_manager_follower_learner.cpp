@@ -61,6 +61,16 @@ Status ClusterManager::InitAsFollower(const String &node_name, const String &lea
 
 Status ClusterManager::UnInitFromFollower() {
 
+    if (hb_periodic_thread_.get() != nullptr) {
+        {
+            std::lock_guard hb_lock(hb_mutex_);
+            hb_running_ = false;
+            hb_cv_.notify_all();
+        }
+        hb_periodic_thread_->join();
+        hb_periodic_thread_.reset();
+    }
+
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
 
     Status status = UnregisterToLeaderNoLock();
@@ -177,21 +187,22 @@ void ClusterManager::HeartBeatToLeaderThread() {
             break;
         }
 
-        if (!client_to_leader_->ServerConnected()) {
-            // If peer_client was disconnected, try to reconnect to server.
-            Status connect_status = client_to_leader_->Reconnect();
-            if (!connect_status.ok()) {
-                LOG_ERROR(connect_status.message());
-                continue;
-            }
-        }
-
         // Update latest update time
         auto hb_now = std::chrono::system_clock::now();
         auto hb_time_since_epoch = hb_now.time_since_epoch();
         SharedPtr<HeartBeatPeerTask> hb_task = nullptr;
         {
             std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
+
+            if (!client_to_leader_->ServerConnected()) {
+                // If peer_client was disconnected, try to reconnect to server.
+                Status connect_status = client_to_leader_->Reconnect();
+                if (!connect_status.ok()) {
+                    LOG_ERROR(connect_status.message());
+                    continue;
+                }
+            }
+
             this_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(hb_time_since_epoch).count());
 
             String this_node_name = this_node_->node_name();

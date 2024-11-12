@@ -75,7 +75,7 @@ Status ClusterManager::UnInit() {
     return Status::OK();
 }
 
-Status ClusterManager::UnInit(bool not_unregister) {
+Status ClusterManager::UnInitOld(bool not_unregister) {
     if (hb_periodic_thread_.get() != nullptr) {
         {
             std::lock_guard hb_lock(hb_mutex_);

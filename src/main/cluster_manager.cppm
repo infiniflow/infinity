@@ -41,7 +41,7 @@ public:
     Status UnInitFromLeader();
     Status UnInitFromFollower();
     Status UnInitFromLearner();
-    Status UnInit(bool not_unregister);
+    Status UnInitOld(bool not_unregister);
     Status UnInit();
     // Used by all nodes ADMIN SHOW NODES
     Vector<SharedPtr<NodeInfo>> ListNodes() const;
