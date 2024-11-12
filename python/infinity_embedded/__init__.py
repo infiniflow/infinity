@@ -20,13 +20,13 @@ import os
 # import pkg_resources
 # __version__ = pkg_resources.get_distribution("infinity_sdk").version
 
-from infinity_embedded.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH, InfinityException
+from infinity_embedded.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH, InfinityException, LOCAL_INFINITY_CONFIG_PATH
 from infinity_embedded.infinity import InfinityConnection
 from infinity_embedded.local_infinity.infinity import LocalInfinityConnection
 from infinity_embedded.errors import ErrorCode
 
-def connect(uri = LOCAL_INFINITY_PATH) -> InfinityConnection:
+def connect(uri = LOCAL_INFINITY_PATH, config_path = LOCAL_INFINITY_CONFIG_PATH) -> InfinityConnection:
     if isinstance(uri, str) and len(uri) != 0:
-        return LocalInfinityConnection(uri)
+        return LocalInfinityConnection(uri, config_path)
     else:
         raise InfinityException(ErrorCode.INVALID_SERVER_ADDRESS, f"Unknown uri: {uri}")
