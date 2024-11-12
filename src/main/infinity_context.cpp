@@ -37,17 +37,9 @@ import infinity_thrift_service;
 
 namespace infinity {
 
-InfinityContext::InfinityContext() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("InfinityContext");
-#endif
-}
+InfinityContext::InfinityContext() = default;
 
-InfinityContext::~InfinityContext() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("InfinityContext");
-#endif
-}
+InfinityContext::~InfinityContext() = default;
 
 NodeRole InfinityContext::GetServerRole() const {
     if (cluster_manager_ == nullptr) {
@@ -72,13 +64,16 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     if (!status.ok()) {
         std::exit(static_cast<int>(status.code()));
     }
-    Logger::Initialize(config_.get());
+    status = Logger::Initialize(config_.get());
+    if (!status.ok()) {
+        std::exit(static_cast<int>(status.code()));
+    }
 
     resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
 
     session_mgr_ = MakeUnique<SessionManager>();
 
-    Status change_result = ChangeRole(NodeRole::kAdmin);
+    Status change_result = ChangeServerRole(NodeRole::kAdmin);
     if (!status.ok()) {
         UnrecoverableError(status.message());
         return;
@@ -89,7 +84,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     }
 
     if (config_->ServerMode() == "standalone") {
-        Status change_to_standalone = ChangeRole(NodeRole::kStandalone);
+        Status change_to_standalone = ChangeServerRole(NodeRole::kStandalone);
         if (!change_to_standalone.ok()) {
             UnrecoverableError(change_to_standalone.message());
             return;
@@ -100,12 +95,12 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     }
 }
 
-Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, u16 node_port) {
+Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, u16 node_port) {
     NodeRole current_role = GetServerRole();
     if (current_role == target_role) {
         return Status::OK();
     }
-    LOG_INFO(fmt::format("ChangeRole from {} to {}", ToString(current_role), ToString(target_role)));
+    LOG_INFO(fmt::format("ChangeServerRole from {} to {}", ToString(current_role), ToString(target_role)));
 
     switch (current_role) {
         case NodeRole::kUnInitialized: {
@@ -410,7 +405,7 @@ void InfinityContext::UnInit() {
             return;
         }
         case NodeRole::kAdmin: {
-            Status status = ChangeRole(NodeRole::kUnInitialized);
+            Status status = ChangeServerRole(NodeRole::kUnInitialized);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
                 return;
@@ -418,12 +413,12 @@ void InfinityContext::UnInit() {
             break;
         }
         default: {
-            Status status = ChangeRole(NodeRole::kAdmin);
+            Status status = ChangeServerRole(NodeRole::kAdmin);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
                 return;
             }
-            status = ChangeRole(NodeRole::kUnInitialized);
+            status = ChangeServerRole(NodeRole::kUnInitialized);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
                 return;

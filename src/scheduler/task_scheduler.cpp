@@ -43,11 +43,7 @@ import global_resource_usage;
 namespace infinity {
 
 Worker::Worker(u64 cpu_id, UniquePtr<FragmentTaskBlockQueue> queue, UniquePtr<Thread> thread)
-    : cpu_id_(cpu_id), queue_(std::move(queue)), thread_(std::move(thread)) {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("Worker");
-#endif
-}
+    : cpu_id_(cpu_id), queue_(std::move(queue)), thread_(std::move(thread)) {}
 
 // Non-static memory methods
 TaskScheduler::TaskScheduler(Config *config_ptr) {

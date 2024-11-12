@@ -33,7 +33,7 @@ namespace infinity {
 
 PeerClient::~PeerClient() {
     if (running_) {
-        UnInit(false);
+        UnInit(true);
     }
     server_connected_ = false;
 #ifdef INFINITY_DEBUG
