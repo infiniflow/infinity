@@ -50,11 +50,6 @@ ClusterManager::~ClusterManager() {
 #endif
 }
 
-void ClusterManager::InitAsStandalone() {
-    std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
-    current_node_role_ = NodeRole::kStandalone;
-}
-
 Status ClusterManager::InitAsLeader(const String &node_name) {
 
     Config *config_ptr = InfinityContext::instance().config();

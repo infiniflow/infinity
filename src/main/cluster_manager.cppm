@@ -36,8 +36,8 @@ public:
     ClusterManager();
     ~ClusterManager();
 
-    Status UnInitAsAdmin();
-    Status UnInitAsStandalone();
+    Status UnInitFromAdminNoLock();
+    Status UnInitFromStandaloneNoLock();
     Status UnInitAsLeader();
     Status UnInitAsFollower();
     Status UnInitAsLearner();

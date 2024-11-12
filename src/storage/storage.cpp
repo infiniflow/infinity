@@ -321,6 +321,8 @@ Status Storage::AdminToWriter() {
         periodic_trigger_thread_->cleanup_trigger_ =
             MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
         bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+
+        current_storage_mode_ = StorageMode::kWritable;
     }
 
     auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
@@ -332,10 +334,6 @@ Status Storage::AdminToWriter() {
 
     periodic_trigger_thread_->Start();
 
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        current_storage_mode_ = StorageMode::kWritable;
-    }
     return Status::OK();
 }
 

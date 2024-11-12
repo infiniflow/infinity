@@ -23,12 +23,12 @@ import status;
 
 namespace infinity {
 
-void ClusterManager::InitAsAdmin() {
+void ClusterManager::InitAsStandalone() {
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
-    current_node_role_ = NodeRole::kAdmin;
+    current_node_role_ = NodeRole::kStandalone;
 }
 
-Status ClusterManager::UnInitFromAdminNoLock() {
+Status ClusterManager::UnInitFromStandaloneNoLock() {
     current_node_role_ = NodeRole::kUnInitialized;
     return Status::OK();
 }
