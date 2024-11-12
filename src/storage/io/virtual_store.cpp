@@ -36,6 +36,8 @@ import infinity_context;
 import object_storage_task;
 import admin_statement;
 
+namespace fs = std::filesystem;
+
 namespace infinity {
 
 StorageType String2StorageType(const String &storage_type) {
@@ -200,7 +202,8 @@ Status VirtualStore::DeleteFileBG(const String &path) {
             break;
         }
         default: {
-            return Status::NotSupport("Not support storage type");
+            fs::remove(path);
+            break;
         }
     }
 
