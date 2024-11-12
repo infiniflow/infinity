@@ -190,6 +190,23 @@ Status VirtualStore::DeleteFile(const String &file_name) {
     return Status::OK();
 }
 
+Status VirtualStore::DeleteFileBG(const String &path) {
+    switch (VirtualStore::storage_type_) {
+        case StorageType::kMinio: {
+            auto drop_task = MakeShared<LocalDropTask>(path);
+            auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
+            object_storage_processor->Submit(drop_task);
+            drop_task->Wait();
+            break;
+        }
+        default: {
+            return Status::NotSupport("Not support storage type");
+        }
+    }
+
+    return Status::OK();
+}
+
 Status VirtualStore::MakeDirectory(const String &path) {
     if (VirtualStore::Exists(path)) {
         if (std::filesystem::is_directory(path)) {

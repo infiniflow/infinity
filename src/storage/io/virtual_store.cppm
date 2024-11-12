@@ -57,6 +57,7 @@ public:
     static bool IsRegularFile(const String &path);
     static bool Exists(const String &path);
     static Status DeleteFile(const String &path);
+    static Status DeleteFileBG(const String &path);
     static Status MakeDirectory(const String &path);
     static Status RemoveDirectory(const String &path);
     static Status CleanupDirectory(const String &path);
