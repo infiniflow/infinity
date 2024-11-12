@@ -22,6 +22,7 @@ module;
 #include <openccxx.h>
 #include <pcre2.h>
 #include <re2/re2.h>
+#include <sstream>
 
 #include "string_utils.h"
 
@@ -132,7 +133,7 @@ String Join(const Vector<String> &tokens, int start, int end, const String &deli
             oss << delim;
         oss << tokens[i];
     }
-    return oss.str();
+    return std::move(oss).str();
 }
 
 String Join(const Vector<String> &tokens, int start, const String &delim = " ") { return Join(tokens, start, tokens.size(), delim); }
@@ -144,7 +145,7 @@ String Join(const TermList &tokens, int start, int end, const String &delim = " 
             oss << delim;
         oss << tokens[i].text_;
     }
-    return oss.str();
+    return std::move(oss).str();
 }
 
 bool IsChinese(const String &str) {
@@ -657,36 +658,23 @@ String RAGAnalyzer::RKey(const String &line) {
 }
 
 Pair<Vector<String>, double> RAGAnalyzer::Score(const Vector<Pair<String, int>> &token_freqs) {
-    const int B = 30;
-    double F = 0.0, L = 0.0;
+    constexpr i64 B = 30;
+    i64 F = 0, L = 0;
     Vector<String> tokens;
     tokens.reserve(token_freqs.size());
-
-    for (const auto &tk_freq_tag : token_freqs) {
-        const String &token = tk_freq_tag.first;
-        const auto &freq_tag = tk_freq_tag.second;
-        i32 freq = DecodeFreq(freq_tag);
-
-        F += freq;
+    for (const auto &[token, freq_tag] : token_freqs) {
+        F += DecodeFreq(freq_tag);
         L += (UTF8Length(token) < 2) ? 0 : 1;
         tokens.push_back(token);
     }
-
-    if (!tokens.empty()) {
-        F /= tokens.size();
-        L /= tokens.size();
-    }
-
-    double score = B / static_cast<double>(tokens.size()) + L + F;
-    return {tokens, score};
+    const auto score = (B + L + F) / static_cast<double>(tokens.size());
+    return {std::move(tokens), score};
 }
 
 void RAGAnalyzer::SortTokens(const Vector<Vector<Pair<String, int>>> &token_list, Vector<Pair<Vector<String>, double>> &res) {
     for (const auto &tfts : token_list) {
-        auto [tks, score] = Score(tfts);
-        res.emplace_back(tks, score);
+        res.push_back(Score(tfts));
     }
-
     std::sort(res.begin(), res.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
 }
 
@@ -711,9 +699,9 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxForward(const String &line) {
 
         int v = trie_->Get(Key(t));
         if (v != -1) {
-            res.emplace_back(t, v);
+            res.emplace_back(std::move(t), v);
         } else {
-            res.emplace_back(t, 0);
+            res.emplace_back(std::move(t), 0);
         }
 
         s = e;
@@ -727,7 +715,7 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) {
     int s = UTF8Length(line) - 1;
 
     while (s >= 0) {
-        int e = s + 1;
+        const int e = s + 1;
         String t = UTF8Substr(line, s, e - s);
         while (s > 0 && trie_->HasKeysWithPrefix(RKey(t))) {
             s -= 1;
@@ -739,10 +727,11 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) {
         }
 
         int v = trie_->Get(Key(t));
-        if (v != -1)
-            res.emplace_back(t, v);
-        else
-            res.emplace_back(t, 0);
+        if (v != -1) {
+            res.emplace_back(std::move(t), v);
+        } else {
+            res.emplace_back(std::move(t), 0);
+        }
 
         s -= 1;
     }
@@ -752,27 +741,20 @@ Pair<Vector<String>, double> RAGAnalyzer::MaxBackward(const String &line) {
 }
 
 int RAGAnalyzer::DFS(const String &chars,
-                     int s,
+                     const int s,
                      Vector<Pair<String, int>> &pre_tokens,
                      Vector<Vector<Pair<String, int>>> &token_list,
                      Vector<String> &best_tokens,
                      double &max_score,
-                     bool memo_all) {
+                     const bool memo_all) {
     int res = s;
-    int len = UTF8Length(chars);
+    const int len = UTF8Length(chars);
     if (s >= len) {
         if (memo_all) {
             token_list.push_back(pre_tokens);
-        } else {
-            double current_score = Score(pre_tokens).second;
-            if (current_score > max_score) {
-                best_tokens.clear();
-                best_tokens.reserve(pre_tokens.size());
-                for (auto &t : pre_tokens) {
-                    best_tokens.push_back(t.first);
-                }
-                max_score = current_score;
-            }
+        } else if (auto [vec_str ,current_score] = Score(pre_tokens); current_score > max_score) {
+            best_tokens = std::move(vec_str);
+            max_score = current_score;
         }
         return res;
     }
@@ -802,13 +784,9 @@ int RAGAnalyzer::DFS(const String &chars,
             break;
         }
 
-        if (trie_->HasKeysWithPrefix(k)) {
+        if (const int v = trie_->Get(k); v != -1) {
             auto pretks = pre_tokens;
-            int v = trie_->Get(k);
-            if (v != -1)
-                pretks.emplace_back(t, v);
-            else
-                pretks.emplace_back(t, Encode(-12, 0));
+            pretks.emplace_back(std::move(t), v);
             res = std::max(res, DFS(chars, e, pretks, token_list, best_tokens, max_score, memo_all));
         }
     }
@@ -818,12 +796,11 @@ int RAGAnalyzer::DFS(const String &chars,
     }
 
     String t = UTF8Substr(chars, s, 1);
-    String k = Key(t);
-    int v = trie_->Get(k);
-    if (v != -1)
-        pre_tokens.emplace_back(t, v);
-    else
-        pre_tokens.emplace_back(t, Encode(-12, 0));
+    if (const int v = trie_->Get(Key(t)); v != -1) {
+        pre_tokens.emplace_back(std::move(t), v);
+    } else {
+        pre_tokens.emplace_back(std::move(t), Encode(-12, 0));
+    }
 
     return DFS(chars, s + 1, pre_tokens, token_list, best_tokens, max_score, memo_all);
 }
@@ -1106,12 +1083,13 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
     }
 
     for (auto &token : tks) {
-        if (UTF8Length(token) < 3 || RE2::PartialMatch(token, pattern4_)) { //[0-9,\\.-]+$
+        const auto token_len = UTF8Length(token);
+        if (token_len < 3 || RE2::PartialMatch(token, pattern4_)) { //[0-9,\\.-]+$
             res.push_back(token);
             continue;
         }
         Vector<Vector<Pair<String, int>>> token_list;
-        if (UTF8Length(token) > 10) {
+        if (token_len > 10) {
             Vector<Pair<String, int>> tk;
             tk.emplace_back(token, Encode(-1, 0));
             token_list.push_back(tk);
@@ -1127,14 +1105,21 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
         }
         Vector<Pair<Vector<String>, double>> sorted_tokens;
         SortTokens(token_list, sorted_tokens);
-        auto stk = sorted_tokens[1].first;
-        if (stk.size() == token.length()) {
+        const auto &stk = sorted_tokens[1].first;
+        if (stk.size() == token_len) {
             res.push_back(token);
         } else if (RE2::PartialMatch(token, pattern5_)) { // [a-z\\.-]+
+            bool need_append_stk = true;
             for (auto &t : stk) {
                 if (UTF8Length(t) < 3) {
                     res.push_back(token);
+                    need_append_stk = false;
                     break;
+                }
+            }
+            if (need_append_stk) {
+                for (auto &t : stk) {
+                    res.push_back(t);
                 }
             }
         } else {
@@ -1151,7 +1136,7 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
 int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     unsigned level = 0;
     Vector<String> tokens;
-    String output = Tokenize(input.text_.c_str());
+    String output = Tokenize(input.text_);
     if (fine_grained_) {
         FineGrainedTokenize(output, tokens);
     } else
