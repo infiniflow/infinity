@@ -44,7 +44,9 @@ Status ClusterManager::InitAsLeader(const String &node_name) {
                                       node_name,
                                       config_ptr->PeerServerIP(),
                                       config_ptr->PeerServerPort(),
-                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
+                                      std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count()); // default: heartbeat 1000 ms
+
+    this_node_->set_heartbeat_interval(1000);
 
     current_node_role_ = NodeRole::kLeader;
     return Status::OK();
@@ -63,7 +65,7 @@ Status ClusterManager::UnInitFromLeader() {
     std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
 
     other_node_map_.clear(); // reset connected clients;
-    this_node_.reset(); // reset this node;
+    this_node_.reset();      // reset this node;
 
     // Disconnect with connected follower and learner
     for (const auto &reader_client_pair : reader_client_map_) {
@@ -83,6 +85,7 @@ void ClusterManager::CheckHeartBeat() {
         String error_message = "Invalid node role.";
         UnrecoverableError(error_message);
     }
+    hb_running_ = true;
     hb_periodic_thread_ = MakeShared<Thread>([this] { this->CheckHeartBeatThread(); });
 }
 
@@ -114,7 +117,7 @@ void ClusterManager::CheckHeartBeatThread() {
                 u64 this_node_update_ts = this_node_->update_ts();
                 u64 this_node_hb_interval = this_node_->heartbeat_interval();
 
-                if (other_node_update_ts + 2 * this_node_hb_interval < this_node_update_ts) {
+                if (other_node_update_ts + 4 * this_node_hb_interval < this_node_update_ts) {
                     other_node->set_node_status(NodeStatus::kTimeout);
                     LOG_INFO(fmt::format("Node {} is timeout", node_name));
                 }
@@ -127,6 +130,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
     // Only used by Leader on follower/learner registration.
 
     String other_node_name = other_node->node_name();
+    bool reconnected_node = false;
     {
         std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         if (current_node_role_ != NodeRole::kLeader) {
@@ -138,8 +142,28 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
         auto iter = other_node_map_.find(other_node_name);
         if (iter != other_node_map_.end()) {
             // Duplicated node
-            // TODO: Update node info and not throw error.
-            return Status::DuplicateNode(other_node_name);
+            // Check the duplicated node ip and status
+            NodeInfo *stored_node_ptr = iter->second.get();
+            switch (stored_node_ptr->node_status()) {
+                case NodeStatus::kTimeout: {
+                    if ((iter->second->node_ip() == other_node->node_ip()) && (iter->second->node_port() == other_node->node_port())) {
+                        LOG_INFO(fmt::format("Reconnected node: {}", other_node_name));
+                        reconnected_node = true;
+                    } else {
+                        LOG_ERROR(fmt::format("Same node node: {}, different address: {}:{} unmatch {}:{}",
+                                              other_node_name,
+                                              other_node->node_ip(),
+                                              other_node->node_port(),
+                                              stored_node_ptr->node_ip(),
+                                              stored_node_ptr->node_port()));
+                        return Status::DuplicateNode(other_node_name);
+                    }
+                    break;
+                }
+                default: {
+                    return Status::DuplicateNode(other_node_name);
+                }
+            }
         }
     }
 
@@ -163,13 +187,19 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
         if (iter == other_node_map_.end()) {
             // Not find, so add the node
             other_node_map_.emplace(other_node_name, other_node);
+            reader_client_map_.emplace(other_node_name, client_to_follower);
         } else {
             // Duplicated node
             // TODO: If the exist node lost connection, or other malfunction, use new other_node to replace it.
-            return Status::DuplicateNode(other_node_name);
+            if (reconnected_node) {
+                other_node_map_.erase(other_node_name);
+                reader_client_map_.erase(other_node_name);
+                other_node_map_.emplace(other_node_name, other_node);
+                reader_client_map_.emplace(other_node_name, client_to_follower);
+            } else {
+                return Status::DuplicateNode(other_node_name);
+            }
         }
-
-        reader_client_map_.emplace(other_node_name, client_to_follower);
     }
 
     return log_sending_status;
@@ -300,6 +330,7 @@ Status ClusterManager::UpdateNodeInfoByHeartBeat(const SharedPtr<NodeInfo> &non_
                 case NodeStatus::kTimeout: {
                     // just update the timestamp
                     other_node->set_txn_ts(non_leader_node->txn_ts());
+                    other_node->set_node_status(NodeStatus::kAlive);
                     auto now = std::chrono::system_clock::now();
                     auto time_since_epoch = now.time_since_epoch();
                     other_node->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());

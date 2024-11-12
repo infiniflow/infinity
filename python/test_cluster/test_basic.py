@@ -340,7 +340,7 @@ def test_tc2(cluster: InfinityCluster):
     infinity4 = cluster.client("node4")
     cluster.set_learner("node4")
 
-    time.sleep(1)
+    time.sleep(4)
     for server in [infinity1, infinity2, infinity3, infinity4]:
         res = server.show_node("node1")
         assert(res.node_name == "node1")
