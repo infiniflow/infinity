@@ -38,9 +38,9 @@ public:
 
     Status UnInitFromAdminNoLock();
     Status UnInitFromStandaloneNoLock();
-    Status UnInitAsLeader();
-    Status UnInitAsFollower();
-    Status UnInitAsLearner();
+    Status UnInitFromLeaderNoLock();
+    Status UnInitFromFollowerNoLock();
+    Status UnInitFromLearnerNoLock();
     Status UnInit(bool not_unregister);
     // Used by all nodes ADMIN SHOW NODES
     Vector<SharedPtr<NodeInfo>> ListNodes() const;
