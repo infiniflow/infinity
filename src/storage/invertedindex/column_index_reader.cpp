@@ -189,7 +189,6 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
             }
             String column_name = index_base->column_name();
             auto column_id = table_entry_ptr_->GetColumnIdByName(column_name);
-            assert(table_index_entry->GetFulltexSegmentUpdateTs() <= last_known_update_ts_);
             if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
                 // need update result
                 target_ts = begin_ts;
@@ -227,7 +226,7 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
 void TableIndexReaderCache::Invalidate() {
     std::scoped_lock lock(mutex_);
     first_known_update_ts_ = 0;
-    last_known_update_ts_ = 0;
+    last_known_update_ts_ = std::max(last_known_update_ts_, cache_ts_);
     cache_ts_ = 0;
     cache_column_ts_.clear();
     cache_column_readers_.reset();
