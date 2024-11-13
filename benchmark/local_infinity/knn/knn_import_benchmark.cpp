@@ -59,6 +59,11 @@ int main(int argc, char *argv[]) {
         data_path = std::string(argv[3]);
     }
 
+    std::string config_path;
+    if (argc >= 5) {
+        config_path = std::string(argv[4]);
+    }
+
     if (VirtualStore::Exists(data_path)) {
         std::cout << "Data path: " << data_path << " is already existed." << std::endl;
     } else {
@@ -66,7 +71,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Data path: " << data_path << " is created." << std::endl;
     }
 
-    Infinity::LocalInit(data_path);
+    Infinity::LocalInit(data_path, config_path);
 
     std::cout << ">>> Import Benchmark Start <<<" << std::endl;
 

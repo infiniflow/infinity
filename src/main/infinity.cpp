@@ -82,12 +82,12 @@ u64 Infinity::GetSessionId() { return session_->session_id(); }
 
 void Infinity::Hello() { fmt::print("hello infinity\n"); }
 
-void Infinity::LocalInit(const String &path) {
-
-    SharedPtr<String> config_path = MakeShared<String>(std::filesystem::absolute(path + "/infinity_conf.toml"));
-    if (VirtualStore::Exists(*config_path)) {
-        InfinityContext::instance().Init(config_path);
+void Infinity::LocalInit(const String &path, const String &config_path) {
+    if (!config_path.empty() && VirtualStore::Exists(config_path)) {
+        SharedPtr<String> config_path_ptr = MakeShared<String>(config_path);
+        InfinityContext::instance().Init(config_path_ptr);
     } else {
+        LOG_WARN(fmt::format("Infinity::LocalInit cannot find config: {}", config_path));
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
         default_config->default_log_dir_ = fmt::format("{}/log", path);
         default_config->default_data_dir_ = fmt::format("{}/data", path);
