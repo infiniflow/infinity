@@ -62,4 +62,4 @@ Try the following links to explore practical examples of using Infinity in Pytho
 
 ## Python API reference
 
-For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
+For detailed information about the capabilities and usage of Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/pysdk_api_reference).
