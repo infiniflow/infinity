@@ -29,7 +29,7 @@ public:
     [[nodiscard]] std::string ToString() const override;
 
 public:
-    std::string index_name_;
+    std::string index_names_;
     std::string fields_;
     std::string matching_text_;
     std::string options_text_;

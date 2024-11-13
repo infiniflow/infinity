@@ -1131,12 +1131,12 @@ static const yytype_int16 yypact[] =
     -698,  -698,  -698,  -698,  -698,  -698,  -698,  -698,  -698,  -698,
     1146,  -698,  -698,  -698,  -698,  -698,  -698,  -698,  -698,  -698,
     -698,  1147,  -698,  -698,  -698,  -698,  -698,  -698,  -698,  -698,
-    -698,  -698,  1148,  -698,  1347,  1149,  1312,  1349,    41,  1150,
+    -698,  -698,  1148,  -698,  1347,  1149,  1303,  1349,    41,  1150,
     1359,  1360,  -698,  -698,  -698,   200,  -698,  -698,  -698,  -698,
     -698,  -698,  -698,  1151,  1206,  1154,  1153,   775,   675,  1365,
-     622,   157,  1158,  1333,  1371,  1372,  1161,  -698,   635,  1373,
-    -698,   775,   675,  1164,  1166,   775,   -31,  1375,  -698,  1330,
-    1168,  -698,  1380,  -698,  1170,  1345,  1346,  -698,  -698,  -698,
+     622,   157,  1158,  1324,  1370,  1371,  1162,  -698,   635,  1372,
+    -698,   775,   675,  1164,  1165,   775,   -31,  1374,  -698,  1333,
+    1168,  -698,  1379,  -698,  1170,  1345,  1346,  -698,  -698,  -698,
      -29,  1173,   174,  -698,  1175,  1350,  1351,  -698,  -698,  1352,
     1353,  1386,  -698,  1181,  -698,  1183,  1184,  1392,  1394,   675,
     1185,  1186,  -698,   675,  -698,  -698
@@ -1444,8 +1444,8 @@ static const yytype_int16 yytable[] =
     1093,  1094,  1095,  1096,  1097,  1098,  1099,  1100,  1101,  1103,
     1106,  1123,  1125,  1126,  1104,  1107,  1108,  1117,  1118,  1119,
     1120,  1121,  1122,  1124,  1128,  1129,  1130,  1134,  1131,  1133,
-    1135,  1138,  1142,  1143,  1144,  1146,  1145,  1152,  1159,  1149,
-    1153,  1158,  1160,  1161,  1162,  1163,  1164,  1168,  1171,  1176,
+    1135,  1138,  1142,  1143,  1144,  1145,  1146,  1152,  1149,  1153,
+    1158,  1159,  1160,  1161,  1162,  1163,  1164,  1168,  1171,  1176,
     1172,  1173,  1174,  1175,  1177,  1180,  1178,  1181,  1179,  1183,
     1184,   200,   153,   693,   678,   816,   343,   118,   477,   440,
      333,   951,   855,   658,   814,   947,   503,   488,   622,   930,
@@ -1590,10 +1590,10 @@ static const yytype_int16 yycheck[] =
      214,     6,     6,   214,   214,   214,   214,   214,   214,   214,
      214,   214,   214,   214,   214,   214,   214,   214,     6,   214,
      214,   214,   214,   214,   214,   214,   214,   214,   214,   214,
-     163,     4,    40,     4,   217,   217,   217,   214,   214,   214,
+     163,     4,    49,     4,   217,   217,   217,   214,   214,   214,
      214,   214,   214,   214,   214,     6,     6,   213,   217,   163,
-     217,     6,   214,    40,     3,   214,     4,   213,    48,     6,
-     214,     6,   214,     3,   214,    40,    40,   214,   213,     3,
+     217,     6,   214,    49,     4,     4,   214,   213,     6,   214,
+       6,    48,   214,     4,   214,    40,    40,   214,   213,     3,
       40,    40,    40,    40,   213,     3,   213,     3,   214,   214,
      214,   121,    60,   612,   592,   673,   213,    20,   351,   319,
      202,   859,   723,   552,   671,   854,   401,   375,   495,   813,
@@ -1717,11 +1717,11 @@ static const yytype_int16 yystos[] =
      214,     6,   214,   214,   214,   214,   214,   214,   214,   214,
      214,   214,     6,   214,   217,   260,   163,   217,   217,   260,
       40,    43,    44,    48,    49,   285,   214,   214,   214,   214,
-     214,   214,   214,     4,   214,    40,     4,     6,   214,     6,
+     214,   214,   214,     4,   214,    49,     4,     6,   214,     6,
        6,   217,   260,   163,   213,   217,   260,   330,     6,    45,
-      46,     6,   214,    40,     3,     4,   214,    43,    44,     6,
+      46,     6,   214,    49,     4,     4,   214,    43,    44,     6,
      260,   330,   213,   214,   260,   125,   163,   330,     6,    48,
-     214,     3,   214,    40,    40,   125,   163,   330,   214,   125,
+     214,     4,   214,    40,    40,   125,   163,   330,   214,   125,
      163,   213,    40,    40,    40,    40,     3,   213,   213,   214,
        3,     3,   330,   214,   214,   330
 };
@@ -7711,14 +7711,14 @@ Return4:
 #line 7712 "parser.cpp"
     break;
 
-  case 385: /* match_text_expr: MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')'  */
+  case 385: /* match_text_expr: MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr ')' USING INDEXES '(' STRING ')'  */
 #line 3085 "parser.y"
-                                                                                                  {
+                                                                                                {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->fields_ = std::string((yyvsp[-9].str_value));
     match_text_expr->matching_text_ = std::string((yyvsp[-7].str_value));
     match_text_expr->filter_expr_.reset((yyvsp[-6].expr_t));
-    match_text_expr->index_name_ = std::string((yyvsp[-1].str_value));
+    match_text_expr->index_names_ = std::string((yyvsp[-1].str_value));
     free((yyvsp[-9].str_value));
     free((yyvsp[-7].str_value));
     (yyval.expr_t) = match_text_expr;
@@ -7726,15 +7726,15 @@ Return4:
 #line 7727 "parser.cpp"
     break;
 
-  case 386: /* match_text_expr: MATCH TEXT '(' STRING ',' STRING ',' STRING optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')'  */
+  case 386: /* match_text_expr: MATCH TEXT '(' STRING ',' STRING ',' STRING optional_search_filter_expr ')' USING INDEXES '(' STRING ')'  */
 #line 3095 "parser.y"
-                                                                                                             {
+                                                                                                           {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->fields_ = std::string((yyvsp[-11].str_value));
     match_text_expr->matching_text_ = std::string((yyvsp[-9].str_value));
     match_text_expr->options_text_ = std::string((yyvsp[-7].str_value));
     match_text_expr->filter_expr_.reset((yyvsp[-6].expr_t));
-    match_text_expr->index_name_ = std::string((yyvsp[-1].str_value));
+    match_text_expr->index_names_ = std::string((yyvsp[-1].str_value));
     free((yyvsp[-11].str_value));
     free((yyvsp[-9].str_value));
     free((yyvsp[-7].str_value));

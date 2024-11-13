@@ -3082,23 +3082,23 @@ match_text_expr : MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr '
     free($8);
     $$ = match_text_expr;
 }
-| MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')' {
+| MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr ')' USING INDEXES '(' STRING ')' {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->fields_ = std::string($4);
     match_text_expr->matching_text_ = std::string($6);
     match_text_expr->filter_expr_.reset($7);
-    match_text_expr->index_name_ = std::string($12);
+    match_text_expr->index_names_ = std::string($12);
     free($4);
     free($6);
     $$ = match_text_expr;
 }
-| MATCH TEXT '(' STRING ',' STRING ',' STRING optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')' {
+| MATCH TEXT '(' STRING ',' STRING ',' STRING optional_search_filter_expr ')' USING INDEXES '(' STRING ')' {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->fields_ = std::string($4);
     match_text_expr->matching_text_ = std::string($6);
     match_text_expr->options_text_ = std::string($8);
     match_text_expr->filter_expr_.reset($9);
-    match_text_expr->index_name_ = std::string($14);
+    match_text_expr->index_names_ = std::string($14);
     free($4);
     free($6);
     free($8);

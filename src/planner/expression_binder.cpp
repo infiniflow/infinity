@@ -785,7 +785,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTextExpr(const MatchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
-    auto match_text = MakeShared<MatchExpression>(expr.fields_, expr.matching_text_, expr.options_text_, expr.index_name_);
+    auto match_text = MakeShared<MatchExpression>(expr.fields_, expr.matching_text_, expr.options_text_, expr.index_names_);
     match_text->optional_filter_ = BuildSearchSubExprOptionalFilter(this, expr.filter_expr_.get(), bind_context_ptr, depth);
     return match_text;
 }

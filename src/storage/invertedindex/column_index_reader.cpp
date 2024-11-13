@@ -169,11 +169,11 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
     if (first_known_update_ts_ != 0 && begin_ts >= cache_ts_ && begin_ts < first_known_update_ts_) [[likely]] {
         // no need to build, use cache
         result.column_index_readers_ = cache_column_readers_;
-        result.column2analyzer_ = column2analyzer_;
+        // result.column2analyzer_ = column2analyzer_;
     } else {
         FlatHashMap<u64, TxnTimeStamp, detail::Hash<u64>> cache_column_ts;
-        result.column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>>();
-        result.column2analyzer_ = MakeShared<Map<String, String>>();
+        result.column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>>();
+        // result.column2analyzer_ = MakeShared<Map<String, String>>();
         for (auto map_guard = table_entry_ptr_->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
@@ -187,17 +187,24 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
                 // non-fulltext index
                 continue;
             }
+
             String column_name = index_base->column_name();
             auto column_id = table_entry_ptr_->GetColumnIdByName(column_name);
+            if (result.column_index_readers_->find(column_id) == result.column_index_readers_->end()) {
+                (*result.column_index_readers_)[column_id] = MakeShared<Map<String, SharedPtr<ColumnIndexReader>>>();
+            }
+            auto column_index_map = (*result.column_index_readers_)[column_id];
+
+            assert(table_index_entry->GetFulltexSegmentUpdateTs() <= last_known_update_ts_);
             if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
                 // need update result
                 target_ts = begin_ts;
                 const IndexFullText *index_full_text = reinterpret_cast<const IndexFullText *>(index_base);
                 // update column2analyzer_
-                (*result.column2analyzer_)[column_name] = index_full_text->analyzer_;
+                // (*result.column2analyzer_)[column_name] = index_full_text->analyzer_;
                 if (auto it = cache_column_ts_.find(column_id); it != cache_column_ts_.end() and it->second == begin_ts) {
                     // reuse cache
-                    (*result.column_index_readers_)[column_id] = cache_column_readers_->at(column_id);
+                    (*column_index_map)[index_name] = cache_column_readers_->at(column_id)->at(index_name);
                 } else {
                     // new column_index_reader
                     auto column_index_reader = MakeShared<ColumnIndexReader>();
@@ -206,7 +213,9 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
                     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment =
                         table_index_entry->GetIndexBySegmentSnapshot(table_entry_ptr_, txn);
                     column_index_reader->Open(flag, std::move(index_dir), std::move(index_by_segment), txn);
-                    (*result.column_index_readers_)[column_id] = std::move(column_index_reader);
+                    column_index_reader->analyzer_ = index_full_text->analyzer_;
+                    column_index_reader->column_name_ = column_name;
+                    (*column_index_map)[index_name] = std::move(column_index_reader);
                 }
             }
         }
@@ -217,7 +226,7 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
             last_known_update_ts_ = 0;
             cache_column_ts_ = std::move(cache_column_ts);
             cache_column_readers_ = result.column_index_readers_;
-            column2analyzer_ = result.column2analyzer_;
+            // column2analyzer_ = result.column2analyzer_;
         }
     }
     return result;
@@ -230,7 +239,7 @@ void TableIndexReaderCache::Invalidate() {
     cache_ts_ = 0;
     cache_column_ts_.clear();
     cache_column_readers_.reset();
-    column2analyzer_.reset();
+    // column2analyzer_.reset();
 }
 
 void TableIndexReaderCache::InvalidateColumn(u64 column_id, const String &column_name) {
@@ -239,9 +248,9 @@ void TableIndexReaderCache::InvalidateColumn(u64 column_id, const String &column
     if (cache_column_readers_.get() != nullptr) {
         cache_column_readers_->erase(column_id);
     }
-    if (column2analyzer_.get() != nullptr) {
-        column2analyzer_->erase(column_name);
-    }
+    // if (column2analyzer_.get() != nullptr) {
+    //     column2analyzer_->erase(column_name);
+    // }
 }
 
 void TableIndexReaderCache::InvalidateSegmentColumn(u64 column_id, SegmentID segment_id) {
@@ -251,7 +260,9 @@ void TableIndexReaderCache::InvalidateSegmentColumn(u64 column_id, SegmentID seg
     }
     auto iter = cache_column_readers_->find(column_id);
     if (iter != cache_column_readers_->end()) {
-        iter->second->InvalidateSegment(segment_id);
+        for (auto index_reader : (*iter->second)) {
+            index_reader.second->InvalidateSegment(segment_id);
+        }
     }
 }
 
@@ -262,7 +273,9 @@ void TableIndexReaderCache::InvalidateChunkColumn(u64 column_id, SegmentID segme
     }
     auto iter = cache_column_readers_->find(column_id);
     if (iter != cache_column_readers_->end()) {
-        iter->second->InvalidateChunk(segment_id, chunk_id);
+        for (auto index_reader : (*iter->second)) {
+            index_reader.second->InvalidateChunk(segment_id, chunk_id);
+        }
     }
 }
 

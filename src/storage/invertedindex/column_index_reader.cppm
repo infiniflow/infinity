@@ -26,6 +26,7 @@ import memory_indexer;
 import internal_types;
 import segment_index_entry;
 import chunk_index_entry;
+import logger;
 
 namespace infinity {
 struct TableEntry;
@@ -46,6 +47,10 @@ public:
 
     void InvalidateChunk(SegmentID segment_id, ChunkID chunk_id);
 
+    inline String GetAnalyzer() const { return analyzer_; }
+
+    inline String GetColumnName() const { return column_name_; }
+
 private:
     std::mutex mutex_;
 
@@ -56,6 +61,8 @@ private:
     float avg_column_length_ = 0.0f;
 
 public:
+    String column_name_;
+    String analyzer_;
     // for loading column length files
     String index_dir_;
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_;
@@ -70,17 +77,63 @@ struct Hash {
 } // namespace detail
 
 export struct IndexReader {
-    ColumnIndexReader *GetColumnIndexReader(const u64 column_id) const {
-        if (const auto it = column_index_readers_->find(column_id); it != column_index_readers_->end()) {
-            return it->second.get();
+    // Get a index reader on a column based on hints.
+    // If no such column exists, return nullptr.
+    // If column exists, but no index with a hint name is found, return a random one.
+    ColumnIndexReader *GetColumnIndexReader(u64 column_id, const Vector<String> &hints) const {
+        String hints_msg = "ColumnIndexReader::GetColumnIndexReader : index hints are ";
+        for (SizeT i = 0; i < hints.size(); i++) {
+            hints_msg += fmt::format("{} ", hints[i]);
         }
-        return nullptr;
+        LOG_TRACE(hints_msg);
+
+        const auto &column_index_map = column_index_readers_->find(column_id);
+        // if no fulltext index exists, or the map is empty.
+        if (column_index_map == column_index_readers_->end() || column_index_map->second->size() == 0) {
+            return nullptr;
+        }
+
+        auto indices_map = column_index_map->second;
+        for (SizeT i = 0; i < hints.size(); i++) {
+            if (auto it = indices_map->find(hints[i]); it != indices_map->end()) {
+                // column_id, column_name, index_name, analyzer
+                LOG_TRACE(fmt::format("index with hint name found : {}, {}, {}, {}.",
+                                      column_id,
+                                      indices_map->at(hints[i])->GetColumnName(),
+                                      hints[i],
+                                      indices_map->at(hints[i])->GetAnalyzer()));
+                return indices_map->at(hints[i]).get();
+            }
+        }
+        // fall back to beginning of the map
+        // column_id, column_name, index_name, analyzer
+        LOG_TRACE(fmt::format("no hint found, settle with: {}, {}, {}, {}.",
+                              column_id,
+                              indices_map->begin()->second->GetColumnName(),
+                              indices_map->begin()->first,
+                              indices_map->begin()->second->GetAnalyzer()));
+        return indices_map->begin()->second.get();
     }
 
-    const Map<String, String> &GetColumn2Analyzer() const { return *column2analyzer_; }
+    // return map: column_name -> analyzer_name based on hints.
+    Map<String, String> GetColumn2Analyzer(const Vector<String> &hints) const {
+        Map<String, String> rst;
+        for (const auto &id_index_map : *column_index_readers_) {
+            ColumnIndexReader *column_index_reader = GetColumnIndexReader(id_index_map.first, hints);
+            if (column_index_reader != nullptr) {
+                rst[column_index_reader->GetColumnName()] = column_index_reader->GetAnalyzer();
+            }
+        }
+        LOG_TRACE("Index::GetColumn2Analyzer results :");
+        for (const auto &iter : rst) {
+            // column_name, analyzer_name
+            LOG_TRACE(fmt::format("{}, {}", iter.first, iter.second));
+        }
+        return rst;
+    }
 
-    SharedPtr<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>> column_index_readers_;
-    SharedPtr<Map<String, String>> column2analyzer_;
+    // column_id -> [index_name -> column_index_reader]
+    SharedPtr<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>> column_index_readers_;
 };
 
 export class TableIndexReaderCache {
@@ -107,8 +160,7 @@ private:
     TxnTimeStamp last_known_update_ts_ = 0;
     TxnTimeStamp cache_ts_ = 0;
     FlatHashMap<u64, TxnTimeStamp, detail::Hash<u64>> cache_column_ts_;
-    SharedPtr<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>> cache_column_readers_;
-    SharedPtr<Map<String, String>> column2analyzer_;
+    SharedPtr<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>> cache_column_readers_;
 };
 
 } // namespace infinity

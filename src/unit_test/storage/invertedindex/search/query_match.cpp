@@ -321,7 +321,8 @@ void QueryMatchTest::QueryMatch(const String &db_name,
     QueryBuilder query_builder(fake_table_ref.get());
     IndexReader index_reader = fake_table_ref->table_entry_ptr_->GetFullTextIndexReader(txn);
     query_builder.Init(index_reader);
-    const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
+    Vector<String> index_hints;
+    const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer(index_hints);
 
     auto match_expr = MakeShared<MatchExpr>();
     match_expr->fields_ = fields;
@@ -337,7 +338,7 @@ void QueryMatchTest::QueryMatch(const String &db_name,
         Status status = Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_);
         RecoverableError(status);
     }
-    FullTextQueryContext full_text_query_context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{});
+    FullTextQueryContext full_text_query_context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{}, index_hints);
     full_text_query_context.early_term_algo_ = EarlyTermAlgo::kNaive;
     full_text_query_context.query_tree_ = std::move(query_tree);
     UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
