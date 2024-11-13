@@ -330,8 +330,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                             if (this->CalculateFilterBitmask(segment_id, block_id, row_to_read, block_bitmask)) {
                                                 const BlockEntry *block_entry = block_guard.block_entries_[block_id].get();
                                                 block_entry->SetDeleteBitmask(begin_ts, block_bitmask);
-                                                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(this->search_column_id_);
-                                                auto column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
+                                                auto column_vector = block_entry->GetConstColumnVector(buffer_mgr, this->search_column_id_);
                                                 // output score will always be float type
                                                 CalculateScoreOnColumnVector(column_vector,
                                                                              segment_id,
@@ -377,7 +376,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         }
     } else if (const u32 task_job_block = task_job_index - index_entries_.size(); task_job_block < block_column_entries_.size()) {
         auto *block_column_entry = block_column_entries_[task_job_block];
-        const BlockEntry *block_entry = block_column_entry->GetBlockEntry();
+        const BlockEntry *block_entry = block_column_entry->block_entry();
         const BlockID block_id = block_entry->block_id();
         const SegmentEntry *segment_entry = block_entry->GetSegmentEntry();
         const SegmentID segment_id = segment_entry->segment_id();
@@ -385,7 +384,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         Bitmask bitmask;
         if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
             block_entry->SetDeleteBitmask(begin_ts, bitmask);
-            auto column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
+            auto column_vector = block_entry->GetConstColumnVector(buffer_mgr, search_column_id_);
             // output score will always be float type
             CalculateScoreOnColumnVector(column_vector, segment_id, block_id, 0, row_count, bitmask, *calc_match_tensor_expr_, function_data);
         }
@@ -428,8 +427,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             const SizeT column_n = base_table_ref_->column_ids_.size();
             for (SizeT i = 0; i < column_n; ++i) {
                 const auto column_id = base_table_ref_->column_ids_[i];
-                auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                auto column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
+                auto column_vector = block_entry->GetConstColumnVector(buffer_mgr, column_id);
                 output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
             }
             output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_scores[top_idx]);
@@ -928,9 +926,8 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
         const SegmentOffset segment_offset = row_id.segment_offset_;
         const BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
         const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-        BlockColumnEntry *block_column_entry =
-            block_index->segment_block_index_.at(segment_id).block_map_.at(block_id)->GetColumnBlockEntry(column_id);
-        auto column_vec = block_column_entry->GetConstColumnVector(buffer_mgr);
+        BlockEntry *block_entry = block_index->segment_block_index_.at(segment_id).block_map_.at(block_id);
+        auto column_vec = block_entry->GetConstColumnVector(buffer_mgr, column_id);
         doc.score_ = CalcutateScoreOfRowOp::Execute(column_vec, block_offset, query_tensor_ptr, query_embedding_num, basic_embedding_dimension);
     }
 }

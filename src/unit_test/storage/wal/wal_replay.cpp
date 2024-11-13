@@ -442,13 +442,9 @@ TEST_P(WalReplayTest, wal_replay_append) {
             EXPECT_EQ(block_entry->block_id(), 0u);
             EXPECT_EQ(block_entry->row_count(), row_count);
 
-            BlockColumnEntry *column0 = block_entry->GetColumnBlockEntry(0);
-            BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
-            BlockColumnEntry *column2 = block_entry->GetColumnBlockEntry(2);
-
-            ColumnVector col0 = column0->GetConstColumnVector(storage->buffer_manager());
-            ColumnVector col1 = column1->GetConstColumnVector(storage->buffer_manager());
-            ColumnVector col2 = column2->GetConstColumnVector(storage->buffer_manager());
+            ColumnVector col0 = block_entry->GetConstColumnVector(storage->buffer_manager(), 0);
+            ColumnVector col1 = block_entry->GetConstColumnVector(storage->buffer_manager(), 1);
+            ColumnVector col2 = block_entry->GetConstColumnVector(storage->buffer_manager(), 2);
 
             for (SizeT i = 0; i < row_count; ++i) {
                 Value v0 = col0.GetValue(i);
@@ -577,28 +573,28 @@ TEST_P(WalReplayTest, wal_replay_import) {
             }
 
             {
-                auto block_column_entry0 = block_entry->GetColumnBlockEntry(0);
-                auto column_type1 = block_column_entry0->column_type().get();
+                auto column_type1 = block_entry->GetColumnBlockEntry(0)->column_type().get();
                 EXPECT_EQ(column_type1->type(), LogicalType::kTinyInt);
                 SizeT data_type_size = columns_vector[0]->data_type_size_;
                 EXPECT_EQ(data_type_size, 1u);
-                block_column_entry0->Append(columns_vector[0].get(), 0, 1, buffer_manager);
+                ColumnVector col = block_entry->GetColumnVector(buffer_manager, 0);
+                col.AppendWith(*columns_vector[0], 0, 1);
             }
             {
-                auto block_column_entry1 = block_entry->GetColumnBlockEntry(1);
-                auto column_type2 = block_column_entry1->column_type().get();
+                auto column_type2 = block_entry->GetColumnBlockEntry(1)->column_type().get();
                 EXPECT_EQ(column_type2->type(), LogicalType::kBigInt);
                 SizeT data_type_size = columns_vector[1]->data_type_size_;
                 EXPECT_EQ(data_type_size, 8u);
-                block_column_entry1->Append(columns_vector[1].get(), 0, 1, buffer_manager);
+                ColumnVector col = block_entry->GetColumnVector(buffer_manager, 1);
+                col.AppendWith(*columns_vector[1], 0, 1);
             }
             {
-                auto block_column_entry2 = block_entry->GetColumnBlockEntry(2);
-                auto column_type3 = block_column_entry2->column_type().get();
+                auto column_type3 = block_entry->GetColumnBlockEntry(2)->column_type().get();
                 EXPECT_EQ(column_type3->type(), LogicalType::kDouble);
                 SizeT data_type_size = columns_vector[2]->data_type_size_;
                 EXPECT_EQ(data_type_size, 8u);
-                block_column_entry2->Append(columns_vector[2].get(), 0, 1, buffer_manager);
+                ColumnVector col = block_entry->GetColumnVector(buffer_manager, 2);
+                col.AppendWith(*columns_vector[2], 0, 1);
             }
 
             block_entry->IncreaseRowCount(1);
@@ -642,19 +638,17 @@ TEST_P(WalReplayTest, wal_replay_import) {
             EXPECT_EQ(block_entry->block_id(), 0u);
             EXPECT_EQ(block_entry->row_count(), 1u);
 
-            BlockColumnEntry *column0 = block_entry->GetColumnBlockEntry(0);
-            BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
             BlockColumnEntry *column2 = block_entry->GetColumnBlockEntry(2);
 
-            ColumnVector col0 = column0->GetConstColumnVector(buffer_manager);
+            ColumnVector col0 = block_entry->GetConstColumnVector(buffer_manager, 0);
             Value v0 = col0.GetValue(0);
             EXPECT_EQ(v0.GetValue<TinyIntT>(), 1);
 
-            ColumnVector col1 = column1->GetConstColumnVector(buffer_manager);
+            ColumnVector col1 = block_entry->GetConstColumnVector(buffer_manager, 1);
             Value v1 = col1.GetValue(0);
             EXPECT_EQ(v1.GetValue<BigIntT>(), (i64)(22));
 
-            ColumnVector col2 = column2->GetConstColumnVector(buffer_manager);
+            ColumnVector col2 = block_entry->GetConstColumnVector(buffer_manager, 2);
             Value v2 = col2.GetValue(0);
             DataType *col2_type = column2->column_type().get();
             EXPECT_EQ(col2_type->type(), LogicalType::kDouble);
@@ -731,12 +725,12 @@ TEST_F(WalReplayTest, wal_replay_compact) {
             }
 
             {
-                auto *block_column_entry0 = block_entry->GetColumnBlockEntry(0);
-                auto column_type0 = block_column_entry0->column_type().get();
+                auto column_type0 = block_entry->GetColumnBlockEntry(0)->column_type().get();
                 EXPECT_EQ(column_type0->type(), LogicalType::kTinyInt);
                 SizeT data_type_size = column_vectors[0]->data_type_size_;
                 EXPECT_EQ(data_type_size, 1u);
-                block_column_entry0->Append(column_vectors[0].get(), 0, 1, buffer_manager);
+                ColumnVector col = block_entry->GetColumnVector(buffer_manager, 0);
+                col.AppendWith(*column_vectors[0], 0, 1);
                 block_entry->IncreaseRowCount(1);
             }
             segment_entry->AppendBlockEntry(std::move(block_entry));

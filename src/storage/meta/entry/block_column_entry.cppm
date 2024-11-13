@@ -72,12 +72,11 @@ public:
 
 public:
     // Getter
-    inline const BlockEntry *GetBlockEntry() const { return block_entry_; }
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
     inline BufferObj *buffer() const { return buffer_; }
     inline u64 column_id() const { return column_id_; }
     inline const SharedPtr<String> &filename() const { return file_name_; }
-    inline const BlockEntry *block_entry() const { return block_entry_; }
+    inline const BlockEntry *block_entry() { return block_entry_; }
 
     SharedPtr<String> OutlineFilename(SizeT file_idx) const { return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx)); }
 
@@ -89,12 +88,13 @@ public:
 
     Vector<String> FilePaths() const;
 
-    ColumnVector GetColumnVector(BufferManager *buffer_mgr);
+public:
+    ColumnVector GetColumnVector(BufferManager *buffer_mgr, SizeT row_count);
 
-    ColumnVector GetConstColumnVector(BufferManager *buffer_mgr);
+    ColumnVector GetConstColumnVector(BufferManager *buffer_mgr, SizeT row_count);
 
 private:
-    ColumnVector GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe);
+    ColumnVector GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe, SizeT row_count);
 
 public:
     void AppendOutlineBuffer(BufferObj *buffer) {
@@ -117,8 +117,6 @@ public:
     void SetLastChunkOff(u64 offset) { last_chunk_offset_ = offset; }
 
 public:
-    void Append(const ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows, BufferManager *buffer_mgr);
-
     static void Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count);
 
     void FlushColumn(TxnTimeStamp checkpoint_ts);

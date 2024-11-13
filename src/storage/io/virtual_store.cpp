@@ -36,6 +36,8 @@ import infinity_context;
 import object_storage_task;
 import admin_statement;
 
+namespace fs = std::filesystem;
+
 namespace infinity {
 
 StorageType String2StorageType(const String &storage_type) {
@@ -187,6 +189,24 @@ Status VirtualStore::DeleteFile(const String &file_name) {
         String error_message = fmt::format("Delete file {} exception: {}", file_name, strerror(errno));
         UnrecoverableError(error_message);
     }
+    return Status::OK();
+}
+
+Status VirtualStore::DeleteFileBG(const String &path) {
+    switch (VirtualStore::storage_type_) {
+        case StorageType::kMinio: {
+            auto drop_task = MakeShared<LocalDropTask>(path);
+            auto object_storage_processor = infinity::InfinityContext::instance().storage()->object_storage_processor();
+            object_storage_processor->Submit(drop_task);
+            drop_task->Wait();
+            break;
+        }
+        default: {
+            fs::remove(path);
+            break;
+        }
+    }
+
     return Status::OK();
 }
 
