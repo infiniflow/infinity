@@ -143,7 +143,7 @@ private:
             for (SizeT i = 0; i < bucket_n; ++i) {
                 SizeT i1 = start + i * bucket_size;
                 SizeT i2 = std::min(i1 + bucket_size, SizeT(end));
-                futs.emplace_back(thread_pool.push([&, i1, i2](int id) {
+                futs.emplace_back(thread_pool.push([&index, i1, i2](int id) {
                     for (SizeT j = i1; j < i2; ++j) {
                         index->Build(j);
                     }

@@ -101,4 +101,14 @@ void CompactStateData::AddNewIndexSegment(TableIndexEntry *table_index_entry, Se
     new_table_ref_->index_index_->Insert(table_index_entry, index_segment_entry);
 }
 
+Map<SegmentID, SegmentIndexEntry *> CompactStateData::GetSegmentIndexEntries(const String &index_name) {
+    std::lock_guard lock(mutex2_);
+    Map<SegmentID, SegmentIndexEntry *> res;
+    const IndexIndex &index_index = *new_table_ref_->index_index_;
+    if (auto iter = index_index.index_snapshots_.find(index_name); iter != index_index.index_snapshots_.end()) {
+        res = iter->second->segment_index_entries_;
+    }
+    return res;
+}
+
 } // namespace infinity

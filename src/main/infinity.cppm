@@ -47,7 +47,7 @@ public:
 
     u64 GetSessionId();
 
-    static void LocalInit(const String &path);
+    static void LocalInit(const String &path, const String &config_path = "");
 
     static void LocalUnInit();
 

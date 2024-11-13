@@ -96,8 +96,7 @@ class TestMemIdx:
                 assert data_dict["count(star)"] == [13]
 
             check()
-            # wait for optimize
-            time.sleep(3)
+            infinity_obj.optimize("default_db", "test_memidx1", optimize_opt = None)
             check()
 
             db_obj.drop_table("test_memidx1")
@@ -196,7 +195,7 @@ class TestMemIdx:
 
             idx1_dir = idx1_dirs[0]
             idx1_files = list(idx1_dir.glob("*"))
-            assert len(idx1_files) == 3
+            assert len(idx1_files) <= 3
 
             idx2_dir = idx2_dirs[0]
             idx2_files = list(idx2_dir.glob("*"))

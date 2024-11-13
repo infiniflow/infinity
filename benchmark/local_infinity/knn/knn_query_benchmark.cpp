@@ -103,7 +103,12 @@ int main(int argc, char *argv[]) {
         path = std::string(argv[5]);
     }
 
-    Infinity::LocalInit(path);
+    std::string config_path;
+    if (argc >= 7) {
+        config_path = std::string(argv[6]);
+    }
+
+    Infinity::LocalInit(path, config_path);
 
     std::cout << ">>> Query Benchmark Start <<<" << std::endl;
     std::cout << "Thread Num: " << thread_num << ", Times: " << total_times << std::endl;

@@ -432,8 +432,8 @@ private:
             return text;
         }
 
-        size_t outlength = text.length() * 1.5;
-        UniquePtr<PCRE2_UCHAR> buffer = MakeUnique<PCRE2_UCHAR>(outlength);
+        size_t outlength = text.length() * 2 < 1024 ? 1024 : text.length() * 2;
+        auto buffer = MakeUnique<PCRE2_UCHAR[]>(outlength);
         pcre2_substitute(re,
                          pcre2_subject,
                          text.length(),
@@ -445,7 +445,6 @@ private:
                          PCRE2_ZERO_TERMINATED,
                          buffer.get(),
                          &outlength);
-
         pcre2_match_data_free(match_data);
         pcre2_code_free(re);
 

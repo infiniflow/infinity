@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <filesystem>
 
 module object_storage_process;
 
@@ -25,6 +26,8 @@ import blocking_queue;
 import infinity_exception;
 import third_party;
 import virtual_store;
+
+namespace fs = std::filesystem;
 
 namespace infinity {
 
@@ -93,6 +96,16 @@ void ObjectStorageProcess::Process() {
                     assert(remove_task != nullptr);
                     VirtualStore::s3_client_->RemoveObject(VirtualStore::bucket_, remove_task->object_name);
                     LOG_TRACE("Remove task done");
+                    break;
+                }
+                case ObjectStorageTaskType::kLocalDrop: {
+                    LOG_TRACE("Local drop task");
+                    LocalDropTask *local_drop_task = static_cast<LocalDropTask *>(object_storage_task.get());
+                    bool removed = fs::remove(local_drop_task->drop_path_);
+                    if (!removed) {
+                        LOG_WARN(fmt::format("ObjectStorageProcess::Process failed to remove file: {}", local_drop_task->drop_path_));
+                    }
+                    LOG_TRACE("Local drop task done");
                     break;
                 }
                 default: {
