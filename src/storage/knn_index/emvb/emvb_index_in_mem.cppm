@@ -21,7 +21,7 @@ import roaring_bitmap;
 
 namespace infinity {
 
-struct BlockColumnEntry;
+struct BlockEntry;
 class BufferManager;
 class ColumnDef;
 struct ChunkIndexEntry;
@@ -61,7 +61,7 @@ public:
 
     u32 GetRowCount() const;
 
-    void Insert(u16 block_id, BlockColumnEntry *block_column_entry, BufferManager *buffer_manager, u32 row_offset, u32 row_count);
+    void Insert(BlockEntry *block_entry, SizeT column_idx, BufferManager *buffer_manager, u32 row_offset, u32 row_count);
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
 

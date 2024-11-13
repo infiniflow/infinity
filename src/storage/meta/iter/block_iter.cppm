@@ -34,8 +34,9 @@ export template <bool CheckTS = true>
 class BlockIter {
 public:
     BlockIter(const BlockEntry *entry, BufferManager *buffer_mgr, const Vector<ColumnID> &column_ids, TxnTimeStamp iterate_ts) {
+        SizeT row_count = entry->row_count();
         for (auto column_id : column_ids) {
-            column_iters_.emplace_back(entry->GetColumnBlockEntry(column_id), buffer_mgr, iterate_ts);
+            column_iters_.emplace_back(entry->GetColumnBlockEntry(column_id), buffer_mgr, iterate_ts, row_count);
         }
     }
 

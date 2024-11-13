@@ -157,7 +157,7 @@ void BuildFastRoughFilterTask::BuildOnlyBloomFilter(BuildFastRoughFilterArg &arg
         input_data.clear();
         // prepare column_iter
         BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(arg.column_id_);
-        BlockColumnIter<CheckTS> column_iter(block_column_entry, arg.buffer_manager_, arg.begin_ts_);
+        BlockColumnIter<CheckTS> column_iter(block_column_entry, arg.buffer_manager_, arg.begin_ts_, block_row_cnt);
         // step 1. swap arg.distinct_keys_ and arg.distinct_keys_backup_
         std::swap(arg.distinct_keys_, arg.distinct_keys_backup_);
         // step 2. collect data in row
@@ -243,7 +243,7 @@ void BuildFastRoughFilterTask::BuildOnlyMinMaxFilter(BuildFastRoughFilterArg &ar
         MinMaxInnerValueType block_min_value = std::numeric_limits<MinMaxInnerValueType>::max();
         MinMaxInnerValueType block_max_value = std::numeric_limits<MinMaxInnerValueType>::lowest();
         BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(arg.column_id_);
-        BlockColumnIter<CheckTS> column_iter(block_column_entry, arg.buffer_manager_, arg.begin_ts_);
+        BlockColumnIter<CheckTS> column_iter(block_column_entry, arg.buffer_manager_, arg.begin_ts_, block_row_cnt);
         for (auto next_pair = column_iter.Next(); next_pair; next_pair = column_iter.Next()) {
             Advance(arg.total_row_count_handler_);
             auto &[ptr, offset] = next_pair.value();
@@ -296,7 +296,7 @@ void BuildFastRoughFilterTask::BuildMinMaxAndBloomFilter(BuildFastRoughFilterArg
         input_data.clear();
         // prepare column_iter
         BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(arg.column_id_);
-        BlockColumnIter<CheckTS> column_iter(block_column_entry, arg.buffer_manager_, arg.begin_ts_);
+        BlockColumnIter<CheckTS> column_iter(block_column_entry, arg.buffer_manager_, arg.begin_ts_, block_row_cnt);
         // step 1. swap arg.distinct_keys_ and arg.distinct_keys_backup_
         std::swap(arg.distinct_keys_, arg.distinct_keys_backup_);
         // step 2. collect data in row, get and update min and max value

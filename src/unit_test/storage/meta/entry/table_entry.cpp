@@ -66,8 +66,7 @@ void InsertData(const String &db_name, const String &table_name) {
             {
                 Vector<ColumnVector> column_vectors;
                 for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
-                    auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                    column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                    column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
                 }
                 auto &row = datas_[block_id];
                 for (SizeT i = 0; i < column_vectors.size(); ++i) {
@@ -500,8 +499,7 @@ TEST_P(TableEntryTest, roll_back_committed_write_test) {
                 {
                     Vector<ColumnVector> column_vectors;
                     for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
-                        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
                     }
                     auto &row = datas_[block_id];
                     for (SizeT i = 0; i < column_vectors.size(); ++i) {
@@ -581,8 +579,7 @@ TEST_P(TableEntryTest, roll_back_uncommitted_write_test) {
                 {
                     Vector<ColumnVector> column_vectors;
                     for (SizeT i = 0; i < table_entry->ColumnCount(); ++i) {
-                        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
                     }
                     auto &row = datas_[block_id];
                     for (SizeT i = 0; i < column_vectors.size(); ++i) {

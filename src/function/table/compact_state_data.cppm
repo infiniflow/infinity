@@ -78,6 +78,13 @@ public:
 
     BaseTableRef *GetNewTableRef() const { return new_table_ref_.get(); }
 
+    Map<SegmentID, SegmentIndexEntry *> GetSegmentIndexEntries(const String &index_name);
+
+    void SetScanTS(TxnTimeStamp scan_ts) {
+        std::lock_guard lock(mutex_);
+        scan_ts_ = scan_ts;
+    }
+
 public:
     Vector<CompactSegmentData> segment_data_list_;
     RowIDRemap remapper_{};
