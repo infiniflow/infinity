@@ -35,10 +35,10 @@ public:
     Vector<i32> ldegs;
     Vector<i32> rdegs;
 
-    Vector<float> term_gains_toright_;
-    Vector<float> term_gains_toleft_;
-    Vector<bool> term_gains_toright_valid_;
-    Vector<bool> term_gains_toleft_valid_;
+    Vector<std::atomic<float>> term_gains_toright_;
+    Vector<std::atomic<float>> term_gains_toleft_;
+    Vector<std::atomic<uint8_t>> term_gains_toright_valid_;
+    Vector<std::atomic<uint8_t>> term_gains_toleft_valid_;
 
     Vector<float> gains_;
     Vector<i32> gains_permu_;
@@ -171,7 +171,9 @@ private:
             SizeT thread_n = 1 << (log_thread_n_ - depth);
             SizeT step = (end - start) / thread_n;
             for (SizeT i = 0; i < thread_n; ++i) {
-                threads.emplace_back(work, start + i * step, i == thread_n - 1 ? end : start + (i + 1) * step);
+                SizeT i1 = start + i * step;
+                SizeT i2 = i == thread_n - 1 ? end : start + (i + 1) * step;
+                threads.emplace_back(work, i1, i2);
             }
             for (auto &t : threads) {
                 t.join();
@@ -186,16 +188,16 @@ private:
                       float to_log_n,
                       const Vector<i32> &from_degs,
                       const Vector<i32> &to_degs,
-                      Vector<float> &term_gains,
-                      Vector<bool> &term_gains_valid) const {
+                      Vector<std::atomic<float>> &term_gains,
+                      Vector<std::atomic<uint8_t>> &term_gains_valid) const {
         float gain = 0;
         for (const auto &term_id : *fwd_[doc_id]) {
-            if (!term_gains_valid[term_id]) {
-                term_gains[term_id] = ComputeTermGain(from_degs[term_id], from_log_n, to_degs[term_id], to_log_n);
+            if (!term_gains_valid[term_id].load(std::memory_order_relaxed)) {
+                term_gains[term_id].store(ComputeTermGain(from_degs[term_id], from_log_n, to_degs[term_id], to_log_n), std::memory_order_relaxed);
 
-                term_gains_valid[term_id] = true;
+                term_gains_valid[term_id].store(true, std::memory_order_relaxed);
             }
-            gain += term_gains[term_id];
+            gain += term_gains[term_id].load(std::memory_order_relaxed);
         }
         return gain;
     }

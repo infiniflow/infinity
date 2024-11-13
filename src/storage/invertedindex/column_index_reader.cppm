@@ -47,6 +47,8 @@ public:
     void InvalidateChunk(SegmentID segment_id, ChunkID chunk_id);
 
 private:
+    std::mutex mutex_;
+
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_;
