@@ -511,7 +511,7 @@ Status Storage::WriterToReader() {
 Status Storage::UnInitFromWriter() {
     LOG_INFO(fmt::format("Start to change storage from writable mode to un-init"));
     {
-        std::unique_lock<std::mutex> lock(mutex_);
+//        std::unique_lock<std::mutex> lock(mutex_);
 
         if (periodic_trigger_thread_ != nullptr) {
             periodic_trigger_thread_->Stop();
@@ -594,6 +594,7 @@ ResultCacheManager *Storage::GetResultCacheManagerPtr() const noexcept { return 
 
 StorageMode Storage::GetStorageMode() const {
     LOG_INFO(fmt::format("Get storage mode"));
+    std::unique_lock<std::mutex> lock(mutex_);
     return current_storage_mode_;
 }
 
