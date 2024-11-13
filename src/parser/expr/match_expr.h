@@ -29,11 +29,7 @@ public:
     [[nodiscard]] std::string ToString() const override;
 
 public:
-<<<<<<< HEAD
     std::string index_names_;
-=======
-    std::string index_name_;
->>>>>>> 97640503f (match tensor and match sparse : using index)
     std::string fields_;
     std::string matching_text_;
     std::string options_text_;

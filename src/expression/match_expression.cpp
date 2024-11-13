@@ -37,11 +37,9 @@ void ParseMultiIndexHints(const String &index_hints, Vector<String> &index_names
         if (comma_idx == String::npos) {
             auto index_name = index_hints.substr(begin_idx);
             index_names.emplace_back(index_name);
-            LOG_TRACE(fmt::format("new index hint : {}", index_name));
             break;
         } else {
             auto index_name = index_hints.substr(begin_idx, comma_idx - begin_idx);
-            LOG_TRACE(fmt::format("new index hint : {}", index_name));
             begin_idx = comma_idx + 1;
         }
     }
@@ -52,10 +50,6 @@ MatchExpression::MatchExpression(const String &fields, const String &matching_te
       options_text_(options_text) {
     ParseMultiIndexHints(index_names, index_names_);
 }
-
-MatchExpression::MatchExpression(const String &fields, const String &matching_text, const String &options_text, const String &index_name)
-    : BaseExpression(ExpressionType::kMatch, Vector<SharedPtr<BaseExpression>>()), fields_(fields), matching_text_(matching_text),
-      options_text_(options_text), index_name_(index_name) {}
 
 String MatchExpression::ToString() const {
     if (!alias_.empty()) {
