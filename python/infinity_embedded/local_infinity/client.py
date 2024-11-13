@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from infinity_embedded.errors import ErrorCode as PyErrorCode
-from infinity_embedded.common import LOCAL_INFINITY_PATH
+from infinity_embedded.common import LOCAL_INFINITY_PATH, LOCAL_INFINITY_CONFIG_PATH
 from infinity_embedded.embedded_infinity_ext import *
 from typing import List
 
@@ -43,9 +43,9 @@ class LocalQueryResult:
 
 
 class LocalInfinityClient:
-    def __init__(self, path: str = LOCAL_INFINITY_PATH):
+    def __init__(self, path: str = LOCAL_INFINITY_PATH, config_path = LOCAL_INFINITY_CONFIG_PATH):
         self.path = path
-        Infinity.LocalInit(path)
+        Infinity.LocalInit(path, config_path)
         self.client = Infinity.LocalConnect()
 
     def __del__(self):

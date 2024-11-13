@@ -104,6 +104,13 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
+        
+    def optimize(self, db_name: str, table_name: str, optimize_opt: ttypes.OptimizeOptions):
+        res = self._client.optimize(db_name, table_name, optimize_opt)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
 
     def disconnect(self):
         res = self._client.disconnect()

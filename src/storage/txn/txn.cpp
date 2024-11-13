@@ -54,13 +54,13 @@ import persistence_manager;
 import infinity_context;
 import admin_statement;
 import global_resource_usage;
+import wal_manager;
 
 namespace infinity {
 
 Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<String> txn_text)
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id),
-      begin_ts_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
-      txn_text_(std::move(txn_text)) {
+      begin_ts_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), txn_text_(std::move(txn_text)) {
     catalog_ = txn_store_.GetCatalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Txn");
@@ -390,6 +390,22 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
     return table_index_entry->CreateIndexDo(table_ref, create_index_idxes, this);
 }
 
+Status Txn::CreateIndexDo(TableEntry *table_entry,
+                          const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
+                          const String &index_name,
+                          HashMap<SegmentID, atomic_u64> &create_index_idxes) {
+    // auto *table_entry = table_ref->table_entry_ptr_;
+    const auto &db_name = *table_entry->GetDBName();
+    const auto &table_name = *table_entry->GetTableName();
+
+    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return table_index_entry->CreateIndexDo(segment_index_entries, create_index_idxes, this);
+}
+
 Status Txn::CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry) {
     // String index_dir_tail = table_index_entry->GetPathNameTail();
     // auto index_base = table_index_entry->table_index_def();
@@ -538,11 +554,11 @@ TxnTimeStamp Txn::Commit() {
         return commit_ts;
     }
 
-    NodeRole current_node_role = InfinityContext::instance().GetServerRole();
-    if (current_node_role != NodeRole::kStandalone and current_node_role != NodeRole::kLeader) {
+    StorageMode current_storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (current_storage_mode != StorageMode::kWritable) {
         if (!IsReaderAllowed()) {
             RecoverableError(
-                Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_node_role))));
+                Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_storage_mode))));
         }
     }
 

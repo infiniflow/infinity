@@ -50,7 +50,7 @@ namespace infinity {
 void ReadDataBlock(DataBlock *output,
                    BufferManager *buffer_mgr,
                    const SizeT row_count,
-                   const BlockEntry *current_block_entry,
+                   BlockEntry *current_block_entry,
                    const Vector<SizeT> &column_ids) {
     auto block_id = current_block_entry->block_id();
     auto segment_id = current_block_entry->segment_id();
@@ -60,7 +60,7 @@ void ReadDataBlock(DataBlock *output,
             u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
             output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else {
-            ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr);
+            ColumnVector column_vector = current_block_entry->GetConstColumnVector(buffer_mgr, column_id);
             output->column_vectors[i]->AppendWith(column_vector, 0, row_count);
         }
     }

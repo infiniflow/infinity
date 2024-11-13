@@ -169,6 +169,22 @@ BlockColumnEntry *BlockEntry::GetColumnBlockEntry(SizeT column_idx) const {
     return columns_[column_idx].get();
 }
 
+ColumnVector BlockEntry::GetColumnVector(BufferManager *buffer_mgr, ColumnID column_id) const {
+    auto *block_column_entry = GetColumnBlockEntry(column_id);
+    SizeT row_count = block_row_count_; // this function is called by the only writer.
+    return block_column_entry->GetColumnVector(buffer_mgr, row_count);
+}
+
+ColumnVector BlockEntry::GetConstColumnVector(BufferManager *buffer_mgr, ColumnID column_id) const {
+    auto *block_column_entry = GetColumnBlockEntry(column_id);
+    SizeT row_count = 0;
+    {
+        std::shared_lock lock(rw_locker_);
+        row_count = block_row_count_;
+    }
+    return block_column_entry->GetColumnVector(buffer_mgr, row_count);
+}
+
 SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
     if (check_ts >= max_row_ts_)
@@ -304,7 +320,8 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
 
     SizeT column_count = this->columns_.size();
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        this->columns_[column_id]->Append(input_data_block->column_vectors[column_id].get(), input_block_offset, actual_copied, buffer_mgr);
+        ColumnVector column_vector = GetColumnVector(buffer_mgr, column_id);
+        column_vector.AppendWith(*input_data_block->column_vectors[column_id], input_block_offset, actual_copied);
 
         LOG_TRACE(fmt::format("Segment: {}, Block: {}, Column: {} is appended with {} rows",
                               this->segment_entry_->segment_id(),
@@ -629,7 +646,8 @@ void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT r
         UnrecoverableError(error_message);
     }
     for (ColumnID column_id = 0; column_id < columns_.size(); ++column_id) {
-        columns_[column_id]->Append(&column_vectors[column_id], row_begin, read_size, buffer_mgr);
+        ColumnVector column_vector = GetColumnVector(buffer_mgr, column_id);
+        column_vector.AppendWith(column_vectors[column_id], row_begin, read_size);
     }
     IncreaseRowCount(read_size);
 }

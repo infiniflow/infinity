@@ -99,7 +99,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
         // read the segment to get total embedding count
         BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
-        auto column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr));
+        auto column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetConstColumnVector(buffer_mgr, column_id));
         const TensorT *tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
         for (u32 i = 0; i < row_count; ++i) {
             {
@@ -108,7 +108,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 if (const BlockID new_block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY; new_block_id != block_id) {
                     block_id = new_block_id;
                     column_vector =
-                        MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr));
+                        MakeUnique<ColumnVector>(block_entries[block_id]->GetConstColumnVector(buffer_mgr, column_id));
                     tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
                 }
             }
@@ -163,7 +163,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 const SegmentOffset new_segment_offset = start_segment_offset + sample_row;
                 const BlockID block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY;
                 const BlockOffset block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
-                auto column_vector = block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr);
+                auto column_vector = block_entries[block_id]->GetConstColumnVector(buffer_mgr, column_id);
                 auto [raw_data, embedding_num] = column_vector.GetTensorRaw(block_offset);
                 std::copy_n(reinterpret_cast<const f32 *>(raw_data.data()) + sample_id * embedding_dimension_,
                             embedding_dimension_,
@@ -192,7 +192,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
         const auto time_4 = std::chrono::high_resolution_clock::now();
         BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
-        auto column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr));
+        auto column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetConstColumnVector(buffer_mgr, column_id));
         for (u32 i = 0; i < row_count; ++i) {
             {
                 const SegmentOffset new_segment_offset = start_segment_offset + i;
@@ -200,7 +200,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 if (const BlockID new_block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY; new_block_id != block_id) {
                     block_id = new_block_id;
                     column_vector =
-                        MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr));
+                        MakeUnique<ColumnVector>(block_entries[block_id]->GetConstColumnVector(buffer_mgr, column_id));
                 }
             }
             auto [raw_data, embedding_num] = column_vector->GetTensorRaw(block_offset);

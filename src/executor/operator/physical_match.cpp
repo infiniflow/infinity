@@ -313,13 +313,12 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
             u32 segment_offset = row_id.segment_offset_;
             u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
             u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-            const BlockEntry *block_entry = base_table_ref_->block_index_->GetBlockEntry(segment_id, block_id);
+            BlockEntry *block_entry = base_table_ref_->block_index_->GetBlockEntry(segment_id, block_id);
             assert(block_entry != nullptr);
             SizeT column_id = 0;
 
             for (; column_id < column_n; ++column_id) {
-                BlockColumnEntry *block_column_ptr = block_entry->GetColumnBlockEntry(column_ids[column_id]);
-                ColumnVector column_vector = block_column_ptr->GetConstColumnVector(query_context->storage()->buffer_manager());
+                ColumnVector column_vector = block_entry->GetConstColumnVector(query_context->storage()->buffer_manager(), column_ids[column_id]);
                 output_block_ptr->column_vectors[column_id]->AppendWith(column_vector, block_offset, 1);
             }
             Value v = Value::MakeFloat(score_result[output_id]);

@@ -51,7 +51,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ### 🎁 Ease-of-use
 
-- Intuitive Python API. See the [Python API](https://infiniflow.org/docs/dev/python_api_reference)
+- Intuitive Python API. See the [Python API](https://infiniflow.org/docs/dev/pysdk_api_reference)
 - A single-binary architecture with no dependencies, making deployment a breeze.
 - Embedded in Python as a module and friendly to AI developers.  
 
@@ -90,12 +90,12 @@ If you wish to deploy Infinity with the server and client as separate processes,
 
 See the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) guide.
 
-> 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/python_api_reference).
+> 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/pysdk_api_reference).
 
 ## 📚 Document
 
 - [Quickstart](https://infiniflow.org/docs/dev/)
-- [Python API](https://infiniflow.org/docs/dev/python_api_reference)
+- [Python API](https://infiniflow.org/docs/dev/pysdk_api_reference)
 - [HTTP API](https://infiniflow.org/docs/dev/http_api_reference)
 - [References](https://infiniflow.org/docs/dev/category/references)
 - [FAQ](https://infiniflow.org/docs/dev/FAQ)

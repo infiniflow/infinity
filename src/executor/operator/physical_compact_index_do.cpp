@@ -27,6 +27,8 @@ import base_table_ref;
 import wal_manager;
 import infinity_context;
 import infinity_exception;
+import table_entry;
+import segment_index_entry;
 
 namespace infinity {
 
@@ -61,7 +63,9 @@ bool PhysicalCompactIndexDo::Execute(QueryContext *query_context, OperatorState 
 
     Txn *txn = query_context->GetTxn();
     auto &create_index_idxes = (*compact_index_do_operator_state->create_index_shared_data_)[create_index_idx]->create_index_idxes_;
-    auto status = txn->CreateIndexDo(new_table_ref, index_name, create_index_idxes);
+    TableEntry *table_entry = new_table_ref->table_entry_ptr_;
+    Map<SegmentID, SegmentIndexEntry *> segment_index_entries = compact_state_data->GetSegmentIndexEntries(index_name);
+    auto status = txn->CreateIndexDo(table_entry, segment_index_entries, index_name, create_index_idxes);
 
     ++create_index_idx;
     compact_index_do_operator_state->create_index_idx_ = create_index_idx;
