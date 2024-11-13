@@ -516,10 +516,11 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
     return Status::OK();
 }
 
-Status Storage::SetReaderStorageContinue(TxnTimeStamp system_start_ts) {
-    StorageMode current_mode = GetStorageMode();
-    if (current_mode != StorageMode::kReadable) {
-        UnrecoverableError(fmt::format("Expect current storage mode is READER, but it is {}", ToString(current_mode)));
+Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
+
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (reader_init_phase_ != ReaderInitPhase::kPhase1) {
+        UnrecoverableError(fmt::format("Expect current storage mode is READER with Phase1"));
     }
 
     BuiltinFunctions builtin_functions(new_catalog_);
@@ -562,6 +563,7 @@ Status Storage::SetReaderStorageContinue(TxnTimeStamp system_start_ts) {
 
     periodic_trigger_thread_->Start();
     reader_init_phase_ = ReaderInitPhase::kPhase2;
+    current_storage_mode_ = StorageMode::kReadable;
 
     return Status::OK();
 }

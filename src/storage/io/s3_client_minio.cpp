@@ -34,9 +34,9 @@ Status S3ClientMinio::DownloadObject(const String &bucket_name, const String &ob
 
     // Handle response.
     if (resp) {
-        LOG_INFO(fmt::format("{} downloaded to {} successfully", object_name, file_path));
+        LOG_INFO(fmt::format("{}/{} downloaded to {} successfully", bucket_name, object_name, file_path));
     } else {
-        UnrecoverableError(fmt::format("Unable to download object: {}", resp.Error().String()));
+        UnrecoverableError(fmt::format("Unable to download object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String()));
     }
     return Status::OK();
 }
@@ -54,9 +54,9 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
 
     // Handle response.
     if (resp) {
-        LOG_INFO(fmt::format("{} uploaded to {} successfully", file_path, object_name));
+        LOG_INFO(fmt::format("{} uploaded to {}/{} successfully", file_path, bucket_name, object_name));
     } else {
-        UnrecoverableError(fmt::format("Unable to upload object: {}", resp.Error().String()));
+        UnrecoverableError(fmt::format("Unable to upload object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String()));
     }
     return Status::OK();
 }
@@ -75,7 +75,7 @@ Status S3ClientMinio::RemoveObject(const String &bucket_name, const String &obje
     if (resp) {
         LOG_INFO(fmt::format("{} is removed from {} successfully", object_name, bucket_name));
     } else {
-        UnrecoverableError(fmt::format("Unable to remove object: {}", resp.Error().String()));
+        UnrecoverableError(fmt::format("Unable to remove object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String()));
     }
     return Status::OK();
 }
@@ -114,14 +114,14 @@ Status S3ClientMinio::BucketExists(const String &bucket_name) {
     // Call bucket exists.
     minio::s3::BucketExistsResponse resp = client_->BucketExists(args);
     // Handle response.
-    if(resp) {
-        if(resp.exist) {
+    if (resp) {
+        if (resp.exist) {
             return Status::OK();
         } else {
             return Status::MinioBucketNotExists(bucket_name);
         }
     } else {
-        switch(resp.status_code) {
+        switch (resp.status_code) {
             case 403: {
                 return Status::MinioInvalidAccessKey(resp.Error().String());
             }

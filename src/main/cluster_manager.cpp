@@ -864,7 +864,7 @@ Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
         last_commit_ts = entry->commit_ts_;
     }
 
-    storage_ptr->SetReaderStorageContinue(last_commit_ts + 1);
+    storage_ptr->AdminToReaderBottom(last_commit_ts + 1);
     return Status::OK();
 }
 

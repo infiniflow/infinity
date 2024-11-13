@@ -112,7 +112,7 @@ class InfinityRunner(BaseInfinityRunner):
         print(f"Launch {self.node_name} successfully. pid: {self.process.pid}")
 
     def uninit(self):
-        print(f"Uniniting node {self.node_name}")
+        print(f"Uniting node {self.node_name}")
         if self.process is None:
             return
         timeout = 60

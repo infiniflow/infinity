@@ -4151,12 +4151,12 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
     Status status;
     switch (target_node_role) {
         case NodeRole::kAdmin: {
-            status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+            status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
             LOG_INFO("Start in ADMIN mode");
             break;
         }
         case NodeRole::kStandalone: {
-            status = InfinityContext::instance().ChangeRole(NodeRole::kStandalone);
+            status = InfinityContext::instance().ChangeServerRole(NodeRole::kStandalone);
             LOG_INFO("Start in STANDALONE mode");
             break;
         }
@@ -4182,7 +4182,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 query_result.status_ = status;
                 return query_result;
             }
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLeader, false, node_name);
+            status = InfinityContext::instance().ChangeServerRole(NodeRole::kLeader, false, node_name);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to LEADER role");
                 if (status.code() == ErrorCode::kCantSwitchRole) {
@@ -4190,7 +4190,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                     break;
                 }
 
-                Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+                Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
                 if (!restore_status.ok()) {
                     UnrecoverableError(fmt::format("Fail to change node role to LEADER, then fail to restore to ADMIN."));
                 }
@@ -4230,10 +4230,10 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 return query_result;
             }
 
-            status = InfinityContext::instance().ChangeRole(NodeRole::kFollower, false, node_name, leader_ip, leader_port);
+            status = InfinityContext::instance().ChangeServerRole(NodeRole::kFollower, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to FOLLOWER role");
-                Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+                Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
                 if (!restore_status.ok()) {
                     UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
                 }
@@ -4273,10 +4273,10 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
                 return query_result;
             }
 
-            status = InfinityContext::instance().ChangeRole(NodeRole::kLearner, false, node_name, leader_ip, leader_port);
+            status = InfinityContext::instance().ChangeServerRole(NodeRole::kLearner, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
                 LOG_INFO("Fail to change to LEARNER role");
-                Status restore_status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin);
+                Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
                 if (!restore_status.ok()) {
                     UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
                 }
