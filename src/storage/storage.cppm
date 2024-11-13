@@ -122,7 +122,7 @@ private:
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
 
     mutable std::mutex mutex_;
-    StorageMode current_storage_mode_{StorageMode::kUnInitialized};
+    Atomic<StorageMode> current_storage_mode_{StorageMode::kUnInitialized};
     ReaderInitPhase reader_init_phase_{ReaderInitPhase::kInvalid};
 };
 

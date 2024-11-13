@@ -105,6 +105,7 @@ Status Storage::UnInitFromAdmin() {
 }
 
 Status Storage::AdminToReader() {
+    LOG_INFO(fmt::format("Start to update storage from admin mode to reader"));
     std::unique_lock<std::mutex> lock(mutex_);
     switch (config_ptr_->StorageType()) {
         case StorageType::kLocal: {
@@ -173,7 +174,7 @@ Status Storage::AdminToReader() {
 }
 
 Status Storage::AdminToWriter() {
-
+    LOG_INFO(fmt::format("Start to update storage from admin mode to writer"));
     TxnTimeStamp system_start_ts = 0;
     {
         std::unique_lock<std::mutex> lock(mutex_);
@@ -344,8 +345,6 @@ Status Storage::UnInitFromReader() {
     LOG_INFO(fmt::format("Start to change storage from readable mode to un-init"));
     {
         std::unique_lock<std::mutex> lock(mutex_);
-        current_storage_mode_ = StorageMode::kAdmin;
-
         if (periodic_trigger_thread_ != nullptr) {
             if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
                 UnrecoverableError("Error reader init phase");
@@ -484,6 +483,7 @@ Status Storage::WriterToAdmin() {
 }
 
 Status Storage::WriterToReader() {
+    LOG_INFO(fmt::format("Start to update storage from writer mode to reader"));
     std::unique_lock<std::mutex> lock(mutex_);
 
     if (periodic_trigger_thread_ != nullptr) {
@@ -512,7 +512,7 @@ Status Storage::UnInitFromWriter() {
     LOG_INFO(fmt::format("Start to change storage from writable mode to un-init"));
     {
         std::unique_lock<std::mutex> lock(mutex_);
-        current_storage_mode_ = StorageMode::kUnInitialized;
+
         if (periodic_trigger_thread_ != nullptr) {
             periodic_trigger_thread_->Stop();
             periodic_trigger_thread_.reset();
@@ -576,6 +576,8 @@ Status Storage::UnInitFromWriter() {
         if (cleanup_info_tracer_ != nullptr) {
             cleanup_info_tracer_.reset();
         }
+
+        current_storage_mode_ = StorageMode::kUnInitialized;
     }
     LOG_INFO(fmt::format("Finishing changing storage from writable mode to un-init"));
     return Status::OK();
@@ -591,7 +593,7 @@ ResultCacheManager *Storage::result_cache_manager() const noexcept {
 ResultCacheManager *Storage::GetResultCacheManagerPtr() const noexcept { return result_cache_manager_.get(); }
 
 StorageMode Storage::GetStorageMode() const {
-    std::unique_lock<std::mutex> lock(mutex_);
+    LOG_INFO(fmt::format("Get storage mode"));
     return current_storage_mode_;
 }
 
