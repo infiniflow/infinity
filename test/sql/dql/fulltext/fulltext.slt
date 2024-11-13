@@ -27,6 +27,17 @@ SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MAT
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 
+query TTI
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3;block_max=compare') USING INDEXES ('ft_index');
+----
+Anarchism 30-APR-2012 03:25:17.000 0 22.299635
+
+# only phrase
+query TTIR rowsort
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs"', 'topn=3;block_max=compare') USING INDEXES ('ft_index');
+----
+Anarchism 30-APR-2012 03:25:17.000 6 46.196758
+
 # only phrase
 query TTIR rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs"', 'topn=3;block_max=compare');
