@@ -133,6 +133,9 @@ public:
 
     Status CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
 
+    Status
+    CreateIndexDo(const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
+
     TxnTimeStamp GetFulltexSegmentUpdateTs() {
         std::shared_lock lock(segment_update_ts_mutex_);
         return segment_update_ts_;

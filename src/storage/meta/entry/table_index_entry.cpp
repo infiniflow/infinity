@@ -395,6 +395,24 @@ Status TableIndexEntry::CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID
     return Status::OK();
 }
 
+Status TableIndexEntry::CreateIndexDo(const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
+                                      HashMap<SegmentID, atomic_u64> &create_index_idxes,
+                                      Txn *txn) {
+    if (this->index_base_->column_names_.size() != 1) {
+        // TODO
+        Status status = Status::NotSupport("Not implemented");
+        RecoverableError(status);
+    }
+    for (auto &[segment_id, segment_index_entry] : segment_index_entries) {
+        atomic_u64 &create_index_idx = create_index_idxes.at(segment_id);
+        auto status = segment_index_entry->CreateIndexDo(create_index_idx);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 void TableIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     if (this->deleted_) {
         return;

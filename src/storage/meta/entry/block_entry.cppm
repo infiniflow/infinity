@@ -125,7 +125,10 @@ public:
     // Getter
     inline const SegmentEntry *GetSegmentEntry() const { return segment_entry_; }
 
-    inline SizeT row_count() const { return block_row_count_; }
+    inline SizeT row_count() const {
+        std::shared_lock lock(rw_locker_);
+        return block_row_count_;
+    }
 
     inline SizeT row_capacity() const { return row_capacity_; }
 
@@ -151,6 +154,10 @@ public:
     const SharedPtr<String> &block_dir() const { return block_dir_; }
 
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_idx) const;
+
+    ColumnVector GetColumnVector(BufferManager *buffer_mgr, ColumnID column_id) const;
+
+    ColumnVector GetConstColumnVector(BufferManager *buffer_mgr, ColumnID column_id) const;
 
     FastRoughFilter *GetFastRoughFilter() { return fast_rough_filter_.get(); }
 

@@ -214,8 +214,8 @@ TEST_P(RepeatReplayTest, import) {
             columns_vector.push_back(column_vector);
         }
         for (int i = 0; i < 2; ++i) {
-            auto column = block_entry->GetColumnBlockEntry(i);
-            column->Append(columns_vector[i].get(), 0 /*offset*/, 1 /*rows*/, buffer_mgr);
+            ColumnVector col = block_entry->GetColumnVector(buffer_mgr, i);
+            col.AppendWith(*columns_vector[i], 0 /*offset*/, 1 /*rows*/);
         }
         block_entry->IncreaseRowCount(1 /*rows*/);
         segment_entry->AppendBlockEntry(std::move(block_entry));

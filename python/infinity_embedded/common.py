@@ -67,6 +67,7 @@ LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 
 # test embedded_infinity
 LOCAL_INFINITY_PATH = "/var/infinity"
+LOCAL_INFINITY_CONFIG_PATH = "conf/pytest_embedded_infinity_conf.toml"
 
 
 class ConflictType(object):

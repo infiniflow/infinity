@@ -536,7 +536,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                 //                       block_column_idx + 1,
                 //                       brute_task_n));
                 block_entry->SetDeleteBitmask(begin_ts, bitmask);
-                ColumnVector column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
+                ColumnVector column_vector = block_entry->GetConstColumnVector(buffer_mgr, knn_column_id);
                 BruteForceBlockScan<t, ColumnDataType, QueryDataType, C, DistanceDataType>::Execute(merge_heap,
                                                                                                     dist_func,
                                                                                                     knn_query_ptr,
@@ -688,8 +688,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                         if (block_id != prev_block_id) {
                                             prev_block_id = block_id;
                                             BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-                                            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
-                                            column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
+                                            column_vector = block_entry->GetConstColumnVector(buffer_mgr, knn_column_id);
                                         }
                                         if constexpr (t == LogicalType::kEmbedding) {
                                             const auto *data = reinterpret_cast<const ColumnDataType *>(column_vector.data());
