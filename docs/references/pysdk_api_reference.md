@@ -1,6 +1,6 @@
 ---
 sidebar_position: 4
-slug: /python_api_reference
+slug: /pysdk_api_reference
 ---
 # Python API Reference
 
