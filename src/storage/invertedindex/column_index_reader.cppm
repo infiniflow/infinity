@@ -81,11 +81,11 @@ export struct IndexReader {
     // If no such column exists, return nullptr.
     // If column exists, but no index with a hint name is found, return a random one.
     ColumnIndexReader *GetColumnIndexReader(u64 column_id, const Vector<String> &hints) const {
-        String hints_msg = "ColumnIndexReader::GetColumnIndexReader : index hints are ";
-        for (SizeT i = 0; i < hints.size(); i++) {
-            hints_msg += fmt::format("{} ", hints[i]);
-        }
-        LOG_TRACE(hints_msg);
+        // String hints_msg = "ColumnIndexReader::GetColumnIndexReader : index hints are ";
+        // for (SizeT i = 0; i < hints.size(); i++) {
+        //     hints_msg += fmt::format("{} ", hints[i]);
+        // }
+        // LOG_TRACE(hints_msg);
 
         const auto &column_index_map = column_index_readers_->find(column_id);
         // if no fulltext index exists, or the map is empty.
@@ -97,21 +97,21 @@ export struct IndexReader {
         for (SizeT i = 0; i < hints.size(); i++) {
             if (auto it = indices_map->find(hints[i]); it != indices_map->end()) {
                 // column_id, column_name, index_name, analyzer
-                LOG_TRACE(fmt::format("index with hint name found : {}, {}, {}, {}.",
-                                      column_id,
-                                      indices_map->at(hints[i])->GetColumnName(),
-                                      hints[i],
-                                      indices_map->at(hints[i])->GetAnalyzer()));
+                // LOG_TRACE(fmt::format("index with hint name found : {}, {}, {}, {}.",
+                //                       column_id,
+                //                       indices_map->at(hints[i])->GetColumnName(),
+                //                       hints[i],
+                //                       indices_map->at(hints[i])->GetAnalyzer()));
                 return indices_map->at(hints[i]).get();
             }
         }
         // fall back to beginning of the map
         // column_id, column_name, index_name, analyzer
-        LOG_TRACE(fmt::format("no hint found, settle with: {}, {}, {}, {}.",
-                              column_id,
-                              indices_map->begin()->second->GetColumnName(),
-                              indices_map->begin()->first,
-                              indices_map->begin()->second->GetAnalyzer()));
+        // LOG_TRACE(fmt::format("no hint found, settle with: {}, {}, {}, {}.",
+        //                       column_id,
+        //                       indices_map->begin()->second->GetColumnName(),
+        //                       indices_map->begin()->first,
+        //                       indices_map->begin()->second->GetAnalyzer()));
         return indices_map->begin()->second.get();
     }
 
@@ -124,10 +124,10 @@ export struct IndexReader {
                 rst[column_index_reader->GetColumnName()] = column_index_reader->GetAnalyzer();
             }
         }
-        LOG_TRACE("IndexReader ::GetColumn2Analyzer results :");
+        // LOG_TRACE("IndexReader ::GetColumn2Analyzer results :");
         for (const auto &iter : rst) {
             // column_name, analyzer_name
-            LOG_TRACE(fmt::format("{}, {}", iter.first, iter.second));
+            // LOG_TRACE(fmt::format("{}, {}", iter.first, iter.second));
         }
         return rst;
     }
