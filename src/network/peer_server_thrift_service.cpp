@@ -173,7 +173,7 @@ void PeerServerThriftService::ChangeRole(infinity_peer_server::ChangeRoleRespons
     Status status = Status::OK();
     switch (request.node_type) {
         case infinity_peer_server::NodeType::kAdmin: {
-            status = InfinityContext::instance().ChangeRole(NodeRole::kAdmin, true);
+            status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin, true);
             break;
         }
         default: {

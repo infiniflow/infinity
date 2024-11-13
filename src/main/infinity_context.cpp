@@ -37,17 +37,9 @@ import infinity_thrift_service;
 
 namespace infinity {
 
-InfinityContext::InfinityContext() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::IncrObjectCount("InfinityContext");
-#endif
-}
+InfinityContext::InfinityContext() = default;
 
-InfinityContext::~InfinityContext() {
-#ifdef INFINITY_DEBUG
-    GlobalResourceUsage::DecrObjectCount("InfinityContext");
-#endif
-}
+InfinityContext::~InfinityContext() = default;
 
 NodeRole InfinityContext::GetServerRole() const {
     if (cluster_manager_ == nullptr) {
@@ -72,13 +64,16 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     if (!status.ok()) {
         std::exit(static_cast<int>(status.code()));
     }
-    Logger::Initialize(config_.get());
+    status = Logger::Initialize(config_.get());
+    if (!status.ok()) {
+        std::exit(static_cast<int>(status.code()));
+    }
 
     resource_manager_ = MakeUnique<ResourceManager>(config_->CPULimit(), 0);
 
     session_mgr_ = MakeUnique<SessionManager>();
 
-    Status change_result = ChangeRole(NodeRole::kAdmin);
+    Status change_result = ChangeServerRole(NodeRole::kAdmin);
     if (!status.ok()) {
         UnrecoverableError(status.message());
         return;
@@ -89,7 +84,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     }
 
     if (config_->ServerMode() == "standalone") {
-        Status change_to_standalone = ChangeRole(NodeRole::kStandalone);
+        Status change_to_standalone = ChangeServerRole(NodeRole::kStandalone);
         if (!change_to_standalone.ok()) {
             UnrecoverableError(change_to_standalone.message());
             return;
@@ -100,12 +95,12 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     }
 }
 
-Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, u16 node_port) {
+Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, u16 node_port) {
     NodeRole current_role = GetServerRole();
     if (current_role == target_role) {
         return Status::OK();
     }
-    LOG_INFO(fmt::format("ChangeRole from {} to {}", ToString(current_role), ToString(target_role)));
+    LOG_INFO(fmt::format("ChangeServerRole from {} to {}", ToString(current_role), ToString(target_role)));
 
     switch (current_role) {
         case NodeRole::kUnInitialized: {
@@ -129,7 +124,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     cluster_manager_->InitAsStandalone();
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kWritable);
                     if (!set_storage_status.ok()) {
-                        cluster_manager_->UnInit(from_leader);
+                        cluster_manager_->UnInit(false);
                         cluster_manager_->InitAsAdmin();
                         return set_storage_status;
                     }
@@ -143,7 +138,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     }
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kWritable);
                     if (!set_storage_status.ok()) {
-                        cluster_manager_->UnInit(from_leader);
+                        cluster_manager_->UnInit(false);
                         cluster_manager_->InitAsAdmin();
                         return set_storage_status;
                     }
@@ -159,7 +154,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     Status init_status = cluster_manager_->InitAsFollower(node_name, node_ip, node_port);
                     if (!init_status.ok()) {
                         storage_->SetStorageMode(StorageMode::kAdmin);
-                        cluster_manager_->UnInit(from_leader);
+                        cluster_manager_->UnInit(false);
                         cluster_manager_.reset();
                         cluster_manager_ = MakeUnique<ClusterManager>();
                         cluster_manager_->InitAsAdmin();
@@ -177,7 +172,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     Status init_status = cluster_manager_->InitAsLearner(node_name, node_ip, node_port);
                     if (!init_status.ok()) {
                         storage_->SetStorageMode(StorageMode::kAdmin);
-                        cluster_manager_->UnInit(from_leader);
+                        cluster_manager_->UnInit(false);
                         cluster_manager_.reset();
                         cluster_manager_ = MakeUnique<ClusterManager>();
                         cluster_manager_->InitAsAdmin();
@@ -192,7 +187,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         UnrecoverableError("Failed to un-init infinity context.");
                     }
                     storage_.reset();
-                    cluster_manager_->UnInit(from_leader);
+                    cluster_manager_->UnInit(false);
                     cluster_manager_.reset();
                     return Status::OK();
                 }
@@ -210,7 +205,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
         case NodeRole::kStandalone: {
             switch (target_role) {
                 case NodeRole::kAdmin: {
-                    cluster_manager_->UnInit(from_leader);
+                    cluster_manager_->UnInit(false);
                     cluster_manager_->InitAsAdmin();
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kAdmin);
                     if (!set_storage_status.ok()) {
@@ -226,8 +221,13 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     break;
                 }
                 case NodeRole::kUnInitialized: {
-                    Status status = Status::InvalidNodeRole("Can't switch standalone role to un-init");
-                    return status;
+                    cluster_manager_->UnInit(false);
+
+                    Status set_storage_status = storage_->SetStorageMode(StorageMode::kUnInitialized);
+                    if (!set_storage_status.ok()) {
+                        UnrecoverableError("Failed to set node storage to un-init.");
+                    }
+                    return set_storage_status;
                 }
                 default: {
                     Status status = Status::InvalidNodeRole("Can't switch Infinity from standalone to cluster mode");
@@ -243,7 +243,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                         UnrecoverableError("cluster manager wasn't valid.");
                     }
                     // TODO: disconnect with all follower/learner
-                    cluster_manager_->UnInit(from_leader);
+                    cluster_manager_->UnInit(false);
                     cluster_manager_->InitAsAdmin();
 
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kAdmin);
@@ -259,7 +259,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     break;
                 }
                 case NodeRole::kFollower: {
-                    cluster_manager_->UnInit(from_leader);
+                    cluster_manager_->UnInit(false);
 
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kAdmin);
                     if (!set_storage_status.ok()) {
@@ -273,14 +273,14 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
 
                     Status init_status = cluster_manager_->InitAsFollower(node_name, node_ip, node_port);
                     if (!init_status.ok()) {
-                        cluster_manager_->UnInit(from_leader);
+                        cluster_manager_->UnInit(false);
                         cluster_manager_.reset();
                         return init_status;
                     }
                     break;
                 }
                 case NodeRole::kLearner: {
-                    cluster_manager_->UnInit(from_leader);
+                    cluster_manager_->UnInit(false);
 
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kAdmin);
                     if (!set_storage_status.ok()) {
@@ -294,7 +294,7 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
 
                     Status init_status = cluster_manager_->InitAsLearner(node_name, node_ip, node_port);
                     if (!init_status.ok()) {
-                        cluster_manager_->UnInit(from_leader);
+                        cluster_manager_->UnInit(false);
                         cluster_manager_.reset();
                         return init_status;
                     }
@@ -302,6 +302,15 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                 }
                 case NodeRole::kStandalone: {
                     return Status::InvalidNodeRole("Can't switch infinity role from leader to standalone");
+                }
+                case NodeRole::kUnInitialized: {
+                    cluster_manager_->UnInit(false);
+
+                    Status set_storage_status = storage_->SetStorageMode(StorageMode::kUnInitialized);
+                    if (!set_storage_status.ok()) {
+                        UnrecoverableError("Failed to set node storage to un-init.");
+                    }
+                    return set_storage_status;
                 }
                 default: {
                     Status status = Status::InvalidNodeRole(fmt::format("Can't switch infinity role from leader to {}", ToString(target_role)));
@@ -341,9 +350,13 @@ Status InfinityContext::ChangeRole(NodeRole target_role, bool from_leader, const
                     break;
                 }
                 case NodeRole::kUnInitialized: {
-                    Status status = Status::InvalidNodeRole("Can't switch follower role to un-init");
-                    RecoverableError(status);
-                    break;
+                    cluster_manager_->UnInit(from_leader);
+
+                    Status set_storage_status = storage_->SetStorageMode(StorageMode::kUnInitialized);
+                    if (!set_storage_status.ok()) {
+                        UnrecoverableError("Failed to set node storage to un-init.");
+                    }
+                    return set_storage_status;
                 }
                 case NodeRole::kLeader: {
                     if (current_role == NodeRole::kLearner) {
@@ -409,29 +422,30 @@ void InfinityContext::UnInit() {
             LOG_INFO("Infinity is already un-initialized.");
             return;
         }
-        case NodeRole::kAdmin: {
-            Status status = ChangeRole(NodeRole::kUnInitialized);
+        default: {
+            Status status = ChangeServerRole(NodeRole::kUnInitialized);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
                 return;
             }
             break;
         }
-        default: {
-            Status status = ChangeRole(NodeRole::kAdmin);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-                return;
-            }
-            status = ChangeRole(NodeRole::kUnInitialized);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-                return;
-            }
-        }
+    }
+
+    if (task_scheduler_ != nullptr) {
+        task_scheduler_->UnInit();
+        task_scheduler_.reset();
     }
 
     storage_.reset();
+
+    if (cluster_manager_ != nullptr) {
+        cluster_manager_.reset();
+    }
+
+//    inverting_thread_pool_.stop(true);
+//    commiting_thread_pool_.stop(true);
+//    hnsw_build_thread_pool_.stop(true);
 
     session_mgr_.reset();
     resource_manager_.reset();
