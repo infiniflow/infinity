@@ -1,5 +1,7 @@
 module;
 
+#include <string>
+
 module strlen;
 
 import stl;
@@ -19,21 +21,17 @@ import column_vector;
 namespace infinity {
 
 struct StrlenFunction {
-    template <typename TA, typename TB, typename TC, typename TD>
-    static inline void Run(TA &left, TB &result, TC left_ptr, TD result_ptr) {
-        Status status = Status::NotSupport("Not implemented");
-        RecoverableError(status);
+    template <typename TA, typename TR>
+    static inline void Run(TA &input, TR &result) {
+        const char *input_str;
+        SizeT input_len;
+        GetReaderValue(input, input_str, input_len);
+
+        int length = static_cast<int>(input_len);
+
+        result.SetValue(length);
     }
 };
-
-template <>
-inline void StrlenFunction::Run(VarcharT &left, IntT &result, ColumnVector *left_ptr, ColumnVector *result_ptr) {
-    Span<const char> left_v = left_ptr->GetVarcharInner(left);
-    const char *input = left_v.data();
-    SizeT input_len = left_v.size();
-    IntT length = static_cast<IntT>(input_len);
-    result_ptr->AppendIntInner(length, result);
-}
 
 void RegisterStrlenFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "strlen";
@@ -42,10 +40,11 @@ void RegisterStrlenFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction strlen_function(func_name,
                                    {DataType(LogicalType::kVarchar)},
-                                   {DataType(LogicalType::kInt)},
-                                   &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, IntT, StrlenFunction>);
+                                   DataType(LogicalType::kInteger),
+                                   &ScalarFunction::UnaryFunction<VarcharT, IntegerT, StrlenFunction>);
 
     function_set_ptr->AddFunction(strlen_function);
+
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
