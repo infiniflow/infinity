@@ -96,6 +96,7 @@ UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, bool fe
 }
 
 Pair<u64, float> ColumnIndexReader::GetTotalDfAndAvgColumnLength() {
+    std::lock_guard lock(mutex_);
     if (total_df_ == 0) {
         u64 column_len_sum = 0;
         u32 column_len_cnt = 0;

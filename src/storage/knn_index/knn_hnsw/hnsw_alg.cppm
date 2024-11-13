@@ -66,11 +66,9 @@ public:
     using CompressVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
 
     // private:
-    KnnHnsw(SizeT M, SizeT ef_construction, DataStore data_store, Distance distance, SizeT random_seed)
+    KnnHnsw(SizeT M, SizeT ef_construction, DataStore data_store, Distance distance)
         : M_(M), ef_construction_(std::max(M_, ef_construction)), mult_(1 / std::log(1.0 * M_)), data_store_(std::move(data_store)),
-          distance_(std::move(distance)) {
-        level_rng_.seed(random_seed);
-    }
+          distance_(std::move(distance)) {}
 
     static Pair<SizeT, SizeT> GetMmax(SizeT M) { return {2 * M, M}; }
 
@@ -78,13 +76,12 @@ public:
     KnnHnsw() : M_(0), ef_construction_(0), mult_(0) {}
     KnnHnsw(This &&other)
         : M_(std::exchange(other.M_, 0)), ef_construction_(std::exchange(other.ef_construction_, 0)), mult_(std::exchange(other.mult_, 0.0)),
-          level_rng_(std::move(other.level_rng_)), data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)) {}
+          data_store_(std::move(other.data_store_)), distance_(std::move(other.distance_)) {}
     This &operator=(This &&other) {
         if (this != &other) {
             M_ = std::exchange(other.M_, 0);
             ef_construction_ = std::exchange(other.ef_construction_, 0);
             mult_ = std::exchange(other.mult_, 0.0);
-            level_rng_ = std::move(other.level_rng_);
             data_store_ = std::move(other.data_store_);
             distance_ = std::move(other.distance_);
         }
@@ -96,7 +93,7 @@ public:
         auto [Mmax0, Mmax] = This::GetMmax(M);
         auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax);
         Distance distance(data_store.dim());
-        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance), 0);
+        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
     SizeT GetSizeInBytes() const { return sizeof(M_) + sizeof(ef_construction_) + data_store_.GetSizeInBytes(); }
@@ -116,14 +113,15 @@ public:
         auto data_store = DataStore::Load(file_handle);
         Distance distance(data_store.dim());
 
-        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance), 0);
+        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
 private:
     // >= 0
     i32 GenerateRandomLayer() {
+        static thread_local std::mt19937 generator;
         std::uniform_real_distribution<double> distribution(0.0, 1.0);
-        auto r1 = distribution(level_rng_);
+        auto r1 = distribution(generator);
         double r = -std::log(r1) * mult_;
         return static_cast<i32>(r);
     }
@@ -407,8 +405,7 @@ public:
             return MakeUnique<KnnHnsw<CompressVecStoreType, LabelType>>(M_,
                                                                         ef_construction_,
                                                                         std::move(compressed_datastore),
-                                                                        std::move(distance),
-                                                                        0);
+                                                                        std::move(distance));
         }
     }
 
@@ -468,7 +465,6 @@ private:
 
     // 1 / log(1.0 * M_)
     double mult_;
-    std::default_random_engine level_rng_{};
 
     DataStore data_store_;
     Distance distance_;
