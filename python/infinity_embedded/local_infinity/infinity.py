@@ -1,7 +1,7 @@
 import os
 from infinity_embedded import InfinityConnection
 from abc import ABC
-from infinity_embedded.common import ConflictType, LOCAL_INFINITY_PATH, InfinityException
+from infinity_embedded.common import ConflictType, LOCAL_INFINITY_PATH, InfinityException, LOCAL_INFINITY_CONFIG_PATH
 from infinity_embedded.local_infinity.client import LocalInfinityClient
 from infinity_embedded.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity_embedded.errors import ErrorCode
@@ -11,7 +11,7 @@ import logging
 
 
 class LocalInfinityConnection(InfinityConnection, ABC):
-    def __init__(self, uri=LOCAL_INFINITY_PATH):
+    def __init__(self, uri=LOCAL_INFINITY_PATH, config_path=LOCAL_INFINITY_CONFIG_PATH):
         if not os.path.exists(uri):
             try:
                 logging.warning(f"Directory {uri} not found, try to create it")
@@ -20,7 +20,7 @@ class LocalInfinityConnection(InfinityConnection, ABC):
                 raise InfinityException(ErrorCode.DIR_NOT_FOUND, f"Directory {uri} not found and create failed: {e}")
         if os.path.isdir(uri):
             if os.access(uri, os.R_OK | os.W_OK):
-                self._client = LocalInfinityClient(uri)
+                self._client = LocalInfinityClient(uri, config_path)
                 self._is_connected = True
             else:
                 raise InfinityException(ErrorCode.UNEXPECTED_ERROR,

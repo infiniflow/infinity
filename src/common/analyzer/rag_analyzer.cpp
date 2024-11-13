@@ -163,6 +163,88 @@ bool IsChinese(const String &str) {
     return false;
 }
 
+bool IsAlphabet(const String &str) {
+    for (std::size_t i = 0; i < str.length(); ++i) {
+        unsigned char c = str[i];
+        if (c > 0x7F) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool IsKorean(const String &str) {
+    for (std::size_t i = 0; i < str.length(); ++i) {
+        unsigned char c = str[i];
+        if (c == 0xE1) {
+            if (i + 2 < str.length()) {
+                unsigned char c2 = str[i + 1];
+                unsigned char c3 = str[i + 2];
+                if ((c2 == 0x84 || c2 == 0x85 || c2 == 0x86 || c2 == 0x87) && (c3 >= 0x80 && c3 <= 0xBF)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool IsJapanese(const String &str) {
+    for (std::size_t i = 0; i < str.length(); ++i) {
+        unsigned char c = str[i];
+        if (c == 0xE3) {
+            if (i + 2 < str.length()) {
+                unsigned char c2 = str[i + 1];
+                unsigned char c3 = str[i + 2];
+                if ((c2 == 0x81 || c2 == 0x82 || c2 == 0x83) && (c3 >= 0x81 && c3 <= 0xBF)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool IsCJK(const String &str) {
+    for (std::size_t i = 0; i < str.length(); ++i) {
+        unsigned char c = str[i];
+
+        // Check Chinese
+        if (c >= 0xE4 && c <= 0xE9) {
+            if (i + 2 < str.length()) {
+                unsigned char c2 = str[i + 1];
+                unsigned char c3 = str[i + 2];
+                if ((c2 >= 0x80 && c2 <= 0xBF) && (c3 >= 0x80 && c3 <= 0xBF)) {
+                    return true;
+                }
+            }
+        }
+
+        // Check Japanese
+        if (c == 0xE3) {
+            if (i + 2 < str.length()) {
+                unsigned char c2 = str[i + 1];
+                unsigned char c3 = str[i + 2];
+                if ((c2 == 0x81 || c2 == 0x82 || c2 == 0x83) && (c3 >= 0x81 && c3 <= 0xBF)) {
+                    return true;
+                }
+            }
+        }
+
+        // Check Korean
+        if (c == 0xE1) {
+            if (i + 2 < str.length()) {
+                unsigned char c2 = str[i + 1];
+                unsigned char c3 = str[i + 2];
+                if ((c2 == 0x84 || c2 == 0x85 || c2 == 0x86 || c2 == 0x87) && (c3 >= 0x80 && c3 <= 0xBF)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 class RegexTokenizer {
 public:
     RegexTokenizer() {
@@ -221,6 +303,7 @@ private:
 
 class MacIntyreContractions {
 public:
+    // List of contractions adapted from Robert MacIntyre's tokenizer.
     Vector<String> CONTRACTIONS2 = {R"((?i)\b(can)(?#X)(not)\b)",
                                     R"((?i)\b(d)(?#X)('ye)\b)",
                                     R"((?i)\b(gim)(?#X)(me)\b)",
@@ -234,6 +317,8 @@ public:
 };
 
 class NLTKWordTokenizer {
+    MacIntyreContractions contractions_;
+
 public:
     // Starting quotes.
     Vector<Pair<String, String>> STARTING_QUOTES = {{String(R"(([«“‘„]|[`]+))"), String(R"( $1 )")},
@@ -273,18 +358,12 @@ public:
 
     Pair<String, String> DOUBLE_DASHES = {String(R"(--)"), String(R"( -- )")};
 
-    // List of contractions adapted from Robert MacIntyre's tokenizer.
-    MacIntyreContractions contractions_;
-    Vector<String> CONTRACTIONS2 = contractions_.CONTRACTIONS2;
-    Vector<String> CONTRACTIONS3 = contractions_.CONTRACTIONS3;
-
     void Tokenize(const String &text, Vector<String> &tokens, bool convert_parentheses = false) {
         String result = text;
 
         for (const auto &[pattern, substitution] : STARTING_QUOTES) {
             result = ApplyRegex(result, pattern, substitution);
         }
-
         for (const auto &[pattern, substitution] : PUNCTUATION) {
             result = ApplyRegex(result, pattern, substitution);
         }
@@ -309,11 +388,11 @@ public:
             result = ApplyRegex(result, pattern, substitution);
         }
 
-        for (const auto &pattern : CONTRACTIONS2) {
+        for (const auto &pattern : contractions_.CONTRACTIONS2) {
             result = ApplyRegex(result, pattern, R"( $1 $2 )");
         }
 
-        for (const auto &pattern : CONTRACTIONS3) {
+        for (const auto &pattern : contractions_.CONTRACTIONS3) {
             result = ApplyRegex(result, pattern, R"( $1 $2 )");
         }
 
@@ -340,9 +419,8 @@ private:
         PCRE2_SPTR pcre2_replacement = reinterpret_cast<PCRE2_SPTR>(substitution.c_str());
         int errorcode;
         PCRE2_SIZE erroroffset;
-        re = pcre2_compile(pcre2_pattern, PCRE2_ZERO_TERMINATED, 0, &errorcode, &erroroffset, nullptr);
+        re = pcre2_compile(pcre2_pattern, PCRE2_ZERO_TERMINATED, PCRE2_MULTILINE | PCRE2_UTF, &errorcode, &erroroffset, nullptr);
         if (re == nullptr) {
-            std::cerr << "pattern " << pattern << " PCRE2 compilation failed at offset " << erroroffset << ": " << errorcode << std::endl;
             return text;
         }
 
@@ -354,8 +432,8 @@ private:
             return text;
         }
 
-        PCRE2_UCHAR buffer[1024];
-        size_t outlength = sizeof(buffer);
+        size_t outlength = text.length() * 1.5;
+        UniquePtr<PCRE2_UCHAR> buffer = MakeUnique<PCRE2_UCHAR>(outlength);
         pcre2_substitute(re,
                          pcre2_subject,
                          text.length(),
@@ -365,13 +443,13 @@ private:
                          nullptr,
                          pcre2_replacement,
                          PCRE2_ZERO_TERMINATED,
-                         buffer,
+                         buffer.get(),
                          &outlength);
 
         pcre2_match_data_free(match_data);
         pcre2_code_free(re);
 
-        return String(reinterpret_cast<char *>(buffer), outlength);
+        return String(reinterpret_cast<char *>(buffer.get()), outlength);
     }
 };
 
@@ -380,7 +458,7 @@ void SentenceSplitter(const String &text, Vector<String> &result) {
     PCRE2_SIZE error_offset;
     const char *pattern = R"( *[\.\?!]['"\)\]]* *)";
 
-    pcre2_code *re = pcre2_compile((PCRE2_SPTR)pattern, PCRE2_ZERO_TERMINATED, 0, &error_code, &error_offset, nullptr);
+    pcre2_code *re = pcre2_compile((PCRE2_SPTR)pattern, PCRE2_ZERO_TERMINATED, PCRE2_MULTILINE | PCRE2_UTF, &error_code, &error_offset, nullptr);
 
     if (re == nullptr) {
         PCRE2_UCHAR buffer[256];
@@ -949,15 +1027,15 @@ String RAGAnalyzer::Tokenize(const String &line) {
     String strline;
     opencc_->convert(str1, strline);
     Vector<String> res;
-    std::size_t zh_num = 0;
+    std::size_t alpha_num = 0;
     int len = UTF8Length(strline);
     for (int i = 0; i < len; ++i) {
         String t = UTF8Substr(strline, i, 1);
-        if (IsChinese(t)) {
-            zh_num++;
+        if (IsAlphabet(t)) {
+            alpha_num++;
         }
     }
-    if (zh_num == 0) {
+    if (alpha_num > (std::size_t)(len * 0.9)) {
         Vector<String> term_list;
         Vector<String> sentences;
         SentenceSplitter(line, sentences);

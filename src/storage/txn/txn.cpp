@@ -54,6 +54,7 @@ import persistence_manager;
 import infinity_context;
 import admin_statement;
 import global_resource_usage;
+import wal_manager;
 
 namespace infinity {
 
@@ -553,11 +554,11 @@ TxnTimeStamp Txn::Commit() {
         return commit_ts;
     }
 
-    NodeRole current_node_role = InfinityContext::instance().GetServerRole();
-    if (current_node_role != NodeRole::kStandalone and current_node_role != NodeRole::kLeader) {
+    StorageMode current_storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    if (current_storage_mode != StorageMode::kWritable) {
         if (!IsReaderAllowed()) {
             RecoverableError(
-                Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_node_role))));
+                Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_storage_mode))));
         }
     }
 
