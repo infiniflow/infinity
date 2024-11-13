@@ -77,7 +77,7 @@ public:
 
     StorageMode GetStorageMode() const;
     Status SetStorageMode(StorageMode mode);
-    Status SetReaderStorageContinue(TxnTimeStamp system_start_ts);
+    Status AdminToReaderBottom(TxnTimeStamp system_start_ts);
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
     void LoadFullCheckpoint(const String &checkpoint_path);

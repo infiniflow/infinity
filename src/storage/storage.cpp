@@ -515,7 +515,7 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
     return Status::OK();
 }
 
-Status Storage::SetReaderStorageContinue(TxnTimeStamp system_start_ts) {
+Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     StorageMode current_mode = GetStorageMode();
     if (current_mode != StorageMode::kReadable) {
         UnrecoverableError(fmt::format("Expect current storage mode is READER, but it is {}", ToString(current_mode)));
