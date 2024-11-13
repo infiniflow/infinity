@@ -124,7 +124,7 @@ export struct IndexReader {
                 rst[column_index_reader->GetColumnName()] = column_index_reader->GetAnalyzer();
             }
         }
-        LOG_TRACE("Index::GetColumn2Analyzer results :");
+        LOG_TRACE("IndexReader ::GetColumn2Analyzer results :");
         for (const auto &iter : rst) {
             // column_name, analyzer_name
             LOG_TRACE(fmt::format("{}, {}", iter.first, iter.second));

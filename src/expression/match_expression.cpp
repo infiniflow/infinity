@@ -16,6 +16,7 @@ module;
 
 import stl;
 
+import logger;
 import base_expression;
 import expression_type;
 import third_party;
@@ -36,10 +37,11 @@ void ParseMultiIndexHints(const String &index_hints, Vector<String> &index_names
         if (comma_idx == String::npos) {
             auto index_name = index_hints.substr(begin_idx);
             index_names.emplace_back(index_name);
+            LOG_TRACE(fmt::format("new index hint : {}", index_name));
             break;
         } else {
             auto index_name = index_hints.substr(begin_idx, comma_idx - begin_idx);
-            index_names.emplace_back(std::move(index_name));
+            LOG_TRACE(fmt::format("new index hint : {}", index_name));
             begin_idx = comma_idx + 1;
         }
     }

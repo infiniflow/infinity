@@ -202,7 +202,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     match_node->common_query_filter_ = std::move(common_query_filter);
                     match_node->index_reader_ = base_table_ref->table_entry_ptr_->GetFullTextIndexReader(query_context->GetTxn());
 
-                    Map<String, String> column2analyzer = match_node->index_reader_.GetColumn2Analyzer(match_text_expr->index_names_);
+                    Map<String, String> column2analyzer = match_node->index_reader_.GetColumn2Analyzer(match_node->match_expr_->index_names_);
                     SearchOptions search_ops(match_node->match_expr_->options_text_);
 
                     // option: begin_threshold

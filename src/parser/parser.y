@@ -3090,6 +3090,7 @@ match_text_expr : MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr '
     match_text_expr->index_names_ = std::string($12);
     free($4);
     free($6);
+    free($12);
     $$ = match_text_expr;
 }
 | MATCH TEXT '(' STRING ',' STRING ',' STRING optional_search_filter_expr ')' USING INDEXES '(' STRING ')' {
@@ -3102,6 +3103,7 @@ match_text_expr : MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr '
     free($4);
     free($6);
     free($8);
+    free($14);
     $$ = match_text_expr;
 }
 
