@@ -32,11 +32,12 @@ import logger;
 namespace infinity {
 
 void PGServer::Run() {
-    if (started_) {
-        return;
+    {
+        auto expected = PGServerStatus::kUnstarted;
+        if (!status_.compare_exchange_strong(expected, PGServerStatus::kStarting)) {
+            UnrecoverableError(fmt::format("PGServer in unexpected state: {}", u8(expected)));
+        }
     }
-
-    started_ = true;
 
     u16 pg_port = InfinityContext::instance().config()->PostgresPort();
     const String &pg_listen_addr = InfinityContext::instance().config()->ServerAddress();
@@ -56,13 +57,28 @@ void PGServer::Run() {
 
     fmt::print("Run 'psql -h {} -p {}' to connect to the server (SQL is only for test).\n", pg_listen_addr, pg_port);
 
+    status_.store(PGServerStatus::kRunning);
+    status_.notify_one();
+
     io_service_ptr_->run();
-    shutdown_semaphore_.release();
+
+    status_.store(PGServerStatus::kStopped);
+    status_.notify_one();
 }
 
 void PGServer::Shutdown() {
-
-    started_ = false;
+    while (true) {
+        auto expected = PGServerStatus::kRunning;
+        if (!status_.compare_exchange_strong(expected, PGServerStatus::kStopping)) {
+            if (expected == PGServerStatus::kStarting) {
+                status_.wait(PGServerStatus::kStarting);
+            } else {
+                UnrecoverableError(fmt::format("PGServer in unexpected state: {}", u8(expected)));
+            }
+        } else {
+            break;
+        }
+    }
 
     while (running_connection_count_ > 0) {
         // Running connection exists.
@@ -71,9 +87,13 @@ void PGServer::Shutdown() {
 
     io_service_ptr_->stop();
     acceptor_ptr_->close();
-    shutdown_semaphore_.acquire();
+
+    status_.wait(PGServerStatus::kStopping);
+
     acceptor_ptr_.reset();
     io_service_ptr_.reset();
+
+    status_.store(PGServerStatus::kUnstarted);
 }
 
 void PGServer::CreateConnection() {
@@ -82,8 +102,9 @@ void PGServer::CreateConnection() {
 }
 
 void PGServer::StartConnection(SharedPtr<Connection> &connection) {
-    Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_, initialized = bool(this->started_)]() mutable {
-        if(initialized) {
+    bool started = status_ == PGServerStatus::kRunning;
+    if (started) {
+        Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_]() mutable {
             ++num_running_connections;
             try {
                 connection->Run();
@@ -98,11 +119,10 @@ void PGServer::StartConnection(SharedPtr<Connection> &connection) {
             // User disconnected
             connection.reset();
             --num_running_connections;
-        }
-    });
-
-    connection_thread.detach();
-    CreateConnection();
+        });
+        connection_thread.detach();
+        CreateConnection();
+    }
 }
 
 } // namespace infinity
