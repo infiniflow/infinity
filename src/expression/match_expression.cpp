@@ -78,7 +78,8 @@ bool MatchExpression::Eq(const BaseExpression &other_base) const {
         return false;
     }
     const auto &other = static_cast<const MatchExpression &>(other_base);
-    bool eq = fields_ == other.fields_ && matching_text_ == other.matching_text_ && options_text_ == other.options_text_;
+    bool eq = (fields_ == other.fields_ && matching_text_ == other.matching_text_ && options_text_ == other.options_text_ &&
+               index_names_.size() == other.index_names_.size());
     if (eq) {
         for (SizeT i = 0; i < index_names_.size(); i++) {
             if (index_names_[i] == other.index_names_[i]) {
