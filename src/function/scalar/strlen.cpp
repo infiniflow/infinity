@@ -20,6 +20,12 @@ import column_vector;
 
 namespace infinity {
 
+template <typename TA>
+void GetReaderValue(const TA &input, const char *&str, std::size_t &len) {
+    str = input.c_str();
+    len = input.length();
+}
+
 struct StrlenFunction {
     template <typename TA, typename TR>
     static inline void Run(const TA &input, TR &result) {
