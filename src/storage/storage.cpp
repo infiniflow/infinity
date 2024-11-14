@@ -104,6 +104,177 @@ Status Storage::UnInitFromAdmin() {
     return Status::OK();
 }
 
+Status Storage::AdminToReader() {
+    LOG_INFO(fmt::format("Start to update storage from admin mode to reader"));
+    std::unique_lock<std::mutex> lock(mutex_);
+    switch (config_ptr_->StorageType()) {
+        case StorageType::kLocal: {
+            // Not init remote store
+            break;
+        }
+        case StorageType::kMinio: {
+            if (VirtualStore::IsInit()) {
+                VirtualStore::UnInitRemoteStore();
+            }
+            LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
+            Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
+                                                          config_ptr_->ObjectStorageUrl(),
+                                                          config_ptr_->ObjectStorageHttps(),
+                                                          config_ptr_->ObjectStorageAccessKey(),
+                                                          config_ptr_->ObjectStorageSecretKey(),
+                                                          config_ptr_->ObjectStorageBucket(),
+                                                          current_storage_mode_ == StorageMode::kWritable);
+            if (!status.ok()) {
+                VirtualStore::UnInitRemoteStore();
+                return status;
+            }
+
+            if (object_storage_processor_ != nullptr) {
+                object_storage_processor_->Stop();
+                object_storage_processor_.reset();
+            }
+            object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
+            object_storage_processor_->Start();
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+        }
+    }
+    // Construct persistence store
+    String persistence_dir = config_ptr_->PersistenceDir();
+    if (!persistence_dir.empty()) {
+        if (persistence_manager_ != nullptr) {
+            persistence_manager_.reset();
+        }
+        i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
+        persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
+    }
+
+    if (result_cache_manager_ != nullptr) {
+        result_cache_manager_.reset();
+    }
+    SizeT cache_result_num = config_ptr_->CacheResultNum();
+    if (result_cache_manager_ == nullptr) {
+        result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
+    }
+
+    // Construct buffer manager
+    if (buffer_mgr_ != nullptr) {
+        buffer_mgr_->Stop();
+        buffer_mgr_.reset();
+    }
+    buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
+                                            MakeShared<String>(config_ptr_->DataDir()),
+                                            MakeShared<String>(config_ptr_->TempDir()),
+                                            persistence_manager_.get(),
+                                            config_ptr_->LRUNum());
+    buffer_mgr_->Start();
+
+    LOG_INFO("No checkpoint found in READER mode, waiting for log replication");
+    reader_init_phase_ = ReaderInitPhase::kPhase1;
+    return Status::OK();
+}
+
+// Used for follower and learner
+Status Storage::InitToReader() { return Status::OK(); }
+
+Status Storage::UnInitFromReader() {
+    LOG_INFO(fmt::format("Start to change storage from readable mode to un-init"));
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (periodic_trigger_thread_ != nullptr) {
+            if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                UnrecoverableError("Error reader init phase");
+            }
+            periodic_trigger_thread_->Stop();
+            periodic_trigger_thread_.reset();
+        }
+
+        if (bg_processor_ != nullptr) {
+            if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                UnrecoverableError("Error reader init phase");
+            }
+            bg_processor_->Stop();
+            bg_processor_.reset();
+        }
+
+        new_catalog_.reset();
+
+        if (memory_index_tracer_ != nullptr) {
+            memory_index_tracer_.reset();
+        }
+
+        if (wal_mgr_ != nullptr) {
+            wal_mgr_->Stop();
+            wal_mgr_.reset();
+        }
+
+        if (txn_mgr_ != nullptr) {
+            if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                UnrecoverableError("Error reader init phase");
+            }
+            txn_mgr_->Stop();
+            txn_mgr_.reset();
+        }
+
+        switch (config_ptr_->StorageType()) {
+            case StorageType::kLocal: {
+                // Not init remote store
+                break;
+            }
+            case StorageType::kMinio: {
+                if (object_storage_processor_ != nullptr) {
+                    object_storage_processor_->Stop();
+                    object_storage_processor_.reset();
+                    VirtualStore::UnInitRemoteStore();
+                }
+                break;
+            }
+            default: {
+                UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+            }
+        }
+
+        if (buffer_mgr_ != nullptr) {
+            buffer_mgr_->Stop();
+            buffer_mgr_.reset();
+        }
+
+        if (result_cache_manager_ != nullptr) {
+            result_cache_manager_.reset();
+        }
+
+        if (persistence_manager_ != nullptr) {
+            persistence_manager_.reset();
+        }
+
+        if (cleanup_info_tracer_ != nullptr) {
+            cleanup_info_tracer_.reset();
+        }
+
+        current_storage_mode_ = StorageMode::kUnInitialized;
+    }
+    LOG_INFO(fmt::format("Finishing changing storage from readable mode to un-init"));
+    return Status::OK();
+}
+
+Status Storage::ReaderToAdmin() {
+    LOG_INFO(fmt::format("Start to change storage from readable mode to admin"));
+
+    Status status = UnInitFromReader();
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = InitToAdmin();
+    if (!status.ok()) {
+        return status;
+    }
+    LOG_INFO(fmt::format("Finishing changing storage from readable mode to admin"));
+    return Status::OK();
+}
+
 ResultCacheManager *Storage::result_cache_manager() const noexcept {
     if (config_ptr_->ResultCache() != "on") {
         return nullptr;
@@ -137,6 +308,29 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                 UnrecoverableError("Attempt to set storage mode from Admin to Admin");
             }
 
+            switch (target_mode) {
+                case StorageMode::kUnInitialized: {
+                    return UnInitFromAdmin();
+                }
+                case StorageMode::kAdmin: {
+                    UnrecoverableError("Attempt to set storage mode from Admin to Admin");
+                    break;
+                }
+                case StorageMode::kReadable: {
+                    Status status = AdminToReader();
+                    if (!status.ok()) {
+                        Status to_admin_status = ReaderToAdmin();
+                        if (!status.ok()) {
+                            UnrecoverableError(fmt::format("Fail to restore to admin status: {}", to_admin_status.message()));
+                        }
+                    }
+                    return status;
+                }
+                default: {
+                    break;
+                }
+            }
+
             if (target_mode == StorageMode::kUnInitialized) {
                 return UnInitFromAdmin();
             }
@@ -153,7 +347,7 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                 }
                 case StorageType::kMinio: {
                     if (VirtualStore::IsInit()) {
-                        UnrecoverableError("remote storage system was initialized before.");
+                        VirtualStore::UnInitRemoteStore();
                     }
                     LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
                     Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
@@ -173,7 +367,8 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                     }
 
                     if (object_storage_processor_ != nullptr) {
-                        UnrecoverableError("Object storage processor was initialized before.");
+                        object_storage_processor_->Stop();
+                        object_storage_processor_.reset();
                     }
                     object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
                     object_storage_processor_->Start();
@@ -187,12 +382,15 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             String persistence_dir = config_ptr_->PersistenceDir();
             if (!persistence_dir.empty()) {
                 if (persistence_manager_ != nullptr) {
-                    UnrecoverableError("persistence_manager was initialized before.");
+                    persistence_manager_.reset();
                 }
                 i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
                 persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
             }
 
+            if (result_cache_manager_ != nullptr) {
+                result_cache_manager_.reset();
+            }
             SizeT cache_result_num = config_ptr_->CacheResultNum();
             if (result_cache_manager_ == nullptr) {
                 result_cache_manager_ = MakeUnique<ResultCacheManager>(cache_result_num);
@@ -200,7 +398,8 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
 
             // Construct buffer manager
             if (buffer_mgr_ != nullptr) {
-                UnrecoverableError("Buffer manager was initialized before.");
+                buffer_mgr_->Stop();
+                buffer_mgr_.reset();
             }
             buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
                                                     MakeShared<String>(config_ptr_->DataDir()),
@@ -333,10 +532,6 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                     periodic_trigger_thread_.reset();
                 }
 
-                if (compact_processor_ != nullptr) {
-                    UnrecoverableError("Compact processor shouldn't be set before");
-                }
-
                 if (bg_processor_ != nullptr) {
                     if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
                         UnrecoverableError("Error reader init phase");
@@ -347,13 +542,22 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
 
                 new_catalog_.reset();
 
-                memory_index_tracer_.reset();
+                if (memory_index_tracer_ != nullptr) {
+                    memory_index_tracer_.reset();
+                }
 
                 if (wal_mgr_ != nullptr) {
                     wal_mgr_->Stop();
                     wal_mgr_.reset();
                 }
 
+                if (txn_mgr_ != nullptr) {
+                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                        UnrecoverableError("Error reader init phase");
+                    }
+                    txn_mgr_->Stop();
+                    txn_mgr_.reset();
+                }
                 switch (config_ptr_->StorageType()) {
                     case StorageType::kLocal: {
                         // Not init remote store
@@ -372,21 +576,22 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                     }
                 }
 
-                if (txn_mgr_ != nullptr) {
-                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
-                        UnrecoverableError("Error reader init phase");
-                    }
-                    txn_mgr_->Stop();
-                    txn_mgr_.reset();
-                }
-
                 if (buffer_mgr_ != nullptr) {
                     buffer_mgr_->Stop();
                     buffer_mgr_.reset();
                 }
 
-                persistence_manager_.reset();
+                if (result_cache_manager_ != nullptr) {
+                    result_cache_manager_.reset();
+                }
 
+                if (persistence_manager_ != nullptr) {
+                    persistence_manager_.reset();
+                }
+
+                if (cleanup_info_tracer_ != nullptr) {
+                    cleanup_info_tracer_.reset();
+                }
                 if (target_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
                     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -488,7 +693,16 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                     buffer_mgr_.reset();
                 }
 
-                persistence_manager_.reset();
+                if (result_cache_manager_ != nullptr) {
+                    result_cache_manager_.reset();
+                }
+
+                if (persistence_manager_ != nullptr) {
+                    persistence_manager_.reset();
+                }
+                if (cleanup_info_tracer_ != nullptr) {
+                    cleanup_info_tracer_.reset();
+                }
 
                 if (target_mode == StorageMode::kAdmin) {
                     // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
