@@ -51,7 +51,12 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
         }
     }
     // Create the iterator from the query tree.
-    const CreateSearchParams params{table_entry_, &index_reader_, context.early_term_algo_, context.ft_similarity_, context.minimum_should_match_};
+    const CreateSearchParams params{table_entry_,
+                                    &index_reader_,
+                                    context.early_term_algo_,
+                                    context.ft_similarity_,
+                                    context.minimum_should_match_,
+                                    context.index_names_};
     auto result = context.optimized_query_tree_->CreateSearch(params);
 #ifdef INFINITY_DEBUG
     {

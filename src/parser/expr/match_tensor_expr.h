@@ -45,6 +45,8 @@ public:
     uint32_t dimension_ = 0;
     std::string options_text_;
     std::unique_ptr<ParsedExpr> filter_expr_;
+    std::string index_name_;
+    bool ignore_index_ = false;
 };
 
 } // namespace infinity

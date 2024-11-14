@@ -157,7 +157,10 @@ UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromAnd(Vector<UniquePt
                     secondary_index_evaluators.push_back(std::move(chi));
                 }
                 if (child_logical->fulltext_evaluator_) {
-                    AddToFulltextEvaluator(fulltext_evaluator, other_children_evaluators, std::move(child_logical->fulltext_evaluator_), combine_type);
+                    AddToFulltextEvaluator(fulltext_evaluator,
+                                           other_children_evaluators,
+                                           std::move(child_logical->fulltext_evaluator_),
+                                           combine_type);
                 }
                 for (auto &chi : child_logical->other_children_evaluators_) {
                     other_children_evaluators.push_back(std::move(chi));
@@ -229,7 +232,10 @@ UniquePtr<IndexFilterEvaluator> IndexFilterEvaluatorBuildFromOr(Vector<UniquePtr
                     secondary_index_evaluators.push_back(std::move(chi));
                 }
                 if (child_logical->fulltext_evaluator_) {
-                    AddToFulltextEvaluator(fulltext_evaluator, other_children_evaluators, std::move(child_logical->fulltext_evaluator_), combine_type);
+                    AddToFulltextEvaluator(fulltext_evaluator,
+                                           other_children_evaluators,
+                                           std::move(child_logical->fulltext_evaluator_),
+                                           combine_type);
                 }
                 for (auto &chi : child_logical->other_children_evaluators_) {
                     other_children_evaluators.push_back(std::move(chi));
@@ -475,7 +481,7 @@ Bitmask IndexFilterEvaluatorFulltext::Evaluate(const SegmentID segment_id, const
     result.SetAllFalse();
     const RowID begin_rowid(segment_id, 0);
     const RowID end_rowid(segment_id, segment_row_count);
-    const CreateSearchParams params{table_entry_, &index_reader_, early_term_algo_, ft_similarity_, minimum_should_match_};
+    const CreateSearchParams params{table_entry_, &index_reader_, early_term_algo_, ft_similarity_, minimum_should_match_, index_names_};
     auto ft_iter = query_tree_->CreateSearch(params);
     if (ft_iter && score_threshold_ > 0.0f) {
         auto new_ft_iter = MakeUnique<ScoreThresholdIterator>(std::move(ft_iter), score_threshold_);
@@ -518,7 +524,8 @@ Bitmask IndexFilterEvaluatorAND::Evaluate(const SegmentID segment_id, const Segm
                                             &(fulltext_evaluator_->index_reader_),
                                             fulltext_evaluator_->early_term_algo_,
                                             fulltext_evaluator_->ft_similarity_,
-                                            fulltext_evaluator_->minimum_should_match_};
+                                            fulltext_evaluator_->minimum_should_match_,
+                                            fulltext_evaluator_->index_names_};
             auto ft_iter = fulltext_evaluator_->query_tree_->CreateSearch(params);
             if (ft_iter && fulltext_evaluator_->score_threshold_ > 0.0f) {
                 auto new_ft_iter = MakeUnique<ScoreThresholdIterator>(std::move(ft_iter), fulltext_evaluator_->score_threshold_);

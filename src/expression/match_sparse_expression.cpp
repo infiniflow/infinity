@@ -43,9 +43,12 @@ MatchSparseExpression::MatchSparseExpression(Vector<SharedPtr<BaseExpression>> s
                                              SizeT query_n,
                                              SizeT topn,
                                              Vector<UniquePtr<InitParameter>> opt_params,
-                                             SharedPtr<BaseExpression> optional_filter)
+                                             SharedPtr<BaseExpression> optional_filter,
+                                             String index_name,
+                                             bool ignore_index)
     : BaseExpression(ExpressionType::kMatchSparse, std::move(search_column)), metric_type_(metric_type), query_n_(query_n), topn_(topn),
-      opt_params_(std::move(opt_params)), optional_filter_(std::move(optional_filter)) {
+      opt_params_(std::move(opt_params)), optional_filter_(std::move(optional_filter)), index_name_(std::move(index_name)),
+      ignore_index_(ignore_index) {
     column_expr_ = static_cast<const ColumnExpression *>(arguments_[0].get());
     this->MakeQuery(query_sparse_expr);
 }

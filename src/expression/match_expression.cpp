@@ -16,6 +16,7 @@ module;
 
 import stl;
 
+import logger;
 import base_expression;
 import expression_type;
 import third_party;
@@ -24,9 +25,33 @@ module match_expression;
 
 namespace infinity {
 
-MatchExpression::MatchExpression(const String &fields, const String &matching_text, const String &options_text)
+void ParseMultiIndexHints(const String &index_hints, Vector<String> &index_names) {
+    index_names.clear();
+    if (index_hints.empty()) {
+        return;
+    }
+    SizeT begin_idx = 0;
+    SizeT len = index_hints.length();
+    while (begin_idx < len) {
+        SizeT comma_idx = index_hints.find_first_of(',', begin_idx);
+        if (comma_idx == String::npos) {
+            auto index_name = index_hints.substr(begin_idx);
+            index_names.emplace_back(index_name);
+            LOG_TRACE(fmt::format("new index hint : {}", index_name));
+            break;
+        } else {
+            auto index_name = index_hints.substr(begin_idx, comma_idx - begin_idx);
+            LOG_TRACE(fmt::format("new index hint : {}", index_name));
+            begin_idx = comma_idx + 1;
+        }
+    }
+}
+
+MatchExpression::MatchExpression(const String &fields, const String &matching_text, const String &options_text, const String &index_names)
     : BaseExpression(ExpressionType::kMatch, Vector<SharedPtr<BaseExpression>>()), fields_(fields), matching_text_(matching_text),
-      options_text_(options_text) {}
+      options_text_(options_text) {
+    ParseMultiIndexHints(index_names, index_names_);
+}
 
 String MatchExpression::ToString() const {
     if (!alias_.empty()) {
@@ -53,7 +78,15 @@ bool MatchExpression::Eq(const BaseExpression &other_base) const {
         return false;
     }
     const auto &other = static_cast<const MatchExpression &>(other_base);
-    bool eq = fields_ == other.fields_ && matching_text_ == other.matching_text_ && options_text_ == other.options_text_;
+    bool eq = (fields_ == other.fields_ && matching_text_ == other.matching_text_ && options_text_ == other.options_text_ &&
+               index_names_.size() == other.index_names_.size());
+    if (eq) {
+        for (SizeT i = 0; i < index_names_.size(); i++) {
+            if (index_names_[i] == other.index_names_[i]) {
+                return false;
+            }
+        }
+    }
     return eq;
 }
 

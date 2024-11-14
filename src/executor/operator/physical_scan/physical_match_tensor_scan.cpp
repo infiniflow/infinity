@@ -176,27 +176,67 @@ void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     Map<u32, SharedPtr<SegmentIndexEntry>> index_entry_map;
 
-    for (auto map_guard = table_entry->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
-        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
-        if (!status.ok()) {
-            // already dropped
-            LOG_WARN(status.message());
-            continue;
+    // if not ignoreing index
+    if (!src_match_tensor_expr_->ignore_index_) {
+        auto map_guard = table_entry->IndexMetaMap();
+        // if index is specified
+        if (src_match_tensor_expr_->index_name_.empty()) {
+            for (auto map_guard = table_entry->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
+                auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+                if (!status.ok()) {
+                    // already dropped
+                    LOG_WARN(status.message());
+                    continue;
+                }
+                if (const String column_name = table_index_entry->index_base()->column_name();
+                    table_entry->GetColumnIdByName(column_name) != search_column_id) {
+                    // search_column_id isn't in this table index
+                    continue;
+                }
+                // check index type
+                if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kEMVB) {
+                    // Skip non-EMVB index
+                    LOG_ERROR("Invalid index type");
+                    Status error_status = Status::InvalidIndexType("invalid index");
+                    RecoverableError(std::move(error_status));
+                }
+                // Fill the segment with index
+                index_entry_map = table_index_entry->index_by_segment();
+                // found one index
+                break;
+            }
+        } else {
+            auto iter = (*map_guard).find(src_match_tensor_expr_->index_name_);
+            if (iter == (*map_guard).end()) {
+                Status status = Status::IndexNotExist(src_match_tensor_expr_->index_name_);
+                RecoverableError(std::move(status));
+            }
+
+            auto &table_index_meta = iter->second;
+
+            auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+            if (!status.ok()) {
+                // already dropped
+                RecoverableError(std::move(status));
+            }
+
+            const String column_name = table_index_entry->index_base()->column_name();
+            SizeT column_id = table_entry->GetColumnIdByName(column_name);
+            if (column_id != search_column_id) {
+                LOG_ERROR(fmt::format("Column {} not found", column_name));
+                Status error_status = Status::ColumnNotExist(column_name);
+                RecoverableError(std::move(error_status));
+            }
+            // check index type
+            if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kEMVB) {
+                LOG_ERROR("Invalid index type");
+                Status error_status = Status::InvalidIndexType("invalid index");
+                RecoverableError(std::move(error_status));
+            }
+
+            // Fill the segment with index
+            index_entry_map = table_index_entry->index_by_segment();
         }
-        if (const String column_name = table_index_entry->index_base()->column_name();
-            table_entry->GetColumnIdByName(column_name) != search_column_id) {
-            // search_column_id isn't in this table index
-            continue;
-        }
-        // check index type
-        if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kEMVB) {
-            // Skip non-EMVB index
-            continue;
-        }
-        // Fill the segment with index
-        index_entry_map = table_index_entry->index_by_segment();
-        // found one index
-        break;
     }
 
     // Generate task set: index segment and no index block
@@ -1145,7 +1185,9 @@ AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpres
                                                                 EmbeddingT(static_cast<char *>(aligned_ptr), false),
                                                                 src_match_tensor_expr.tensor_basic_embedding_dimension_,
                                                                 src_match_tensor_expr.options_text_,
-                                                                src_match_tensor_expr.optional_filter_);
+                                                                src_match_tensor_expr.optional_filter_,
+                                                                src_match_tensor_expr.index_name_,
+                                                                src_match_tensor_expr.ignore_index_);
     }
     return result;
 }
