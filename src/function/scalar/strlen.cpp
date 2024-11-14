@@ -21,7 +21,14 @@ import column_vector;
 namespace infinity {
 
 struct StrlenFunction {
-    static inline int32_t Operation(const Varchar &input) { return static_cast<int32_t>(input.size()); }
+    template <typename TA, typename TR>
+    static inline void Run(const TA &input, TR &result) {
+        const char *input_str;
+        SizeT input_len;
+        GetReaderValue(input, input_str, input_len);
+
+        result.SetValue(static_cast<int32_t>(input_len));
+    }
 };
 
 void RegisterStrlenFunction(const UniquePtr<Catalog> &catalog_ptr) {
@@ -32,7 +39,7 @@ void RegisterStrlenFunction(const UniquePtr<Catalog> &catalog_ptr) {
     ScalarFunction strlen_function(func_name,
                                    {DataType(LogicalType::kVarchar)},
                                    DataType(LogicalType::kInteger),
-                                   ScalarFunction::UnaryFunction<Varchar, int32_t, StrlenFunction>);
+                                   &ScalarFunction::UnaryFunction<VarcharT, int32_t, StrlenFunction>);
 
     function_set_ptr->AddFunction(strlen_function);
 
