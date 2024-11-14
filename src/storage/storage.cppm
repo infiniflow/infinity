@@ -79,6 +79,10 @@ public:
     Status SetStorageMode(StorageMode mode);
     Status AdminToReaderBottom(TxnTimeStamp system_start_ts);
 
+    // Used for admin
+    Status InitToAdmin();
+    Status UnInitFromAdmin();
+
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
     void LoadFullCheckpoint(const String &checkpoint_path);
     void AttachDeltaCheckpoint(const String &checkpoint_path);
