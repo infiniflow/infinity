@@ -17,6 +17,7 @@ export module logger;
 
 import stl;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -34,7 +35,7 @@ export struct LoggerConfig {
 
 export class Logger {
 public:
-    static void
+    static Status
     Initialize(Config* config_ptr);
 
     static void Initialize(const LoggerConfig &config);

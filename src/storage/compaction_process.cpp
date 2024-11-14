@@ -236,10 +236,7 @@ void CompactionProcessor::Process() {
     while (running) {
         Deque<SharedPtr<BGTask>> tasks;
         task_queue_.DequeueBulk(tasks);
-        StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-        if (storage_mode == StorageMode::kUnInitialized) {
-            UnrecoverableError("Uninitialized storage mode");
-        }
+
         for (const auto &bg_task : tasks) {
             switch (bg_task->type_) {
                 case BGTaskType::kStopProcessor: {
@@ -247,6 +244,10 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kNotifyCompact: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Do compact start.");
                         DoCompact();
@@ -255,6 +256,10 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kNotifyOptimize: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
                     if (storage_mode == StorageMode::kWritable) {
                         LOG_DEBUG("Optimize start.");
                         ScanAndOptimize();
@@ -263,6 +268,10 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kDumpIndex: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
                     if (storage_mode == StorageMode::kWritable) {
                         auto dump_task = static_cast<DumpIndexTask *>(bg_task.get());
                         LOG_DEBUG(dump_task->ToString());
@@ -273,6 +282,10 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 case BGTaskType::kDumpIndexByline: {
+                    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+                    if (storage_mode == StorageMode::kUnInitialized) {
+                        UnrecoverableError("Uninitialized storage mode");
+                    }
                     if (storage_mode == StorageMode::kWritable) {
                         auto dump_task = static_cast<DumpIndexBylineTask *>(bg_task.get());
                         LOG_DEBUG(dump_task->ToString());

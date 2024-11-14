@@ -745,7 +745,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
         last_txn_id = replay_entries[replay_count]->txn_id_;
 
         LOG_DEBUG(replay_entries[replay_count]->ToString());
-        ReplayWalEntry(*replay_entries[replay_count], false, true);
+        ReplayWalEntry(*replay_entries[replay_count], false, true, false);
     }
 
     LOG_INFO(fmt::format("Latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
@@ -901,7 +901,7 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
     return wal_entries;
 }
 
-void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup, bool is_replay) {
+void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup, bool is_replay, bool sync_from_leader) {
     for (const auto &cmd : entry.cmds_) {
         LOG_TRACE(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), entry.commit_ts_));
         switch (cmd->GetType()) {
@@ -956,7 +956,7 @@ void WalManager::ReplayWalEntry(const WalEntry &entry, bool on_startup, bool is_
             //     break;
             case WalCommandType::CHECKPOINT: {
                 if (on_startup) {
-                    if (storage_->GetStorageMode() == StorageMode::kReadable) {
+                    if (sync_from_leader) {
                         WalCmdCheckpointReplay(*static_cast<const WalCmdCheckpoint *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                     } else {
                         UnrecoverableError("Checkpoint");
