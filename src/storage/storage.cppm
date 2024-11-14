@@ -83,6 +83,7 @@ public:
     Status InitToAdmin();
     Status UnInitFromAdmin();
     Status AdminToReader();
+    Status AdminToWriter();
 
     // Used for follower and learner
     Status InitToReader();
