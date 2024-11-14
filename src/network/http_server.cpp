@@ -3681,11 +3681,11 @@ namespace infinity {
 // oatpp example
 // https://github.com/oatpp/example-server-stop/blob/master/src/App_StopSimple.cpp
 
-void HTTPServer::Start(const String &ip_address, u16 port) {
+Thread HTTPServer::Start(const String &ip_address, u16 port) {
     {
-        auto expected = HTTPServerStatus::kUnstarted;
+        auto expected = HTTPServerStatus::kStopped;
         if (!status_.compare_exchange_strong(expected, HTTPServerStatus::kStarting)) {
-            UnrecoverableError(fmt::format("HTTP server is in unexpected state: {}", u8(expected)));
+            UnrecoverableError("HTTP server is already running.");
         }
     }
     WebEnvironment::init();
@@ -3798,22 +3798,23 @@ void HTTPServer::Start(const String &ip_address, u16 port) {
     fmt::print("HTTP server listen on {}: {}\n", ip_address, port);
 
     status_.store(HTTPServerStatus::kRunning);
-    status_.notify_one();
 
-    server_->run();
+    return Thread([this] {
+        server_->run();
+
+        status_.store(HTTPServerStatus::kStopped);
+        status_.notify_one();
+    });
 }
 
 void HTTPServer::Shutdown() {
     {
         auto expected = HTTPServerStatus::kRunning;
         if (!status_.compare_exchange_strong(expected, HTTPServerStatus::kStopping)) {
-            if (expected == HTTPServerStatus::kStarting) {
-                status_.wait(HTTPServerStatus::kStarting);
-                if (!status_.compare_exchange_strong(expected, HTTPServerStatus::kStopping)) {
-                    UnrecoverableError(fmt::format("HTTP server is in unexpected state: {}", u8(expected)));
-                }
+            if (expected == HTTPServerStatus::kStopped) {
+                return;
             } else {
-                UnrecoverableError(fmt::format("HTTP server is in unexpected state: {}", u8(expected)));
+                UnrecoverableError(fmt::format("Http server in unexpected state: {}", u8(expected)));
             }
         }
     }
@@ -3824,9 +3825,9 @@ void HTTPServer::Shutdown() {
     }
     connection_handler_->stop();
 
-    status_.store(HTTPServerStatus::kUnstarted);
-
     WebEnvironment::destroy();
+
+    status_.wait(HTTPServerStatus::kStopping);
 }
 
 } // namespace infinity

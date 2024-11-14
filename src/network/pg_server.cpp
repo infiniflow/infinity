@@ -31,23 +31,22 @@ import logger;
 
 namespace infinity {
 
-void PGServer::Run() {
+Thread PGServer::Run() {
     {
-        auto expected = PGServerStatus::kUnstarted;
+        auto expected = PGServerStatus::kStopped;
         if (!status_.compare_exchange_strong(expected, PGServerStatus::kStarting)) {
             UnrecoverableError(fmt::format("PGServer in unexpected state: {}", u8(expected)));
         }
     }
-
     u16 pg_port = InfinityContext::instance().config()->PostgresPort();
     const String &pg_listen_addr = InfinityContext::instance().config()->ServerAddress();
 
     boost::system::error_code error;
     boost::asio::ip::address address = boost::asio::ip::make_address(pg_listen_addr, error);
     if (error) {
-        fmt::print("{} isn't a valid IPv4 address.\n", pg_listen_addr);
         infinity::InfinityContext::instance().UnInit();
-        return ;
+        String err_msg = fmt::format("{} isn't a valid IPv4 address.\n", pg_listen_addr);
+        UnrecoverableError(err_msg);
     }
 
     running_connection_count_ = 0;
@@ -56,25 +55,21 @@ void PGServer::Run() {
     CreateConnection();
 
     fmt::print("Run 'psql -h {} -p {}' to connect to the server (SQL is only for test).\n", pg_listen_addr, pg_port);
-
     status_.store(PGServerStatus::kRunning);
-    status_.notify_one();
+    return Thread([this] {
+        io_service_ptr_->run();
 
-    io_service_ptr_->run();
-
-    status_.store(PGServerStatus::kStopped);
-    status_.notify_one();
+        status_.store(PGServerStatus::kStopped);
+        status_.notify_one();
+    });
 }
 
 void PGServer::Shutdown() {
     {
         auto expected = PGServerStatus::kRunning;
         if (!status_.compare_exchange_strong(expected, PGServerStatus::kStopping)) {
-            if (expected == PGServerStatus::kStarting) {
-                status_.wait(PGServerStatus::kStarting);
-                if (!status_.compare_exchange_strong(expected, PGServerStatus::kStopping)) {
-                    UnrecoverableError(fmt::format("PGServer in unexpected state: {}", u8(expected)));
-                }
+            if (status_ == PGServerStatus::kStopped) {
+                return;
             } else {
                 UnrecoverableError(fmt::format("PGServer in unexpected state: {}", u8(expected)));
             }
@@ -90,11 +85,6 @@ void PGServer::Shutdown() {
     acceptor_ptr_->close();
 
     status_.wait(PGServerStatus::kStopping);
-
-    acceptor_ptr_.reset();
-    io_service_ptr_.reset();
-
-    status_.store(PGServerStatus::kUnstarted);
 }
 
 void PGServer::CreateConnection() {

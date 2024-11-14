@@ -22,7 +22,7 @@ import third_party;
 namespace infinity {
 
 enum struct HTTPServerStatus : u8 {
-    kUnstarted = 0,
+    kStopped = 0,
     kStarting,
     kRunning,
     kStopping,
@@ -30,12 +30,11 @@ enum struct HTTPServerStatus : u8 {
 
 export class HTTPServer {
 public:
-    void Start(const String& server_address, u16 port);
+    Thread Start(const String& server_address, u16 port);
     void Shutdown();
 
 private:
-    Atomic<HTTPServerStatus> status_ = HTTPServerStatus::kUnstarted;
-
+    Atomic<HTTPServerStatus> status_{HTTPServerStatus::kStopped};
     SharedPtr<HttpRouter> router_{};
     SharedPtr<WebServer> server_{};
 

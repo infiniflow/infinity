@@ -24,16 +24,15 @@ import connection;
 namespace infinity {
 
 enum struct PGServerStatus : u8 {
-    kUnstarted = 0,
+    kStopped = 0,
     kStarting,
     kRunning,
     kStopping,
-    kStopped,
 };
 
 export class PGServer {
 public:
-    void Run();
+    Thread Run();
 
     void Shutdown();
 
@@ -42,7 +41,7 @@ private:
 
     void StartConnection(SharedPtr<Connection> &connection);
 
-    Atomic<PGServerStatus> status_ = PGServerStatus::kUnstarted;
+    Atomic<PGServerStatus> status_{PGServerStatus::kStopped};
     atomic_u64 running_connection_count_{0};
     UniquePtr<boost::asio::io_service> io_service_ptr_{};
     UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
