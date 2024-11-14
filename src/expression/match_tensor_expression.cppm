@@ -36,7 +36,9 @@ public:
                           EmbeddingT query_embedding,
                           u32 tensor_basic_embedding_dimension,
                           const String &options_text,
-                          SharedPtr<BaseExpression> optional_filter);
+                          SharedPtr<BaseExpression> optional_filterm,
+                          String index_name,
+                          bool ignore_index);
 
     DataType Type() const override;
 
@@ -52,11 +54,13 @@ public:
     const ColumnExpression *column_expr_ = nullptr;
     const EmbeddingDataType embedding_data_type_;
     const u32 dimension_;                        // num of total elements in the tensor (num of embedding * dimension of single embedding)
-    EmbeddingT query_embedding_;           // treat the query tensor as an embedding here
+    EmbeddingT query_embedding_;                 // treat the query tensor as an embedding here
     const u32 tensor_basic_embedding_dimension_; // dimension of single embedding in the tensor column
     const u32 num_of_embedding_in_query_tensor_ = dimension_ / tensor_basic_embedding_dimension_;
     const String options_text_;
     SharedPtr<BaseExpression> optional_filter_;
+    const String index_name_;
+    bool ignore_index_;
 };
 
 } // namespace infinity

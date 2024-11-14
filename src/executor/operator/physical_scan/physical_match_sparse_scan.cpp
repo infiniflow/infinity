@@ -61,6 +61,7 @@ import bmp_util;
 import knn_filter;
 import segment_entry;
 import abstract_bmp;
+import status;
 
 namespace infinity {
 
@@ -128,21 +129,58 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
     SizeT knn_column_id = column_expr->binding().column_idx;
     {
         auto map_guard = table_entry->IndexMetaMap();
-        for (const auto &[idx_name, table_index_meta] : *map_guard) {
+        if (match_sparse_expr_->index_name_.empty()) {
+            for (const auto &[idx_name, table_index_meta] : *map_guard) {
+                auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+                if (!status.ok()) {
+                    // maybe already dropped
+                    LOG_WARN(status.message());
+                    continue;
+                }
+                const String column_name = table_index_entry->index_base()->column_name();
+                SizeT column_id = table_entry->GetColumnIdByName(column_name);
+                if (column_id != knn_column_id) {
+                    continue;
+                }
+                if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kBMP) {
+                    LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
+                    continue;
+                }
+                if (base_table_ref_->index_index_.get() == nullptr) {
+                    base_table_ref_->index_index_ = MakeShared<IndexIndex>();
+                }
+                IndexIndex *index_index = base_table_ref_->index_index_.get();
+                auto index_snapshot = index_index->Insert(table_index_entry, txn);
+                ret = index_snapshot->segment_index_entries_.size();
+                break;
+            }
+        } else {
+            auto iter = (*map_guard).find(match_sparse_expr_->index_name_);
+            if (iter == (*map_guard).end()) {
+                Status status = Status::IndexNotExist(match_sparse_expr_->index_name_);
+                RecoverableError(std::move(status));
+            }
+
+            auto &table_index_meta = iter->second;
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
             if (!status.ok()) {
-                // maybe already dropped
-                LOG_WARN(status.message());
-                continue;
+                // already dropped
+                RecoverableError(std::move(status));
             }
+
             const String column_name = table_index_entry->index_base()->column_name();
             SizeT column_id = table_entry->GetColumnIdByName(column_name);
             if (column_id != knn_column_id) {
-                continue;
+                // knn_column_id isn't in this table index
+                LOG_ERROR(fmt::format("Column {} not found", column_name));
+                Status error_status = Status::ColumnNotExist(column_name);
+                RecoverableError(std::move(error_status));
             }
+            // check index type
             if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kBMP) {
-                LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
-                continue;
+                LOG_ERROR("Invalid index type");
+                Status error_status = Status::InvalidIndexType("invalid index");
+                RecoverableError(std::move(error_status));
             }
             if (base_table_ref_->index_index_.get() == nullptr) {
                 base_table_ref_->index_index_ = MakeShared<IndexIndex>();
@@ -150,7 +188,6 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
             IndexIndex *index_index = base_table_ref_->index_index_.get();
             auto index_snapshot = index_index->Insert(table_index_entry, txn);
             ret = index_snapshot->segment_index_entries_.size();
-            break;
         }
     }
 

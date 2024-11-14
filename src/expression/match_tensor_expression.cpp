@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-#include<vector>
+#include <vector>
 
 module match_tensor_expression;
 
@@ -38,10 +38,13 @@ MatchTensorExpression::MatchTensorExpression(Vector<SharedPtr<BaseExpression>> s
                                              EmbeddingT query_embedding,
                                              const u32 tensor_basic_embedding_dimension,
                                              const String &options_text,
-                                             SharedPtr<BaseExpression> optional_filter)
+                                             SharedPtr<BaseExpression> optional_filter,
+                                             String index_name,
+                                             bool ignore_index)
     : BaseExpression(ExpressionType::kMatchTensor, std::move(search_column)), search_method_(search_method),
       embedding_data_type_(embedding_data_type), dimension_(dimension), query_embedding_(std::move(query_embedding)),
-      tensor_basic_embedding_dimension_(tensor_basic_embedding_dimension), options_text_(options_text), optional_filter_(std::move(optional_filter)) {
+      tensor_basic_embedding_dimension_(tensor_basic_embedding_dimension), options_text_(options_text), optional_filter_(std::move(optional_filter)),
+      index_name_(index_name), ignore_index_(ignore_index) {
     column_expr_ = static_cast<ColumnExpression *>(arguments_[0].get());
 }
 

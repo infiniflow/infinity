@@ -7,13 +7,21 @@ slug: /http_api_reference
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-## Create database
+A complete reference for Infinity's Python APIs.
+
+---
+
+## SCHEMA MANAGEMENT
+
+---
+
+### Create database
 
 **POST** `/databases/{database_name}`
 
 Creates a database by its name. If the database already exists, the action taken depends on the `"create_option"` parameter.
 
-### Request
+#### Request
 
 - Method: POST
 - URL: `/database/{database_name}`
@@ -23,7 +31,7 @@ Creates a database by its name. If the database already exists, the action taken
 - Body:
   - `"create_option"`: `enum<string>`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request POST \
@@ -33,7 +41,7 @@ curl --request POST \
      --data ' {"create_option": "ignore_if_exists"} '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database, which must adhere to the following requirements:  
@@ -48,7 +56,7 @@ curl --request POST \
   - `"error"`: (Default) Raise an error if a database with the same name exists.
   - `"ignore_if_exists"`: Ignore the database creation request and keep the existing database.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -92,13 +100,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Drop database
+### Drop database
 
 **DELETE** `/databases/{database_name}`
 
 Deletes a database by its name. If the database does not exist, the action taken depends on the `"drop_option"` parameter.
 
-### Request
+#### Request
 
 - Method: DELETE
 - URL: `/database/{database_name}`
@@ -108,7 +116,7 @@ Deletes a database by its name. If the database does not exist, the action taken
 - Body:
   - `"drop_option"`: `enum<string>`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request DELETE \
@@ -118,7 +126,7 @@ curl --request DELETE \
      --data ' {"drop_option": "error"} '
 ```
 
-#### Request parameter
+##### Request parameter
 
 - `database_name`: (*Path parameter*)  
   The name of the database to delete.
@@ -126,7 +134,7 @@ curl --request DELETE \
   - `"error"`: (Default) Raise an error if the specified database does not exist.
   - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -169,19 +177,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## List databases
+### List databases
 
 **GET** `/databases`
 
 Retrieves a list of all available databases within the Infinity system.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/databases`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -189,9 +197,9 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -212,19 +220,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show database
+### Show database
 
 **GET** `/databases/{database_name}`
 
 Shows detailed information about a specified database.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/database/{database_name}`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -232,12 +240,12 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameter
+##### Request parameter
 
 - `database_name`: (*Path parameter*)  
   The name of the database to retrieve.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -289,13 +297,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Create table
+### Create table
 
 **POST** `/databases/{database_name}/tables/{table_name}`
 
 Creates a table with a specified name and defined fields (columns) within a given database. If the table already exists, the action taken depends on the `"create_option"` parameter.
 
-### Request
+#### Request
 
 - Method: POST
 - URL: `/databases/{database_name}/tables/{table_name}`
@@ -306,7 +314,7 @@ Creates a table with a specified name and defined fields (columns) within a give
   - `"create_option"`: `enum<string>`
   - `"fields"`: `object[]`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request POST \
@@ -360,7 +368,7 @@ curl --request POST \
     } '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -468,7 +476,7 @@ curl --request POST \
   - `"comment"`: `string`, *Optional*
     User provided text to describe the column.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -511,13 +519,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Drop table
+### Drop table
 
 **DELETE** `/databases/{database_name}/tables/{table_name}`
 
 Deletes a table from a specified database. If the table does not exist, the action taken depends on the `"drop_option"` parameter.
 
-### Request
+#### Request
 
 - Method: DELETE
 - URL: `/databases/{database_name}/tables/{table_name}`
@@ -527,7 +535,7 @@ Deletes a table from a specified database. If the table does not exist, the acti
 - Body:
   - `"drop_option"`: `enum<string>`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request DELETE \
@@ -537,7 +545,7 @@ curl --request DELETE \
      --data ' {"drop_option": "ignore_if_not_exists"} '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -547,7 +555,7 @@ curl --request DELETE \
   - `"error"`: (Default) Raise an error if the specified table does not exist.
   - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -590,19 +598,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## List tables
+### List tables
 
 **GET** `/databases/{database_name}/tables`
 
 Retrieves a list of all available tables in a specified database.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/databases/{database_name}/tables`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -610,14 +618,14 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -638,19 +646,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show table
+### Show table
 
 **GET** `/databases/{database_name}/tables/{table_name}`
 
 Shows detailed information about a specified table within a given database.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/databases/{database_name}/tables/{table_name}`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -658,14 +666,14 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
 - `table_name`: (*Path parameter*)  
   The name of the table.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -714,19 +722,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Show table columns
+### Show table columns
 
 **GET** `/databases/{database_name}/tables/{table_name}/columns`
 
 Shows the column information about a specified table.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/databases/{database_name}/tables/{table_name}/columns`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -734,14 +742,14 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
 - `table_name`: (*Path parameter*)  
   The name of the table.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -805,13 +813,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Create index
+### Create index
 
 **POST** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 
 Creates an index on a specified table. If an index with the same name exists, the action taken depends on the `"create_option"` parameter.
 
-### Request
+#### Request
 
 - Method: POST
 - URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
@@ -823,7 +831,7 @@ Creates an index on a specified table. If an index with the same name exists, th
   - `"index"`: `object`
   - `"create_option"`: `enum<string>`
 
-#### Request example
+##### Request example
 
 - Creates an HNSW index on a dense vector or a multivector column:
 
@@ -915,7 +923,7 @@ curl --request POST \
      } '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -984,7 +992,7 @@ curl --request POST \
   - `"error"`: (Default) Raise an error if a table with the same name exists.
   - `"ignore_if_exists"`: Ignore the table creation request and keep the existing table.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -1027,13 +1035,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Drop index
+### Drop index
 
 **DELETE** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 
 Deletes an index by its name.
 
-### Request
+#### Request
 
 - Method: DELETE
 - URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
@@ -1043,7 +1051,7 @@ Deletes an index by its name.
 - Body:
   - `"drop_option"`: `enum<string>`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request DELETE \
@@ -1053,7 +1061,7 @@ curl --request DELETE \
      --data ' {"drop_option": "ignore_if_not_exists"} '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -1065,7 +1073,7 @@ curl --request DELETE \
   - `"error"`: (Default) Raise an error if the specified index does not exist.
   - `"ignore_if_not_exists"`: Ignore the operation and proceed regardless, if the specified index does not exist.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -1108,19 +1116,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## List indexes
+### List indexes
 
 **GET** `/databases/{database_name}/tables/{table_name}/indexes`
 
 Retrieves a list of all indexes created on a given table.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/databases/{database_name}/tables/{table_name}/indexes`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -1128,16 +1136,16 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
 - `table_name`: (*Path parameter*)  
   The name of the table.
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -1165,19 +1173,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show index
+### Show index
 
 **GET** `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 
 Shows detailed information about a specified index.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/databases/{database_name}/tables/{table_name}/indexes/{index_name}`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -1185,7 +1193,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -1195,7 +1203,7 @@ curl --request GET \
   The name of the index.
 
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -1248,13 +1256,17 @@ The response includes a JSON object like the following:
 
 ---
 
-## Import data
+## DATA MANAGEMENT
+
+---
+
+### Import data
 
 **PUT** `/databases/{database_name}/tables/{table_name}`
 
 Imports data from a selected file into a specified table.
 
-### Request
+#### Request
 
 - Method: PUT
 - URL: `/databases/{database_name}/tables/{table_name}`
@@ -1267,7 +1279,7 @@ Imports data from a selected file into a specified table.
   - `"header"`: `boolean`
   - `"delimiter"`: `string`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request PUT \
@@ -1282,7 +1294,7 @@ curl --request PUT \
     } '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -1303,7 +1315,7 @@ curl --request PUT \
 - `"delimiter"`: (*Body parameter*), `string`, *Optional*, Defaults to ","  
   Delimiter to separate columns. Works with **.csv** files only.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -1346,13 +1358,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Export data
+### Export data
 
 **GET** `/databases/{database_name}/tables/{table_name}`
 
 Exports data from a specified table to a specified file.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/databases/{database_name}/tables/{table_name}`
@@ -1368,7 +1380,7 @@ Exports data from a specified table to a specified file.
   - `"limit"`: `int`
   - `"row_limit"`: `int`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -1386,7 +1398,7 @@ curl --request GET \
     } '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -1412,7 +1424,7 @@ curl --request GET \
 - `"row_limit"`: (*Body parameter*), `int`, *Optional*  
   Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so on.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -1455,13 +1467,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Insert data
+### Insert data
 
 **POST** `/databases/{database_name}/tables/{table_name}/docs`
 
 Inserts rows of data into a specified table.
 
-### Request
+#### Request
 
 - Method: POST
 - URL: `/databases/{database_name}/tables/{table_name}/docs`
@@ -1471,7 +1483,7 @@ Inserts rows of data into a specified table.
 - Body:
   - `object[]`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request POST \
@@ -1503,7 +1515,7 @@ curl --request POST \
      ] '  
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -1522,7 +1534,7 @@ curl --request POST \
 Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once.
 :::
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -1565,13 +1577,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Delete data
+### Delete data
 
 **DELETE** `/databases/{database_name}/tables/{table_name}/docs`
 
 Deletes rows from a table based on the specified condition.
 
-### Request
+#### Request
 
 - Method: DELETE
 - URL: `/databases/{database_name}/tables/{table_name}/docs`
@@ -1581,7 +1593,7 @@ Deletes rows from a table based on the specified condition.
 - Body:
   - `"filter"`: `string`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request DELETE \
@@ -1599,7 +1611,7 @@ curl --request DELETE \
      --data ' {"filter": "name = '"'Toby'"'"} '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -1608,7 +1620,7 @@ curl --request DELETE \
 - `"filter"`: (*Body parameter*), `string`, *Optional*  
   A string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `"filter"` is not specified or set to `Null`, the method will delete all rows in the table.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -1652,13 +1664,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Update data
+### Update data
 
 **PUT** `/databases/{database_name}/tables/{table_name}/docs`
 
 Searches for rows that match the specified condition and updates them accordingly.
 
-### Request
+#### Request
 
 - Method: PUT
 - URL: `/databases/{database_name}/tables/{table_name}/docs`
@@ -1669,7 +1681,7 @@ Searches for rows that match the specified condition and updates them accordingl
   - `"update"`: `object`
   - `"filter"`: `string`
 
-#### Request example
+##### Request example
 
 The following code updates the score to `1.0` for rows where the `name` field is `Neil`.
 
@@ -1685,7 +1697,7 @@ curl --request PUT \
     } '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -1695,7 +1707,7 @@ curl --request PUT \
   A string that defines the condition for selecting rows to update. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `true` for the rows that should be updated. If `"filter"` is not specified or set to `"Null"`, the method will update all rows in the table.
 
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -1739,13 +1751,17 @@ The response includes a JSON object like the following:
 
 ---
 
-## Search data
+## SEARCH
+
+---
+
+### Search data
 
 **GET** `/databases/{database_name}/tables/{table_name}/docs`
 
 Searches for data in a specified table. The search can range from a simple vector search, sparse vector search, or full-text search to complex hybrid searches involving reranking methods.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/databases/{database_name}/tables/{table_name}/docs`
@@ -1758,7 +1774,7 @@ Searches for data in a specified table. The search can range from a simple vecto
   - `"filter"`: `string`
   - `"fusion"`: `object`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -1820,7 +1836,7 @@ curl --request GET \
     } '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `database_name`: (*Path parameter*)  
   The name of the database.
@@ -1987,7 +2003,7 @@ curl --request GET \
 
 
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2036,13 +2052,17 @@ The response includes a JSON object like the following:
 
 ---
 
-## Set variable
+## ADMINISTRATION
+
+---
+
+### Set variable
 
 **POST** `/variables/{variable_name}`
 
 Assigns a value to a global variable.
 
-### Request
+#### Request
 
 - Method: POST
 - URL: `/variables/{variable_name}`
@@ -2052,7 +2072,7 @@ Assigns a value to a global variable.
 - Body:
   - `"profile_record_capacity"`: `integer`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request POST \
@@ -2062,7 +2082,7 @@ curl --request POST \
      --data ' { "profile_record_capacity" : 120 } '
 ```
 
-#### Request parameter
+##### Request parameter
 
 - `variable_name`: (*Path parameter*)  
   The name of the variable, which must adhere to the following requirements:  
@@ -2074,7 +2094,7 @@ curl --request POST \
   - Maximum 65,535 characters.
   - Case-insensitive.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2117,19 +2137,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show variables
+### Show variables
 
 **GET** `/variables`
 
 Retrieves all global variables in the Infinity system.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/variables`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2137,9 +2157,9 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -2168,19 +2188,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show variable
+### Show variable
 
 **GET** `/variables/{variable_name}`
 
 Retrieves the value of a global variable.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/variables/{variable_name}`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2188,12 +2208,12 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `variable_name`: (*Path parameter*)  
   The name of the variable.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2237,13 +2257,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Set config
+### Set config
 
 **PUT** `/configs`
 
 Assigns a value to a configuration parameter.
 
-### Request
+#### Request
 
 - Method: PUT
 - URL: `/configs`
@@ -2252,7 +2272,7 @@ Assigns a value to a configuration parameter.
   - `content-Type: application/json`
 - Body: `object`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request POST \
@@ -2262,13 +2282,13 @@ curl --request POST \
      --data ' { "log_level": "trace" } '
 ```
 
-#### Request parameter
+##### Request parameter
 
 - `Body`:  (*Body parameter*),  `object`, *Required*  
   The configuration parameters to update, where each key (`string`) in the JSON object represents an entry, and the corresponding value (`string`) represents its value. 
 
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2311,19 +2331,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show configs
+### Show configs
 
 **GET** `/configs`
 
 Retrieves the values of all configuration parameters.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/configs`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2331,9 +2351,9 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -2373,19 +2393,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show config
+### Show config
 
 **GET** `/configs/{config_name}`
 
 Retrieves the value of a configuration parameter.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/configs/{config_name}`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2393,12 +2413,12 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `config_name`: (*Path parameter*)  
   The name of the configuration parameter.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2442,19 +2462,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Show buffer
+### Show buffer
 
 **GET** `/instance/buffer`
 
 List the cached buffer objects in database.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/buffer`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2462,7 +2482,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2528,19 +2548,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Show profiles
+### Show profiles
 
 **GET** `/instance/profiles`
 
 When set session variable 'profile', Infinity will record query profile information. This command is to list recorded queries profile.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/profiles`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2548,7 +2568,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2606,19 +2626,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Show queries
+### Show queries
 
 **GET** `/instance/queries`
 
 Show running queries, only valid when config: record_running_query is set.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/queries`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2626,7 +2646,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2678,19 +2698,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Show transactions
+### Show transactions
 
 **GET** `/instance/transactions`
 
 Shows running transactions on database.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/transactions`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2698,7 +2718,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2751,19 +2771,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Show transaction
+### Show transaction
 
 **GET** `/instance/transactions/{trasaction_id}`
 
 Shows running transactions on database by transaction_id.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/transactions`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2771,12 +2791,12 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `transaction_id`: (*Path parameter*)
   The id of the running transaction.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -2823,19 +2843,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Show logs
+### Show logs
 
 **GET** `/instance/logs`
 
 Shows logs.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/logs`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2843,9 +2863,9 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -2868,19 +2888,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show delta checkpoints
+### Show delta checkpoints
 
 **GET** `/instance/delta_checkpoint`
 
 Shows delta logs.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/delta_checkpoint`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2888,9 +2908,9 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -2905,19 +2925,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show full checkpoints
+### Show full checkpoints
 
 **GET** `/instance/global_checkpoint`
 
 Shows delta logs.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/global_checkpoint`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2925,9 +2945,9 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -2948,19 +2968,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show objects
+### Show objects
 
 **GET** `/instance/objects`
 
 Shows persistence objects.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/objects`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -2968,9 +2988,9 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -3015,13 +3035,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show object
+### Show object
 
 **GET** `/instance/objects/{object_name}`
 
 Shows persistence object by its name.
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3029,12 +3049,12 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `object_name`: Required (*Path parameter*)
   The object name.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -3083,19 +3103,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Show files
+### Show files
 
 **GET** `/instance/files`
 
 Shows files in persistent manager.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/files`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3103,9 +3123,9 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -3146,19 +3166,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show memory
+### Show memory
 
 **GET** `/instance/memory`
 
 Shows the memory usage information of the instance.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/memory`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3166,9 +3186,9 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -3185,19 +3205,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show memory object
+### Show memory object
 
 **GET** `/instance/memory/objects`
 
 Shows the memory object usage information of the instance.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/memory/objects`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3205,9 +3225,9 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -3222,19 +3242,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Show memory allocation
+### Show memory allocation
 
 **GET** `/instance/memory/allocation`
 
 Shows the memory allocation information of the instance.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/instance/memory/allocation`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3242,9 +3262,9 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -3259,13 +3279,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Global Checkpoint
+### Global Checkpoint
 
 **POST** `/instance/flush`
 
 Performs a full checkpoint on the instance.
 
-### Request
+#### Request
 
 - Method: POST
 - URL: `/instance/flush`
@@ -3273,7 +3293,7 @@ Performs a full checkpoint on the instance.
   - `accept: application/json`
   - `content-type: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request POST \
@@ -3281,9 +3301,9 @@ curl --request POST \
     --header 'accept: application/json' \
 ```
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -3298,13 +3318,13 @@ The response includes a JSON object like the following:
 
 ---
 
-## Compact Table
+### Compact Table
 
 **POST** `/instance/table/compact`
 
 Performs a compaction operation on a specified table.
 
-### Request
+#### Request
 
 - Method: POST
 - URL: `/instance/table/compact`
@@ -3312,7 +3332,7 @@ Performs a compaction operation on a specified table.
   - `accept: application/json`
   - `content-type: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request POST \
@@ -3326,13 +3346,13 @@ curl --request POST \
     } '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `db_name`: Required (*Body parameter*)
 - `table_name`: Required (*Body parameter*)
 `db_name` and `table_name` specifies the table to perform compaction.
 
-### Response
+#### Response
 
 
 <Tabs
@@ -3376,13 +3396,17 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Admin set node role
+## DISTRIBUTED
+
+---
+
+### Admin set node role
 
 **POST** `/admin/node/current`
 
 Sets role for a node.
 
-### Request
+#### Request
 
 - Method: POST
 - URL: `/admin/node/current`
@@ -3390,7 +3414,7 @@ Sets role for a node.
   - `accept: application/json`
   - `content-type: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request POST \
@@ -3404,7 +3428,7 @@ curl --request POST \
     } '
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `role`: Required (*Body parameter*)
   Indicating which role the user want the node to be, it must be set to `admin`, `standalone`, `leader` or `follower`.
@@ -3415,7 +3439,7 @@ curl --request POST \
         - "name" Required : Name of the node in the cluster.
         - "address" Required : Peer server address of the leader in the cluster.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -3458,19 +3482,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Admin show node variables
+### Admin show node variables
 
 **GET** `/admin/variables`
 
 Shows all node variables in admin mode.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/admin/variables`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3478,13 +3502,13 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 None.
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -3500,19 +3524,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Admin show node configs
+### Admin show node configs
 
 **GET** `/admin/configs`
 
 Shows all node configs in admin mode.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/admin/configs`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3520,13 +3544,13 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 None.
 
-### Response
+#### Response
 
-#### Status Code 200
+##### Status Code 200
 
 The response includes a JSON object like the following:
 
@@ -3568,19 +3592,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Admin show node variable
+### Admin show node variable
 
 **GET** `/admin/variables/{variable_name}`
 
 Retrieves the value of a global variable in admin mode.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/admin/variables/{variable_name}`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3588,12 +3612,12 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 - `variable_name`: (*Path parameter*)  
   The name of the variable.
 
-### Response
+#### Response
 
 <Tabs
   defaultValue="s200"
@@ -3637,19 +3661,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Admin show current node
+### Admin show current node
 
 **GET** `/admin/node/current`
 
 Gets information about the currently connected node.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/admin/node/{node_name}`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3657,13 +3681,13 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 None.
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 
@@ -3681,19 +3705,19 @@ The response includes a JSON object like the following:
 
 ---
 
-## Admin show node
+### Admin show node
 
 **GET** `/admin/node/{node_name}`
 
 Gets information about a node in the cluster.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/admin/node/{node_name}`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3701,11 +3725,11 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 None.
 
-### Response
+#### Response
 <Tabs
   defaultValue="s200"
   values={[
@@ -3750,19 +3774,19 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
-## Admin list nodes
+### Admin list nodes
 
 **GET** `/admin/nodes`
 
 Lists all nodes in the cluster.
 
-### Request
+#### Request
 
 - Method: GET
 - URL: `/admin/nodes`
 - Headers: `accept: application/json`
 
-#### Request example
+##### Request example
 
 ```shell
 curl --request GET \
@@ -3770,13 +3794,13 @@ curl --request GET \
     --header 'accept: application/json'
 ```
 
-#### Request parameters
+##### Request parameters
 
 None.
 
-### Response
+#### Response
 
-#### Status code 200
+##### Status code 200
 
 The response includes a JSON object like the following:
 

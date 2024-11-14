@@ -4,7 +4,15 @@ slug: /pysdk_api_reference
 ---
 # Python API Reference
 
-## connect
+A complete reference for Infinity's Python APIs.
+
+---
+
+## SCHEMA MANAGEMENT
+
+---
+
+### connect
 
 ```python
 # Connect to the local directory and get an Infinity object
@@ -24,9 +32,9 @@ Connects to the local directory or the Infinity server, and gets an Infinity obj
 You must have an Infinity object ready to perform database-specific operations.
 :::
 
-### Parameters
+#### Parameters
 
-#### uri: *Required*
+##### uri: *Required*
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
@@ -54,7 +62,8 @@ When connecting to Infinity in client-server mode, ensure that the client versio
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
 | v0.3.0             | v0.3.0             |
-| v0.4.0.dev4        | v0.4.0.dev4        |
+| v0.4.0             | v0.4.0             |
+| v0.5.0-dev2        | v0.5.0-dev2        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 
@@ -72,16 +81,16 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 :::
 
-### Returns
+#### Returns
 
 - Success: An `infinity.local_infinity.infinity.LocalInfinityConnection` object in embedded mode or an `infinity.remote_thrift.infinity.RemoteThriftInfinityConnection` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
 
-### Examples
+#### Examples
 
-#### Connect to the local directory of Infinity
+##### Connect to the local directory of Infinity
 
 From v0.4.0.dev4 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed the Infinity client via `pip install infinity-embedded-sdk==<v0.4.0.dev4_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
@@ -90,7 +99,7 @@ import infinity_embedded
 infinity_object = infinity_embedded.connect("/absolute/path/to/save/to")
 ```
 
-#### Connect to Infinity in client-server mode
+##### Connect to Infinity in client-server mode
 
 If you have deployed Infinity as a separate server and installed the Infinity client via `pip install infinity==<VERSION>`, you can connect to it via its IP address. If your Infinity is running on your local machine, you can also use `infinity.common.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet.
 
@@ -102,7 +111,7 @@ infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 2381
 
 ---
 
-## disconnect
+### disconnect
 
 ```python
 infinity_object.disconnect()
@@ -110,7 +119,7 @@ infinity_object.disconnect()
 
 Disconnects the client from the Infinity server in client-server mode, or destructs the Infinity object and releases all associated resources when Infinity is imported as a Python module.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -120,7 +129,7 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 infinity_object.disconnect()
@@ -128,7 +137,7 @@ infinity_object.disconnect()
 
 ---
 
-## create_database
+### create_database
 
 ```python
 infinity_object.create_database(db_name, conflict_type = ConflictType.Error)
@@ -136,9 +145,9 @@ infinity_object.create_database(db_name, conflict_type = ConflictType.Error)
 
 Creates a database with a specified name.
 
-### Parameters
+#### Parameters
 
-#### db_name: `str`, *Required*
+##### db_name: `str`, *Required*
 
 A non-empty string indicating the name of the database, which must adhere to the following requirements:
 
@@ -150,7 +159,7 @@ A non-empty string indicating the name of the database, which must adhere to the
 - Maximum 65,535 characters.
 - Case-insensitive.
 
-#### conflict_type: `ConflictType`, *Optional*
+##### conflict_type: `ConflictType`, *Optional*
 
 - `Error`: Raise an error if a database with the same name exists.
 - `Ignore`: Ignore the database creation request and keep the existing database with the same name.
@@ -167,14 +176,14 @@ from infinity.common import ConflictType
 If `ConflictType` is not set, it defaults to `Error`.
 :::
 
-### Returns
+#### Returns
 
 - Success: An `infinity.local_infinity.db.LocalDatabase` object in embedded mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 # Create a database named 'my_database':
@@ -197,7 +206,7 @@ infinity_object.create_database("my_database", ConflictType.Ignore)
 
 ---
 
-## drop_database
+### drop_database
 
 ```python
 infinity_object.drop_database(db_name, conflict_type = ConflictType.Error)
@@ -205,13 +214,13 @@ infinity_object.drop_database(db_name, conflict_type = ConflictType.Error)
 
 Deletes a database by its name.
 
-### Parameters
+#### Parameters
 
-#### db_name: `str`, *Required*
+##### db_name: `str`, *Required*
 
 A non-empty string indicating the name of the database to delete.
 
-#### conflict_type: `ConflictType`, *Optional*
+##### conflict_type: `ConflictType`, *Optional*
 
 - `Error`: Raise an error if the specified database does not exist.
 - `Ignore`: Ignore the operation and proceed regardless, if the specified database does not exist.
@@ -229,7 +238,7 @@ from infinity.common import ConflictType
 If `ConflictType` is not set, it defaults to `Error`.
 :::
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -239,7 +248,7 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 # Delete a database named 'my_database':
@@ -262,7 +271,7 @@ infinity_object.drop_database("my_database", ConflictType.Ignore)
 
 ---
 
-## list_databases
+### list_databases
 
 ```python
 infinity_object.list_databases()
@@ -270,7 +279,7 @@ infinity_object.list_databases()
 
 Retrieves a list of all available databases within the Infinity system.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -281,17 +290,16 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 res = infinity_object.list_databases() 
 print(res.db_names) # ['my_database', 'database_1']
 ```
 
-
 ---
 
-## show_database
+### show_database
 
 ```python
 infinity_object.show_database(database_name)
@@ -299,7 +307,7 @@ infinity_object.show_database(database_name)
 
 Shows detailed information about a database.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -309,7 +317,7 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 res = infinity_object.show_database('my_database')
@@ -317,7 +325,7 @@ res = infinity_object.show_database('my_database')
 
 ---
 
-## get_database
+### get_database
 
 ```python
 infinity_object.get_database(database_name)
@@ -325,20 +333,20 @@ infinity_object.get_database(database_name)
 
 Retrieves a database object by its name.
 
-### Parameters
+#### Parameters
 
-#### db_name: `str`, *Required*
+##### db_name: `str`, *Required*
 
 A non-empty string indicating the name of the database to retrieve.
 
-### Returns
+#### Returns
 
 - Success: An `infinity.local_infinity.db.LocalDatabase` object in embedded mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 db_object = infinity_object.get_database("my_database")
@@ -346,7 +354,7 @@ db_object = infinity_object.get_database("my_database")
 
 ---
 
-## create_table
+### create_table
 
 ```python
 db_object.create_table(table_name, columns_definition, conflict_type = ConflictType.Error)
@@ -358,9 +366,9 @@ Creates a table with a specified name and defined columns.
 Call `create_database()` or `get_database()` to get a database object for all table-specific operations.
 :::
 
-### Parameters
+#### Parameters
 
-#### table_name: `str`, *Required*
+##### table_name: `str`, *Required*
 
 A non-empty string indicating the name of the table, which must adhere to the following requirements:
 
@@ -372,7 +380,7 @@ A non-empty string indicating the name of the table, which must adhere to the fo
 - Maximum 65,535 characters.
 - Case-insensitive.
 
-#### columns_definition: `dict[str, dict[str, Any]]`, *Required*
+##### columns_definition: `dict[str, dict[str, Any]]`, *Required*
 
 Definitions for all table columns as a dictionary. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value information in key-value pairs:
 
@@ -456,7 +464,7 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
 - **Default value** (`"default"`)  
   The default value for unspecified cells in that column.  
 
-#### conflict_type: `ConflictType`, *Optional*
+##### conflict_type: `ConflictType`, *Optional*
 
 - `Error`: Raise an error if a table with the same name exists.
 - `Ignore`: Ignore the table creation request and keep the existing table with the same name.
@@ -474,16 +482,16 @@ from infinity.common import ConflictType
 If `ConflictType` is not set, it defaults to `Error`.
 :::
 
-### Returns
+#### Returns
 
 - Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`:
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
 
-### Examples
+#### Examples
 
-#### Create a table with an integer column only
+##### Create a table with an integer column only
 
 ```python
 # The `create_table`method supports creating integer columns in the following data types:
@@ -494,7 +502,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 db_object.create_table("my_table", {"c1": {"type": "int", "default": 1}})
 ```
 
-#### Create a table with a float column only
+##### Create a table with a float column only
 
 ```python
 # The `create_table`method supports creating float columns in the following data types:
@@ -505,19 +513,19 @@ db_object.create_table("my_table", {"c1": {"type": "int", "default": 1}})
 db_object.create_table("my_table", {"c1": {"type": "float64"}})
 ```
 
-#### Create a table with a string column only
+##### Create a table with a string column only
 
 ```python
 db_object.create_table("my_table", {"c1": {"type": "varchar"}})
 ```
 
-#### Create a table with a bool column only
+##### Create a table with a bool column only
 
 ```python
 db_object.create_table("my_table", {"c1": {"type": "bool"}})
 ```
 
-#### Create a table with a vector column only
+##### Create a table with a vector column only
 
 :::tip NOTE
 You can build a HNSW index on the vector column to speed up the match_dense search.
@@ -532,7 +540,7 @@ db_object.create_table("my_table", {"c1": {"type": "vector,128,float"}})
 
 ```
 
-#### Create a table with a multi-vector column only
+##### Create a table with a multi-vector column only
 
 :::tip NOTE
 You can build an HNSW index on the multi-vector column to accelerate match_dense search.
@@ -547,7 +555,7 @@ db_object.create_table("my_table", {"c1": {"type": "multivector,128,float"}})
 
 ```
 
-#### Create a table with a sparse vector column only
+##### Create a table with a sparse vector column only
 
 :::tip NOTE
 You can build a BMP index on the sparse vector column to speed up the match_sparse search.
@@ -563,7 +571,7 @@ from infinity.common import ConflictType
 db_object.create_table("my_table", {"c1": {"type": "sparse,128,float,int"}}, ConflictType.Error)
 ```
 
-#### Create a table with a tensor column only
+##### Create a table with a tensor column only
 
 ```python
 from infinity.common import ConflictType
@@ -574,7 +582,7 @@ from infinity.common import ConflictType
 db_object.create_table("my_table", {"c1": {"type": "tensor,4,float"}}, ConflictType.Ignore)
 ```
 
-#### Create a table with a tensor array column only
+##### Create a table with a tensor array column only
 
 ```python
 from infinity.common import ConflictType
@@ -587,7 +595,7 @@ db_object.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, Conf
 
 ---
 
-## drop_table
+### drop_table
 
 ```python
 db_object.drop_table(table_name, conflict_type = ConflictType.Error)
@@ -595,13 +603,13 @@ db_object.drop_table(table_name, conflict_type = ConflictType.Error)
 
 Deletes a table from the database by its name.
 
-### Parameters
+#### Parameters
 
-#### table_name: `str`, *Required*
+##### table_name: `str`, *Required*
 
 A non-empty string indicating the name of the table to delete.
 
-#### conflict_type: `ConflictType`, *Optional*
+##### conflict_type: `ConflictType`, *Optional*
 
 - `Error`: Raise an error if the specified table does not exist.
 - `Ignore`: Ignore the operation and proceed regardless, if the specified table does not exist.
@@ -619,7 +627,7 @@ from infinity.common import ConflictType
 If `ConflictType` is not set, it defaults to `Error`.
 :::
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -629,7 +637,7 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 # Delete a table named 'my_table':
@@ -652,15 +660,15 @@ db_object.drop_table("my_table", ConflictType.Ignore)
 
 ---
 
-## add_columns
+### add_columns
 
 ```python
 table_object.add_columns(column_defs)
 ```
 
-### Parameters
+#### Parameters
 
-#### column_defs: `dict[str, dict[str, Any]]`, *Required*
+##### column_defs: `dict[str, dict[str, Any]]`, *Required*
 
 A dictionary defining the columns to add. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value. See the description of `create_table()`'s `columns_definition` for all available settings.
 
@@ -668,33 +676,33 @@ A dictionary defining the columns to add. Each key in the dictionary is a column
 You must specify a default value each time you add a column.
 :::
 
-### Examples
+#### Examples
 
-#### Add an Integer column, a float column, and a varchar/string column at once
+##### Add an Integer column, a float column, and a varchar/string column at once
 
 ```python
 table_obj.add_columns({"column_name1": {"type": "integer", "default": 0}, "column_name2": {"type": "float", "default": 0.0}, "column_name3": {"type": "varchar", "default": ""}})
 ```
 
-#### Add a dense vector column
+##### Add a dense vector column
 
 ```python
 table_obj.add_columns({"column_name1": {"type": "vector,4,float", "default": [1.0, 1.2, 2.4, 4.6]}})
 ```
 
-#### Add a multivector column
+##### Add a multivector column
 
 ```python
 table_obj.add_columns({"column_name1": {"type": "multivector,4,float", "default": [[1.0, 0.0, 0.0, 0.0], [1.2, 0.0, 0.0, 0.0]]}})
 ```
 
-#### Add a tensor column
+##### Add a tensor column
 
 ```python
 table_obj.add_columns({"column_name1": {"type": "tensor,4,float", "default": [[1.0, 0.0, 0.0, 0.0], [1.2, 0.0, 0.0, 0.0]]}})
 ```
 
-#### Add a sparse column
+##### Add a sparse column
 
 ```python
 from infinity.common import SparseVector
@@ -709,27 +717,27 @@ table_obj.add_columns({"column_name1": {"type": "sparse,128,float,int", "default
 
 ---
 
-## drop_columns
+### drop_columns
 
 ```python
 table_object.drop_columns(column_names)
 ```
 
-### Parameters
+#### Parameters
 
-#### column_names: `list[str]`, *Required*
+##### column_names: `list[str]`, *Required*
 
 A list of strings representing the names of the columns to drop.
 
-### Examples
+#### Examples
 
-#### Remove one column from the table
+##### Remove one column from the table
 
 ```python
 table_object.drop_columns(["column_name"])
 ```
 
-#### Remove two columns at once
+##### Remove two columns at once
 
 ```python
 table_object.drop_columns(["column_name1", "column_name2"])
@@ -737,7 +745,7 @@ table_object.drop_columns(["column_name1", "column_name2"])
 
 ---
 
-## get_table
+### get_table
 
 ```python
 db_object.get_table(table_name)
@@ -745,20 +753,20 @@ db_object.get_table(table_name)
 
 Retrieves a table object by its name.
 
-### Parameters
+#### Parameters
 
-#### `table_name`: `str`, *Required*
+##### `table_name`: `str`, *Required*
 
 A non-empty string indicating the name of the table to retrieve.
 
-### Returns
+#### Returns
 
 - Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`:
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 table_object = db_object.get_table("my_table")
@@ -766,7 +774,7 @@ table_object = db_object.get_table("my_table")
 
 ---
 
-## list_tables
+### list_tables
 
 ```python
 db_object.list_tables()
@@ -774,7 +782,7 @@ db_object.list_tables()
 
 Retrieves a list of all available tables within the current database.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -785,7 +793,7 @@ A structure containing the following attributes:
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available tables in the current database.
 
-### Examples
+#### Examples
 
 ```python
 res = db_object.list_tables()
@@ -794,7 +802,7 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 
 ---
 
-## show_table
+### show_table
 
 ```python
 db_object.show_table(table_name)
@@ -802,7 +810,7 @@ db_object.show_table(table_name)
 
 Shows detailed information about a table.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -812,7 +820,7 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 res = db_object.show_table('my_table')
@@ -820,7 +828,7 @@ res = db_object.show_table('my_table')
 
 ---
 
-## create_index
+### create_index
 
 ```python
 table_object.create_index(index_name, index_info, conflict_type = ConflictType.Error)
@@ -832,9 +840,9 @@ Creates an index on a specified column.
 Call `create_table()` or `get_table()` to get a database object for all index-specific operations.
 :::
 
-### Parameters
+#### Parameters
 
-#### index_name: `str` *Required*
+##### index_name: `str` *Required*
 
 A non-empty string indicating the name of the index, which must adhere to the following requirements:
 
@@ -846,7 +854,7 @@ A non-empty string indicating the name of the index, which must adhere to the fo
 - Maximum 65,535 characters.
 - Case-insensitive.
 
-#### index_info: `IndexInfo()`, *Required*
+##### index_info: `IndexInfo()`, *Required*
 
 An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
 
@@ -915,7 +923,7 @@ from infinity.index import IndexInfo, IndexType
 
 :::
 
-#### conflict_type: `ConflictType`, *Optional*
+##### conflict_type: `ConflictType`, *Optional*
 
 - `Error`: Raise an error if an index with the same name exists.
 - `Ignore`: Ignore the index creation request and keep the existing table with the same name.
@@ -933,7 +941,7 @@ from infinity.common import ConflictType
 If `ConflictType` is not set, it defaults to `Error`.
 :::
 
-### Returns
+#### Returns
 
 A structure containing these attributes:
 
@@ -943,9 +951,9 @@ A structure containing these attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
-#### Create an HNSW index on a dense vector column
+##### Create an HNSW index on a dense vector column
 
 ```python {1}
 from infinity.index import IndexInfo, IndexType
@@ -982,7 +990,7 @@ table_object.create_index(
 )
 ```
 
-#### Create an HNSW index on a multi-vector column
+##### Create an HNSW index on a multi-vector column
 
 ```python
 from infinity.index import IndexInfo, IndexType
@@ -996,7 +1004,7 @@ table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "multiv
 table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}))
 ```
 
-#### Create a full-text index
+##### Create a full-text index
 
 ```python
 from infinity.index import IndexInfo, IndexType
@@ -1033,7 +1041,7 @@ table_object.create_index(
 )
 ```
 
-#### Create a secondary index
+##### Create a secondary index
 
 ```python {11}
 from infinity.index import IndexInfo, IndexType
@@ -1050,7 +1058,7 @@ table_object.create_index(
 )
 ```
 
-#### Create a BMP index
+##### Create a BMP index
 
 ```python {13}
 from infinity.index import IndexInfo, IndexType
@@ -1091,7 +1099,7 @@ table_object.create_index(
 
 ---
 
-## drop_index
+### drop_index
 
 ```python
 table_object.drop_index(index_name, conflict_type = ConflictType.Error)
@@ -1099,13 +1107,13 @@ table_object.drop_index(index_name, conflict_type = ConflictType.Error)
 
 Deletes an index by its name.
 
-### Parameters
+#### Parameters
 
-#### index_name: `str`, *Required*
+##### index_name: `str`, *Required*
 
 A non-empty string indicating the name of the index to delete.
 
-#### conflict_type: `ConflictType`, *Optional*
+##### conflict_type: `ConflictType`, *Optional*
 
 - `Error`: Raise an error if an index with the specified name does not exist.
 - `Ignore`: Ignore the index creation request if the index does not exist.
@@ -1122,7 +1130,7 @@ from infinity.common import ConflictType
 If `ConflictType` is not set, it defaults to `Error`.
 :::
 
-### Returns
+#### Returns
 
 A structure containing these attributes:
 
@@ -1132,7 +1140,7 @@ A structure containing these attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.  
 
-### Examples
+#### Examples
 
 ```python
 table_object.drop_index("my_index")
@@ -1140,7 +1148,7 @@ table_object.drop_index("my_index")
 
 ---
 
-## show_columns
+### show_columns
 
 ```python
 table_object.show_columns()
@@ -1148,7 +1156,7 @@ table_object.show_columns()
 
 Show the column definition of the current table.
 
-### Returns
+#### Returns
 
 An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
@@ -1156,7 +1164,7 @@ An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `inf
 This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
 :::
 
-### Examples
+#### Examples
 
 ```python
 res = table_object.show_columns()
@@ -1165,7 +1173,7 @@ print(res)
 
 ---
 
-## list_indexes
+### list_indexes
 
 ```python
 table_object.list_indexes()
@@ -1173,7 +1181,7 @@ table_object.list_indexes()
 
 Retrieves a list of all available indexes built on the current table.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -1184,7 +1192,7 @@ A structure containing the following attributes:
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available indexes.
 
-### Examples
+#### Examples
 
 ```python
 res = table_object.list_indexes()
@@ -1193,7 +1201,7 @@ res.index_names # ['my_index', 'tensor_index', 'sparse_index']
 
 ---
 
-## show_index
+### show_index
 
 ```python
 table_object.show_index(index_name)
@@ -1201,7 +1209,7 @@ table_object.show_index(index_name)
 
 Shows detailed information about an index.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -1211,7 +1219,7 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 res = table_object.show_index('my_index')
@@ -1219,7 +1227,7 @@ res = table_object.show_index('my_index')
 
 ---
 
-## show_current_node
+### show_current_node
 
 ```python
 infinity.show_current_node()
@@ -1227,7 +1235,7 @@ infinity.show_current_node()
 
 Shows the role of the currently connected node.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -1239,7 +1247,7 @@ A structure containing the following attributes:
 - `role`: `str`  
   One of the five values: `admin`, `standalone`, `leader`, `follower`, and `learner`.
 
-### Examples
+#### Examples
 
 ```python
 res = infinity_object.show_current_row()
@@ -1247,7 +1255,11 @@ res = infinity_object.show_current_row()
 
 ---
 
-## insert
+## DATA MANAGEMENT
+
+---
+
+### insert
 
 ```python
 table_object.insert(data)
@@ -1255,9 +1267,9 @@ table_object.insert(data)
 
 Inserts rows of data into the current table.
 
-### Parameters
+#### Parameters
 
-#### data: `dict[str, Any]`, *Required*
+##### data: `dict[str, Any]`, *Required*
 
 Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and a table cell value.
 
@@ -1271,7 +1283,7 @@ For information about setting default column values, see `create_table()`.
 Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once.
 :::
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -1281,9 +1293,9 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
-#### Insert primitives
+##### Insert primitives
 
 ```python
 # Create a table with four primitive columns:
@@ -1306,7 +1318,7 @@ table_instance = db_instance.create_table("primitive_table", {
 table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 ```
 
-#### Insert dense vectors
+##### Insert dense vectors
 
 ```python
 # Create a table with a integer column and a 3-d vector column:
@@ -1321,7 +1333,7 @@ table_object.insert({"vector_column": [1.1, 2.2, 3.3]})
 table_object.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}])
 ```
 
-#### Insert sparse vectors
+##### Insert sparse vectors
 
 ```python
 from infinity.common import SparseVector
@@ -1334,7 +1346,7 @@ table_object = db_object.create_table("sparse_vector_table", {"c1": {"type": "in
 table_object.insert([{"c1": 2022, "sparse_column": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])}, {"sparse_column": SparseVector([70, 80, 90], [7.7, 8.8, 9.9])}])
 ```
 
-#### Insert tensors
+##### Insert tensors
 
 ```python
 # Create a table with a tensor column: 
@@ -1344,7 +1356,7 @@ table_object = db_object.create_table("tensor_table", {"c1": {"type": "integer",
 table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}])
 ```
 
-#### Insert tensor arrays
+##### Insert tensor arrays
 
 ```python
 # Creat a table with only one tensor array column:
@@ -1354,7 +1366,7 @@ table_object.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6
 
 ---
 
-## import_data
+### import_data
 
 ```python
 table_object.import_data(filepath, import_options)
@@ -1362,13 +1374,13 @@ table_object.import_data(filepath, import_options)
 
 Imports data from a specified file into the current table.
 
-### Parameters
+#### Parameters
 
-#### file_path: `str`, *Required*
+##### file_path: `str`, *Required*
 
 Absolute path to the file for export.
 
-#### import_options: `dict[str, bool | str]`
+##### import_options: `dict[str, bool | str]`
 
 Example: `{"header":True, "delimiter": "\t", file_type}`
 
@@ -1386,7 +1398,7 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
   - `json`
   - `jsonl`
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -1396,15 +1408,15 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
-#### Import a csv file
+##### Import a csv file
 
 ```python
 table_object.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_type": "csv", "delimiter": "\t"})
 ```
 
-#### Import a jsonl file
+##### Import a jsonl file
 
 ```python
 table_object.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "jsonl"})
@@ -1412,7 +1424,7 @@ table_object.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "jsonl"
 
 ---
 
-## export_data
+### export_data
 
 ```python
 table_object.export_data(filepath, export_options, columns = None)
@@ -1420,13 +1432,13 @@ table_object.export_data(filepath, export_options, columns = None)
 
 Exports data in the current table to a specified file.
 
-### Parameters
+#### Parameters
 
-#### file_path: `str`, *Required*
+##### file_path: `str`, *Required*
 
 Absolute path to the file for export.
   
-#### export_options: `dict[str, Any]`, *Required*
+##### export_options: `dict[str, Any]`, *Required*
 
 Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2, "limit": 5}`
 
@@ -1452,11 +1464,11 @@ Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2
 - **row_limit**: `int`, *Optional*  
   Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so on.
 
-#### columns: `[str]`, *Optional*
+##### columns: `[str]`, *Optional*
 
 Columns to export to the output file, for example, `["num", "name", "score"]`. If not specified, the entire table is exported.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -1466,15 +1478,15 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
-#### Export your table to a csv file
+##### Export your table to a csv file
 
 ```python
 table_object.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_type": "csv", "delimiter": ",", "offset": 2, "limit": 7, "row_limit": 3}, ["num", "name", "score"])
 ```
 
-#### Export your table to a jsonl file
+##### Export your table to a jsonl file
 
 ```python
 table_object.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
@@ -1482,7 +1494,7 @@ table_object.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "json
 
 ---
 
-## delete
+### delete
 
 ```python
 table_object.delete(cond = None)
@@ -1490,9 +1502,9 @@ table_object.delete(cond = None)
 
 Deletes rows from the table based on the specified condition.
 
-### Parameters
+#### Parameters
 
-#### cond: `str`, *Optional*
+##### cond: `str`, *Optional*
 
 A string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
 
@@ -1502,7 +1514,7 @@ A string that defines the condition for selecting rows to delete. The parameter 
 - `cond` must not be an empty string.
 :::
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -1514,9 +1526,9 @@ A structure containing the following attributes:
 - `deleted_rows`: `int`
   The number of deleted rows.
 
-### Examples
+#### Examples
 
-#### Remove all rows in the table
+##### Remove all rows in the table
 
 ```python
 # Clear all data in the current table
@@ -1529,7 +1541,7 @@ table_object.delete(None)
 
 ```
 
-#### Conditional row deletion
+##### Conditional row deletion
 
 ```python
 # Create a table named "my_table" with two columns:
@@ -1553,7 +1565,7 @@ table_object.delete("c1 >= 70 and c1 <= 90")
 
 ---
 
-## update data
+### update data
 
 ```python
 table_object.update(cond, data)
@@ -1561,17 +1573,17 @@ table_object.update(cond, data)
 
 Searches for rows that match the specified condition and updates them accordingly.
 
-### Parameters
+#### Parameters
 
-#### cond: `str`, *Required*
+##### cond: `str`, *Required*
 
 A string that defines the condition for selecting rows to update. It represents a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated. If `cond` is not specified or set to `Null`, the method will update all rows in the table.
 
-#### data: `dict[str, Any]`, *Required*
+##### data: `dict[str, Any]`, *Required*
 
 A non-empty dictionary where each key indicates a column name and each value indicates the new value for the corresponding cell.
 
-### Returns
+#### Returns
 
 A structure containing the following attributes:
 
@@ -1581,7 +1593,7 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 # Update rows where column "c1" equals 1, setting "c2" to 90 and "c3" to 900
@@ -1595,7 +1607,11 @@ table_object.update("c1 > 2", {"c2": 100, "c3": 1000})
 
 ---
 
-## output
+## SEARCH
+
+---
+
+### output
 
 ```python
 table_object.output(columns)
@@ -1603,9 +1619,9 @@ table_object.output(columns)
 
 This method allows you to customize the output of your query by selecting specific columns, applying aggregation functions, or performing arithmetic operations.
 
-### Parameters
+#### Parameters
 
-#### columns: `list[str]`, *Required*
+##### columns: `list[str]`, *Required*
 
 A non-empty list of strings specifying the columns to include in the output. Each string in the list can represent:
 
@@ -1628,7 +1644,7 @@ A non-empty list of strings specifying the columns to include in the output. Eac
 The list must contain at least one element. Empty lists are not allowed.
 :::
   
-### Returns
+#### Returns
 
 An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
@@ -1636,9 +1652,9 @@ An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `inf
 This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
 :::
 
-### Examples
+#### Examples
 
-#### Select columns to display
+##### Select columns to display
 
 ```python
 # Select all columns
@@ -1655,7 +1671,7 @@ table_object.output(["num", "body"]).to_df()
 table_object.output(["_row_id"]).to_pl()
 ```
 
-#### Perform aggregation or arithmetic operations on selected columns
+##### Perform aggregation or arithmetic operations on selected columns
 
 ```python
 # Specify that the output should display the average value of all cells in column "c2"
@@ -1696,7 +1712,7 @@ table_object.output(["3 * 5"]).to_pl()
 
 ---
 
-## filter
+### filter
 
 ```python
 table_object.filter(cond)
@@ -1708,13 +1724,13 @@ Creates a filtering condition expression for the current table.
 This method creates a filtering condition for your query. To display the results, you must chain it with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
-### Parameters
+#### Parameters
 
-#### cond: `str`, *Required*
+##### cond: `str`, *Required*
 
 A non-empty string representing the filter condition. It comprises one or multiple expressions combined by 'and', 'or' or 'not' logical operators, where each expression uses comparison operators to set criteria for keeping or removing rows.
 
-#### filter expressions in cond
+##### filter expressions in cond
 
 * `<`, `<=`, `>`, `>=`, `=`, `==`, `!=` expression
 * `in` and `not in` expression
@@ -1738,7 +1754,7 @@ A non-empty string representing the filter condition. It comprises one or multip
     - **'default_field'**
       - If `"fields"` is an empty string, this parameter specifies the default field to search on.
 
-### Returns
+##### Returns
 
 An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
@@ -1746,7 +1762,7 @@ An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `inf
 This method specifies a filtering condition for the rows in the current table but does not directly produce displayable data. To display the query results, use `filter()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
 :::
 
-### Examples
+#### Examples
 
 ```python
 table_object.output(["c1", "c2"]).filter("(-7 < c1 or 9 >= c1) and (c2 = 3)").to_pl()
@@ -1766,7 +1782,7 @@ table_object.output(["*"]).filter("filter_fulltext('doc', 'first second', 'minim
 
 ---
 
-## match_dense
+### match_dense
 
 ```python
 table_object.match_dense(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
@@ -1778,24 +1794,24 @@ Creates a dense vector search expression to identify the top n closest rows to t
 To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
-### Parameters
+#### Parameters
 
-#### vector_column_name: `str`, *Required*
+##### vector_column_name: `str`, *Required*
 
 A non-empty string indicating the name of the vector multi-vector column to search on.
 
-#### embedding_data: `list/np.ndarray`, *Required*
+##### embedding_data: `list/np.ndarray`, *Required*
 
 The query vector data to compare against. This should be provided as a list or a one-dimensional NumPy array of numerical values.
 
-#### embedding_data_type: `str`, *Required*
+##### embedding_data_type: `str`, *Required*
 
 Specifies the data type of the embedding vector. Commonly used types (values) include:
 
 - `"float"`
 - `"uint8"`.
 
-#### distance_type: `str`, *Required*
+##### distance_type: `str`, *Required*
 
 The distance metric to use in similarity search.
 
@@ -1803,11 +1819,11 @@ The distance metric to use in similarity search.
 - `"l2"`: Euclidean distance.
 - `"cosine"`: Cosine similarity.
 
-#### topn: `int`, *Required*
+##### topn: `int`, *Required*
 
 An integer indicating the number of nearest neighbours to return.
 
-#### knn_params: `dict[str, str]`, *Optional*
+##### knn_params: `dict[str, str]`, *Optional*
 
 A dictionary representing additional KNN or ANN search parameters.
 
@@ -1819,16 +1835,16 @@ A dictionary representing additional KNN or ANN search parameters.
   - For example, if you use the `"cosine"` distance metric and set `"threshold"` to `"0.5"`, the search will return only those rows with a cosine similarity greater than `0.5`.
 - `"nprobe"`: `str`, *Optional* The number of cells to search for the IVF index. The default value is `"1"`.
 
-### Returns
+#### Returns
 
 - Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
 
-### Examples
+#### Examples
 
-#### Perform a brute-force vector search
+##### Perform a brute-force vector search
 
 ```python
 # Find the 100 nearest neighbors using Euclidean distance
@@ -1841,7 +1857,7 @@ table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "l2", 100)
 `knn_params` settings will not take effect here because no index has been created.
 :::
 
-#### Perform a vector search in HNSW
+##### Perform a vector search in HNSW
 
 1. Ensure that you have successfully built an HNSW index. If uncertain, you can rebuild the index, setting `ConflictType` to `Ignore`.
 2. Set the `ef` value as follows:
@@ -1871,7 +1887,7 @@ If the HNSW index is not created successfully, the search will fall back to a br
 
 ---
 
-## match_sparse
+### match_sparse
 
 ```python
 table_object.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
@@ -1883,13 +1899,13 @@ Creates a sparse vector search expression to identify the top n closest rows to 
 To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
-### Parameters
+#### Parameters
 
-#### vector_column_name: `str`, *Required*
+##### vector_column_name: `str`, *Required*
 
 A non-empty string indicating the name of the column to query on.
 
-#### sparse_data: `SparseVector(list[int], list[int] | list[float])`, *Required*
+##### sparse_data: `SparseVector(list[int], list[int] | list[float])`, *Required*
 
 The query sparse vector data to compare against. The `sparse_data` parameter should be provided as a SparseVector object, which has two members:
 
@@ -1907,15 +1923,15 @@ sparse_vector = SparseVector(**dic_sparse_vector)
 
 :::
 
-#### distance_type: `str`, *Required*
+##### distance_type: `str`, *Required*
 
  A non-empty string indicating the distance type for the search. Currently, only `"ip"` (inner product) is supported.
 
-#### topn: `int`, *Required*
+##### topn: `int`, *Required*
 
 An integer indicating the number of nearest neighbours to return.
 
-#### opt_params: `dict[str, str]`, *Optional*
+##### opt_params: `dict[str, str]`, *Optional*
 
 A dictionary representing additional parameters for the sparse vector search. Following are parameters for the BMP index:
 
@@ -1924,16 +1940,16 @@ A dictionary representing additional parameters for the sparse vector search. Fo
 - `"beta"`: `str`  
   `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Query Term Pruning" parameter. The smaller the value, the more aggressive the pruning.
 
-### Returns
+#### Returns
 
 - Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
 
-### Examples
+#### Examples
 
-#### Perform a brute-force sparse vector search
+##### Perform a brute-force sparse vector search
 
 ```python
 # As demonstrated in the following example:
@@ -1952,7 +1968,7 @@ table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20
 `opt_params` settings will not take effect here because no index has been created.
 :::
 
-#### Perform a sparse vector search in BMP
+##### Perform a sparse vector search in BMP
 
 ```python
 from infinity.index import IndexInfo, IndexType
@@ -1978,7 +1994,7 @@ table_object.output(["*"]).match_sparse('sparse_column', SparseVector([0, 10, 20
 
 ---
 
-## match_text
+### match_text
 
 ```python
 table_object.match_text(fields, matching_text, topn, extra_options)
@@ -1990,9 +2006,9 @@ Creates a full-text search expression on the specified field(s)/column(s) to ide
 To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
-### Parameters
+#### Parameters
 
-#### fields: `str`, *Required*
+##### fields: `str`, *Required*
 
 A non-empty, comma-separated string of column names on which the full-text search will be performed.
 
@@ -2004,7 +2020,7 @@ Ensure that a full-text index has been successfully built on each column involve
 To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
-#### matching_text: `str`, *Required*
+##### matching_text: `str`, *Required*
 
 A non-empty text string to search for. You can use various search options within the matching text, including:
 
@@ -2016,11 +2032,11 @@ A non-empty text string to search for. You can use various search options within
 - Sloppy phrase search: `'"harmful chemical"~10'`
 - Field-specific search: `"title:(quick OR brown) AND body:foobar"`
 
-#### topn: `int`, *Required*
+##### topn: `int`, *Required*
 
 Specifies the number of the most relevant rows to retrieve, e.g., assign `10` to obtain the ten most relevant rows.
 
-#### extra_options: `dict`, *Optional*
+##### extra_options: `dict`, *Optional*
 
 An optional dictionary specifying the following search options:
 
@@ -2046,14 +2062,14 @@ An optional dictionary specifying the following search options:
     - `{"operator": "and"}`: Interpolates the `AND` operator between words in `matching_text` to create a new search text.  
       For example, reinterprets `"A01-233:BC"` as `'"A01" AND "-233" AND "BC"'`.
 
-### Returns
+#### Returns
 
 - Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
 
-### Examples
+#### Examples
 
 ```python
 
@@ -2074,7 +2090,7 @@ for question in questions:
 
 ---
 
-## highlight
+### highlight
 
 ```python
 table_object.highlight(columns)
@@ -2082,9 +2098,9 @@ table_object.highlight(columns)
 
 This method allows you to highlight the words of the output of the query, when the word text are matched.
 
-### Parameters
+#### Parameters
 
-#### columns: `list[str]`, *Required*
+##### columns: `list[str]`, *Required*
 
 A list of strings specifying the columns to include words match in match_text clause. Each string in the list can represent:
 
@@ -2094,7 +2110,7 @@ A list of strings specifying the columns to include words match in match_text cl
 The columns must also be the `output` clause output and also be the match_text clause column.
 :::
 
-### Returns
+#### Returns
 
 An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
@@ -2102,9 +2118,9 @@ An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `inf
 This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
 :::
 
-### Examples
+#### Examples
 
-#### Highlight the matched column to display
+##### Highlight the matched column to display
 
 ```python
 table_obj.output(["doctitle", "docdate", "body"]).highlight(["body"]).match_text("body^5", "harmful chemical", 3).to_pl()
@@ -2113,7 +2129,7 @@ table_obj.output(["doctitle", "docdate", "body"]).highlight(["body"]).match_text
 
 ---
 
-## fusion
+### fusion
 
 ```python
 table_object.fusion(method, topn, fusion_params = None)
@@ -2125,9 +2141,9 @@ Creates a reranking expression for multiple retrieval ways to identify the top n
 To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
-### Parameters
+#### Parameters
 
-#### method: `str`, *Required*
+##### method: `str`, *Required*
 
 A non-empty string indicating the reranking methods to use:
 
@@ -2155,11 +2171,11 @@ A non-empty string indicating the reranking methods to use:
 - `"match_tensor"`  
   Infinity's tensor-based late interaction reranking approach.  
 
-#### topn: `int`, *Required*
+##### topn: `int`, *Required*
 
 An integer indicating the number of the most relevant rows to retrieve.
 
-#### fusion_params: `dict[str, Any]`, *Optional*
+##### fusion_params: `dict[str, Any]`, *Optional*
 
 A dictionary representing additional options for the selected reranking method:
 
@@ -2178,18 +2194,18 @@ A dictionary representing additional options for the selected reranking method:
     array of numerical values.
   - `"element_type"`: The element data type of the query tensor. Usually `"float"`.
 
-### Returns
+#### Returns
 
 - Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value indicating a specific error condition.
   - `error_msg`: `str` A message providing additional details about the error.
 
-### Examples
+#### Examples
 
 The following code snippets illustrate the use of fused reranking in a three-way retrieval.
 
-#### Use RRF for reranking
+##### Use RRF for reranking
 
 ```python {6}
 from infinity.common import SparseVector
@@ -2213,7 +2229,7 @@ table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_
             .to_pl()
 ```
 
-#### Use Weighted Sum for reranking
+##### Use Weighted Sum for reranking
 
 ```python {6}
 from infinity.common import SparseVector
@@ -2226,7 +2242,7 @@ table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_
             .to_pl()
 ```
 
-#### Use tensor reranking
+##### Use tensor reranking
 
 ```python {8}
 from infinity.common import SparseVector
@@ -2241,7 +2257,7 @@ table_object.output(["num", "body", "vec", "sparse_column", "year", "tensor", "_
 
 ---
 
-## to_result
+### to_result
 
 
 ```python
@@ -2258,11 +2274,11 @@ Call `to_result()` in a chain after (not necessarily "immediately after") `outpu
 We recommend calling `to_df()`, `to_pl()`, or `to_arrow()` to format your results.
 :::
 
-### Returns 
+#### Returns 
 
 `tuple[dict[str, list[Any]], dict[str, Any]]`
 
-## to_df
+### to_df
 
 ```python
 table_object.to_df()
@@ -2274,18 +2290,18 @@ Returns the query result in pandas DataFrame format.
 Call `to_df()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
 :::
 
-### Returns
+#### Returns
 
 A `pandas.DataFrame` object.
 
-### Examples
+#### Examples
 
 ```python
 # Format columns "c1" and C2" of the current table into a pandas DataFrame
 res = table_object.output(["c1", "c2"]).to_df()
 ```
 
-## to_pl
+### to_pl
 
 ```python
 table_object.to_pl()
@@ -2297,18 +2313,18 @@ Returns the query result in Polas DataFrame format.
 Call `to_pl()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
 :::
 
-### Returns
+#### Returns
 
 A `polas.DataFrame` object.
 
-### Examples
+#### Examples
 
 ```python
 # Format a vector search result into a Polas DataFrame. 
 res = table_object.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10).to_pl()
 ```
 
-## to_arrow
+### to_arrow
 
 ```python
 table_object.to_arrow()
@@ -2320,11 +2336,11 @@ Returns the query result in Apache Arrow Table format.
 Call `to_arrow()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
 :::
 
-### Returns
+#### Returns
 
 A `pyarrow.Table` object.
 
-### Examples
+#### Examples
 
 ```python
 # Format the current table object into an Apache Arrow Table. 

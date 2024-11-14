@@ -26,7 +26,7 @@ namespace infinity {
 
 export class MatchExpression : public BaseExpression {
 public:
-    MatchExpression(const String &fields, const String &matching_text, const String &options_text);
+    MatchExpression(const String &fields, const String &matching_text, const String &options_text, const String &index_names);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
@@ -40,6 +40,7 @@ public:
     String fields_;
     String matching_text_;
     String options_text_;
+    Vector<String> index_names_;
     SharedPtr<BaseExpression> optional_filter_;
 };
 

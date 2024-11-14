@@ -35,9 +35,7 @@ namespace infinity {
 // 3. children of "or" can only be term, "and" or "and_not", because "or" will be optimized, and "not" is either optimized or not allowed
 // 4. "and_not" does not exist in parser output, it is generated during optimization
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
-void QueryNode::FilterOptimizeQueryTree() {
-    UnrecoverableError("Should not reach here!");
-}
+void QueryNode::FilterOptimizeQueryTree() { UnrecoverableError("Should not reach here!"); }
 
 std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<QueryNode> root) {
     if (root->GetType() == QueryNodeType::FILTER) {
@@ -405,7 +403,7 @@ std::unique_ptr<QueryNode> KeywordQueryNode::InnerGetNewOptimizedQueryTree() {
 // create search iterator
 std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
     ColumnID column_id = params.table_entry->GetColumnIdByName(column_);
-    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id);
+    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
     if (!column_index_reader) {
         RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
         return nullptr;
@@ -430,7 +428,7 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParam
 
 std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
     ColumnID column_id = params.table_entry->GetColumnIdByName(column_);
-    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id);
+    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
     if (!column_index_reader) {
         RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
         return nullptr;

@@ -161,7 +161,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 
     // 2 build query iterator
     // result
-    FullTextQueryContext full_text_query_context(ft_similarity_, minimum_should_match_option_);
+    FullTextQueryContext full_text_query_context(ft_similarity_, minimum_should_match_option_, match_expr_->index_names_);
     u32 result_count = 0;
     const float *score_result = nullptr;
     const RowID *row_id_result = nullptr;

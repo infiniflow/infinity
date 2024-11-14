@@ -38,7 +38,9 @@ public:
                           SizeT query_n,
                           SizeT topn,
                           Vector<UniquePtr<InitParameter>> opt_params,
-                          SharedPtr<BaseExpression> optional_filter);
+                          SharedPtr<BaseExpression> optional_filter,
+                          String index_name,
+                          bool ignore_index);
 
     DataType Type() const override;
 
@@ -62,6 +64,9 @@ public:
     Vector<UniquePtr<InitParameter>> opt_params_;
 
     SharedPtr<BaseExpression> optional_filter_;
+
+    const String index_name_;
+    bool ignore_index_;
 };
 
 } // namespace infinity

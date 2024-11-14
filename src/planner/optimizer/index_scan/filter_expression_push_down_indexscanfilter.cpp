@@ -461,8 +461,8 @@ private:
                 MinimumShouldMatchOption minimum_should_match_option;
                 f32 score_threshold = {};
                 FulltextSimilarity ft_similarity = FulltextSimilarity::kBM25;
+                Vector<String> index_names;
                 {
-                    const Map<String, String> &column2analyzer = index_reader.GetColumn2Analyzer();
                     SearchOptions search_ops(filter_fulltext_expr->options_text_);
 
                     // option: default field
@@ -527,6 +527,27 @@ private:
                         }
                     }
 
+                    // option: indexes
+                    if (iter = search_ops.options_.find("indexes"); iter != search_ops.options_.end()) {
+                        String indexes_text = iter->second;
+                        ToLower(indexes_text);
+                        SizeT begin_idx = 0;
+                        SizeT len = indexes_text.length();
+                        while (begin_idx < len) {
+                            SizeT comma_idx = indexes_text.find_first_of(',', begin_idx);
+                            if (comma_idx == String::npos) {
+                                auto index_name = indexes_text.substr(begin_idx);
+                                index_names.emplace_back(index_name);
+                                break;
+                            } else {
+                                auto index_name = indexes_text.substr(begin_idx, comma_idx - begin_idx);
+                                index_names.emplace_back(std::move(index_name));
+                                begin_idx = comma_idx + 1;
+                            }
+                        }
+                    }
+
+                    Map<String, String> column2analyzer = index_reader.GetColumn2Analyzer(index_names);
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
                     if (!query_tree) {
@@ -540,7 +561,8 @@ private:
                                                                 std::move(query_tree),
                                                                 std::move(minimum_should_match_option),
                                                                 score_threshold,
-                                                                ft_similarity);
+                                                                ft_similarity,
+                                                                std::move(index_names));
             }
             case Enum::kAndExpr: {
                 Vector<UniquePtr<IndexFilterEvaluator>> candidates;

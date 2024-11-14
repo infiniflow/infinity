@@ -37,25 +37,27 @@ export struct FullTextQueryContext {
     const MinimumShouldMatchOption minimum_should_match_option_{};
     u32 minimum_should_match_ = 0;
     EarlyTermAlgo early_term_algo_ = EarlyTermAlgo::kNaive;
-    FullTextQueryContext(const FulltextSimilarity ft_similarity, const MinimumShouldMatchOption &minimum_should_match_option)
-        : ft_similarity_(ft_similarity), minimum_should_match_option_(minimum_should_match_option) {}
+    const Vector<String> &index_names_;
+    FullTextQueryContext(const FulltextSimilarity ft_similarity,
+                         const MinimumShouldMatchOption &minimum_should_match_option,
+                         const Vector<String> &index_names)
+        : ft_similarity_(ft_similarity), minimum_should_match_option_(minimum_should_match_option), index_names_(index_names) {}
 };
 
 export class QueryBuilder {
 public:
-    explicit QueryBuilder(BaseTableRef* base_table_ref)
-    : base_table_ref_(base_table_ref), table_entry_(base_table_ref->table_entry_ptr_) {};
+    explicit QueryBuilder(BaseTableRef *base_table_ref) : base_table_ref_(base_table_ref), table_entry_(base_table_ref->table_entry_ptr_){};
 
     void Init(IndexReader index_reader);
 
     ~QueryBuilder();
 
-    const Map<String, String> &GetColumn2Analyzer() { return index_reader_.GetColumn2Analyzer(); }
+    Map<String, String> GetColumn2Analyzer(const Vector<String> &hints) { return index_reader_.GetColumn2Analyzer(hints); }
 
     UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
 private:
-    BaseTableRef* base_table_ref_{nullptr};
+    BaseTableRef *base_table_ref_{nullptr};
     TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
 };

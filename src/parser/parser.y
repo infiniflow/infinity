@@ -2762,7 +2762,40 @@ match_tensor_expr : MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRIN
     match_tensor_expr->SetOptionalFilter($13);
     $$ = match_tensor_expr.release();
 }
-
+| //1   2     3       4       5        6            7     8    9     10   11   12          13                   14    15   16   17     18
+MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING ',' STRING optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')' {
+    auto match_tensor_expr = std::make_unique<infinity::MatchTensorExpr>();
+    // search column
+    match_tensor_expr->SetSearchColumn($4);
+    // search tensor
+    ParserHelper::ToLower($8);
+    match_tensor_expr->SetQueryTensor($8, $6);
+    // search method
+    ParserHelper::ToLower($10);
+    match_tensor_expr->SetSearchMethod($10);
+    // search options
+    match_tensor_expr->SetExtraOptions($12);
+    match_tensor_expr->SetOptionalFilter($13);
+    match_tensor_expr->index_name_ = $18;
+    $$ = match_tensor_expr.release();
+}
+| //1   2     3       4       5        6            7     8    9     10   11   12          13                   14
+MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING ',' STRING optional_search_filter_expr ')' IGNORE INDEX {
+    auto match_tensor_expr = std::make_unique<infinity::MatchTensorExpr>();
+    // search column
+    match_tensor_expr->SetSearchColumn($4);
+    // search tensor
+    ParserHelper::ToLower($8);
+    match_tensor_expr->SetQueryTensor($8, $6);
+    // search method
+    ParserHelper::ToLower($10);
+    match_tensor_expr->SetSearchMethod($10);
+    // search options
+    match_tensor_expr->ignore_index_ = true;
+    match_tensor_expr->SetExtraOptions($12);
+    match_tensor_expr->SetOptionalFilter($13);
+    $$ = match_tensor_expr.release();
+}
 //                  MATCH VECTOR (column_name, query_vec, data_type, metric_type, topn             optional_filter          ) USING INDEX ( index_name )  extra options
 //                   1      2         4         6              8          10           12                13                                        18             20
 match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE optional_search_filter_expr ')' USING INDEX '(' IDENTIFIER ')' with_index_param_list {
@@ -3047,6 +3080,30 @@ match_text_expr : MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr '
     free($4);
     free($6);
     free($8);
+    $$ = match_text_expr;
+}
+| MATCH TEXT '(' STRING ',' STRING optional_search_filter_expr ')' USING INDEXES '(' STRING ')' {
+    infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
+    match_text_expr->fields_ = std::string($4);
+    match_text_expr->matching_text_ = std::string($6);
+    match_text_expr->filter_expr_.reset($7);
+    match_text_expr->index_names_ = std::string($12);
+    free($4);
+    free($6);
+    free($12);
+    $$ = match_text_expr;
+}
+| MATCH TEXT '(' STRING ',' STRING ',' STRING optional_search_filter_expr ')' USING INDEXES '(' STRING ')' {
+    infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
+    match_text_expr->fields_ = std::string($4);
+    match_text_expr->matching_text_ = std::string($6);
+    match_text_expr->options_text_ = std::string($8);
+    match_text_expr->filter_expr_.reset($9);
+    match_text_expr->index_names_ = std::string($14);
+    free($4);
+    free($6);
+    free($8);
+    free($14);
     $$ = match_text_expr;
 }
 
