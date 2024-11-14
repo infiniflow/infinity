@@ -68,6 +68,42 @@ Storage::~Storage() {
 #endif
 }
 
+Status Storage::InitToAdmin() {
+    LOG_INFO(fmt::format("Start to initialize storage from un-init mode to admin"));
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (current_storage_mode_ != StorageMode::kUnInitialized) {
+            UnrecoverableError("Unexpected: attempt to init initialized status storage");
+        }
+
+        // Construct wal manager
+        if (wal_mgr_ != nullptr) {
+            UnrecoverableError("WAL manager was initialized before.");
+        }
+
+        wal_mgr_ = MakeUnique<WalManager>(this,
+                                          config_ptr_->WALDir(),
+                                          config_ptr_->DataDir(),
+                                          config_ptr_->WALCompactThreshold(),
+                                          config_ptr_->DeltaCheckpointThreshold(),
+                                          config_ptr_->FlushMethodAtCommit());
+        current_storage_mode_ = StorageMode::kAdmin;
+    }
+    LOG_INFO(fmt::format("Finish initializing storage from un-init mode to admin"));
+    return Status::OK();
+}
+
+Status Storage::UnInitFromAdmin() {
+    LOG_INFO(fmt::format("Start to un-initialize storage from admin mode to un-init"));
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        wal_mgr_.reset();
+        current_storage_mode_ = StorageMode::kUnInitialized;
+    }
+    LOG_INFO(fmt::format("Finishing un-initializing storage from admin mode to un-init"));
+    return Status::OK();
+}
+
 ResultCacheManager *Storage::result_cache_manager() const noexcept {
     if (config_ptr_->ResultCache() != "on") {
         return nullptr;
@@ -94,25 +130,7 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             if (target_mode != StorageMode::kAdmin) {
                 UnrecoverableError("Attempt to set storage mode from UnInit to UnInit");
             }
-
-            {
-                std::unique_lock<std::mutex> lock(mutex_);
-                current_storage_mode_ = target_mode;
-            }
-
-            // Construct wal manager
-            if (wal_mgr_ != nullptr) {
-                UnrecoverableError("WAL manager was initialized before.");
-            }
-
-            wal_mgr_ = MakeUnique<WalManager>(this,
-                                              config_ptr_->WALDir(),
-                                              config_ptr_->DataDir(),
-                                              config_ptr_->WALCompactThreshold(),
-                                              config_ptr_->DeltaCheckpointThreshold(),
-                                              config_ptr_->FlushMethodAtCommit());
-            LOG_INFO(fmt::format("Set storage from un-init mode to admin"));
-            break;
+            return InitToAdmin();
         }
         case StorageMode::kAdmin: {
             if (target_mode == StorageMode::kAdmin) {
@@ -120,9 +138,7 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             }
 
             if (target_mode == StorageMode::kUnInitialized) {
-                wal_mgr_.reset();
-                LOG_INFO(fmt::format("Set storage from admin mode to un-init"));
-                break;
+                return UnInitFromAdmin();
             }
 
             {
