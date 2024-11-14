@@ -67,16 +67,17 @@ void PGServer::Run() {
 }
 
 void PGServer::Shutdown() {
-    while (true) {
+    {
         auto expected = PGServerStatus::kRunning;
         if (!status_.compare_exchange_strong(expected, PGServerStatus::kStopping)) {
             if (expected == PGServerStatus::kStarting) {
                 status_.wait(PGServerStatus::kStarting);
+                if (!status_.compare_exchange_strong(expected, PGServerStatus::kStopping)) {
+                    UnrecoverableError(fmt::format("PGServer in unexpected state: {}", u8(expected)));
+                }
             } else {
                 UnrecoverableError(fmt::format("PGServer in unexpected state: {}", u8(expected)));
             }
-        } else {
-            break;
         }
     }
 

@@ -3678,11 +3678,16 @@ public:
 
 namespace infinity {
 
-void HTTPServer::Start(const String &ip_address, u16 port) {
-    if (started_) {
-        return;
-    }
+// oatpp example
+// https://github.com/oatpp/example-server-stop/blob/master/src/App_StopSimple.cpp
 
+void HTTPServer::Start(const String &ip_address, u16 port) {
+    {
+        auto expected = HTTPServerStatus::kUnstarted;
+        if (!status_.compare_exchange_strong(expected, HTTPServerStatus::kStarting)) {
+            UnrecoverableError(fmt::format("HTTP server is in unexpected state: {}", u8(expected)));
+        }
+    }
     WebEnvironment::init();
 
     SharedPtr<HttpRouter> router = HttpRouter::createShared();
@@ -3785,24 +3790,43 @@ void HTTPServer::Start(const String &ip_address, u16 port) {
     router->route("GET", "/admin/nodes", MakeShared<AdminListAllNodesHandler>());
     router->route("DELETE", "/admin/node/{node_name}", MakeShared<AdminRemoveNodeHandler>());
 
-    SharedPtr<HttpConnectionProvider> connection_provider = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
-    SharedPtr<HttpConnectionHandler> connection_handler = HttpConnectionHandler::createShared(router);
+    connection_provider_ = HttpConnectionProvider::createShared({ip_address, port, WebAddress::IP_4});
+    connection_handler_ = HttpConnectionHandler::createShared(router);
 
-    server_ = MakeShared<WebServer>(connection_provider, connection_handler);
+    server_ = MakeShared<WebServer>(connection_provider_, connection_handler_);
 
     fmt::print("HTTP server listen on {}: {}\n", ip_address, port);
 
-    started_ = true;
+    status_.store(HTTPServerStatus::kRunning);
+    status_.notify_one();
 
     server_->run();
 }
 
 void HTTPServer::Shutdown() {
-    if (started_) {
-        server_->stop();
-        WebEnvironment::destroy();
-        started_ = false;
+    {
+        auto expected = HTTPServerStatus::kRunning;
+        if (!status_.compare_exchange_strong(expected, HTTPServerStatus::kStopping)) {
+            if (expected == HTTPServerStatus::kStarting) {
+                status_.wait(HTTPServerStatus::kStarting);
+                if (!status_.compare_exchange_strong(expected, HTTPServerStatus::kStopping)) {
+                    UnrecoverableError(fmt::format("HTTP server is in unexpected state: {}", u8(expected)));
+                }
+            } else {
+                UnrecoverableError(fmt::format("HTTP server is in unexpected state: {}", u8(expected)));
+            }
+        }
     }
+
+    connection_provider_->stop();
+    if (server_->getStatus() == WebServer::STATUS_RUNNING) {
+        server_->stop();
+    }
+    connection_handler_->stop();
+
+    status_.store(HTTPServerStatus::kUnstarted);
+
+    WebEnvironment::destroy();
 }
 
 } // namespace infinity
