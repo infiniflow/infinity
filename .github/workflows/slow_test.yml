@@ -92,7 +92,7 @@ jobs:
           # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
           old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
           sudo sysctl -w vm.mmap_rnd_bits=28
-          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY} && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so TSAN_OPTIONS=log_path=cluster_tsan.log python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY}"
+          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY} && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so TSAN_OPTIONS=log_path=cluster_tsan.log ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY}"
           sudo sysctl -w vm.mmap_rnd_bits=$old_value
 
       - name: Collect thread sanitizer output in cluster test
@@ -105,7 +105,10 @@ jobs:
       - name: Start infinity debug version with thread sanitizer
         if: ${{ !cancelled() && !failure()}}
         run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug.log 2> debug_error.log &" && sleep 1s
+          # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
+          old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && TSAN_OPTIONS=log_path=tsan.log cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug.log 2> debug_error.log &" && sleep 1s
           if ! sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity > /dev/null; then
             echo "Failed to start infinity debug version"
             cat debug_error.log
@@ -116,11 +119,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         id: run_tests_debug
         run: |
-          # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
-          old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
-          sudo sysctl -w vm.mmap_rnd_bits=28
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so TSAN_OPTIONS=log_path=tsan.log python3 tools/run_pytest_parallel.py" && sleep 1s
-          sudo sysctl -w vm.mmap_rnd_bits=$old_value
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
 
       - name: Stop infinity pysdk & http_api & sqllogictest debug
         if: ${{ !cancelled() }}
@@ -133,6 +132,7 @@ jobs:
               echo "Failed to kill infinity debug version"
               exit 1
           fi
+          sudo sysctl -w vm.mmap_rnd_bits=$old_value
 
       - name: Collect thread sanitizer output in pytest parallel
         if: ${{ !cancelled() }}
