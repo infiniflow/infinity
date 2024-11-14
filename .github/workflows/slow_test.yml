@@ -72,13 +72,22 @@ jobs:
       - name: Start infinity debug version with thread sanitizer
         if: ${{ !cancelled() && !failure()}}
         run: |
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_continuous_conf.toml > release.log 2> release_error.log" & && sleep 1s
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug.log 2> debug_error.log &" && sleep 1s
+          if ! sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity > /dev/null; then
+            echo "Failed to start infinity debug version"
+            cat debug_error.log
+            exit 1
+          fi
     
       - name: Run pytest parallel with thread sanitizer
         if: ${{ !cancelled() && !failure() }}
         id: run_tests_debug
         run: |
+          # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
+          old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
+          sudo sysctl -w vm.mmap_rnd_bits=28
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
+          sudo sysctl -w vm.mmap_rnd_bits=$old_value
 
       - name: Stop infinity pysdk & http_api & sqllogictest debug
         if: ${{ !cancelled() }}
