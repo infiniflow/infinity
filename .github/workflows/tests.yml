@@ -84,13 +84,13 @@ jobs:
         id: run_cluster_test
         run: |
           sudo docker exec ${TESTER_CONTAINER} bash -c "rm -rf /root/.config/pip/pip.conf && cd /infinity/ && pip3 uninstall -y infinity-sdk infinity-embedded-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug' -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd python/infinity_sdk/ && pip3 install . -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn && cd ../.."
-          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY} && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY} 2>cluster_test_error.log"
+          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY} && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY}"
 
       - name: Collect cluster test output
         if: ${{ !cancelled() }}
         run: |
           failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
-          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --stderror_path=cluster_test_error.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
+          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure}
 
       - name: Remove tester container
         if: always()  # always run this step even if previous steps failed

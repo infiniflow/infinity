@@ -92,14 +92,15 @@ jobs:
           # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
           old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
           sudo sysctl -w vm.mmap_rnd_bits=28
-          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY} && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY} 2>cluster_test_error.log"
+          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY} && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so TSAN_OPTIONS=log_path=cluster_tsan.log python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY}"
           sudo sysctl -w vm.mmap_rnd_bits=$old_value
 
       - name: Collect thread sanitizer output in cluster test
         if: ${{ !cancelled() }}
         run: |
           failure="${{ steps.run_cluster_test.outcome == 'failure'}}"
-          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --stderror_path=cluster_test_error.log --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --thread_sanitizer
+          sudo python3 scripts/collect_cluster_log.py --executable_path=cmake-build-debug/src/infinity --log_dir=/var/infinity/ --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --tsan_log=cluster_tsan.log
+          sudo rm -f cluster_tsan.log*
 
       - name: Start infinity debug version with thread sanitizer
         if: ${{ !cancelled() && !failure()}}
@@ -118,7 +119,7 @@ jobs:
           # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
           old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
           sudo sysctl -w vm.mmap_rnd_bits=28
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so TSAN_OPTIONS=log_path=tsan.log python3 tools/run_pytest_parallel.py" && sleep 1s
           sudo sysctl -w vm.mmap_rnd_bits=$old_value
 
       - name: Stop infinity pysdk & http_api & sqllogictest debug
@@ -138,7 +139,8 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: |
           failure="${{ steps.run_tests_debug.outcome == 'failure' || steps.stop_tests_debug.outcome == 'failure' }}"
-          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --thread_sanitizer
+          sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --tsan_log=tsan.log
+          sudo rm -f tsan.log*
 
       - name: Prepare restart test data
         if: ${{ !cancelled() && !failure() }}

@@ -106,11 +106,11 @@ if __name__ == "__main__":
         "--failure", type=str, required=True, help="If the test failured"
     )
     parser.add_argument(
-        "--thread_sanitizer",
-        action="store_true",
-        help="Collect thread sanitizer log",
+        "--tsan_log",
+        type=str,
         required=False,
-        default=False,
+        help="Thread sanitizer log prefix",
+        default=None,
     )
     args = parser.parse_args()
 
@@ -120,11 +120,11 @@ if __name__ == "__main__":
     executable_path = args.executable_path
     output_dir = args.output_dir
     failure = args.failure == "true" or args.failure == "True"
-    thread_sanitizer = args.thread_sanitizer
+    tsan_log = args.tsan_log
     show_lines = 1000
 
-    if not failure and thread_sanitizer:
-        collect_thread_sanitizer_log.collect_log(stderror_path, output_dir)
+    if not failure and tsan_log is not None:
+        collect_thread_sanitizer_log.collect_log(tsan_log, output_dir, show_lines)
     else:
         collect_log(
             log_path,
