@@ -78,34 +78,34 @@ As a result, these types are similar but have different meaning:
 - `multivector`: Used for dense vector search.
 
 ```json
-             {
-                  "name": "multivector_column",
-                  "type": "multivector,4,float",
-                  "default": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
-             },  
+{
+	"name": "multivector_column",
+	"type": "multivector,4,float",
+	"default": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+},  
 ```
 
 - `tensor`: Used for tensor search and tensor reranking.
 
 ```json
-						 {
-                  "name": "tensor_column",
-                  "type": "tensor,4,float",
-                  "default": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]
-             }, 
+{
+	"name": "tensor_column",
+	"type": "tensor,4,float",
+	"default": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]
+}, 
 ```
 
 - `tensorarray`: It's used to serve scenarios where there are some late interaction models having token limits. For example, the ColBERT model has a token limit of 128, which means it cannot generate tensor for documents with tokens larger than 128.  In that case, the document is splitted into multiple chunks, each encoded into a tensor. And tensors for each document can be stored into a `tensorarray` . During search and reranking, the `MaxSim` of each tensor pair is computed at first, the eventual `MaxSim` score for each document is the accumulation of all `MaxSim` scores among all tensor pairs.
 
 ```json
-						{
-                  "name": "tensorarray_column",
-                  "type": "tensorarray,2,float",
-                  "default": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]]
-             }   
+{
+	"name": "tensorarray_column",
+	"type": "tensorarray,2,float",
+	"default": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]]
+}   
 ```
 
-Due to the storage explosion caused by tensor compared with raw document data, tensor search is not recommended to use directly. It's more suitable to be used as a reranker, which will be described in the [hybrid search](#hybrid) part.
+Due to the storage explosion caused by tensor compared with raw document data, tensor search is not recommended to use directly. It's more suitable to be used as a reranker, which will be described in the hybrid search part.
 
 Infinity offers two approaches to improve tensor performance:
 
@@ -123,8 +123,7 @@ Infinity offers three kinds of rerankers for the fusion:
 - `weighted_sum`
   The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.
 - `match_tensor`
-
-  The `tensor` based rank fusion, the final results are decided by the `MaxSim` operator between the tensor of query and tensor 		of each document.
+  The `tensor` based rank fusion, the final results are decided by the `MaxSim` operator between the tensor of query and tensor of each document.
 
 ## Conditional filters
 
