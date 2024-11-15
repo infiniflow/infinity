@@ -611,7 +611,7 @@ Vector<SharedPtr<WalEntry>> AdminExecutor::GetAllCheckpointEntries(QueryContext 
         for (auto &entry_cmd : wal_entry_ptr->cmds_) {
             if (entry_cmd->GetType() == WalCommandType::CHECKPOINT) {
                 WalCmdCheckpoint *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(entry_cmd.get());
-                max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
+                max_checkpoint_ts = std::max(max_checkpoint_ts, TxnTimeStamp(checkpoint_cmd->max_commit_ts_));
             }
         }
     }

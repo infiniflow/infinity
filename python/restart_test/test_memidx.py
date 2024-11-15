@@ -330,17 +330,17 @@ class TestMemIdx:
                 ]
             )
             # dump by line submit here
-            table_obj.insert(
-                [
-                    {
-                        "c1": 8192 + i,
-                        "c2": 8192 + i,
-                        "c3": SparseVector(indices=[1], values=[1.0]),
-                    }
-                    for i in range(100)
-                ]
-            )
             infinity_obj.flush_delta()
+            for i in range(100):
+                table_obj.insert(
+                    [
+                        {
+                            "c1": 8192 + i,
+                            "c2": 8192 + i,
+                            "c3": SparseVector(indices=[1], values=[1.0]),
+                        }
+                    ]
+                )
             # wait for dump by line done
             # time.sleep(4)
 
@@ -349,7 +349,7 @@ class TestMemIdx:
         delta_paths = list(pathlib.Path(catalog_dir).rglob("*DELTA*"))
         if len(delta_paths) < 1:
             print("Warning: delta checkpoint not triggered. skip this test")
-            # infinity_runner.clear()
+            infinity_runner.clear()
             return
 
         @decorator2
@@ -370,4 +370,4 @@ class TestMemIdx:
 
         part2()
 
-        # infinity_runner.clear()
+        infinity_runner.clear()
