@@ -56,6 +56,12 @@ export String ToString(StorageMode storage_mode) {
     }
 }
 
+export struct ReplayWalOptions {
+    bool on_startup_;
+    bool is_replay_;
+    bool sync_from_leader_;
+};
+
 export class WalManager {
 public:
     WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
@@ -100,7 +106,7 @@ public:
 
     Vector<SharedPtr<WalEntry>> CollectWalEntries() const;
 
-    void ReplayWalEntry(const WalEntry &entry, bool on_startup, bool is_replay, bool sync_from_leader);
+    void ReplayWalEntry(const WalEntry &entry, ReplayWalOptions options);
 
     TxnTimeStamp LastCheckpointTS();
 

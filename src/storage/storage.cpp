@@ -392,7 +392,6 @@ Status Storage::InitToReader() { return Status::OK(); }
 Status Storage::UnInitFromReader() {
     LOG_INFO(fmt::format("Start to change storage from readable mode to un-init"));
     {
-        std::unique_lock<std::mutex> lock(mutex_);
         if (periodic_trigger_thread_ != nullptr) {
             if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
                 UnrecoverableError("Error reader init phase");
@@ -463,6 +462,7 @@ Status Storage::UnInitFromReader() {
             cleanup_info_tracer_.reset();
         }
 
+        std::unique_lock<std::mutex> lock(mutex_);
         current_storage_mode_ = StorageMode::kUnInitialized;
     }
     LOG_INFO(fmt::format("Finishing changing storage from readable mode to un-init"));
@@ -543,88 +543,19 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             break;
         }
         case StorageMode::kReadable: {
-            if (target_mode == StorageMode::kReadable) {
-                UnrecoverableError("Attempt to set storage mode from Readable to Readable");
-            }
 
-            if (target_mode == StorageMode::kUnInitialized or target_mode == StorageMode::kAdmin) {
-
-                if (periodic_trigger_thread_ != nullptr) {
-                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
-                        UnrecoverableError("Error reader init phase");
-                    }
-                    periodic_trigger_thread_->Stop();
-                    periodic_trigger_thread_.reset();
+            switch (target_mode) {
+                case StorageMode::kUnInitialized: {
+                    return UnInitFromReader();
                 }
-
-                if (bg_processor_ != nullptr) {
-                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
-                        UnrecoverableError("Error reader init phase");
-                    }
-                    bg_processor_->Stop();
-                    bg_processor_.reset();
+                case StorageMode::kAdmin: {
+                    return ReaderToAdmin();
                 }
-
-                new_catalog_.reset();
-
-                if (memory_index_tracer_ != nullptr) {
-                    memory_index_tracer_.reset();
+                case StorageMode::kReadable: {
+                    UnrecoverableError("Attempt to set storage mode from Readable to Readable");
                 }
-
-                if (wal_mgr_ != nullptr) {
-                    wal_mgr_->Stop();
-                    wal_mgr_.reset();
-                }
-
-                if (txn_mgr_ != nullptr) {
-                    if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
-                        UnrecoverableError("Error reader init phase");
-                    }
-                    txn_mgr_->Stop();
-                    txn_mgr_.reset();
-                }
-                switch (config_ptr_->StorageType()) {
-                    case StorageType::kLocal: {
-                        // Not init remote store
-                        break;
-                    }
-                    case StorageType::kMinio: {
-                        if (object_storage_processor_ != nullptr) {
-                            object_storage_processor_->Stop();
-                            object_storage_processor_.reset();
-                            VirtualStore::UnInitRemoteStore();
-                        }
-                        break;
-                    }
-                    default: {
-                        UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
-                    }
-                }
-
-                if (buffer_mgr_ != nullptr) {
-                    buffer_mgr_->Stop();
-                    buffer_mgr_.reset();
-                }
-
-                if (result_cache_manager_ != nullptr) {
-                    result_cache_manager_.reset();
-                }
-
-                if (persistence_manager_ != nullptr) {
-                    persistence_manager_.reset();
-                }
-
-                if (cleanup_info_tracer_ != nullptr) {
-                    cleanup_info_tracer_.reset();
-                }
-                if (target_mode == StorageMode::kAdmin) {
-                    // wal_manager stop won't reset many member. We need to recreate the wal_manager object.
-                    wal_mgr_ = MakeUnique<WalManager>(this,
-                                                      config_ptr_->WALDir(),
-                                                      config_ptr_->DataDir(),
-                                                      config_ptr_->WALCompactThreshold(),
-                                                      config_ptr_->DeltaCheckpointThreshold(),
-                                                      config_ptr_->FlushMethodAtCommit());
+                default: {
+                    break;
                 }
             }
 

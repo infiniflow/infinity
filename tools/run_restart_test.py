@@ -38,6 +38,8 @@ if __name__ == "__main__":
                 "-s",
                 "-m",
                 "not slow",
+                # "-k",
+                # "test_optimize_from_different_database"
             ]
         )
     else:

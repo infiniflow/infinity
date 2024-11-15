@@ -32,9 +32,7 @@ import node_info;
 namespace infinity {
 
 PeerClient::~PeerClient() {
-    if (running_) {
-        UnInit(false);
-    }
+    UnInit(true);
     server_connected_ = false;
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::DecrObjectCount("PeerClient");
@@ -64,6 +62,7 @@ Status PeerClient::UnInit(bool sync) {
         } else {
             processor_thread_->detach();
         }
+        processor_thread_.reset();
     }
 
     LOG_INFO(fmt::format("Peer client: {} is stopped.", from_node_name_));
@@ -114,20 +113,23 @@ Status PeerClient::Disconnect() {
 }
 
 void PeerClient::Send(SharedPtr<PeerTask> peer_task) {
+    if (peer_task->Type() == PeerTaskType::kTerminate) {
+        UnrecoverableError("Terminate the background processor");
+    }
     ++peer_task_count_;
     peer_task_queue_.Enqueue(std::move(peer_task));
 }
 
 void PeerClient::Process() {
     Deque<SharedPtr<PeerTask>> peer_tasks;
-    running_ = true;
-    while (running_) {
+    bool running = true;
+    while (running) {
         peer_task_queue_.DequeueBulk(peer_tasks);
         for (const auto &peer_task : peer_tasks) {
             switch (peer_task->Type()) {
                 case PeerTaskType::kTerminate: {
                     LOG_INFO("Stop the background processor");
-                    running_ = false;
+                    running = false;
                     break;
                 }
                 case PeerTaskType::kRegister: {

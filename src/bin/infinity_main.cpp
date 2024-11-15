@@ -188,7 +188,7 @@ auto main(int argc, char **argv) -> int {
 
         i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
         pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
-        pool_thrift_thread = infinity::Thread([&]() { pool_thrift_server.Start(); });
+        pool_thrift_thread = pool_thrift_server.Start();
 
 #elif THRIFT_SERVER_TYPE == 1
 
@@ -206,7 +206,7 @@ auto main(int argc, char **argv) -> int {
         u32 peer_server_port = InfinityContext::instance().config()->PeerServerPort();
         i32 peer_server_connection_pool_size = InfinityContext::instance().config()->PeerServerConnectionPoolSize();
         pool_peer_thrift_server.Init(InfinityContext::instance().config()->PeerServerIP(), peer_server_port, peer_server_connection_pool_size);
-        pool_peer_thrift_thread = infinity::Thread([&]() { pool_peer_thrift_server.Start(); });
+        pool_peer_thrift_thread = pool_peer_thrift_server.Start();
     };
 
     auto stop_thrift_servers = [&]() {
@@ -242,10 +242,9 @@ auto main(int argc, char **argv) -> int {
     InfinityContext::instance().AddThriftServerFn(start_thrift_servers, stop_thrift_servers);
     InfinityContext::instance().StartThriftServers();
 
-    pg_thread = infinity::Thread([&]() { pg_server.Run(); });
+    pg_thread = pg_server.Run();
 
-    http_server_thread = infinity::Thread(
-        [&]() { http_server.Start(InfinityContext::instance().config()->ServerAddress(), InfinityContext::instance().config()->HTTPPort()); });
+    http_server_thread = http_server.Start(InfinityContext::instance().config()->ServerAddress(), InfinityContext::instance().config()->HTTPPort());
 
     shutdown_thread = infinity::Thread([&]() { ShutdownServer(); });
 

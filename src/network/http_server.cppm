@@ -21,15 +21,25 @@ import third_party;
 
 namespace infinity {
 
+enum struct HTTPServerStatus : u8 {
+    kStopped = 0,
+    kStarting,
+    kRunning,
+    kStopping,
+};
+
 export class HTTPServer {
 public:
-    void Start(const String& server_address, u16 port);
+    Thread Start(const String& server_address, u16 port);
     void Shutdown();
 
 private:
+    Atomic<HTTPServerStatus> status_{HTTPServerStatus::kStopped};
     SharedPtr<HttpRouter> router_{};
     SharedPtr<WebServer> server_{};
-    atomic_bool started_{false};
+
+    SharedPtr<HttpConnectionProvider> connection_provider_{};
+    SharedPtr<HttpConnectionHandler> connection_handler_{};
 };
 
 } // namespace infinity
