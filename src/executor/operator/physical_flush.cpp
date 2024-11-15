@@ -47,6 +47,7 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
     }
 
     switch (flush_type_) {
+        case FlushType::kDelta:
         case FlushType::kData: {
             FlushData(query_context, operator_state);
             break;
@@ -66,7 +67,9 @@ bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator
 
 void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operator_state) {
     // full checkpoint here
-    auto force_ckp_task = MakeShared<ForceCheckpointTask>(query_context->GetTxn(), true /*is_full_checkpoint*/);
+
+    bool is_full_checkpoint = flush_type_ == FlushType::kData;
+    auto force_ckp_task = MakeShared<ForceCheckpointTask>(query_context->GetTxn(), is_full_checkpoint);
     auto *wal_mgr = query_context->storage()->wal_manager();
     if (!wal_mgr->TrySubmitCheckpointTask(force_ckp_task)) {
         LOG_TRACE(fmt::format("Skip {} checkpoint(manual) because there is already a full checkpoint task running.", "FULL"));

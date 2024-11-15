@@ -767,6 +767,9 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
 
 Status ExplainAST::BuildFlush(const FlushStatement *flush_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64) {
     switch (flush_statement->type_) {
+        case FlushType::kDelta:
+            result->emplace_back(MakeShared<String>("FLUSH DELTA"));
+            break;
         case FlushType::kData:
             result->emplace_back(MakeShared<String>("FLUSH DATA"));
             break;
