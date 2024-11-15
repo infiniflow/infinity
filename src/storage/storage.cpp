@@ -184,9 +184,11 @@ Status Storage::AdminToWriter() {
         current_storage_mode_ = StorageMode::kWritable;
     }
 
-    Status status = VirtualStore::CreateBucket();
-    if (!status.ok()) {
-        return status;
+    if (config_ptr_->StorageType() == StorageType::kMinio) {
+        Status status = VirtualStore::CreateBucket();
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     if (result_cache_manager_ != nullptr) {
@@ -476,9 +478,11 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
 
             if (target_mode == StorageMode::kWritable) {
 
-                Status status = VirtualStore::CreateBucket();
-                if (!status.ok()) {
-                    return status;
+                if (config_ptr_->StorageType() == StorageType::kMinio) {
+                    Status status = VirtualStore::CreateBucket();
+                    if (!status.ok()) {
+                        return status;
+                    }
                 }
 
                 if (compact_processor_ != nullptr) {
