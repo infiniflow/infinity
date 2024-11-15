@@ -875,40 +875,41 @@ class TestInfinity:
 
     def test_select_strlen(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_select_strlen"+suffix, ConflictType.Ignore)
-        db_obj.create_table("test_select_strlen"+suffix,
+        db_obj.drop_table("test_select_strlen" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_strlen" + suffix,
                             {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
-                            "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
-        table_obj = db_obj.get_table("test_select_strlen"+suffix)
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+    
+        table_obj = db_obj.get_table("test_select_strlen" + suffix)
         table_obj.insert(
             [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
             {"c1": 'abc', "c2": 'abc'}, {"c1": 'shortstr', "c2": 'shortstr'}, {"c1": 'longerthanthirteen', "c2": 'longerstr'}])
 
-        res = table_obj.output(["c1", "c2", "strlen(c1) as len_c1"]).filter("strlen(c1) = 3").to_df()
+        res = table_obj.output(["c1", "c2", "strlen(c1)"]).filter("strlen(c1) = 3").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({
             'c1': ['abc'],
             'c2': ['abc'],
-            'len_c1': [3]
-        }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'len_c1': dtype('int64')}))
+            'strlen(c1)': [3]
+        }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'strlen(c1)': dtype('int64')}))
 
-        res = table_obj.output(["c1", "c2", "strlen(c1) as len_c1"]).filter("strlen(c1) <= 13").to_df()
+        res = table_obj.output(["c1", "c2", "strlen(c1)"]).filter("strlen(c1) <= 13").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({
             'c1': ['a', 'b', 'c', 'd', 'abc', 'shortstr'],
             'c2': ['a', 'b', 'c', 'd', 'abc', 'shortstr'],
-            'len_c1': [1, 1, 1, 1, 3, 8]
-        }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'len_c1': dtype('int64')}))
+            'strlen(c1)': [1, 1, 1, 1, 3, 8]
+        }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'strlen(c1)': dtype('int64')}))
 
-        res = table_obj.output(["c1", "c2", "strlen(c1) as len_c1"]).filter("strlen(c1) > 13").to_df()
+        res = table_obj.output(["c1", "c2", "strlen(c1)"]).filter("strlen(c1) > 13").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({
             'c1': ['longerthanthirteen'],
             'c2': ['longerstr'],
-            'len_c1': [18]
-        }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'len_c1': dtype('int64')}))
+            'strlen(c1)': [18]
+        }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'strlen(c1)': dtype('int64')}))
 
-        res = db_obj.drop_table("test_select_strlen"+suffix)
+        res = db_obj.drop_table("test_select_strlen" + suffix)
         assert res.error_code == ErrorCode.OK
 
     def test_select_substring(self, suffix):

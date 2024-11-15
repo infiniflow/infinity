@@ -166,7 +166,7 @@ SELECT *, strlen(c1)
 FROM test_varchar_filter 
 WHERE strlen(c1) > 13;
 ----
-longerthanthirteen longerstr 6 17
+longerthanthirteen longerstr 6 18
 
 statement ok
 DROP TABLE test_varchar_filter;
