@@ -88,6 +88,7 @@ public:
     // Used for follower and learner
     Status InitToReader();
     Status ReaderToAdmin();
+    Status ReaderToWriter();
     Status UnInitFromReader();
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
