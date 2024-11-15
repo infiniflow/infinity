@@ -213,9 +213,6 @@ void CompactionProcessor::DoDumpByline(DumpIndexBylineTask *dump_task) {
         if (dumped_chunk->deprecate_ts_ != UNCOMMIT_TS) {
             RecoverableError(Status::TxnRollback(txn->TxnID(), fmt::format("Dumped chunk {} is deleted.", dumped_chunk->encode())));
         }
-        auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-        TxnTableStore *txn_table_store = txn->GetTxnTableStore(table_entry);
-        txn_table_store->AddChunkIndexStore(table_index_entry, dumped_chunk);
 
         SharedPtr<SegmentIndexEntry> segment_index_entry;
         bool created = table_index_entry->GetOrCreateSegment(dump_task->segment_id_, txn, segment_index_entry);

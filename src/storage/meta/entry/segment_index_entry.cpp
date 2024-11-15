@@ -1057,7 +1057,9 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
         return entry->chunk_id_ < id;
     });
     if (iter != chunk_index_entries_.end() && (*iter)->chunk_id_ == chunk_id) {
-        UnrecoverableError(fmt::format("Chunk ID: {} already exists in segment: {}", chunk_id, segment_id_));
+        // Dump wal is after delta catalog, which is possible
+        LOG_WARN(fmt::format("Chunk ID: {} already exists in segment: {}", chunk_id, segment_id_));
+        return *iter;
     }
     chunk_index_entries_.insert(iter, chunk_index_entry);
     ChunkID old_next_chunk_id = next_chunk_id_;
