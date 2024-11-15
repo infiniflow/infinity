@@ -83,6 +83,33 @@ jobs:
       - name: Build debug version with thread sanitizer
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DENABLE_SANITIZER_THREAD=ON -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOLS:STRING=link=8 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity"
+    
+      - name: Prepare restart test data
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
+          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
+          sudo python3 scripts/prepare_restart_test_data.py --from_dir=${RUNNER_WORKSPACE_PREFIX} --op=add
+
+      - name: Run restart test with thread sanitizer
+        if: ${{ !cancelled() && !failure() }}
+        id: run_restart_test_sanitizer
+        run : |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host tuna.tsinghua.edu.cn"
+          # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
+          old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so TSAN_OPTIONS=log_path=restart_tsan.log ASAN_OPTIONS=detect_leaks=0 python3 tools/run_restart_test.py --infinity_path=cmake-build-debug/src/infinity"
+          sudo sysctl -w vm.mmap_rnd_bits=$old_value
+  
+      - name: Collect restart test output with thread sanitizer
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+          # remove symbolic link
+          # find all log file like [debug.log.*] in directory, and cat to stdout
+        run: |
+          sudo python3 scripts/prepare_restart_test_data.py --op=remove
+          failure="${{ steps.run_restart_test_sanitizer.outcome == 'failure'}}"
+          sudo python3 scripts/collect_restart_log.py --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --tsan_log=restart_tsan.log
 
       - name: Run cluster test
         if: ${{ !cancelled() && !failure() }}
@@ -145,13 +172,6 @@ jobs:
           failure="${{ steps.run_tests_debug.outcome == 'failure' || steps.stop_tests_debug.outcome == 'failure' }}"
           sudo python3 scripts/collect_log.py --log_path=/var/infinity/log/infinity.log --stdout_path=debug.log --stderror_path=debug_error.log --executable_path=cmake-build-debug/src/infinity --output_dir=${RUNNER_WORKSPACE_PREFIX}/log --failure=${failure} --tsan_log=tsan.log
           sudo rm -f tsan.log*
-
-      - name: Prepare restart test data
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
-          echo "RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX}" >> $GITHUB_ENV
-          sudo python3 scripts/prepare_restart_test_data.py --from_dir=${RUNNER_WORKSPACE_PREFIX} --op=add
 
       - name: Run restart test
         if: ${{ !cancelled() && !failure() }}
