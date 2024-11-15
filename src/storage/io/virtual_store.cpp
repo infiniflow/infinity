@@ -456,7 +456,8 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
                                      bool HTTPS,
                                      const String &access_key,
                                      const String &secret_key,
-                                     const String &bucket) {
+                                     const String &bucket,
+                                     bool create_bucket_if_not_exist) {
     switch (storage_type) {
         case StorageType::kMinio: {
             storage_type_ = StorageType::kMinio;
@@ -469,16 +470,14 @@ Status VirtualStore::InitRemoteStore(StorageType storage_type,
     }
 
     bucket_ = bucket;
-    return Status::OK();
-}
-
-Status VirtualStore::CreateBucket() {
-    Status bucket_check = s3_client_->BucketExists(bucket_);
-    if (!bucket_check.ok()) {
-        if (bucket_check.code() == ErrorCode::kMinioBucketNotExists) {
-            return s3_client_->MakeBucket(bucket_);
-        } else {
-            return bucket_check;
+    if (create_bucket_if_not_exist) {
+        Status bucket_check = s3_client_->BucketExists(bucket);
+        if (!bucket_check.ok()) {
+            if (bucket_check.code() == ErrorCode::kMinioBucketNotExists) {
+                return s3_client_->MakeBucket(bucket);
+            } else {
+                return bucket_check;
+            }
         }
     }
     return Status::OK();

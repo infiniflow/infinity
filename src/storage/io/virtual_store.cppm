@@ -77,14 +77,14 @@ public:
                                   bool HTTPS = false,
                                   const String &access_key = "minioadmin",
                                   const String &secret_key = "minioadmin",
-                                  const String &bucket = "infinity");
+                                  const String &bucket = "infinity",
+                                  bool create_bucket_if_not_exist = false);
 
     static Status UnInitRemoteStore();
 
     static bool IsInit();
-    static Status CreateBucket();
-    static Status DownloadObject(const String &file_dir, const String &object_name);
-    static Status UploadObject(const String &file_dir, const String &object_name);
+    static Status DownloadObject(const String &file_dir, const String& object_name);
+    static Status UploadObject(const String &file_dir, const String& object_name);
     static Status RemoveObject(const String &object_name);
     static Status CopyObject(const String &src_object_name, const String &dst_object_name);
     //
@@ -98,7 +98,7 @@ private:
     static String bucket_;
     static UniquePtr<S3Client> s3_client_;
 
-    friend class ObjectStorageProcess;
+friend class ObjectStorageProcess;
 };
 
 } // namespace infinity
