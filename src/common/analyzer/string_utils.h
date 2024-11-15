@@ -71,8 +71,8 @@ inline void ToLower(const char *data, size_t len, char *out, size_t out_limit) {
     (*end) = '\0';
 }
 
-inline std::string ToLowerString(std::string const &s) {
-    std::string result = s;
+inline std::string ToLowerString(std::string_view s) {
+    std::string result{s.data(), s.size()};
     char *begin = result.data();
     char *end = result.data() + s.size();
     
@@ -143,10 +143,10 @@ static const uint8_t UTF8_BYTE_LENGTH_TABLE[256] = {
         // invalid utf8 byte: 0b1111'1000~ 0b1111'1111
         4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1};
 
-inline uint32_t UTF8Length(std::string const &str) {
+inline uint32_t UTF8Length(const std::string_view str) {
     uint32_t len = 0;
     for (uint32_t i = 0, char_size = 0; i < str.size(); i += char_size) {
-        char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(str.data()[i])];
+        char_size = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(str[i])];
         ++len;
     }
     return len;
@@ -161,6 +161,29 @@ static inline std::string UTF8Substr(const std::string &str, std::size_t start, 
 
     while (byte_index < str_len && i < (start + len)) {
         std::size_t char_len = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(str[byte_index])];
+        if (i >= start) {
+            if (i == start) {
+                start_byte = byte_index;
+            }
+            end_byte = byte_index + char_len;
+        }
+
+        byte_index += char_len;
+        i += 1;
+    }
+
+    return str.substr(start_byte, end_byte - start_byte);
+}
+
+static inline std::string_view UTF8Substrview(const std::string_view str, const std::size_t start, const std::size_t len) {
+    const std::size_t str_len = str.length();
+    std::size_t i = 0;
+    std::size_t byte_index = 0;
+    std::size_t start_byte = 0;
+    std::size_t end_byte = 0;
+
+    while (byte_index < str_len && i < (start + len)) {
+        const std::size_t char_len = UTF8_BYTE_LENGTH_TABLE[static_cast<uint8_t>(str[byte_index])];
         if (i >= start) {
             if (i == start) {
                 start_byte = byte_index;

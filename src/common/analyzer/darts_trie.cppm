@@ -64,9 +64,11 @@ public:
 
     void Save(const String &file_name);
 
-    bool HasKeysWithPrefix(const String &key);
+    bool HasKeysWithPrefix(std::string_view key) const;
 
-    int Get(const String &key);
+    int Traverse(const char *key, SizeT &node_pos, SizeT &key_pos, SizeT length) const;
+
+    int Get(std::string_view key) const;
 };
 
 } // namespace infinity
