@@ -74,6 +74,7 @@ u64 MatchTensorExpression::Hash() const {
     h ^= std::hash<u32>()(dimension_);
     h ^= std::hash<u32>()(tensor_basic_embedding_dimension_);
     h ^= std::hash<String>()(options_text_);
+    h ^= std::hash<String>()(index_name_);
     return h;
 }
 
@@ -92,7 +93,8 @@ bool MatchTensorExpression::Eq(const BaseExpression &other_base) const {
     }
     bool eq = search_method_ == other.search_method_ && column_expr_->Eq(*other.column_expr_) && embedding_data_type_ == other.embedding_data_type_ &&
               dimension_ == other.dimension_ && query_embedding_.Eq(other.query_embedding_, embedding_data_type_, dimension_) &&
-              tensor_basic_embedding_dimension_ == other.tensor_basic_embedding_dimension_ && options_text_ == other.options_text_;
+              tensor_basic_embedding_dimension_ == other.tensor_basic_embedding_dimension_ && options_text_ == other.options_text_ &&
+              index_name_ == other.index_name_;
     return eq;
 }
 

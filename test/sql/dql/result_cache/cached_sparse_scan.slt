@@ -63,7 +63,7 @@ EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20
  -> MERGE MatchSparse (5)
     - table name: cached_sparse_scan(default_db.cached_sparse_scan)
     - table index: #1
-    - MatchSparse expression: MATCH SPARSE (col2, [Cast([0:1.000000,20:2.000000,80:3.000000] AS Sparse(float,int8,100))], INNER_PRODUCT, 3) WITH ()
+    - MatchSparse expression: MATCH SPARSE (col2, [Cast([0:1.000000,20:2.000000,80:3.000000] AS Sparse(float,int8,100))], INNER_PRODUCT, 3) WITH () USING INDEX ()
     - Top N: 3
     - output columns: [col1, __score, __rowid]
    -> MatchSparseScan (2)
@@ -103,7 +103,7 @@ EXPLAIN SELECT col1 FROM cached_sparse_scan SEARCH MATCH SPARSE (col2, [0:1.0,20
  -> MERGE MatchSparse (5)
     - table name: cached_sparse_scan(default_db.cached_sparse_scan)
     - table index: #1
-    - MatchSparse expression: MATCH SPARSE (col2, [Cast([0:1.000000,20:2.000000,80:3.000000] AS Sparse(float,int8,100))], INNER_PRODUCT, 3) WITH ()
+    - MatchSparse expression: MATCH SPARSE (col2, [Cast([0:1.000000,20:2.000000,80:3.000000] AS Sparse(float,int8,100))], INNER_PRODUCT, 3) WITH () USING INDEX ()
     - Top N: 3
     - output columns: [col1, __score, __rowid]
    -> MatchSparseScan (2)
