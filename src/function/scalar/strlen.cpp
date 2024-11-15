@@ -16,26 +16,23 @@ import logical_type;
 import internal_types;
 import data_type;
 import logger;
-import column_vector;
 
 namespace infinity {
 
-template <typename TA>
-void GetReaderValue(const TA &input, const char *&str, std::size_t &len) {
-    str = input.c_str();
-    len = input.length();
-}
-
 struct StrlenFunction {
-    template <typename TA, typename TR>
-    static inline void Run(const TA &input, TR &result) {
-        const char *input_str;
-        SizeT input_len;
-        GetReaderValue(input, input_str, input_len);
-
-        result.SetValue(static_cast<int32_t>(input_len));
+    template <typename TA, typename TB>
+    static inline bool Run(TA &input, TB &result) {
+        Status status = Status::NotSupport("Not implemented");
+        RecoverableError(status);
+        return false;
     }
 };
+
+template <>
+inline bool StrlenFunction::Run(VarcharT &input, int &result) {
+    result = input.length_;
+    return true;
+}
 
 void RegisterStrlenFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "strlen";
@@ -44,8 +41,8 @@ void RegisterStrlenFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction strlen_function(func_name,
                                    {DataType(LogicalType::kVarchar)},
-                                   DataType(LogicalType::kInteger),
-                                   &ScalarFunction::UnaryFunction<VarcharT, int32_t, StrlenFunction>);
+                                   {DataType(LogicalType::kInteger)},
+                                   &ScalarFunction::UnaryFunctionWithFailure<VarcharT, IntegerT, StrlenFunction>);
 
     function_set_ptr->AddFunction(strlen_function);
 
