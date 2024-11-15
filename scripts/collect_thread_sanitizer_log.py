@@ -9,6 +9,7 @@ filter_keywords = [
     "TServerSocket::notify",
     "TServerSocket::interrupt",
     #
+    "promise<void>::~promise() <null>"
 ]
 
 thread_sanitizer_delimiter = "=================="
