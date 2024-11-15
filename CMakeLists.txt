@@ -116,7 +116,7 @@ endif ()
 
 message(STATUS "Build type = ${CMAKE_BUILD_TYPE}")
 
-option(ENABLE_SANITIZER_THREAD "Enable multi-thread sanitizer" ON)
+option(ENABLE_SANITIZER_THREAD "Enable multi-thread sanitizer" OFF)
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 
