@@ -89,22 +89,28 @@ void DartsTrie::Load(const String &file_name) { darts_->open(file_name.c_str());
 
 void DartsTrie::Save(const String &file_name) { darts_->save(file_name.c_str()); }
 
-bool DartsTrie::HasKeysWithPrefix(const String &key) {
-    std::size_t key_pos = 0;
-    DartsCore::value_type result = 0;
-    std::size_t id = 0;
-    for (std::size_t i = 0; i < key.length(); ++i) {
-        result = darts_->traverse(key.c_str(), id, key_pos, i + 1);
-        if (result == -2)
-            return false;
+// string literal "" is null-terminated
+constexpr std::string_view empty_null_terminated_sv = "";
+
+bool DartsTrie::HasKeysWithPrefix(std::string_view key) const {
+    if (key.empty()) [[unlikely]] {
+        key = empty_null_terminated_sv;
     }
+    std::size_t id = 0;
+    std::size_t key_pos = 0;
+    const auto result = darts_->traverse(key.data(), id, key_pos, key.size());
     return result != -2;
 }
 
-int DartsTrie::Get(const String &key) {
-    DartsCore::value_type value;
-    darts_->exactMatchSearch(key.c_str(), value);
-    return value;
+int DartsTrie::Traverse(const char *key, std::size_t &node_pos, std::size_t &key_pos, const std::size_t length) const {
+    return darts_->traverse(key, node_pos, key_pos, length);
+}
+
+int DartsTrie::Get(std::string_view key) const {
+    if (key.empty()) [[unlikely]] {
+        key = empty_null_terminated_sv;
+    }
+    return darts_->exactMatchSearch<DartsCore::value_type>(key.data(), key.size());
 }
 
 } // namespace infinity

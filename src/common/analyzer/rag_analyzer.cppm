@@ -57,21 +57,21 @@ protected:
 private:
     static constexpr float DENOMINATOR = 1000000;
 
-    String StrQ2B(const String &input);
+    static String StrQ2B(const String &input);
 
-    i32 Freq(const String &key);
+    i32 Freq(std::string_view key) const;
 
-    String Key(const String &line);
+    static String Key(std::string_view line);
 
-    String RKey(const String &line);
+    static String RKey(std::string_view line);
 
-    Pair<Vector<String>, double> Score(const Vector<Pair<String, int>> &token_freqs);
+    static Pair<Vector<String>, double> Score(const Vector<Pair<String, int>> &token_freqs);
 
-    void SortTokens(const Vector<Vector<Pair<String, int>>> &token_list, Vector<Pair<Vector<String>, double>> &res);
+    static void SortTokens(const Vector<Vector<Pair<String, int>>> &token_list, Vector<Pair<Vector<String>, double>> &res);
 
-    Pair<Vector<String>, double> MaxForward(const String &line);
+    Pair<Vector<String>, double> MaxForward(const String &line) const;
 
-    Pair<Vector<String>, double> MaxBackward(const String &line);
+    Pair<Vector<String>, double> MaxBackward(const String &line) const;
 
     int DFS(const String &chars,
             int s,
@@ -79,17 +79,19 @@ private:
             Vector<Vector<Pair<String, int>>> &token_list,
             Vector<String> &best_tokens,
             double &max_score,
-            bool memo_all);
+            bool memo_all) const;
 
-    void TokenizeInner(Vector<String> &res, const String &L);
+    void TokenizeInner(Vector<String> &res, const String &L) const;
 
-    void SplitLongText(const String &L, u32 length, Vector<String> &sublines);
+    void SplitLongText(const String &L, u32 length, Vector<String> &sublines) const;
 
-    String Merge(const String &tokens);
+    String Merge(const String &tokens) const;
 
     void EnglishNormalize(const Vector<String> &tokens, Vector<String> &res);
 
 public:
+    Pair<Vector<std::string_view>, double> GetBestTokens(std::string_view chars) const;
+
     static const SizeT term_string_buffer_limit_ = 4096 * 3;
 
     String dict_path_;
