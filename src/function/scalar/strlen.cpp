@@ -30,7 +30,13 @@ struct StrlenFunction {
 
 template <>
 inline bool StrlenFunction::Run(VarcharT &input, int &result) {
-    result = input.length_;
+    if (input.IsInlined()) {
+        result = input.length_;
+    } else {
+        const char *data = input.vector_.prefix_;
+        SizeT actual_length = strlen(data);
+        result = static_cast<int32_t>(actual_length);
+    }
     return true;
 }
 

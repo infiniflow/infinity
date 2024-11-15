@@ -905,7 +905,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({
             'c1': ['longerthanthirteen'],
             'c2': ['longerstr'],
-            'len_c1': [17]
+            'len_c1': [18]
         }).astype({'c1': dtype('O'), 'c2': dtype('O'), 'len_c1': dtype('int64')}))
 
         res = db_obj.drop_table("test_select_strlen"+suffix)
