@@ -604,14 +604,14 @@ Vector<SharedPtr<WalEntry>> AdminExecutor::GetAllCheckpointEntries(QueryContext 
         return checkpoint_entries;
     }
 
-    TxnTimeStamp max_checkpoint_ts = 0;
+    i64 max_checkpoint_ts = 0;
     WalListIterator iterator(wal_list);
     while (iterator.HasNext()) {
         auto wal_entry_ptr = iterator.Next();
         for (auto &entry_cmd : wal_entry_ptr->cmds_) {
             if (entry_cmd->GetType() == WalCommandType::CHECKPOINT) {
                 WalCmdCheckpoint *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(entry_cmd.get());
-                max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
+                max_checkpoint_ts = std::max(max_checkpoint_ts, checkpoint_cmd->max_commit_ts_);
             }
         }
     }
