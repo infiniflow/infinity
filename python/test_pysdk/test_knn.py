@@ -1882,9 +1882,12 @@ class TestInfinity:
             res = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
                                                                        SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
                                                                        "ip", 3,
-                                                                       {"alpha": "1.0", "beta": "1.0", "threshold": "10", "index_name" : "idx2"}
+                                                                       {"alpha": "1.0", "beta": "1.0", "threshold": "10", "index_name" : "idx8"}
                                                           ).to_pl()
         assert e.value.args[0] == ErrorCode.INDEX_NOT_EXIST
+
+        res = table_obj.drop_index("idx2", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
         res = table_obj.drop_index("idx1", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -1947,11 +1950,11 @@ class TestInfinity:
         # filter_fulltext = """num!=98 AND num != 12 AND filter_fulltext('body', '(harmful OR chemical)')"""
         # filter_fulltext = """num!=98 AND num != 12 AND filter_fulltext('body', '("harmful" OR "chemical")')"""
         # filter_fulltext = """(num!=98 AND num != 12) AND filter_fulltext('body', '(("harmful" OR "chemical"))')"""
-        filter_fulltext = """(num!=98 AND num != 12) AND filter_fulltext('body^3,body,body^2', '(("harmful" OR "chemical"))', 'indexes=my_index,111,222')"""
+        filter_fulltext = """(num!=98 AND num != 12) AND filter_fulltext('body^3,body,body^2', '(("harmful" OR "chemical"))', 'indexes=my_index')"""
         _ = (table_obj
                .output(["*"])
                .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1, {"filter": filter_fulltext})
-               .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12", "index_names" : "111,2"})
+               .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12"})
                .fusion(method='rrf', topn=10)
                .to_pl())
 
@@ -1959,7 +1962,7 @@ class TestInfinity:
             res_filter_3 = (table_obj
                .output(["*"])
                .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1, {"filter": "num!=98 AND num != 12"})
-               .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12"})
+                            .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12", "index_names" : 'my_index'})
                .fusion(method='rrf', topn=10)
                .filter("num!=98 AND num != 12")
                .to_pl())

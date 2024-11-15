@@ -68,6 +68,9 @@ u64 MatchExpression::Hash() const {
     h ^= std::hash<String>()(fields_);
     h ^= std::hash<String>()(matching_text_);
     h ^= std::hash<String>()(options_text_);
+    for (SizeT i = 0; i < index_names_.size(); i++) {
+        h ^= std::hash<String>()(index_names_[i]);
+    }
     return h;
 }
 

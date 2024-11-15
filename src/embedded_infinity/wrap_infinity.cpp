@@ -444,14 +444,16 @@ ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
     for (auto &param : opt_params) {
         if (param.param_name_ == "index_name") {
             match_sparse_expr->index_name_ = param.param_value_;
+            continue;
         }
         if (param.param_name_ == "ignore_index" && param.param_value_ == "true") {
             match_sparse_expr->ignore_index_ = true;
+            continue;
         }
-        auto *init_parameter = new InitParameter();
+        auto init_parameter = MakeUnique<InitParameter>();
         init_parameter->param_name_ = param.param_name_;
         init_parameter->param_value_ = param.param_value_;
-        opt_params_ptr->emplace_back(init_parameter);
+        opt_params_ptr->emplace_back(init_parameter.release());
     }
     match_sparse_expr->SetOptParams(topn, opt_params_ptr);
 

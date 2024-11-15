@@ -851,9 +851,11 @@ UniquePtr<KnnExpr> HTTPSearch::ParseMatchDense(const nlohmann::json &json_object
                 }
                 if (param_k == "index_name") {
                     knn_expr->index_name_ = param_v;
+                    continue;
                 }
                 if (param_k == "ignore_index" && param_v.get<String>() == "true") {
                     knn_expr->ignore_index_ = true;
+                    continue;
                 }
                 if (knn_expr->opt_params_ == nullptr) {
                     knn_expr->opt_params_ = new Vector<InitParameter *>();
@@ -940,6 +942,7 @@ UniquePtr<MatchExpr> HTTPSearch::ParseMatchText(const nlohmann::json &json_objec
                 String param_k = param.key(), param_v = param.value();
                 if (param_k == "index_names") {
                     match_expr->index_names_ = param_v;
+                    continue;
                 }
                 if (param_k == "filter") {
                     if (match_expr->filter_expr_) {
@@ -1046,9 +1049,11 @@ UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &js
                 String param_k = param.key(), param_v = param.value();
                 if (param_k == "index_name") {
                     match_tensor_expr->index_name_ = param_v;
+                    continue;
                 }
                 if (param_k == "ignore_index" && param_v == "true") {
                     match_tensor_expr->ignore_index_ = true;
+                    continue;
                 }
                 if (param_k == "filter") {
                     if (match_tensor_expr->filter_expr_) {
@@ -1182,9 +1187,11 @@ UniquePtr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(const nlohmann::json &js
                 }
                 if (param_k == "index_name") {
                     match_sparse_expr->index_name_ = param_v;
+                    continue;
                 }
                 if (param_k == "ignore_index" && param_v == "true") {
                     match_sparse_expr->ignore_index_ = true;
+                    continue;
                 }
                 auto *init_parameter = new InitParameter();
                 init_parameter->param_name_ = param.key();

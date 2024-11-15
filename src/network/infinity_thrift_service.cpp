@@ -2140,9 +2140,11 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
     for (auto &param : expr.opt_params) {
         if (param.param_name == "index_name") {
             knn_expr->index_name_ = param.param_value;
+            continue;
         }
         if (param.param_name == "ignore_index" && param.param_value == "true") {
             knn_expr->ignore_index_ = true;
+            continue;
         }
 
         auto init_parameter = new InitParameter();
@@ -2190,9 +2192,11 @@ MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &stat
     for (auto &param : expr.opt_params) {
         if (param.param_name == "index_name") {
             match_sparse_expr->index_name_ = param.param_value;
+            continue;
         }
         if (param.param_name == "ignore_index" && param.param_value == "true") {
             match_sparse_expr->ignore_index_ = true;
+            continue;
         }
         auto *init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name;
