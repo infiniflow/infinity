@@ -21,15 +21,23 @@ import thrift;
 
 namespace infinity {
 
+enum class PeerThriftServerStatus : u8 {
+    kStopped,
+    kRunning,
+    kStopping,
+};
+
 export class PoolPeerThriftServer {
 public:
     void Init(const String& server_address, i32 port_no, i32 pool_size);
-    void Start();
+    Thread Start();
     void Shutdown();
 
 private:
     UniquePtr<apache::thrift::server::TServer> server{nullptr};
-    atomic_bool started_{false};
+
+    bool initialized_{false};
+    Atomic<PeerThriftServerStatus> status_{PeerThriftServerStatus::kStopped};
 };
 
 } // namespace infinity

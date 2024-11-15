@@ -41,6 +41,7 @@ import infinity_thrift_types;
 import logger;
 import third_party;
 import stl;
+import infinity_exception;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;
@@ -62,6 +63,9 @@ public:
 };
 
 // Thrift server
+#define THRIFT_SERVER_TYPE 0
+
+#if THRIFT_SERVER_TYPE == 2
 
 void ThreadedThriftServer::Init(const String& server_address, i32 port_no) {
 
@@ -90,6 +94,8 @@ void ThreadedThriftServer::Shutdown() {
     }
 }
 
+#elif THRIFT_SERVER_TYPE == 0
+
 void PoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_size) {
 
     SharedPtr<TServerSocket> server_socket = MakeShared<TServerSocket>(server_address, port_no);
@@ -112,22 +118,46 @@ void PoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_
                                       MakeShared<TBufferedTransportFactory>(),
                                       protocol_factory,
                                       threadManager);
+
+    initialized_ = true;
 }
 
-void PoolThriftServer::Start() {
-    if(started_) {
-        return ;
+Thread PoolThriftServer::Start() {
+    if (!initialized_) {
+        UnrecoverableError("Thrift server is not initialized");
     }
-    started_ = true;
-    server->serve();
+    {
+        auto expect = ThriftServerStatus::kStopped;
+        if (!status_.compare_exchange_strong(expect, ThriftServerStatus::kRunning)) {
+            UnrecoverableError(fmt::format("Thrift server in unexpected state: {}", u8(expect)));
+        }
+    }
+    return Thread([this] {
+        server->serve();
+
+        status_.store(ThriftServerStatus::kStopped);
+        status_.notify_one();
+    });
+
 }
 
 void PoolThriftServer::Shutdown() {
-    if(started_) {
-        server->stop();
-        started_ = false;
+    {
+        auto expected = ThriftServerStatus::kRunning;
+        if (!status_.compare_exchange_strong(expected, ThriftServerStatus::kStopping)) {
+            if (status_ == ThriftServerStatus::kStopped) {
+                return;
+            } else {
+                UnrecoverableError(fmt::format("Thrift server in unexpected state: {}", u8(expected)));
+            }
+        }
     }
+    server->stop();
+
+    status_.wait(ThriftServerStatus::kStopping);
 }
+
+#elif THRIFT_SERVER_TYPE == 1
 
 void NonBlockPoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_size) {
 
@@ -172,5 +202,7 @@ void NonBlockPoolThriftServer::Shutdown() {
         started_ = false;
     }
 }
+
+#endif
 
 } // namespace infinity

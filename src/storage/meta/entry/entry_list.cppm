@@ -448,6 +448,7 @@ template <EntryConcept Entry>
 Tuple<Entry *, Status> EntryList<Entry>::AddEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func,
                                                         TransactionID txn_id,
                                                         TxnTimeStamp begin_ts) {
+    std::unique_lock lock(rw_locker_);
     FindResult find_res = FindEntryReplay(txn_id, begin_ts);
     switch (find_res) {
         case FindResult::kNotFound: {
@@ -472,6 +473,7 @@ template <EntryConcept Entry>
 Status EntryList<Entry>::UpdateEntryReplay(std::function<void(SharedPtr<Entry>, TransactionID, TxnTimeStamp)> &&update_func,
                                            TransactionID txn_id,
                                            TxnTimeStamp begin_ts) {
+    std::unique_lock lock(rw_locker_);
     FindResult find_res = FindEntryReplay(txn_id, begin_ts);
     switch (find_res) {
         case FindResult::kNotFound: {
@@ -492,6 +494,7 @@ template <EntryConcept Entry>
 Tuple<Entry *, Status> EntryList<Entry>::DropEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_entry,
                                                          TransactionID txn_id,
                                                          TxnTimeStamp begin_ts) {
+    std::unique_lock lock(rw_locker_);
     FindResult find_res = FindEntryReplay(txn_id, begin_ts);
     switch (find_res) {
         case FindResult::kNotFound: {
@@ -511,6 +514,7 @@ Tuple<Entry *, Status> EntryList<Entry>::DropEntryReplay(std::function<SharedPtr
 
 template <EntryConcept Entry>
 Tuple<Entry *, Status> EntryList<Entry>::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
+    std::shared_lock lock(rw_locker_);
     if (!entry_list_.empty()) {
         auto *entry = entry_list_.front().get();
         // FIXME

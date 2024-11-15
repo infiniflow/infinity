@@ -35,6 +35,7 @@ import peer_server_thrift_types;
 import logger;
 import third_party;
 import stl;
+import infinity_exception;
 
 using namespace apache::thrift;
 using namespace apache::thrift::concurrency;
@@ -72,21 +73,41 @@ void PoolPeerThriftServer::Init(const String &server_address, i32 port_no, i32 p
                                            MakeShared<TBufferedTransportFactory>(),
                                            protocol_factory,
                                            threadManager);
+    initialized_ = true;
 }
 
-void PoolPeerThriftServer::Start() {
-    if (started_) {
-        return;
+Thread PoolPeerThriftServer::Start() {
+    if (!initialized_) {
+        UnrecoverableError("Peer server is not initialized.");
     }
-    started_ = true;
-    server->serve();
+    {
+        auto expect = PeerThriftServerStatus::kStopped;
+        if (!status_.compare_exchange_strong(expect, PeerThriftServerStatus::kRunning)) {
+            UnrecoverableError(fmt::format("Peer server in unexpected state: {}", u8(expect)));
+        }
+    }
+    return Thread([this] {
+        server->serve();
+
+        status_.store(PeerThriftServerStatus::kStopped);
+        status_.notify_one();
+    });
 }
 
 void PoolPeerThriftServer::Shutdown() {
-    if (started_) {
-        server->stop();
-        started_ = false;
+    {
+        auto expected = PeerThriftServerStatus::kRunning;
+        if (!status_.compare_exchange_strong(expected, PeerThriftServerStatus::kStopping)) {
+            if (status_ == PeerThriftServerStatus::kStopped) {
+                return;
+            } else {
+                UnrecoverableError(fmt::format("Peer server in unexpected state: {}", u8(expected)));
+            }
+        }
     }
+    server->stop();
+
+    status_.wait(PeerThriftServerStatus::kStopping);
 }
 
 } // namespace infinity

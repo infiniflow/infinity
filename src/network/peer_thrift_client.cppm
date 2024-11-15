@@ -77,7 +77,6 @@ private:
     UniquePtr<PeerServiceClient> client_{};
     Atomic<bool> server_connected_{false};
 
-    Atomic<bool> running_{false};
     BlockingQueue<SharedPtr<PeerTask>> peer_task_queue_{"PeerClient"};
     SharedPtr<Thread> processor_thread_{};
     Atomic<u64> peer_task_count_{};
