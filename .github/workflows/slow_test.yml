@@ -104,9 +104,11 @@ jobs:
 
       - name: Start infinity debug version with thread sanitizer
         if: ${{ !cancelled() && !failure()}}
+        id: start_tests_debug
         run: |
           # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
           old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
+          echo "old_mmmap_rnd_bits=${old_value}" >> "$GITHUB_OUTPUT"
           sudo sysctl -w vm.mmap_rnd_bits=28
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && TSAN_OPTIONS=log_path=tsan.log cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug.log 2> debug_error.log &" && sleep 1s
           if ! sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity > /dev/null; then
@@ -124,6 +126,8 @@ jobs:
       - name: Stop infinity pysdk & http_api & sqllogictest debug
         if: ${{ !cancelled() }}
         id: stop_tests_debug
+        env:
+          old_value: ${{ steps.start_tests_debug.outputs.old_mmmap_rnd_bits }}
         run: |
           pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
