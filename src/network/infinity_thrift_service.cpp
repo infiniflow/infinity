@@ -32,7 +32,7 @@ import value;
 import infinity_exception;
 import logical_type;
 import internal_types;
-
+import search_options;
 import column_def;
 import statement_common;
 import data_type;
@@ -2140,9 +2140,11 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
     for (auto &param : expr.opt_params) {
         if (param.param_name == "index_name") {
             knn_expr->index_name_ = param.param_value;
+            continue;
         }
         if (param.param_name == "ignore_index" && param.param_value == "true") {
             knn_expr->ignore_index_ = true;
+            continue;
         }
 
         auto init_parameter = new InitParameter();
@@ -2188,6 +2190,14 @@ MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &stat
 
     auto *opt_params_ptr = new Vector<InitParameter *>();
     for (auto &param : expr.opt_params) {
+        if (param.param_name == "index_name") {
+            match_sparse_expr->index_name_ = param.param_value;
+            continue;
+        }
+        if (param.param_name == "ignore_index" && param.param_value == "true") {
+            match_sparse_expr->ignore_index_ = true;
+            continue;
+        }
         auto *init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name;
         init_parameter->param_value_ = param.param_value;
@@ -2220,6 +2230,10 @@ MatchTensorExpr *InfinityThriftService::GetMatchTensorExprFromProto(Status &stat
     const auto copy_bytes = EmbeddingT::EmbeddingSize(match_tensor_expr->embedding_data_type_, match_tensor_expr->dimension_);
     match_tensor_expr->query_tensor_data_ptr_ = MakeUniqueForOverwrite<char[]>(copy_bytes);
     std::memcpy(match_tensor_expr->query_tensor_data_ptr_.get(), embedding_data_ptr, copy_bytes);
+    SearchOptions options(match_tensor_expr->options_text_);
+    if (options.options_.find("index_name") != options.options_.end()) {
+        match_tensor_expr->index_name_ = options.options_["index_name"];
+    }
     match_tensor_expr->options_text_ = expr.extra_options;
     if (expr.__isset.filter_expr) {
         match_tensor_expr->filter_expr_.reset(GetParsedExprFromProto(status, expr.filter_expr));
@@ -2236,6 +2250,10 @@ MatchExpr *InfinityThriftService::GetMatchExprFromProto(Status &status, const in
     match_expr->fields_ = expr.fields;
     match_expr->matching_text_ = expr.matching_text;
     match_expr->options_text_ = expr.options_text;
+    SearchOptions options(match_expr->options_text_);
+    if (options.options_.find("index_names") != options.options_.end()) {
+        match_expr->index_names_ = options.options_["index_names"];
+    }
     if (expr.__isset.filter_expr) {
         match_expr->filter_expr_.reset(GetParsedExprFromProto(status, expr.filter_expr));
         if (!status.ok()) {
