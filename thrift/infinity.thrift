@@ -733,6 +733,17 @@ struct ShowCurrentNodeResponse {
 3: string node_role
 }
 
+struct CommandRequest {
+1: i64 session_id
+2: string command_type,
+3: string test_command_content
+}
+
+struct FlushRequest {
+1: i64 session_id
+2: string flush_type,
+}
+
 // Service
 service InfinityService {
 CommonResponse Connect(1:ConnectRequest request),
@@ -781,5 +792,9 @@ CommonResponse AddColumns(1:AddColumnsRequest request),
 CommonResponse DropColumns(1:DropColumnsRequest request),
 
 CommonResponse Cleanup(1:CommonRequest request),
+
+CommonResponse Command(1: CommandRequest request),
+
+CommonResponse Flush(1: FlushRequest request),
 
 }
