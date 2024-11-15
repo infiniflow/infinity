@@ -161,7 +161,7 @@ String MatchSparseExpression::ToString() const {
     }
     String opt_str = ss.str();
 
-    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}{}) WITH ({}) USING INDEX {}",
+    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}{}) WITH ({}) USING INDEX ({})",
                        column_expr_->Name(),
                        sparse_str,
                        MatchSparseExpr::MetricTypeToString(metric_type_),
