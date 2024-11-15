@@ -1834,3 +1834,144 @@ class TestInfinity:
                 {'c1' : (0, 1, 2), 'c2' : (['0100000000000000'], ['0000000000000001'], ['0000000000000011']), 'DISTANCE' : (1.0, 1.0, 2.0)}
             ).astype({'c1': dtype('int32'), 'DISTANCE' : dtype('float32')}))
         db_obj.drop_table("test_binary_knn_hamming_distance" + suffix, ConflictType.Error)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_match_sparse_index_hint(self, check_data, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_knn_with_index"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_sparse_knn_with_index"+suffix,
+                                        {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}},
+                                        ConflictType.Error)
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        table_obj.create_index("idx1",
+                               index.IndexInfo("c2",
+                                               index.IndexType.BMP,
+                                               {"block_size": "8", "compress_type": "compress"}), ConflictType.Error)
+        table_obj.create_index("idx2",
+                               index.IndexInfo("c2",
+                                               index.IndexType.BMP,
+                                               {"block_size": "8", "compress_type": "raww"}), ConflictType.Error)
+
+        table_obj.optimize("idx1", {"topk": "3"})
+
+        res = (table_obj
+               .output(["*", "_row_id", "_similarity"])
+               .match_sparse("c2", SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}), "ip", 3,
+                             {"alpha": "1.0", "beta": "1.0"})
+               .to_pl())
+        print(res)
+        pd.testing.assert_frame_equal(table_obj.output(["c1", "_similarity"])
+                                      .match_sparse("c2",
+                                                    SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
+                                                    "ip", 3, {"alpha": "1.0", "beta": "1.0", "index_name":"idx1"})
+                                      .to_df(), pd.DataFrame({'c1': [4, 2, 1], 'SIMILARITY': [16.0, 12.0, 6.0]}).astype(
+            {'c1': dtype('int32'), 'SIMILARITY': dtype('float32')}))
+        pd.testing.assert_frame_equal(table_obj.output(["c1", "_similarity"])
+                                      .match_sparse("c2",
+                                                    SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
+                                                    "ip", 3, {"alpha": "1.0", "beta": "1.0", "threshold": "10", "index_name" : "idx2"})
+                                      .to_df(), pd.DataFrame({'c1': [4, 2], 'SIMILARITY': [16.0, 12.0]}).astype(
+            {'c1': dtype('int32'), 'SIMILARITY': dtype('float32')}))
+
+        # non-existent index
+        with pytest.raises(InfinityException) as e:
+            res = table_obj.output(["c1", "_similarity"]).match_sparse("c2",
+                                                                       SparseVector(**{"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}),
+                                                                       "ip", 3,
+                                                                       {"alpha": "1.0", "beta": "1.0", "threshold": "10", "index_name" : "idx8"}
+                                                          ).to_pl()
+        assert e.value.args[0] == ErrorCode.INDEX_NOT_EXIST
+
+        res = table_obj.drop_index("idx2", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index("idx1", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_sparse_knn_with_index"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("match_param_1", ["body^5"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_match_text_index_hints(self, check_data, match_param_1, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table(
+            "test_with_fulltext_match_with_valid_columns"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_fulltext_match_with_valid_columns"+suffix,
+                                        {"doctitle": {"type": "varchar"},
+                                         "docdate": {"type": "varchar"},
+                                         "body": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "vec": {"type": "vector, 4, float"}})
+        table_obj.create_index("my_index",
+                               index.IndexInfo("body",
+                                               index.IndexType.FullText,
+                                               {"ANALYZER": "standard"}),
+                               ConflictType.Error)
+
+        if not check_data:
+            generate_commas_enwiki(
+                "enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
+            copy_data("enwiki_embedding_99_commas.csv")
+
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+               .match_text(match_param_1, "black", 1, {"index_names" : "my_index"})
+               .fusion(method='rrf', topn=10)
+               .to_pl())
+        print(res)
+        res_filter_1 = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
+                        .match_text(match_param_1, "black", 1, {"index_names" : "index1"})
+               .fusion(method='rrf', topn=10)
+               .filter("num!=98 AND num != 12")
+               .to_pl())
+        print(res_filter_1)
+        pl_assert_frame_not_equal(res, res_filter_1)
+        res_filter_2 = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1, {"filter": "num!=98 AND num != 12"})
+               .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12"})
+               .fusion(method='rrf', topn=10)
+               .to_pl())
+        print(res_filter_2)
+        pl_assert_frame_equal(res_filter_1, res_filter_2)
+
+        # filter_fulltext = "num!=98 AND num != 12 AND filter_fulltext('body', 'harmful chemical')"
+        # filter_fulltext = """num!=98 AND num != 12 AND filter_fulltext('body', '(harmful OR chemical)')"""
+        # filter_fulltext = """num!=98 AND num != 12 AND filter_fulltext('body', '("harmful" OR "chemical")')"""
+        # filter_fulltext = """(num!=98 AND num != 12) AND filter_fulltext('body', '(("harmful" OR "chemical"))')"""
+        filter_fulltext = """(num!=98 AND num != 12) AND filter_fulltext('body^3,body,body^2', '(("harmful" OR "chemical"))', 'indexes=my_index')"""
+        _ = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1, {"filter": filter_fulltext})
+               .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12"})
+               .fusion(method='rrf', topn=10)
+               .to_pl())
+
+        with pytest.raises(InfinityException) as e_info:
+            res_filter_3 = (table_obj
+               .output(["*"])
+               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1, {"filter": "num!=98 AND num != 12"})
+                            .match_text(match_param_1, "black", 1, {"filter": "num!=98 AND num != 12", "index_names" : 'my_index'})
+               .fusion(method='rrf', topn=10)
+               .filter("num!=98 AND num != 12")
+               .to_pl())
+        print(e_info)
+
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table(
+            "test_with_fulltext_match_with_valid_columns"+suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+

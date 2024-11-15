@@ -90,7 +90,7 @@ private:
     void EnglishNormalize(const Vector<String> &tokens, Vector<String> &res);
 
 public:
-    Pair<Vector<std::string_view>, double> GetBestTokens(std::string_view chars) const;
+    Vector<Pair<Vector<std::string_view>, double>> GetBestTokensTopN(std::string_view chars, u32 n) const;
 
     static const SizeT term_string_buffer_limit_ = 4096 * 3;
 
