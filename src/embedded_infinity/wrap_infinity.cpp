@@ -43,6 +43,7 @@ import table_def;
 import third_party;
 import logger;
 import query_options;
+import search_options;
 import defer_op;
 
 namespace infinity {
@@ -357,6 +358,10 @@ ParsedExpr *WrapMatchExpr::GetParsedExpr(Status &status) {
     match_expr->fields_ = fields;
     match_expr->matching_text_ = matching_text;
     match_expr->options_text_ = options_text;
+    SearchOptions options(match_expr->options_text_);
+    if (options.options_.find("index_names") != options.options_.end()) {
+        match_expr->index_names_ = options.options_["index_names"];
+    }
     if (filter_expr) {
         match_expr->filter_expr_.reset(filter_expr->GetParsedExpr(status));
     }
@@ -389,6 +394,10 @@ ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
     match_tensor_expr->column_expr_.reset(column_expr.GetParsedExpr(status));
     match_tensor_expr->options_text_ = options_text;
     match_tensor_expr->embedding_data_type_ = embedding_data_type;
+    SearchOptions options(match_tensor_expr->options_text_);
+    if (options.options_.find("index_name") != options.options_.end()) {
+        match_tensor_expr->index_name_ = options.options_["index_name"];
+    }
 
     if (status.code_ != ErrorCode::kOk) {
         return nullptr;
@@ -433,6 +442,12 @@ ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
 
     auto *opt_params_ptr = new Vector<InitParameter *>();
     for (auto &param : opt_params) {
+        if (param.param_name_ == "index_name") {
+            match_sparse_expr->index_name_ = param.param_value_;
+        }
+        if (param.param_name_ == "ignore_index" && param.param_value_ == "true") {
+            match_sparse_expr->ignore_index_ = true;
+        }
         auto *init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name_;
         init_parameter->param_value_ = param.param_value_;

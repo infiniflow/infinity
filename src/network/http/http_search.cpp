@@ -938,6 +938,9 @@ UniquePtr<MatchExpr> HTTPSearch::ParseMatchText(const nlohmann::json &json_objec
             }
             for (auto &param : params.items()) {
                 String param_k = param.key(), param_v = param.value();
+                if (param_k == "index_names") {
+                    match_expr->index_names_ = param_v;
+                }
                 if (param_k == "filter") {
                     if (match_expr->filter_expr_) {
                         response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1041,6 +1044,12 @@ UniquePtr<MatchTensorExpr> HTTPSearch::ParseMatchTensor(const nlohmann::json &js
             }
             for (auto &param : params.items()) {
                 String param_k = param.key(), param_v = param.value();
+                if (param_k == "index_name") {
+                    match_tensor_expr->index_name_ = param_v;
+                }
+                if (param_k == "ignore_index" && param_v == "true") {
+                    match_tensor_expr->ignore_index_ = true;
+                }
                 if (param_k == "filter") {
                     if (match_tensor_expr->filter_expr_) {
                         response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1157,6 +1166,7 @@ UniquePtr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(const nlohmann::json &js
                 return nullptr;
             }
             for (auto &param : params.items()) {
+                String param_k = param.key(), param_v = param.value();
                 if (param.key() == "filter") {
                     if (match_sparse_expr->filter_expr_) {
                         response["error_code"] = ErrorCode::kInvalidExpression;
@@ -1169,6 +1179,12 @@ UniquePtr<MatchSparseExpr> HTTPSearch::ParseMatchSparse(const nlohmann::json &js
                     }
                     // do not put it into opt_params_ptr
                     continue;
+                }
+                if (param_k == "index_name") {
+                    match_sparse_expr->index_name_ = param_v;
+                }
+                if (param_k == "ignore_index" && param_v == "true") {
+                    match_sparse_expr->ignore_index_ = true;
                 }
                 auto *init_parameter = new InitParameter();
                 init_parameter->param_name_ = param.key();
