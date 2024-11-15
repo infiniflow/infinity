@@ -122,8 +122,7 @@ Status Storage::AdminToReader() {
                                                           config_ptr_->ObjectStorageHttps(),
                                                           config_ptr_->ObjectStorageAccessKey(),
                                                           config_ptr_->ObjectStorageSecretKey(),
-                                                          config_ptr_->ObjectStorageBucket(),
-                                                          current_storage_mode_ == StorageMode::kWritable);
+                                                          config_ptr_->ObjectStorageBucket());
             if (!status.ok()) {
                 VirtualStore::UnInitRemoteStore();
                 return status;
@@ -198,8 +197,7 @@ Status Storage::AdminToWriter() {
                                                           config_ptr_->ObjectStorageHttps(),
                                                           config_ptr_->ObjectStorageAccessKey(),
                                                           config_ptr_->ObjectStorageSecretKey(),
-                                                          config_ptr_->ObjectStorageBucket(),
-                                                          true);
+                                                          config_ptr_->ObjectStorageBucket());
             if (!status.ok()) {
                 {
                     std::unique_lock<std::mutex> lock(mutex_);
@@ -229,6 +227,11 @@ Status Storage::AdminToWriter() {
         }
         i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
         persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
+    }
+
+    Status status = VirtualStore::CreateBucket();
+    if (!status.ok()) {
+        return status;
     }
 
     if (result_cache_manager_ != nullptr) {
@@ -517,6 +520,12 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
             }
 
             if (target_mode == StorageMode::kWritable) {
+
+                Status status = VirtualStore::CreateBucket();
+                if (!status.ok()) {
+                    return status;
+                }
+
                 if (compact_processor_ != nullptr) {
                     UnrecoverableError("compact processor was initialized before.");
                 }
