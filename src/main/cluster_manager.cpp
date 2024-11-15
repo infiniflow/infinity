@@ -829,7 +829,8 @@ Status ClusterManager::ApplySyncedLogNolock(const Vector<String> &synced_logs) {
         LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
         last_txn_id = entry->txn_id_;
         last_commit_ts = entry->commit_ts_;
-        wal_manager->ReplayWalEntry(*entry, false, false, true);
+        ReplayWalOptions options{.on_startup_ = false, .is_replay_ = false, .sync_from_leader_ = true};
+        wal_manager->ReplayWalEntry(*entry, options);
     }
 
     LOG_INFO(fmt::format("Replicated from leader: latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
@@ -860,7 +861,8 @@ Status ClusterManager::ContinueStartup(const Vector<String> &synced_logs) {
             }
         }
         LOG_DEBUG(fmt::format("WAL Entry: {}", entry->ToString()));
-        wal_manager->ReplayWalEntry(*entry, true, true, true);
+        ReplayWalOptions options{.on_startup_ = true, .is_replay_ = false, .sync_from_leader_ = true};
+        wal_manager->ReplayWalEntry(*entry, options);
         last_commit_ts = entry->commit_ts_;
     }
 
