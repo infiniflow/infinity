@@ -86,10 +86,14 @@ public:
     Status AdminToWriter();
 
     // Used for follower and learner
-    Status InitToReader();
     Status ReaderToAdmin();
     Status ReaderToWriter();
     Status UnInitFromReader();
+
+    // Used for leader and standalone
+    Status WriterToAdmin();
+    Status WriterToReader();
+    Status UnInitFromWriter();
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
     void LoadFullCheckpoint(const String &checkpoint_path);
