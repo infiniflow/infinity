@@ -102,10 +102,16 @@ query
     }
 }
 | query OR clause {
-    auto q = std::make_unique<OrQueryNode>();
-    q->Add(std::move($1));
-    q->Add(std::move($3));
-    $$ = std::move(q);
+    if (!($1)) {
+        $$ = std::move($3);
+    } else if (!($3)) {
+        $$ = std::move($1);
+    } else {
+        auto q = std::make_unique<OrQueryNode>();
+        q->Add(std::move($1));
+        q->Add(std::move($3));
+        $$ = std::move(q);
+    }
 };
 
 clause
@@ -137,7 +143,9 @@ term
 | LPAREN query RPAREN { $$ = std::move($2); }
 | LPAREN query RPAREN CARAT {
     $$ = std::move($2);
-    $$->MultiplyWeight($4);
+    if ($$) {
+        $$->MultiplyWeight($4);
+    }
 };
 
 basic_filter_boost
