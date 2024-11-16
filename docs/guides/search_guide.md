@@ -76,7 +76,7 @@ Infinity's dense vector search is similar to the 'vector search' feature in many
 
 For incoming streaming vectors, Infinity executes a brute-force search rather than building index first, ensuring a real-time search experience. The search results are from both the incoming streaming vectors and those indexed. This search strategy is applied autonomously, without the need for human intervention.
 
-Infinity also shas innate support for multi-vector search. Each row in a table represents a document, which is a collection of vectors, each represnting a chunk of the document. Infinity then builds vector index on these vectors to retrieve the top K documents (rows). This modeling applies to many scenarios.
+Infinity also has built-in support for multi-vector search. Each row in a table represents a document, comprising a collection of vectors that represent chunks of the document. Infinity builds a vector index on these vectors to retrieve the top K documents (rows). This model is applicable to many scenarios.
 
 ## Sparse vector search
 
