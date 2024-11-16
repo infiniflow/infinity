@@ -75,49 +75,6 @@ Status Storage::InitToAdmin() {
         if (current_storage_mode_ != StorageMode::kUnInitialized) {
             UnrecoverableError("Unexpected: attempt to init initialized status storage");
         }
-        switch (config_ptr_->StorageType()) {
-            case StorageType::kLocal: {
-                // Not init remote store
-                break;
-            }
-            case StorageType::kMinio: {
-                if (VirtualStore::IsInit()) {
-                    VirtualStore::UnInitRemoteStore();
-                }
-                LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
-                Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
-                                                            config_ptr_->ObjectStorageUrl(),
-                                                            config_ptr_->ObjectStorageHttps(),
-                                                            config_ptr_->ObjectStorageAccessKey(),
-                                                            config_ptr_->ObjectStorageSecretKey(),
-                                                            config_ptr_->ObjectStorageBucket(),
-                                                            current_storage_mode_ == StorageMode::kWritable);
-                if (!status.ok()) {
-                    VirtualStore::UnInitRemoteStore();
-                    return status;
-                }
-
-                if (object_storage_processor_ != nullptr) {
-                    object_storage_processor_->Stop();
-                    object_storage_processor_.reset();
-                }
-                object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
-                object_storage_processor_->Start();
-                break;
-            }
-            default: {
-                UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
-            }
-        }
-        // Construct persistence store
-        String persistence_dir = config_ptr_->PersistenceDir();
-        if (!persistence_dir.empty()) {
-            if (persistence_manager_ != nullptr) {
-                persistence_manager_.reset();
-            }
-            i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
-            persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
-        }
 
         // Construct wal manager
         if (wal_mgr_ != nullptr) {
