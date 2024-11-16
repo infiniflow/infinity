@@ -8,12 +8,18 @@ slug: /search_guide
 
 Infinity offers powerful search capabilities. This page covers the search usage.  These search operators are available:
 
-- [Full text search](#full-text-search)
-- [Dense Vector search](#dense-vector-search)
-- [Sparse vector search](#sparse-vector-search)
-- [Tensor search](#tensor-search)
-- [Hybrid search](#hybrid-search)
-- [Conditional filters](#conditional-filters)
+- [Search usage guide](#search-usage-guide)
+	- [Overview](#overview)
+	- [Full text search](#full-text-search)
+		- [Tokenizer](#tokenizer)
+		- [Search and ranking](#search-and-ranking)
+	- [Dense vector search](#dense-vector-search)
+	- [Sparse vector search](#sparse-vector-search)
+	- [Tensor search](#tensor-search)
+	- [Hybrid search](#hybrid-search)
+	- [Conditional filters](#conditional-filters)
+		- [Filter based on secondary index](#filter-based-on-secondary-index)
+		- [Filter based on full text index](#filter-based-on-full-text-index)
 
 ## Full text search
 
@@ -69,8 +75,6 @@ Infinity's dense vector search is similar to the 'vector search' feature in many
 - Infinity's IVF index supports multiple data types, including `float32`, `float16`, `bfloat16`, `int8` and `uint8`. By implementing scalar quantization and product quantization, Infinity's IVF index achieves a significantly lower memory footprint than its peers.
 
 For incoming streaming vectors, Infinity executes a brute-force search rather than building index first, ensuring a real-time search experience. The search results are from both the incoming streaming vectors and those indexed. This search strategy is applied autonomously, without the need for human intervention.
-
-Infinity also has built-in support for multi-vector search,  which makes modeling such scenarios conveniently:  each row in the table indicates a single document, where each document is composed of multiple chunks, and for each chunk, we get corresponding embedding. Vector index is built over these embeddings while we hope the vector search could provide the top K document in the results.
 
 Infinity also shas innate support for multi-vector search. Each row in a table represents a document, which is a collection of vectors, each represnting a chunk of the document. Infinity then builds vector index on these vectors to retrieve the top K documents (rows). This modeling applies to many scenarios.
 
