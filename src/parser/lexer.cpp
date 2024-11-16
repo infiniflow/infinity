@@ -1,6 +1,6 @@
-#line 2 "lexer.cpp"
+#line 1 "lexer.cpp"
 
-#line 4 "lexer.cpp"
+#line 3 "lexer.cpp"
 
 #define  YY_INT_ALIGNED short int
 
@@ -1373,10 +1373,10 @@ static const flex_int16_t yy_rule_linenum[209] =
 
 static thread_local std::stringstream string_buffer;
 
-#line 1377 "lexer.cpp"
+#line 1376 "lexer.cpp"
 #define YY_NO_INPUT 1
 
-#line 1380 "lexer.cpp"
+#line 1379 "lexer.cpp"
 
 #define INITIAL 0
 #define SINGLE_QUOTED_STRING 1
@@ -1730,7 +1730,7 @@ YY_DECL
 #line 27 "lexer.l"
 
 
-#line 1734 "lexer.cpp"
+#line 1733 "lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -2875,7 +2875,7 @@ YY_RULE_SETUP
 #line 269 "lexer.l"
 ECHO;
 	YY_BREAK
-#line 2879 "lexer.cpp"
+#line 2878 "lexer.cpp"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
