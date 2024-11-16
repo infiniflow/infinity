@@ -17,7 +17,7 @@ Infinity offers powerful search capabilities. This page covers the search usage.
 
 ## Full text search
 
-Full text search will work if full text index is created. There are two kinds of working modes for full text indexing:
+Full text search will work if full text index is created. There are two kinds of work modes for full text indexing:
 
 - Real time mode -- If the full text index is created immediately after the table is created, then the full-text index will work in real time mode if data is ingested at this time. Real time index will accumulate posting data within memory and flush to disk if it reaches up the quota.
 - Offline mode -- If the full text index is created after the data is ingested, then it will work under offline mode, where the full text index is constructed through external sorting.
@@ -57,13 +57,16 @@ You must specify a tokenizer when creating a full text index, but you don't need
 
 ## Dense vector search
 
-Dense vector search is actually `Vector Search` in other vector databases. Infinity has two kinds of built-in vector indices : `HNSW` and `IVF`, `HNSW` has faster search performance while `IVF`has lower memory footprint. Additionally, Infinity offers `Vector Streaming Search` because vector indices will not be built on streaming fresh data due to high cost of index building. For these fresh data, a brute force strategy is applied directly to provide real time search.  As a result, each vector search response is a combination of results from streaming part and vector index parts. The vector index is maintained automatically.  You don't need to care about whether the search is performed through vector index or brute forcing.
+Infinity's dense vector search is similar to the 'vector search' feature in many other vector databases. It supports two types of vector indexes: HNSW, which offers faster search performance, and IVF, which consumes less memory.
 
-`HNSW` index is an optimized implementation introducing locally-adaptive quantization, to deliver a much higher performance together with lower memory footprint compared with `HNSW` index from other vector databases.
+- Infinity optimizes its implementation of the HNSW index by incorporating locally-adaptive quantization, delivering much higher performance and a much smaller memory footprint than other HNSW implementations.
+- Infinity's IVF index supports multiple data types, including `float32`, `float16`, `bfloat16`, `int8` and `uint8`. By implementing scalar quantization and product quantization, Infinity's IVF index achieves a significantly lower memory footprint than its peers.
 
-`IVF` index offers embedding storage with different types including `float32`, `float16`, `bfloat16`, `int8` and `uint8`, combined with scalar quantization as well as product quantization, `IVF` delivers much lower memory footprint.
+For incoming streaming vectors, Infinity executes a brute-force search rather than building index first, ensuring a real-time search experience. The search results are from both the incoming streaming vectors and those indexed. This search strategy is applied autonomously, without the need for human intervention.
 
-Infinity offers built-in support for `multi-vector` search,  which makes modeling such scenarios conveniently:  each row in the table indicates a single document, where each document is composed of multiple chunks, and for each chunk, we get corresponding embedding. Vector index is built over these embeddings while we hope the vector search could provide the top K document in the results.
+Infinity also has built-in support for multi-vector search,  which makes modeling such scenarios conveniently:  each row in the table indicates a single document, where each document is composed of multiple chunks, and for each chunk, we get corresponding embedding. Vector index is built over these embeddings while we hope the vector search could provide the top K document in the results.
+
+Infinity also shas innate support for multi-vector search. Each row in a table represents a document, which is a collection of vectors, each represnting a chunk of the document. Infinity then builds vector index on these vectors to retrieve the top K documents (rows). This modeling applies to many scenarios.
 
 ## Sparse vector search
 
