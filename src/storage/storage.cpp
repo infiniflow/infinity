@@ -87,6 +87,50 @@ Status Storage::InitToAdmin() {
                                           config_ptr_->WALCompactThreshold(),
                                           config_ptr_->DeltaCheckpointThreshold(),
                                           config_ptr_->FlushMethodAtCommit());
+
+        switch (config_ptr_->StorageType()) {
+            case StorageType::kLocal: {
+                // Not init remote store
+                break;
+            }
+            case StorageType::kMinio: {
+                if (VirtualStore::IsInit()) {
+                    VirtualStore::UnInitRemoteStore();
+                }
+                LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
+                Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
+                                                              config_ptr_->ObjectStorageUrl(),
+                                                              config_ptr_->ObjectStorageHttps(),
+                                                              config_ptr_->ObjectStorageAccessKey(),
+                                                              config_ptr_->ObjectStorageSecretKey(),
+                                                              config_ptr_->ObjectStorageBucket());
+                if (!status.ok()) {
+                    VirtualStore::UnInitRemoteStore();
+                    return status;
+                }
+
+                if (object_storage_processor_ != nullptr) {
+                    object_storage_processor_->Stop();
+                    object_storage_processor_.reset();
+                }
+                object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
+                object_storage_processor_->Start();
+                break;
+            }
+            default: {
+                UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+            }
+        }
+        // Construct persistence store
+        String persistence_dir = config_ptr_->PersistenceDir();
+        if (!persistence_dir.empty()) {
+            if (persistence_manager_ != nullptr) {
+                persistence_manager_.reset();
+            }
+            i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
+            persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
+        }
+
         current_storage_mode_ = StorageMode::kAdmin;
     }
     LOG_INFO(fmt::format("Finish initializing storage from un-init mode to admin"));
@@ -107,49 +151,6 @@ Status Storage::UnInitFromAdmin() {
 Status Storage::AdminToReader() {
     LOG_INFO(fmt::format("Start to update storage from admin mode to reader"));
     std::unique_lock<std::mutex> lock(mutex_);
-    switch (config_ptr_->StorageType()) {
-        case StorageType::kLocal: {
-            // Not init remote store
-            break;
-        }
-        case StorageType::kMinio: {
-            if (VirtualStore::IsInit()) {
-                VirtualStore::UnInitRemoteStore();
-            }
-            LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
-            Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
-                                                          config_ptr_->ObjectStorageUrl(),
-                                                          config_ptr_->ObjectStorageHttps(),
-                                                          config_ptr_->ObjectStorageAccessKey(),
-                                                          config_ptr_->ObjectStorageSecretKey(),
-                                                          config_ptr_->ObjectStorageBucket(),
-                                                          current_storage_mode_ == StorageMode::kWritable);
-            if (!status.ok()) {
-                VirtualStore::UnInitRemoteStore();
-                return status;
-            }
-
-            if (object_storage_processor_ != nullptr) {
-                object_storage_processor_->Stop();
-                object_storage_processor_.reset();
-            }
-            object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
-            object_storage_processor_->Start();
-            break;
-        }
-        default: {
-            UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
-        }
-    }
-    // Construct persistence store
-    String persistence_dir = config_ptr_->PersistenceDir();
-    if (!persistence_dir.empty()) {
-        if (persistence_manager_ != nullptr) {
-            persistence_manager_.reset();
-        }
-        i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
-        persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
-    }
 
     if (result_cache_manager_ != nullptr) {
         result_cache_manager_.reset();
@@ -183,52 +184,11 @@ Status Storage::AdminToWriter() {
         current_storage_mode_ = StorageMode::kWritable;
     }
 
-    switch (config_ptr_->StorageType()) {
-        case StorageType::kLocal: {
-            // Not init remote store
-            break;
+    if (config_ptr_->StorageType() == StorageType::kMinio) {
+        Status status = VirtualStore::CreateBucket();
+        if (!status.ok()) {
+            return status;
         }
-        case StorageType::kMinio: {
-            if (VirtualStore::IsInit()) {
-                VirtualStore::UnInitRemoteStore();
-            }
-            LOG_INFO(fmt::format("Init remote store url: {}", config_ptr_->ObjectStorageUrl()));
-            Status status = VirtualStore::InitRemoteStore(StorageType::kMinio,
-                                                          config_ptr_->ObjectStorageUrl(),
-                                                          config_ptr_->ObjectStorageHttps(),
-                                                          config_ptr_->ObjectStorageAccessKey(),
-                                                          config_ptr_->ObjectStorageSecretKey(),
-                                                          config_ptr_->ObjectStorageBucket(),
-                                                          true);
-            if (!status.ok()) {
-                {
-                    std::unique_lock<std::mutex> lock(mutex_);
-                    current_storage_mode_ = StorageMode::kAdmin;
-                }
-                VirtualStore::UnInitRemoteStore();
-                return status;
-            }
-
-            if (object_storage_processor_ != nullptr) {
-                object_storage_processor_->Stop();
-                object_storage_processor_.reset();
-            }
-            object_storage_processor_ = MakeUnique<ObjectStorageProcess>();
-            object_storage_processor_->Start();
-            break;
-        }
-        default: {
-            UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
-        }
-    }
-    // Construct persistence store
-    String persistence_dir = config_ptr_->PersistenceDir();
-    if (!persistence_dir.empty()) {
-        if (persistence_manager_ != nullptr) {
-            persistence_manager_.reset();
-        }
-        i64 persistence_object_size_limit = config_ptr_->PersistenceObjectSizeLimit();
-        persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_ptr_->DataDir(), (SizeT)persistence_object_size_limit);
     }
 
     if (result_cache_manager_ != nullptr) {
@@ -442,6 +402,31 @@ Status Storage::ReaderToAdmin() {
     return Status::OK();
 }
 
+Status Storage::ReaderToWriter() {
+    if (compact_processor_ != nullptr) {
+        UnrecoverableError("compact processor was initialized before.");
+    }
+
+    compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
+    compact_processor_->Start();
+
+    periodic_trigger_thread_->Stop();
+    i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
+    i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+    //                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+    i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+    i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
+    periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
+    periodic_trigger_thread_->delta_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
+    periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+    periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
+    periodic_trigger_thread_->Start();
+
+    std::unique_lock<std::mutex> lock(mutex_);
+    current_storage_mode_ = StorageMode::kWritable;
+    return Status::OK();
+}
+
 ResultCacheManager *Storage::result_cache_manager() const noexcept {
     if (config_ptr_->ResultCache() != "on") {
         return nullptr;
@@ -511,39 +496,9 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                 case StorageMode::kReadable: {
                     UnrecoverableError("Attempt to set storage mode from Readable to Readable");
                 }
-                default: {
-                    break;
+                case StorageMode::kWritable: {
+                    return ReaderToWriter();
                 }
-            }
-
-            if (target_mode == StorageMode::kWritable) {
-                if (compact_processor_ != nullptr) {
-                    UnrecoverableError("compact processor was initialized before.");
-                }
-
-                compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
-                compact_processor_->Start();
-
-                periodic_trigger_thread_->Stop();
-                i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
-                i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-                //                i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-                i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-                i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
-                periodic_trigger_thread_->full_checkpoint_trigger_ =
-                    MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
-                periodic_trigger_thread_->delta_checkpoint_trigger_ =
-                    MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
-                periodic_trigger_thread_->compact_segment_trigger_ =
-                    MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
-                periodic_trigger_thread_->optimize_index_trigger_ =
-                    MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
-                periodic_trigger_thread_->Start();
-            }
-
-            {
-                std::unique_lock<std::mutex> lock(mutex_);
-                current_storage_mode_ = target_mode;
             }
             break;
         }
@@ -578,21 +533,23 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                     wal_mgr_.reset();
                 }
 
-                switch (config_ptr_->StorageType()) {
-                    case StorageType::kLocal: {
-                        // Not init remote store
-                        break;
-                    }
-                    case StorageType::kMinio: {
-                        if (object_storage_processor_ != nullptr) {
-                            object_storage_processor_->Stop();
-                            object_storage_processor_.reset();
-                            VirtualStore::UnInitRemoteStore();
+                if (target_mode == StorageMode::kUnInitialized) {
+                    switch (config_ptr_->StorageType()) {
+                        case StorageType::kLocal: {
+                            // Not init remote store
+                            break;
                         }
-                        break;
-                    }
-                    default: {
-                        UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+                        case StorageType::kMinio: {
+                            if (object_storage_processor_ != nullptr) {
+                                object_storage_processor_->Stop();
+                                object_storage_processor_.reset();
+                                VirtualStore::UnInitRemoteStore();
+                            }
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+                        }
                     }
                 }
 
@@ -610,9 +567,12 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                     result_cache_manager_.reset();
                 }
 
-                if (persistence_manager_ != nullptr) {
-                    persistence_manager_.reset();
+                if (target_mode == StorageMode::kUnInitialized) {
+                    if (persistence_manager_ != nullptr) {
+                        persistence_manager_.reset();
+                    }
                 }
+
                 if (cleanup_info_tracer_ != nullptr) {
                     cleanup_info_tracer_.reset();
                 }

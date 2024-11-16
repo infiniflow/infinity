@@ -1954,7 +1954,10 @@ curl --request GET \
   - `"topn"`: `int`, *Required*  
     An integer indicating the number of nearest neighbours (vector search) or most relevant rows (full-text search) to return.  
   - `"params"`: `object`, *Optional*  
-    Additional matching or reranking parameters. 
+    Additional matching or reranking parameters.
+    - For all matching methods, you can provide a index hint when searching, so that the query will run using specified index.
+      - For `"match_method" : "dense"`, `"match_method" : "sparse"`, `"match_method" : "tensor"`, use `"index_name" : "idx1"` to specify index, note that if the index specified is not present, an error would occur.
+      - For `"match_method" : "text"`, since the query can run on multiple columns, you should specify multiple indexes using `"index_names" : "idx1,idx2..."`, there will be no error when some of specified indexes are not present.
     - If you set `"match_method"` to `"dense"`:  
       - `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
         - For example, if you set `topn` to `10`, you can set `"ef"` to `"50"`.

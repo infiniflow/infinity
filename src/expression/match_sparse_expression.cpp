@@ -106,6 +106,7 @@ u64 MatchSparseExpression::Hash() const {
     h ^= std::hash<SparseMetricType>()(metric_type_);
     h ^= std::hash<SizeT>()(query_n_);
     h ^= std::hash<SizeT>()(topn_);
+    h ^= std::hash<String>()(index_name_);
     if (optional_filter_) {
         h ^= optional_filter_->Hash();
     }
@@ -126,7 +127,7 @@ bool MatchSparseExpression::Eq(const BaseExpression &other_base) const {
         }
     }
     bool eq = column_expr_->Eq(*other.column_expr_) && query_sparse_expr_->Eq(*other.query_sparse_expr_) && metric_type_ == other.metric_type_ &&
-              query_n_ == other.query_n_ && topn_ == other.topn_;
+              query_n_ == other.query_n_ && topn_ == other.topn_ && index_name_ == other.index_name_;
     if (!eq) {
         return false;
     }
@@ -160,13 +161,14 @@ String MatchSparseExpression::ToString() const {
     }
     String opt_str = ss.str();
 
-    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}{}) WITH ({})",
+    return fmt::format("MATCH SPARSE ({}, [{}], {}, {}{}) WITH ({}) USING INDEX ({})",
                        column_expr_->Name(),
                        sparse_str,
                        MatchSparseExpr::MetricTypeToString(metric_type_),
                        topn_,
                        optional_filter_ ? fmt::format(", WHERE {}", optional_filter_->ToString()) : "",
-                       opt_str);
+                       opt_str,
+                       index_name_);
 }
 
 } // namespace infinity

@@ -1838,6 +1838,7 @@ A dictionary representing additional KNN or ANN search parameters.
 - `"threshold"`: `str`, *Optional* A threshold value for the search.
   - For example, if you use the `"cosine"` distance metric and set `"threshold"` to `"0.5"`, the search will return only those rows with a cosine similarity greater than `0.5`.
 - `"nprobe"`: `str`, *Optional* The number of cells to search for the IVF index. The default value is `"1"`.
+- `"index_name"` : `str`, *Optional* The name of index on which you would like the database to perform query on.
 
 #### Returns
 
@@ -1943,6 +1944,7 @@ A dictionary representing additional parameters for the sparse vector search. Fo
   `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Termination Conditions" parameter. The smaller the value, the more aggressive the pruning.
 - `"beta"`: `str`  
   `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Query Term Pruning" parameter. The smaller the value, the more aggressive the pruning.
+- `"index_name"` : `str`, *Optional* The name of index on which you would like the database to perform query on.
 
 #### Returns
 
@@ -2065,6 +2067,7 @@ An optional dictionary specifying the following search options:
       For example, reinterprets `"A01-233:BC"` as `'"A01" OR "-233" OR "BC"'`.
     - `{"operator": "and"}`: Interpolates the `AND` operator between words in `matching_text` to create a new search text.  
       For example, reinterprets `"A01-233:BC"` as `'"A01" AND "-233" AND "BC"'`.
+  - **`"index_name"`** : `str`, *Optional* The names of indexes on which you would like the database to perform query on.
 
 #### Returns
 

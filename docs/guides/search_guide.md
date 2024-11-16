@@ -8,12 +8,12 @@ slug: /search_guide
 
 Infinity offers powerful search capabilities. This page covers the search usage.  These search operators are available:
 
-- Full text search
-- Dense Vector search
-- Sparse vector search
-- Tensor search
-- Hybrid search
-- Conditional filters
+- [Full text search](#full-text-search)
+- [Dense Vector search](#dense-vector-search)
+- [Sparse vector search](#sparse-vector-search)
+- [Tensor search](#tensor-search)
+- [Hybrid search](#hybrid-search)
+- [Conditional filters](#conditional-filters)
 
 ## Full text search
 
@@ -41,19 +41,25 @@ You must specify a tokenizer when creating a full text index, but you don't need
 - Japanese analyzer: Use `japanese` to specify tokenizer for Japanese. It's a wrapper of [mecab](http://taku910.github.io/mecab/).
 - Korean analyzer: Use `korean` to specify tokenizer for Korean. It's also a wrapper of [mecab](http://taku910.github.io/mecab/) but has different Korean dictionary.
 - RAG analyzer: It's a c++ migration of tokenizer imported from [RAGFlow](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py). It's a multilingual tokenizer and currently, both Chinese and English are well supported. RAG analyzer has better recall compared to [Jieba](https://github.com/yanyiwu/cppjieba) analyzer, but lower tokenization throughput due to much more expensive computation.  The English processing within RAG analyzer is also different from Standard analyzer, because it has an extra step of lemmatization before stemming, additionally, the tokenization of latin characters is a c++ migration of [NLTK](https://www.nltk.org/api/nltk.tokenize.punkt.html). RAG analyzer also supports fined grained mode through `rag-fine`, which will output tokenization results with the second highest score. In RAGFlow, both RAG tokenization and fine-grained RAG tokenization are used to guarantee the recall.
-- Keyword analyzer: It's a noop analyzer, like corresponding feature in [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-keyword-analyzer.html). This is used if you have columns containing keywords only, and you don't want such traditional scoring approaches as `BM25`to take into effects.
+- Keyword analyzer: It's a noop analyzer. This is used if you have columns containing keywords only, and you don't want such traditional scoring approaches as `BM25`to take into effects, the score will return 0 or 1 according to whether any keywords are hit.
 
 ### Search and ranking
 
-- Single terms: `"blooms"`
-- OR multiple terms: `"Bloom OR filter"`, `"Bloom || filter"` or just `"Bloom filter"` .
-- Phrase search: `'"Bloom filter"'`
+Infinity offers following syntax for full text search:
+
+- Single term: `"blooms"`
 - AND multiple terms: `"space AND efficient"`, `"space && efficient"` or `"space + efficient"`
+- OR multiple terms: `"Bloom OR filter"`, `"Bloom || filter"` or just `"Bloom filter"` .
+- Phrase search: `"Bloom filter" or 'Bloom filter'`
+- CARAT operator: `^`: Used to boost the importance of a term, e.g., `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
 - Sloppy phrase search: `'"harmful chemical"~10'`
 - Field-specific search: `"title:(quick OR brown) AND body:foobar"`
-- Escaping reserved characters: `"space\-efficient"` . `:` `~` `()` `""` are reserved characters for search syntax
+- Escaping reserved characters: `"space\-efficient"` . `:` `~` `()` `""` `+` `-` `=` `&` `|` `[]` `{}` `*` `?` `\` `/` are reserved characters for search syntax.
 
- `OR`  is the default semantic between multiple terms if user does not specify in search syntax. Infinity offers `BM25` scoring and block-max `WAND` for dynamic pruning to accelerate the multiple terms search processing. If the column is indexed using `keyword` analyzer, then `BM25` will not be used and it will return the score based on number of keywords hit.
+`OR`  is the default semantic among multiple terms if user does not specify in search syntax. Infinity offers `BM25` scoring and block-max `WAND` for dynamic pruning to accelerate the multiple terms search processing. There are two approaches to bypass `BM25` scoring:
+
+* Using `keyword` analyzer when creating index, then `BM25` will not be used and it will return the score based on whether keywords are hit.
+* Specifying `similarity=boolean` during searching. Then the scoring is decided by the number of keywords hits.
 
 ## Dense vector search
 
@@ -142,4 +148,4 @@ Filters based on secondary index can have any number of logical combinations, su
 
 ### Filter based on full text index
 
-Full text index provides filters through `filter_fulltext` , since it's a keyword based filter, it does not provide similar expressions as filters based on secondary index.  It has a special parameter of `minimum_should_match` , which specifies how many keywords should be satisfied at least during fitlering. This feature has similar semantics to that of [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-minimum-should-match.html).
+Full text index provides filters through `filter_fulltext` , since it's a keyword based filter, it does not provide similar expressions as filters based on secondary index.  It has a special parameter of `minimum_should_match` , which specifies how many keywords should be satisfied at least during fitlering.

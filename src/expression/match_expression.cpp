@@ -37,11 +37,9 @@ void ParseMultiIndexHints(const String &index_hints, Vector<String> &index_names
         if (comma_idx == String::npos) {
             auto index_name = index_hints.substr(begin_idx);
             index_names.emplace_back(index_name);
-            LOG_TRACE(fmt::format("new index hint : {}", index_name));
             break;
         } else {
             auto index_name = index_hints.substr(begin_idx, comma_idx - begin_idx);
-            LOG_TRACE(fmt::format("new index hint : {}", index_name));
             begin_idx = comma_idx + 1;
         }
     }
@@ -70,6 +68,9 @@ u64 MatchExpression::Hash() const {
     h ^= std::hash<String>()(fields_);
     h ^= std::hash<String>()(matching_text_);
     h ^= std::hash<String>()(options_text_);
+    for (SizeT i = 0; i < index_names_.size(); i++) {
+        h ^= std::hash<String>()(index_names_[i]);
+    }
     return h;
 }
 
