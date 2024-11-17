@@ -69,6 +69,62 @@ bool server_running = false;
 
 infinity::Thread shutdown_thread;
 
+void StartThriftServer() {
+    using namespace infinity;
+    u32 thrift_server_port = InfinityContext::instance().config()->ClientPort();
+
+#if THRIFT_SERVER_TYPE == 0
+
+    i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
+    pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
+    pool_thrift_thread = pool_thrift_server.Start();
+
+#elif THRIFT_SERVER_TYPE == 1
+
+    i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
+    non_block_pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
+    non_block_pool_thrift_thread = infinity::Thread([&]() { non_block_pool_thrift_server.Start(); });
+
+#else
+
+    threaded_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port);
+    threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
+
+#endif
+    LOG_INFO("Thrift server is started.");
+}
+
+void StopThriftServer() {
+    using namespace infinity;
+#if THRIFT_SERVER_TYPE == 0
+    pool_thrift_server.Shutdown();
+    pool_thrift_thread.join();
+#elif THRIFT_SERVER_TYPE == 1
+    non_block_pool_thrift_server.Shutdown();
+    non_block_pool_thrift_server.join();
+#else
+    threaded_thrift_server.Shutdown();
+    threaded_thrift_thread.join();
+#endif
+    LOG_INFO("Thrift server is shutdown.");
+}
+
+void StartPeerServer() {
+    using namespace infinity;
+    u32 peer_server_port = InfinityContext::instance().config()->PeerServerPort();
+    i32 peer_server_connection_pool_size = InfinityContext::instance().config()->PeerServerConnectionPoolSize();
+    pool_peer_thrift_server.Init(InfinityContext::instance().config()->PeerServerIP(), peer_server_port, peer_server_connection_pool_size);
+    pool_peer_thrift_thread = pool_peer_thrift_server.Start();
+    infinity::LOG_INFO("Peer server is started.");
+}
+
+void StopPeerServer() {
+    using namespace infinity;
+    pool_peer_thrift_server.Shutdown();
+    pool_peer_thrift_thread.join();
+    LOG_INFO("Peer server is shutdown.");
+}
+
 void ShutdownServer() {
     {
         std::unique_lock<std::mutex> lock(server_mutex);
@@ -177,66 +233,14 @@ auto main(int argc, char **argv) -> int {
 
     InfinityContext::instance().Init(config_path, m_flag, nullptr);
 
-    InfinityContext::instance().config()->PrintAll();
-
-
-
     auto start_thrift_servers = [&]() {
-        u32 thrift_server_port = InfinityContext::instance().config()->ClientPort();
-
-#if THRIFT_SERVER_TYPE == 0
-
-        i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
-        pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
-        pool_thrift_thread = pool_thrift_server.Start();
-
-#elif THRIFT_SERVER_TYPE == 1
-
-        i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
-        non_block_pool_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port, thrift_server_pool_size);
-        non_block_pool_thrift_thread = infinity::Thread([&]() { non_block_pool_thrift_server.Start(); });
-
-#else
-
-        threaded_thrift_server.Init(InfinityContext::instance().config()->ServerAddress(), thrift_server_port);
-        threaded_thrift_thread = infinity::Thread([&]() { threaded_thrift_server.Start(); });
-
-#endif
-
-        u32 peer_server_port = InfinityContext::instance().config()->PeerServerPort();
-        i32 peer_server_connection_pool_size = InfinityContext::instance().config()->PeerServerConnectionPoolSize();
-        pool_peer_thrift_server.Init(InfinityContext::instance().config()->PeerServerIP(), peer_server_port, peer_server_connection_pool_size);
-        pool_peer_thrift_thread = pool_peer_thrift_server.Start();
+        StartThriftServer();
+        StartPeerServer();
     };
 
     auto stop_thrift_servers = [&]() {
-
-#if THRIFT_SERVER_TYPE == 0
-        pool_thrift_server.Shutdown();
-#elif THRIFT_SERVER_TYPE == 1
-        non_block_pool_thrift_server.Shutdown();
-#else
-        threaded_thrift_server.Shutdown();
-#endif
-        infinity::LOG_INFO("Thrift server is shutdown.");
-        pool_peer_thrift_server.Shutdown();
-        infinity::LOG_INFO("Peer server is shutdown.");
-
-        pool_peer_thrift_thread.join();
-
-#if THRIFT_SERVER_TYPE == 0
-
-        pool_thrift_thread.join();
-
-#elif THRIFT_SERVER_TYPE == 1
-
-        non_block_pool_thrift_server.join();
-
-#else
-
-        threaded_thrift_thread.join();
-
-#endif
+        StopPeerServer();
+        StopThriftServer();
     };
 
     InfinityContext::instance().AddThriftServerFn(start_thrift_servers, stop_thrift_servers);
