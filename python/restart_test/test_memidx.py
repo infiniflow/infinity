@@ -4,8 +4,7 @@ from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 from infinity import index
 import time
 import pathlib
-from infinity.common import ConflictType
-import os
+from infinity.common import ConflictType, SparseVector
 
 
 class TestMemIdx:
@@ -130,6 +129,8 @@ class TestMemIdx:
     # # result: 13
 
     def test_optimize_from_different_database(self, infinity_runner: InfinityRunner):
+        infinity_runner.clear()
+
         config1 = "test/data/config/restart_test/test_memidx/1.toml"
         config2 = "test/data/config/restart_test/test_memidx/3.toml"
         uri = common_values.TEST_LOCAL_HOST
@@ -278,3 +279,95 @@ class TestMemIdx:
             db_obj.drop_table(table_name)
 
         part2()
+
+    def test_memidx_recover2(self, infinity_runner: InfinityRunner):
+        infinity_runner.clear()
+
+        uri = common_values.TEST_LOCAL_HOST
+        data_dir = "/var/infinity/data"
+        catalog_dir = "/var/infinity/data/catalog"
+
+        config1 = "test/data/config/restart_test/test_memidx/5.toml"
+        config2 = "test/data/config/restart_test/test_memidx/4.toml"
+        decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
+        decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
+
+        table_name = "test_memidx4"
+
+        @decorator1
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, conflict_type=ConflictType.Ignore)
+            dim = 100
+            table_obj = db_obj.create_table(
+                table_name,
+                {
+                    "c1": {"type": "int"},
+                    "c2": {"type": "int"},
+                    "c3": {"type": f"sparse,{dim},float,int"},
+                },
+            )
+            table_obj.create_index(
+                "idx1", index.IndexInfo("c2", index.IndexType.Secondary)
+            )
+            table_obj.create_index(
+                "idx2",
+                index.IndexInfo(
+                    "c3",
+                    index.IndexType.BMP,
+                    {"BLOCK_SIZE": "8", "COMPRESS_TYPE": "compress"},
+                ),
+            )
+            infinity_obj.test_command("stuck dump by line bg_task for 3 second")
+            table_obj.insert(
+                [
+                    {
+                        "c1": i,
+                        "c2": i,
+                        "c3": SparseVector(indices=[0], values=[1.0]),
+                    }
+                    for i in range(8192)
+                ]
+            )
+            # dump by line submit here
+            infinity_obj.flush_delta()
+            for i in range(100):
+                table_obj.insert(
+                    [
+                        {
+                            "c1": 8192 + i,
+                            "c2": 8192 + i,
+                            "c3": SparseVector(indices=[1], values=[1.0]),
+                        }
+                    ]
+                )
+            # wait for dump by line done
+            # time.sleep(4)
+
+        part1()
+
+        delta_paths = list(pathlib.Path(catalog_dir).rglob("*DELTA*"))
+        if len(delta_paths) < 1:
+            print("Warning: delta checkpoint not triggered. skip this test")
+            infinity_runner.clear()
+            return
+
+        @decorator2
+        def part2(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table(table_name)
+            data_dict, data_type_dict = (
+                table_obj.output(["c1"]).filter("c2 >= 8192").to_result()
+            )
+            assert data_dict["c1"] == [8192 + i for i in range(100)]
+
+            data_dict, data_type_dict = (
+                table_obj.output(["c1"])
+                .match_sparse("c3", SparseVector(indices=[1], values=[1.0]), "ip", 100)
+                .to_result()
+            )
+            assert data_dict["c1"] == [8192 + i for i in range(100)]
+
+        part2()
+
+        infinity_runner.clear()

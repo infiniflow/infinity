@@ -37,6 +37,7 @@ export enum class BGTaskType {
     kUpdateSegmentBloomFilterData, // Not used
     kDumpIndex,
     kDumpIndexByline,
+    kTestCommand,
     kInvalid
 };
 
@@ -206,6 +207,18 @@ public:
     SharedPtr<String> index_name_;
     SegmentID segment_id_;
     SharedPtr<ChunkIndexEntry> dumped_chunk_;
+};
+
+export class TestCommandTask final : public BGTask {
+public:
+    TestCommandTask(String command_content);
+
+    ~TestCommandTask() override = default;
+
+    String ToString() const override { return "TestCommandTask"; }
+
+public:
+    String command_content_{};
 };
 
 } // namespace infinity

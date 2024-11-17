@@ -28,6 +28,29 @@ class Catalog;
 class TxnManager;
 class SessionManager;
 
+class TestCommander {
+public:
+    void Add(BGTaskType type, const String &command) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        test_commands_[type] = command;
+    }
+
+    Optional<String> Check(BGTaskType type) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        auto iter = test_commands_.find(type);
+        if (iter != test_commands_.end()) {
+            String res = iter->second;
+            test_commands_.erase(iter);
+            return res;
+        }
+        return None;
+    }
+
+private:
+    HashMap<BGTaskType, String> test_commands_;
+    std::mutex mtx_;
+};
+
 export class CompactionProcessor {
 public:
     CompactionProcessor(Catalog *catalog, TxnManager *txn_mgr);
@@ -47,6 +70,8 @@ public:
                                  const String &table_name,
                                  bool rollback,
                                  Optional<std::function<void()>> mid_func = None); // false unit test
+
+    void AddTestCommand(BGTaskType type, const String &command) { test_commander_.Add(type, command); }
 
 private:
     Vector<Pair<UniquePtr<BaseStatement>, Txn *>> ScanForCompact(Txn *scan_txn);
@@ -69,6 +94,8 @@ private:
     SessionManager *session_mgr_{};
 
     Atomic<u64> task_count_{};
+
+    TestCommander test_commander_;
 };
 
 } // namespace infinity

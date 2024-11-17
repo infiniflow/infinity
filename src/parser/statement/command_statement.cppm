@@ -33,4 +33,5 @@ export using infinity::ExportCmd;
 export using infinity::LockCmd;
 export using infinity::UnlockCmd;
 export using infinity::CleanupCmd;
+export using infinity::TestCmd;
 }

@@ -73,12 +73,20 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
 
     session_mgr_ = MakeUnique<SessionManager>();
 
+    if (admin_flag) {
+        Status change_to_admin = ChangeServerRole(NodeRole::kAdmin);
+        if (!change_to_admin.ok()) {
+            UnrecoverableError(change_to_admin.message());
+            return;
+        }
+        return;
+    }
     Status change_result = ChangeServerRole(NodeRole::kAdmin);
     if (!status.ok()) {
         UnrecoverableError(status.message());
         return;
     }
-    if (admin_flag or config_->ServerMode() == "cluster") {
+    if (config_->ServerMode() == "cluster") {
         // Admin mode or cluster start phase
         return;
     }

@@ -154,6 +154,10 @@ public:
 
     void ShowCurrentNode(infinity_thrift_rpc::ShowCurrentNodeResponse &response, const infinity_thrift_rpc::ShowCurrentNodeRequest &request) final;
 
+    void Command(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommandRequest &request) final;
+
+    void Flush(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::FlushRequest &request) final;
+
 private:
     Tuple<Infinity *, Status> GetInfinityBySessionID(i64 session_id);
 

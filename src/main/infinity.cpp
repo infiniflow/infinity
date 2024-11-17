@@ -202,10 +202,17 @@ QueryResult Infinity::Query(const String &query_text) {
     return result;
 }
 
-QueryResult Infinity::Flush() {
+QueryResult Infinity::Flush(const String &flush_type) {
     UniquePtr<QueryContext> query_context_ptr = GetQueryContext();
     UniquePtr<FlushStatement> flush_statement = MakeUnique<FlushStatement>();
-    flush_statement->type_ = FlushType::kData;
+
+    if (flush_type == "data") {
+        flush_statement->type_ = FlushType::kData;
+    } else if (flush_type == "delta") {
+        flush_statement->type_ = FlushType::kDelta;
+    } else {
+        flush_statement->type_ = FlushType::kData;
+    }
 
     QueryResult result = query_context_ptr->QueryStatement(flush_statement.get());
     return result;
@@ -1077,6 +1084,22 @@ QueryResult Infinity::CompactTable(const String &db_name, const String &table_na
     auto compact_statement = MakeUnique<ManualCompactStatement>(db_name, table_name);
 
     QueryResult result = query_context_ptr->QueryStatement(compact_statement.get());
+
+    return result;
+}
+
+QueryResult Infinity::TestCommand(const String &command_content) {
+    auto query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
+    auto command_statement = MakeUnique<CommandStatement>();
+    command_statement->command_info_ = MakeUnique<TestCmd>(command_content);
+
+    QueryResult result = query_context_ptr->QueryStatement(command_statement.get());
 
     return result;
 }

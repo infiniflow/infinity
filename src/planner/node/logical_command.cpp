@@ -118,6 +118,11 @@ String LogicalCommand::ToString(i64 &space) const {
             ss << String(space, ' ') << arrow_str << "Cleanup";
             break;
         }
+        case CommandType::kTestCommand: {
+            auto *test_command_info = static_cast<TestCmd *>(command_info_.get());
+            ss << String(space, ' ') << arrow_str << "Test command: " << test_command_info->command_content();
+            break;
+        }
         case CommandType::kInvalid: {
             String error_message = "Invalid command type.";
             UnrecoverableError(error_message);

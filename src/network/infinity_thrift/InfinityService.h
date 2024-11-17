@@ -57,6 +57,8 @@ class InfinityServiceIf {
   virtual void AddColumns(CommonResponse& _return, const AddColumnsRequest& request) = 0;
   virtual void DropColumns(CommonResponse& _return, const DropColumnsRequest& request) = 0;
   virtual void Cleanup(CommonResponse& _return, const CommonRequest& request) = 0;
+  virtual void Command(CommonResponse& _return, const CommandRequest& request) = 0;
+  virtual void Flush(CommonResponse& _return, const FlushRequest& request) = 0;
 };
 
 class InfinityServiceIfFactory {
@@ -189,6 +191,12 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void Cleanup(CommonResponse& /* _return */, const CommonRequest& /* request */) override {
+    return;
+  }
+  void Command(CommonResponse& /* _return */, const CommandRequest& /* request */) override {
+    return;
+  }
+  void Flush(CommonResponse& /* _return */, const FlushRequest& /* request */) override {
     return;
   }
 };
@@ -3833,6 +3841,214 @@ class InfinityService_Cleanup_presult {
 
 };
 
+typedef struct _InfinityService_Command_args__isset {
+  _InfinityService_Command_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_Command_args__isset;
+
+class InfinityService_Command_args {
+ public:
+
+  InfinityService_Command_args(const InfinityService_Command_args&);
+  InfinityService_Command_args& operator=(const InfinityService_Command_args&);
+  InfinityService_Command_args() noexcept {
+  }
+
+  virtual ~InfinityService_Command_args() noexcept;
+  CommandRequest request;
+
+  _InfinityService_Command_args__isset __isset;
+
+  void __set_request(const CommandRequest& val);
+
+  bool operator == (const InfinityService_Command_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Command_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Command_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_Command_pargs {
+ public:
+
+
+  virtual ~InfinityService_Command_pargs() noexcept;
+  const CommandRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Command_result__isset {
+  _InfinityService_Command_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Command_result__isset;
+
+class InfinityService_Command_result {
+ public:
+
+  InfinityService_Command_result(const InfinityService_Command_result&);
+  InfinityService_Command_result& operator=(const InfinityService_Command_result&);
+  InfinityService_Command_result() noexcept {
+  }
+
+  virtual ~InfinityService_Command_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_Command_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_Command_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Command_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Command_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Command_presult__isset {
+  _InfinityService_Command_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Command_presult__isset;
+
+class InfinityService_Command_presult {
+ public:
+
+
+  virtual ~InfinityService_Command_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_Command_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_Flush_args__isset {
+  _InfinityService_Flush_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_Flush_args__isset;
+
+class InfinityService_Flush_args {
+ public:
+
+  InfinityService_Flush_args(const InfinityService_Flush_args&);
+  InfinityService_Flush_args& operator=(const InfinityService_Flush_args&);
+  InfinityService_Flush_args() noexcept {
+  }
+
+  virtual ~InfinityService_Flush_args() noexcept;
+  FlushRequest request;
+
+  _InfinityService_Flush_args__isset __isset;
+
+  void __set_request(const FlushRequest& val);
+
+  bool operator == (const InfinityService_Flush_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Flush_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Flush_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_Flush_pargs {
+ public:
+
+
+  virtual ~InfinityService_Flush_pargs() noexcept;
+  const FlushRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Flush_result__isset {
+  _InfinityService_Flush_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Flush_result__isset;
+
+class InfinityService_Flush_result {
+ public:
+
+  InfinityService_Flush_result(const InfinityService_Flush_result&);
+  InfinityService_Flush_result& operator=(const InfinityService_Flush_result&);
+  InfinityService_Flush_result() noexcept {
+  }
+
+  virtual ~InfinityService_Flush_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_Flush_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_Flush_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Flush_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Flush_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Flush_presult__isset {
+  _InfinityService_Flush_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Flush_presult__isset;
+
+class InfinityService_Flush_presult {
+ public:
+
+
+  virtual ~InfinityService_Flush_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_Flush_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 class InfinityServiceClient : virtual public InfinityServiceIf {
  public:
   InfinityServiceClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
@@ -3963,6 +4179,12 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void Cleanup(CommonResponse& _return, const CommonRequest& request) override;
   void send_Cleanup(const CommonRequest& request);
   void recv_Cleanup(CommonResponse& _return);
+  void Command(CommonResponse& _return, const CommandRequest& request) override;
+  void send_Command(const CommandRequest& request);
+  void recv_Command(CommonResponse& _return);
+  void Flush(CommonResponse& _return, const FlushRequest& request) override;
+  void send_Flush(const FlushRequest& request);
+  void recv_Flush(CommonResponse& _return);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
@@ -4013,6 +4235,8 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_AddColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_DropColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Cleanup(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Command(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Flush(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   InfinityServiceProcessor(::std::shared_ptr<InfinityServiceIf> iface) :
     iface_(iface) {
@@ -4051,6 +4275,8 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["AddColumns"] = &InfinityServiceProcessor::process_AddColumns;
     processMap_["DropColumns"] = &InfinityServiceProcessor::process_DropColumns;
     processMap_["Cleanup"] = &InfinityServiceProcessor::process_Cleanup;
+    processMap_["Command"] = &InfinityServiceProcessor::process_Command;
+    processMap_["Flush"] = &InfinityServiceProcessor::process_Flush;
   }
 
   virtual ~InfinityServiceProcessor() {}
@@ -4429,6 +4655,26 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
     return;
   }
 
+  void Command(CommonResponse& _return, const CommandRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->Command(_return, request);
+    }
+    ifaces_[i]->Command(_return, request);
+    return;
+  }
+
+  void Flush(CommonResponse& _return, const FlushRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->Flush(_return, request);
+    }
+    ifaces_[i]->Flush(_return, request);
+    return;
+  }
+
 };
 
 // The 'concurrent' client is a thread safe client that correctly handles
@@ -4566,6 +4812,12 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void Cleanup(CommonResponse& _return, const CommonRequest& request) override;
   int32_t send_Cleanup(const CommonRequest& request);
   void recv_Cleanup(CommonResponse& _return, const int32_t seqid);
+  void Command(CommonResponse& _return, const CommandRequest& request) override;
+  int32_t send_Command(const CommandRequest& request);
+  void recv_Command(CommonResponse& _return, const int32_t seqid);
+  void Flush(CommonResponse& _return, const FlushRequest& request) override;
+  int32_t send_Flush(const FlushRequest& request);
+  void recv_Flush(CommonResponse& _return, const int32_t seqid);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;

@@ -2315,6 +2315,11 @@ Status ExplainLogicalPlan::Explain(const LogicalFlush *flush_node, SharedPtr<Vec
     }
 
     switch (flush_node->flush_type()) {
+        case FlushType::kDelta:
+            flush_header_str += "DELTA (";
+            flush_header_str += std::to_string(flush_node->node_id());
+            flush_header_str += ")";
+            break;
         case FlushType::kData:
             flush_header_str += "DATA (";
             flush_header_str += std::to_string(flush_node->node_id());

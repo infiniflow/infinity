@@ -311,3 +311,13 @@ class ThriftInfinityClient:
 
     def cleanup(self):
         return self.client.Cleanup(CommonRequest(session_id=self.session_id))
+
+    def command(self, command: ttypes.CommandRequest):
+        command.session_id = self.session_id
+        print(command)
+        return self.client.Command(command)
+
+    def flush(self, flush_request: ttypes.FlushRequest):
+        flush_request.session_id = self.session_id
+        print(flush_request)
+        return self.client.Flush(flush_request)
