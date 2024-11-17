@@ -480,7 +480,29 @@ Status Storage::WriterToAdmin() {
     current_storage_mode_ = StorageMode::kAdmin;
     return Status::OK();
 }
-Status WriterToReader() { return Status::OK(); }
+Status Storage::WriterToReader() {
+    if (periodic_trigger_thread_ != nullptr) {
+        periodic_trigger_thread_->Stop();
+        periodic_trigger_thread_.reset();
+    }
+
+    if (compact_processor_ != nullptr) {
+        compact_processor_->Stop(); // Different from Readable
+        compact_processor_.reset(); // Different from Readable
+    }
+
+    i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+
+    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+    periodic_trigger_thread_->cleanup_trigger_ =
+        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+    periodic_trigger_thread_->Start();
+
+    std::unique_lock<std::mutex> lock(mutex_);
+    current_storage_mode_ = StorageMode::kReadable;
+    return Status::OK();
+}
 Status UnInitFromWriter() { return Status::OK(); }
 
 ResultCacheManager *Storage::result_cache_manager() const noexcept {
@@ -567,7 +589,7 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                     return WriterToAdmin();
                 }
                 case StorageMode::kReadable: {
-                    break;
+                    return WriterToReader();
                 }
                 case StorageMode::kWritable: {
                     UnrecoverableError("Attempt to set storage mode from Writable to Writable");
