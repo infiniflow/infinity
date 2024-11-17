@@ -330,6 +330,8 @@ void ClusterManager::CheckHeartBeat() {
         String error_message = "Invalid node role.";
         UnrecoverableError(error_message);
     }
+    hb_running_ = true;
+    this_node_->set_heartbeat_interval(1000);
     hb_periodic_thread_ = MakeShared<Thread>([this] { this->CheckHeartBeatThread(); });
 }
 
@@ -357,9 +359,9 @@ void ClusterManager::CheckHeartBeatThread() {
             if (other_node_status == NodeStatus::kAlive) {
                 u64 other_node_update_ts = other_node->update_ts();
                 u64 this_node_update_ts = this_node_->update_ts();
-                u64 this_node_hb_interval = this_node_->heartbeat_interval();
+//                u64 this_node_hb_interval = this_node_->heartbeat_interval();
 
-                if (other_node_update_ts + 2 * this_node_hb_interval < this_node_update_ts) {
+                if (other_node_update_ts + 4 < this_node_update_ts) {
                     other_node->set_node_status(NodeStatus::kTimeout);
                     LOG_INFO(fmt::format("Node {} is timeout", node_name));
                 }
