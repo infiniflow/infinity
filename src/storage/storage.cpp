@@ -141,7 +141,40 @@ Status Storage::UnInitFromAdmin() {
     LOG_INFO(fmt::format("Start to un-initialize storage from admin mode to un-init"));
     {
         std::unique_lock<std::mutex> lock(mutex_);
+
+        if (persistence_manager_ != nullptr) {
+            persistence_manager_.reset();
+        }
+
+        switch (config_ptr_->StorageType()) {
+            case StorageType::kLocal: {
+                // Not init remote store
+                break;
+            }
+            case StorageType::kMinio: {
+                if (object_storage_processor_ != nullptr) {
+                    object_storage_processor_->Stop();
+                    object_storage_processor_.reset();
+                    VirtualStore::UnInitRemoteStore();
+                }
+                break;
+            }
+            default: {
+                UnrecoverableError(fmt::format("Unsupported storage type: {}.", ToString(config_ptr_->StorageType())));
+            }
+        }
+
+        if (wal_mgr_ != nullptr) {
+            wal_mgr_->Stop();
+            wal_mgr_.reset();
+        }
+
         wal_mgr_.reset();
+
+        if (memory_index_tracer_ != nullptr) {
+            memory_index_tracer_.reset();
+        }
+
         current_storage_mode_ = StorageMode::kUnInitialized;
     }
     LOG_INFO(fmt::format("Finishing un-initializing storage from admin mode to un-init"));

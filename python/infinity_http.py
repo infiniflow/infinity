@@ -231,6 +231,14 @@ class infinity_http:
         return database_result(node_name=r.json()["node"]["name"], node_role=r.json()["node"]["role"],
                                node_status=r.json()["node"]["status"])
 
+    def show_current_node(self):
+        url = f"admin/node/current"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        # print(r.json())
+        return database_result(node_role=r.json()["node"]["role"])
+
     def show_global_variables(self):
         url = "variables/global"
         h = self.net.set_up_header(["accept"])
