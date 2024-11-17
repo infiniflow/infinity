@@ -1725,6 +1725,34 @@ void InfinityThriftService::ShowCurrentNode(infinity_thrift_rpc::ShowCurrentNode
     }
 }
 
+void InfinityThriftService::Command(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CommandRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+    LOG_TRACE(fmt::format("THRIFT: Command Type: {}, Test Command Content: {}", request.command_type, request.test_command_content));
+    if (request.command_type != "test_command") {
+        LOG_WARN(fmt::format("Not support command type: {}", request.command_type));
+        return;
+    }
+
+    QueryResult result = infinity->TestCommand(request.test_command_content);
+    ProcessQueryResult(response, result);
+}
+
+void InfinityThriftService::Flush(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::FlushRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+    LOG_TRACE(fmt::format("THRIFT: Flush Type: {}", request.flush_type));
+
+    QueryResult result = infinity->Flush(request.flush_type);
+    ProcessQueryResult(response, result);
+}
+
 Tuple<Infinity *, Status> InfinityThriftService::GetInfinityBySessionID(i64 session_id) {
     std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
     auto iter = infinity_session_map_.find(session_id);

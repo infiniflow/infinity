@@ -412,6 +412,10 @@ class ShowCurrentNodeRequest;
 
 class ShowCurrentNodeResponse;
 
+class CommandRequest;
+
+class FlushRequest;
+
 typedef struct _Property__isset {
   _Property__isset() : key(false), value(false) {}
   bool key :1;
@@ -5885,6 +5889,113 @@ class ShowCurrentNodeResponse : public virtual ::apache::thrift::TBase {
 void swap(ShowCurrentNodeResponse &a, ShowCurrentNodeResponse &b);
 
 std::ostream& operator<<(std::ostream& out, const ShowCurrentNodeResponse& obj);
+
+typedef struct _CommandRequest__isset {
+  _CommandRequest__isset() : session_id(false), command_type(false), test_command_content(false) {}
+  bool session_id :1;
+  bool command_type :1;
+  bool test_command_content :1;
+} _CommandRequest__isset;
+
+class CommandRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  CommandRequest(const CommandRequest&);
+  CommandRequest& operator=(const CommandRequest&);
+  CommandRequest() noexcept
+                 : session_id(0),
+                   command_type(),
+                   test_command_content() {
+  }
+
+  virtual ~CommandRequest() noexcept;
+  int64_t session_id;
+  std::string command_type;
+  std::string test_command_content;
+
+  _CommandRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_command_type(const std::string& val);
+
+  void __set_test_command_content(const std::string& val);
+
+  bool operator == (const CommandRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(command_type == rhs.command_type))
+      return false;
+    if (!(test_command_content == rhs.test_command_content))
+      return false;
+    return true;
+  }
+  bool operator != (const CommandRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const CommandRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(CommandRequest &a, CommandRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const CommandRequest& obj);
+
+typedef struct _FlushRequest__isset {
+  _FlushRequest__isset() : session_id(false), flush_type(false) {}
+  bool session_id :1;
+  bool flush_type :1;
+} _FlushRequest__isset;
+
+class FlushRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  FlushRequest(const FlushRequest&);
+  FlushRequest& operator=(const FlushRequest&);
+  FlushRequest() noexcept
+               : session_id(0),
+                 flush_type() {
+  }
+
+  virtual ~FlushRequest() noexcept;
+  int64_t session_id;
+  std::string flush_type;
+
+  _FlushRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_flush_type(const std::string& val);
+
+  bool operator == (const FlushRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(flush_type == rhs.flush_type))
+      return false;
+    return true;
+  }
+  bool operator != (const FlushRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const FlushRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(FlushRequest &a, FlushRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const FlushRequest& obj);
 
 } // namespace
 

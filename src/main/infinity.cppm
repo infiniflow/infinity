@@ -72,7 +72,7 @@ public:
 
     QueryResult ShowDatabase(const String &db_name);
 
-    QueryResult Flush();
+    QueryResult Flush(const String &flush_type = "");
 
     QueryResult SetVariableOrConfig(const String &name, bool value, SetScope scope);
 
@@ -203,6 +203,8 @@ public:
 
     QueryResult ForceCheckpoint();
     QueryResult CompactTable(const String &db_name, const String &table_name);
+
+    QueryResult TestCommand(const String &command_content);
 
     // Admin interface
     QueryResult AdminShowCatalogs();

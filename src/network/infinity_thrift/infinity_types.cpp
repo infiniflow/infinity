@@ -14877,4 +14877,248 @@ void ShowCurrentNodeResponse::printTo(std::ostream& out) const {
   out << ")";
 }
 
+
+CommandRequest::~CommandRequest() noexcept {
+}
+
+
+void CommandRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void CommandRequest::__set_command_type(const std::string& val) {
+  this->command_type = val;
+}
+
+void CommandRequest::__set_test_command_content(const std::string& val) {
+  this->test_command_content = val;
+}
+std::ostream& operator<<(std::ostream& out, const CommandRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t CommandRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->command_type);
+          this->__isset.command_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->test_command_content);
+          this->__isset.test_command_content = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t CommandRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("CommandRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("command_type", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->command_type);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("test_command_content", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->test_command_content);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(CommandRequest &a, CommandRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.command_type, b.command_type);
+  swap(a.test_command_content, b.test_command_content);
+  swap(a.__isset, b.__isset);
+}
+
+CommandRequest::CommandRequest(const CommandRequest& other540) {
+  session_id = other540.session_id;
+  command_type = other540.command_type;
+  test_command_content = other540.test_command_content;
+  __isset = other540.__isset;
+}
+CommandRequest& CommandRequest::operator=(const CommandRequest& other541) {
+  session_id = other541.session_id;
+  command_type = other541.command_type;
+  test_command_content = other541.test_command_content;
+  __isset = other541.__isset;
+  return *this;
+}
+void CommandRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "CommandRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "command_type=" << to_string(command_type);
+  out << ", " << "test_command_content=" << to_string(test_command_content);
+  out << ")";
+}
+
+
+FlushRequest::~FlushRequest() noexcept {
+}
+
+
+void FlushRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void FlushRequest::__set_flush_type(const std::string& val) {
+  this->flush_type = val;
+}
+std::ostream& operator<<(std::ostream& out, const FlushRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t FlushRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->flush_type);
+          this->__isset.flush_type = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t FlushRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("FlushRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("flush_type", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->flush_type);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(FlushRequest &a, FlushRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.flush_type, b.flush_type);
+  swap(a.__isset, b.__isset);
+}
+
+FlushRequest::FlushRequest(const FlushRequest& other542) {
+  session_id = other542.session_id;
+  flush_type = other542.flush_type;
+  __isset = other542.__isset;
+}
+FlushRequest& FlushRequest::operator=(const FlushRequest& other543) {
+  session_id = other543.session_id;
+  flush_type = other543.flush_type;
+  __isset = other543.__isset;
+  return *this;
+}
+void FlushRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "FlushRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "flush_type=" << to_string(flush_type);
+  out << ")";
+}
+
 } // namespace

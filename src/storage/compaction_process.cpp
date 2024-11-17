@@ -213,9 +213,6 @@ void CompactionProcessor::DoDumpByline(DumpIndexBylineTask *dump_task) {
         if (dumped_chunk->deprecate_ts_ != UNCOMMIT_TS) {
             RecoverableError(Status::TxnRollback(txn->TxnID(), fmt::format("Dumped chunk {} is deleted.", dumped_chunk->encode())));
         }
-        auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-        TxnTableStore *txn_table_store = txn->GetTxnTableStore(table_entry);
-        txn_table_store->AddChunkIndexStore(table_index_entry, dumped_chunk);
 
         SharedPtr<SegmentIndexEntry> segment_index_entry;
         bool created = table_index_entry->GetOrCreateSegment(dump_task->segment_id_, txn, segment_index_entry);
@@ -287,6 +284,12 @@ void CompactionProcessor::Process() {
                         UnrecoverableError("Uninitialized storage mode");
                     }
                     if (storage_mode == StorageMode::kWritable) {
+                        if (auto cmd = test_commander_.Check(BGTaskType::kDumpIndexByline)) {
+                            if (cmd.value() == "stuck for 3 seconds") {
+                                LOG_INFO("Compact process stuck for 3 seconds");
+                                std::this_thread::sleep_for(std::chrono::seconds(1));
+                            }
+                        }
                         auto dump_task = static_cast<DumpIndexBylineTask *>(bg_task.get());
                         LOG_DEBUG(dump_task->ToString());
                         // Trigger transaction to save the mem index

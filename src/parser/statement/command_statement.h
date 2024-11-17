@@ -30,7 +30,8 @@ enum class CommandType {
     kCheckTable,
     kLockTable,
     kUnlockTable,
-    kCleanup
+    kCleanup,
+    kTestCommand,
 };
 
 class CommandInfo {
@@ -235,6 +236,18 @@ public:
     std::shared_ptr<CommandInfo> command_info_{};
 
     [[nodiscard]] std::string ToString() const final;
+};
+
+class TestCmd final : public CommandInfo {
+public:
+    TestCmd(std::string command_content) : CommandInfo(CommandType::kTestCommand), command_content_(command_content) {}
+
+    [[nodiscard]] std::string ToString() const final;
+
+    const std::string &command_content() { return command_content_; }
+
+private:
+    std::string command_content_{};
 };
 
 } // namespace infinity

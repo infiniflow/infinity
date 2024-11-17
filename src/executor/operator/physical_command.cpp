@@ -434,6 +434,17 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             }
             break;
         }
+        case CommandType::kTestCommand: {
+            auto *test_command = static_cast<TestCmd *>(command_info_.get());
+            LOG_INFO(fmt::format("Execute test command: {}", test_command->command_content()));
+            if (test_command->command_content() == "stuck dump by line bg_task for 3 second") {
+                auto *compact_processor = query_context->storage()->compaction_processor();
+                compact_processor->AddTestCommand(BGTaskType::kTestCommand, "stuck for 3 seconds");
+            } else if (test_command->command_content() == "delta checkpoint") {
+                
+            }
+            break;
+        }
         default: {
             String error_message = fmt::format("Invalid command type: {}", command_info_->ToString());
             UnrecoverableError(error_message);

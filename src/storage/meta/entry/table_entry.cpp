@@ -774,6 +774,9 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
             if (chunk_index_entry.get() != nullptr) {
                 chunk_index_entry->Commit(txn->CommitTS());
 
+                TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+
                 auto *compaction_process = InfinityContext::instance().storage()->compaction_processor();
 
                 compaction_process->Submit(

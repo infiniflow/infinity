@@ -44,4 +44,6 @@ DumpIndexBylineTask::DumpIndexBylineTask(SharedPtr<String> db_name,
     : BGTask(BGTaskType::kDumpIndexByline, true), db_name_(db_name), table_name_(table_name), index_name_(index_name), segment_id_(segment_id),
       dumped_chunk_(dumped_chunk) {}
 
+TestCommandTask::TestCommandTask(String command_content) : BGTask(BGTaskType::kTestCommand, true), command_content_(std::move(command_content)) {}
+
 } // namespace infinity

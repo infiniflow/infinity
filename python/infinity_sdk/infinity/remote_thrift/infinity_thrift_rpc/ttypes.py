@@ -8682,6 +8682,153 @@ class ShowCurrentNodeResponse(object):
 
     def __ne__(self, other):
         return not (self == other)
+
+
+class CommandRequest(object):
+    """
+    Attributes:
+     - session_id
+     - command_type
+     - test_command_content
+
+    """
+
+
+    def __init__(self, session_id=None, command_type=None, test_command_content=None,):
+        self.session_id = session_id
+        self.command_type = command_type
+        self.test_command_content = test_command_content
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.command_type = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.test_command_content = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('CommandRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.command_type is not None:
+            oprot.writeFieldBegin('command_type', TType.STRING, 2)
+            oprot.writeString(self.command_type.encode('utf-8') if sys.version_info[0] == 2 else self.command_type)
+            oprot.writeFieldEnd()
+        if self.test_command_content is not None:
+            oprot.writeFieldBegin('test_command_content', TType.STRING, 3)
+            oprot.writeString(self.test_command_content.encode('utf-8') if sys.version_info[0] == 2 else self.test_command_content)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class FlushRequest(object):
+    """
+    Attributes:
+     - session_id
+     - flush_type
+
+    """
+
+
+    def __init__(self, session_id=None, flush_type=None,):
+        self.session_id = session_id
+        self.flush_type = flush_type
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.flush_type = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('FlushRequest')
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 1)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        if self.flush_type is not None:
+            oprot.writeFieldBegin('flush_type', TType.STRING, 2)
+            oprot.writeString(self.flush_type.encode('utf-8') if sys.version_info[0] == 2 else self.flush_type)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
 all_structs.append(Property)
 Property.thrift_spec = (
     None,  # 0
@@ -9386,6 +9533,19 @@ ShowCurrentNodeResponse.thrift_spec = (
     (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.STRING, 'node_role', 'UTF8', None, ),  # 3
+)
+all_structs.append(CommandRequest)
+CommandRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'command_type', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'test_command_content', 'UTF8', None, ),  # 3
+)
+all_structs.append(FlushRequest)
+FlushRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.I64, 'session_id', None, None, ),  # 1
+    (2, TType.STRING, 'flush_type', 'UTF8', None, ),  # 2
 )
 fix_spec(all_structs)
 del all_structs
