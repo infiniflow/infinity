@@ -64,6 +64,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
     if (!status.ok()) {
         std::exit(static_cast<int>(status.code()));
     }
+    InfinityContext::instance().config()->PrintAll(); // Print all configs
     status = Logger::Initialize(config_.get());
     if (!status.ok()) {
         std::exit(static_cast<int>(status.code()));
