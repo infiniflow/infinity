@@ -81,6 +81,7 @@ void ClusterManager::CheckHeartBeatThread() {
         auto time_since_epoch = now.time_since_epoch();
         this_node_->set_update_ts(std::chrono::duration_cast<std::chrono::seconds>(time_since_epoch).count());
 
+        std::unique_lock cluster_lock(cluster_mutex_);
         for (auto &[node_name, other_node] : other_node_map_) {
             NodeStatus other_node_status = other_node->node_status();
             if (other_node_status == NodeStatus::kAlive) {
