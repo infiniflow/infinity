@@ -15,7 +15,7 @@ filter_keywords = [
 thread_sanitizer_delimiter = "=================="
 
 
-def filter_warning(lines: list[str]):
+def filter_warning(lines: list[str], filter_keywords: list[str] = filter_keywords) -> list[str]:
     ret = []
     warning = []
     in_warning = False
