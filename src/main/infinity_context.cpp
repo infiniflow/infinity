@@ -48,7 +48,7 @@ NodeRole InfinityContext::GetServerRole() const {
     return cluster_manager_->GetNodeRole();
 }
 
-void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag, DefaultConfig *default_config) {
+void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, bool admin_flag, DefaultConfig *default_config) {
 
     if (GetServerRole() != NodeRole::kUnInitialized) {
         LOG_ERROR("Infinity is already initialized.");
@@ -83,10 +83,14 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
         return;
     }
     Status change_result = ChangeServerRole(NodeRole::kAdmin);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
+    if (!change_result.ok()) {
+        UnrecoverableError(change_result.message());
         return;
     }
+}
+
+void InfinityContext::InitPhase2() {
+
     if (config_->ServerMode() == "cluster") {
         // Admin mode or cluster start phase
         return;
@@ -102,6 +106,8 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, bool admin_flag
         UnrecoverableError(fmt::format("Unexpected server mode: {}", config_->ServerMode()));
         return;
     }
+
+    infinity_context_started_ = true;
 }
 
 Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, u16 node_port) {
@@ -452,9 +458,9 @@ void InfinityContext::UnInit() {
         cluster_manager_.reset();
     }
 
-//    inverting_thread_pool_.stop(true);
-//    commiting_thread_pool_.stop(true);
-//    hnsw_build_thread_pool_.stop(true);
+    //    inverting_thread_pool_.stop(true);
+    //    commiting_thread_pool_.stop(true);
+    //    hnsw_build_thread_pool_.stop(true);
 
     session_mgr_.reset();
     resource_manager_.reset();
