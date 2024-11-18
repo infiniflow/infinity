@@ -16,17 +16,19 @@ Infinity offers powerful search capabilities. This page covers the search usage.
 	- [Dense vector search](#dense-vector-search)
 	- [Sparse vector search](#sparse-vector-search)
 	- [Tensor search](#tensor-search)
+		- [Tensor vs. multi-vector](#tensor-vs-multi-vector)
+		- [Performance tuning](#performance-tuning)
 	- [Hybrid search](#hybrid-search)
 	- [Conditional filters](#conditional-filters)
 		- [Filter based on secondary index](#filter-based-on-secondary-index)
-		- [Filter based on full text index](#filter-based-on-full-text-index)
+		- [Filter based on full-text index](#filter-based-on-full-text-index)
 
 ## Full text search
 
 Full text search will work if full text index is created. There are two kinds of work modes for full text indexing:
 
-- Real time mode -- If the full text index is created immediately after the table is created, then the full-text index will work in real time mode if data is ingested at this time. Real time index will accumulate posting data within memory and flush to disk if it reaches up the quota.
-- Offline mode -- If the full text index is created after the data is ingested, then it will work under offline mode, where the full text index is constructed through external sorting.
+- Real-time mode - If the full text index is created immediately after the table is created, then the full-text index will work in real time mode if data is ingested at this time. Real time index will accumulate posting data within memory and flush to disk if it reaches up the quota.
+- Offline mode - If the full text index is created after the data is ingested, then it will work under offline mode, where the full text index is constructed through external sorting.
 
 ### Tokenizer
 
@@ -80,50 +82,26 @@ Infinity also has built-in support for multi-vector search. Each row in a table 
 
 ## Sparse vector search
 
-Sparse vector search is based on sparse vector index, implemented according to [Block-Max Pruning(BMP)](https://arxiv.org/abs/2405.01117) . Infinity also offers real time search for sparse vector by default.
+Infinity supports real-time sparse vector search, which is based on a sparse vector index implemented using [Block-Max Pruning(BMP)](https://arxiv.org/abs/2405.01117).
 
 ## Tensor search
 
-`Tensor` is actually multi-vector. It is used to serve the scenario where embedding of all the tokens of each document needs to be preserved. However, it's different from `multi-vector` in dense vector search. Because `multi-vector` search is still a general KNN search,  and the search results will be aggregated according to vector identifiers, while `tensor` is dedicated to `ColXXX` models where `Col` means `contextualized late interaction`and `xxx` refers to a series models that can be added with `Col adaptor`, such as `ColBERT`, `ColPali`,`ColQwen2`,...,etc.  For these late interaction models, `MaxSim` is a special similarty operation which accumulate the similarity among all pair embeddings between query tensor and document tensor.
+### Tensor vs. multi-vector
 
-As a result, these types are similar but have different meaning:
+Tensors work in scenarios where all tokens of a document need to be preserved. Tensor is another form of multi-vector, but *not* the multi-vector mentioned in dense vector search. They share similarities but are different in several aspects:
 
-- `multivector`: Used for dense vector search.
+Multi-vectors are mainly used for dense vector search, while tensors are mainly used for tensor reranking. Tensor search is *not* recommended due to the potential for significant storage overhead when converting raw documents to tensors; tensors are more appropriate for reranking in a [hyprid search](#hybrid-search).
 
-```json
-{
-	"name": "multivector_column",
-	"type": "multivector,4,float",
-	"default": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
-},  
-```
+A multi-vector search remains a KNN search, where search results are aggregated using vector identifiers. In contrast, a tensor search uses 'Colxxx' models, such as ColBERT, ColPali, and ColQwen2. In this context, 'Col' denotes 'contextualized late interaction' and 'xxx' refers to specific models that can be added using a 'Col adapter'. Additionally, a tensor search uses the MaxSim method for similarity operations, which accumulates similarities of all tensor pairs between a query tensor and a document tensor.
 
-- `tensor`: Used for tensor search and tensor reranking.
+Tensor arrays are specifically used with late interaction models with a token limit. For example, the ColBERT model has a token limit of 128, meaning that it cannot generate tensors for documents exceeding this token limit. In such cases, a document is split into multiple chunks, with each chunk represented by a tensor and all tensors for that document stored as a tensor array. During search and reranking, MaxSim scores of all tensor pairs (between a query tensor and a chunk tensor) are calculated and aggregated to produce the final MaxSim score for each document.
 
-```json
-{
-	"name": "tensor_column",
-	"type": "tensor,4,float",
-	"default": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]
-}, 
-```
+### Performance tuning
 
-- `tensorarray`: It's used to serve scenarios where there are some late interaction models having token limits. For example, the ColBERT model has a token limit of 128, which means it cannot generate tensor for documents with tokens larger than 128.  In that case, the document is splitted into multiple chunks, each encoded into a tensor. And tensors for each document can be stored into a `tensorarray` . During search and reranking, the `MaxSim` of each tensor pair is computed at first, the eventual `MaxSim` score for each document is the accumulation of all `MaxSim` scores among all tensor pairs.
+Infinity offers two approaches for improving the performance of a tensor search:
 
-```json
-{
-	"name": "tensorarray_column",
-	"type": "tensorarray,2,float",
-	"default": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]]
-}   
-```
-
-Due to the storage explosion caused by tensor compared with raw document data, tensor search is not recommended to use directly. It's more suitable to be used as a reranker, which will be described in the hybrid search part.
-
-Infinity offers two approaches to improve tensor performance:
-
-- Binary quantization : It uses single bit to represent each float in the tensor and therefore consumes 1/32 of the space of the original tensor. Infinity supports the insertion of data directly into the database as a result of such quantization.
-- Hamming distance : If tensor data is inserted into Infinity after binary quantization, the `MaxSim` operation is performed on hamming distance, which is a kind of acceleration compared with the original inner product between embeddings.
+- Binary quantization: Each float in a tensor is represented by a bit, occupying only 1/32 of the original tensor's space. Infinity supports direct insertion of tensor data resulting from binary quantization.
+- Hamming distance: The MaxSim scores of tensor data inserted after binary quantization are calculated using the Hamming distance instead of the inner product, thereby accelerating retrieval.
 
 ## Hybrid search
 
@@ -131,11 +109,11 @@ Infinity offers you the flexibility to assemble any search methods into the hybr
 
 Infinity offers three kinds of rerankers for the fusion:
 
-- `rrf`: Reciprocal rank fusion
+- `rrf`: Reciprocal rank fusion  
   RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval method.
-- `weighted_sum`
+- `weighted_sum`  
   The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.
-- `match_tensor`
+- `match_tensor`  
   The `tensor` based rank fusion, the final results are decided by the `MaxSim` operator between the tensor of query and tensor of each document.
 
 ## Conditional filters
@@ -150,6 +128,6 @@ Secondary index is built on numeric and string columns. It's optimized for colum
 
 Filters based on secondary index can have any number of logical combinations, supported expressions include `<`, `<=`, `>`, `>=`, `=`, `==`, `!=`, `in`, `not in` .
 
-### Filter based on full text index
+### Filter based on full-text index
 
 Full text index provides filters through `filter_fulltext` , since it's a keyword based filter, it does not provide similar expressions as filters based on secondary index.  It has a special parameter of `minimum_should_match` , which specifies how many keywords should be satisfied at least during fitlering.
