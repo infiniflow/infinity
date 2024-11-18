@@ -8,21 +8,6 @@ slug: /search_guide
 
 Infinity offers powerful search capabilities. This page covers the search usage.  These search operators are available:
 
-- [Search usage guide](#search-usage-guide)
-	- [Overview](#overview)
-	- [Full text search](#full-text-search)
-		- [Tokenizer](#tokenizer)
-		- [Search and ranking](#search-and-ranking)
-	- [Dense vector search](#dense-vector-search)
-	- [Sparse vector search](#sparse-vector-search)
-	- [Tensor search](#tensor-search)
-		- [Tensor vs. multi-vector](#tensor-vs-multi-vector)
-		- [Performance tuning](#performance-tuning)
-	- [Hybrid search](#hybrid-search)
-	- [Conditional filters](#conditional-filters)
-		- [Filter based on secondary index](#filter-based-on-secondary-index)
-		- [Filter based on full-text index](#filter-based-on-full-text-index)
-
 ## Full text search
 
 Full text search will work if full text index is created. There are two kinds of work modes for full text indexing:
@@ -88,13 +73,15 @@ Infinity supports real-time sparse vector search, which is based on a sparse vec
 
 ### Tensor vs. multi-vector
 
-Tensors work in scenarios where all tokens of a document need to be preserved. Tensor is another form of multi-vector, but *not* the multi-vector mentioned in dense vector search. They share similarities but are different in several aspects:
+Tensors work in scenarios where embeddings of all tokens of each document need to be preserved. Tensor is another form of multi-vector, but *not* the multi-vector mentioned in dense vector search. They share similarities but are different in several aspects:
 
 Multi-vectors are mainly used for dense vector search, while tensors are mainly used for tensor reranking. Tensor search is *not* recommended due to the potential for significant storage overhead when converting raw documents to tensors; tensors are more appropriate for reranking in a [hyprid search](#hybrid-search).
 
-A multi-vector search remains a KNN search, where search results are aggregated using vector identifiers. In contrast, a tensor search uses 'Colxxx' models, such as ColBERT, ColPali, and ColQwen2. In this context, 'Col' denotes 'contextualized late interaction' and 'xxx' refers to specific models that can be added using a 'Col adapter'. Additionally, a tensor search uses the MaxSim method for similarity operations, which accumulates similarities of all tensor pairs between a query tensor and a document tensor.
+A multi-vector search remains a KNN search, where search results are aggregated using vector identifiers. In contrast, a tensor search uses 'Colxxx' models, such as ColBERT, ColPali, and ColQwen2. In this context, 'Col' denotes 'contextualized late interaction' and 'xxx' refers to specific models that can be added using a 'Col adapter'. Additionally, a tensor search uses the MaxSim method for similarity operations, which accumulates similarities of all embedding pairs between a query tensor and a document tensor.
 
-Tensor arrays are specifically used with late interaction models with a token limit. For example, the ColBERT model has a token limit of 128, meaning that it cannot generate tensors for documents exceeding this token limit. In such cases, a document is split into multiple chunks, with each chunk represented by a tensor and all tensors for that document stored as a tensor array. During search and reranking, MaxSim scores of all tensor pairs (between a query tensor and a chunk tensor) are calculated and aggregated to produce the final MaxSim score for each document.
+### Tensor array
+
+Tensor arrays are specifically used with late interaction models with a token limit. For example, the ColBERT model has a token limit of 128, meaning that it cannot generate tensors for documents exceeding this token limit. In such cases, a document is split into multiple chunks, with each chunk represented by a tensor and all tensors for that document stored as a tensor array. During search and reranking, MaxSim scores of all embedding pairs (between a query tensor and a chunk tensor) are calculated and aggregated to produce the final MaxSim score for each document.
 
 ### Performance tuning
 
@@ -105,7 +92,7 @@ Infinity offers two approaches for improving the performance of a tensor search:
 
 ## Hybrid search
 
-Infinity offers you the flexibility to assemble any search methods into the hybrid search pipeline, including full text search, vector search and sparse vector search. For any combinations, a fusion must be attached to decide the final ranking results. The outputs of fusion can also be further combined with other search ways, for example, you can assemble dense vector search and sparse vector search to build the first stage retrieval, attached with a fusion reranker, then continue assemble the fused results with full text search to build the second stage retrieval.
+Infinity offers you the flexibility to assemble any search methods into the hybrid search pipeline, including full-text search, vector search and sparse vector search. For any combinations, a fusion must be attached to decide the final ranking results. The outputs of fusion can also be further combined with other search ways, for example, you can assemble dense vector search and sparse vector search to build the first stage retrieval, attached with a fusion reranker, then continue assemble the fused results with full text search to build the second stage retrieval.
 
 Infinity offers three kinds of rerankers for the fusion:
 
