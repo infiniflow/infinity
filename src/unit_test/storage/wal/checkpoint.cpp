@@ -140,7 +140,8 @@ TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
     infinity::GlobalResourceUsage::Init();
 #endif
     std::shared_ptr<std::string> config_path = CheckpointTest::config_path();
-    infinity::InfinityContext::instance().Init(config_path);
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
 
     Storage *storage = infinity::InfinityContext::instance().storage();
     BufferManager *buffer_manager = storage->buffer_manager();
@@ -218,7 +219,8 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
 
     // create table and shutdown
     {
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         {
@@ -241,7 +243,8 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
     }
     // create index and shutdown
     {
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
@@ -264,7 +267,8 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
     }
     // drop index and shutdown
     {
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
@@ -283,7 +287,8 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
     }
     // now restart and recreate index should be ok
     {
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
@@ -331,7 +336,8 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
     // create table
     // create index, insert data and shutdown
     {
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         BGTaskProcessor *bg_processor = storage->bg_processor();
@@ -407,7 +413,8 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
     }
     // now restart and recreate index should be ok
     {
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
@@ -447,7 +454,8 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
     String wal_dir;
     int insert_n = 100;
     {
-        infinity::InfinityContext::instance().Init(nullptr /*config_path*/);
+        infinity::InfinityContext::instance().InitPhase1(nullptr /*config_path*/);
+        infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
@@ -493,7 +501,8 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
     }
     RemoveOldWal(wal_dir);
     {
-        infinity::InfinityContext::instance().Init(nullptr /*config_path*/);
+        infinity::InfinityContext::instance().InitPhase1(nullptr /*config_path*/);
+        infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = infinity::InfinityContext::instance().storage();
         auto *txn_mgr = storage->txn_manager();
 

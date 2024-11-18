@@ -144,7 +144,8 @@ TEST_P(SealingTaskTest, append_unsealed_segment_sealed) {
         infinity::GlobalResourceUsage::Init();
         std::shared_ptr<std::string> config_path = nullptr;
         RemoveDbDirs();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
         Storage *storage = infinity::InfinityContext::instance().storage();
         // BufferManager *buffer_manager = storage->buffer_manager();
         TxnManager *txn_mgr = storage->txn_manager();

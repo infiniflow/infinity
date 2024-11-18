@@ -4126,6 +4126,27 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
         }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("status");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                bool infinity_started = InfinityContext::instance().InfinityContextStarted();
+                String infinity_status("started");
+                if (!infinity_started) {
+                    infinity_status = "starting";
+                }
+                Value value = Value::MakeVarchar(infinity_status);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
     }
 
     output_block_ptr->Finalize();

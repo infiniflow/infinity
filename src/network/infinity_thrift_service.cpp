@@ -1720,6 +1720,11 @@ void InfinityThriftService::ShowCurrentNode(infinity_thrift_rpc::ShowCurrentNode
             response.node_role = value.GetVarchar();
         }
 
+        {
+            Value value = data_block->GetValue(1, 1);
+            response.server_status = value.GetVarchar();
+        }
+
         response.__set_error_code((i64)(result.ErrorCode()));
     } else {
         ProcessQueryResult(response, result);

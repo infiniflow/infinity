@@ -8611,14 +8611,16 @@ class ShowCurrentNodeResponse(object):
      - error_code
      - error_msg
      - node_role
+     - server_status
 
     """
 
 
-    def __init__(self, error_code=None, error_msg=None, node_role=None,):
+    def __init__(self, error_code=None, error_msg=None, node_role=None, server_status=None,):
         self.error_code = error_code
         self.error_msg = error_msg
         self.node_role = node_role
+        self.server_status = server_status
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -8644,6 +8646,11 @@ class ShowCurrentNodeResponse(object):
                     self.node_role = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRING:
+                    self.server_status = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -8665,6 +8672,10 @@ class ShowCurrentNodeResponse(object):
         if self.node_role is not None:
             oprot.writeFieldBegin('node_role', TType.STRING, 3)
             oprot.writeString(self.node_role.encode('utf-8') if sys.version_info[0] == 2 else self.node_role)
+            oprot.writeFieldEnd()
+        if self.server_status is not None:
+            oprot.writeFieldBegin('server_status', TType.STRING, 4)
+            oprot.writeString(self.server_status.encode('utf-8') if sys.version_info[0] == 2 else self.server_status)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -9533,6 +9544,7 @@ ShowCurrentNodeResponse.thrift_spec = (
     (1, TType.I64, 'error_code', None, None, ),  # 1
     (2, TType.STRING, 'error_msg', 'UTF8', None, ),  # 2
     (3, TType.STRING, 'node_role', 'UTF8', None, ),  # 3
+    (4, TType.STRING, 'server_status', 'UTF8', None, ),  # 4
 )
 all_structs.append(CommandRequest)
 CommandRequest.thrift_spec = (
