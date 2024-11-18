@@ -14761,6 +14761,10 @@ void ShowCurrentNodeResponse::__set_error_msg(const std::string& val) {
 void ShowCurrentNodeResponse::__set_node_role(const std::string& val) {
   this->node_role = val;
 }
+
+void ShowCurrentNodeResponse::__set_server_status(const std::string& val) {
+  this->server_status = val;
+}
 std::ostream& operator<<(std::ostream& out, const ShowCurrentNodeResponse& obj)
 {
   obj.printTo(out);
@@ -14813,6 +14817,14 @@ uint32_t ShowCurrentNodeResponse::read(::apache::thrift::protocol::TProtocol* ip
           xfer += iprot->skip(ftype);
         }
         break;
+      case 4:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->server_status);
+          this->__isset.server_status = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -14842,6 +14854,10 @@ uint32_t ShowCurrentNodeResponse::write(::apache::thrift::protocol::TProtocol* o
   xfer += oprot->writeString(this->node_role);
   xfer += oprot->writeFieldEnd();
 
+  xfer += oprot->writeFieldBegin("server_status", ::apache::thrift::protocol::T_STRING, 4);
+  xfer += oprot->writeString(this->server_status);
+  xfer += oprot->writeFieldEnd();
+
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -14852,6 +14868,7 @@ void swap(ShowCurrentNodeResponse &a, ShowCurrentNodeResponse &b) {
   swap(a.error_code, b.error_code);
   swap(a.error_msg, b.error_msg);
   swap(a.node_role, b.node_role);
+  swap(a.server_status, b.server_status);
   swap(a.__isset, b.__isset);
 }
 
@@ -14859,12 +14876,14 @@ ShowCurrentNodeResponse::ShowCurrentNodeResponse(const ShowCurrentNodeResponse& 
   error_code = other538.error_code;
   error_msg = other538.error_msg;
   node_role = other538.node_role;
+  server_status = other538.server_status;
   __isset = other538.__isset;
 }
 ShowCurrentNodeResponse& ShowCurrentNodeResponse::operator=(const ShowCurrentNodeResponse& other539) {
   error_code = other539.error_code;
   error_msg = other539.error_msg;
   node_role = other539.node_role;
+  server_status = other539.server_status;
   __isset = other539.__isset;
   return *this;
 }
@@ -14874,6 +14893,7 @@ void ShowCurrentNodeResponse::printTo(std::ostream& out) const {
   out << "error_code=" << to_string(error_code);
   out << ", " << "error_msg=" << to_string(error_msg);
   out << ", " << "node_role=" << to_string(node_role);
+  out << ", " << "server_status=" << to_string(server_status);
   out << ")";
 }
 

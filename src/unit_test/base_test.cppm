@@ -166,7 +166,8 @@ public:
         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
             config_path = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
         }
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
     }
 
     void TearDown() override {

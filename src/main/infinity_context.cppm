@@ -54,7 +54,8 @@ public:
 
     NodeRole GetServerRole() const;
 
-    void Init(const SharedPtr<String> &config_path, bool admin_flag = false, DefaultConfig *default_config = nullptr);
+    void InitPhase1(const SharedPtr<String> &config_path, bool admin_flag = false, DefaultConfig *default_config = nullptr);
+    void InitPhase2();
     //    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
     Status
     ChangeServerRole(NodeRole target_role, bool from_leader = false, const String &node_name = {}, String leader_ip = {}, u16 leader_port = {});
@@ -70,6 +71,8 @@ public:
     void StartThriftServers();
     void StopThriftServers();
 
+    bool InfinityContextStarted() const { return infinity_context_started_; }
+
 private:
     friend class Singleton;
 
@@ -82,6 +85,7 @@ private:
     UniquePtr<Storage> storage_{};
     UniquePtr<SessionManager> session_mgr_{};
     UniquePtr<ClusterManager> cluster_manager_{};
+    atomic_bool infinity_context_started_{false};
 
     // For fulltext index
     ThreadPool inverting_thread_pool_{4};

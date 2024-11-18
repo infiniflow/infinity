@@ -85,7 +85,7 @@ void Infinity::Hello() { fmt::print("hello infinity\n"); }
 void Infinity::LocalInit(const String &path, const String &config_path) {
     if (!config_path.empty() && VirtualStore::Exists(config_path)) {
         SharedPtr<String> config_path_ptr = MakeShared<String>(config_path);
-        InfinityContext::instance().Init(config_path_ptr);
+        InfinityContext::instance().InitPhase1(config_path_ptr);
     } else {
         LOG_WARN(fmt::format("Infinity::LocalInit cannot find config: {}", config_path));
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
@@ -97,8 +97,9 @@ void Infinity::LocalInit(const String &path, const String &config_path) {
 
         default_config->default_log_level_ = LogLevel::kInfo;
         default_config->default_log_to_stdout_ = false;
-        InfinityContext::instance().Init(nullptr, false, default_config.get());
+        InfinityContext::instance().InitPhase1(nullptr, false, default_config.get());
     }
+    InfinityContext::instance().InitPhase2();
 }
 
 void Infinity::LocalUnInit() { InfinityContext::instance().UnInit(); }
