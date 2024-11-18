@@ -94,7 +94,8 @@ TEST_P(WalReplayTest, wal_replay_database) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -151,7 +152,8 @@ TEST_P(WalReplayTest, wal_replay_database) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -210,7 +212,8 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -263,7 +266,8 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -298,7 +302,8 @@ TEST_P(WalReplayTest, wal_replay_append) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -401,7 +406,8 @@ TEST_P(WalReplayTest, wal_replay_append) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -474,7 +480,8 @@ TEST_P(WalReplayTest, wal_replay_import) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -618,7 +625,8 @@ TEST_P(WalReplayTest, wal_replay_import) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -675,7 +683,8 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         BufferManager *buffer_manager = storage->buffer_manager();
@@ -754,7 +763,8 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -793,7 +803,8 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -866,7 +877,8 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -897,7 +909,8 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -972,7 +985,8 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();

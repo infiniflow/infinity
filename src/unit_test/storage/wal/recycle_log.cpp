@@ -56,7 +56,8 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         Config *config = storage->config();
@@ -124,7 +125,8 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         infinity::GlobalResourceUsage::Init(); // test replay
 #endif
         std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -150,7 +152,8 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         Config *config = storage->config();
@@ -226,7 +229,8 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
         infinity::GlobalResourceUsage::Init(); // test replay
 #endif
         std::shared_ptr<std::string> config_path = RecycleLogTest::test_ckp_recycle_config();
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();

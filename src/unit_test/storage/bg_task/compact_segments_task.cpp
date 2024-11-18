@@ -104,7 +104,8 @@ class SilentLogTestCompactTaskTest : public CompactTaskTest {
         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
             config_path = infinity::MakeShared<std::string>(config_path_str);
         }
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
     }
 };
 

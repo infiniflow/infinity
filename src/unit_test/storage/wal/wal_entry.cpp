@@ -198,7 +198,8 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
 
 TEST_F(WalEntryTest, ReadWrite) {
     RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(nullptr);
+    infinity::InfinityContext::instance().InitPhase1(nullptr);
+    infinity::InfinityContext::instance().InitPhase2();
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     entry->cmds_.push_back(MakeShared<WalCmdCreateDatabase>("db1", "default2_comment", "AAA_db1"));
     entry->cmds_.push_back(MakeShared<WalCmdDropDatabase>("db1"));
@@ -253,7 +254,9 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<ChunkID> deprecate_ids{0, 1};
         entry->cmds_.push_back(MakeShared<WalCmdDumpIndex>("db1", "tbl1", "idx1", 0 /*segment_id*/, chunk_infos, deprecate_ids));
     }
-    { entry->cmds_.push_back(MakeShared<WalCmdRenameTable>("db1", "tbl1", "tbl2")); }
+    {
+        entry->cmds_.push_back(MakeShared<WalCmdRenameTable>("db1", "tbl1", "tbl2"));
+    }
     {
         Vector<SharedPtr<ColumnDef>> column_defs;
         std::set<ConstraintType> constraints;

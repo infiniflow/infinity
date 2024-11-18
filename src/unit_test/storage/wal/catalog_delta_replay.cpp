@@ -120,7 +120,8 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
 
     std::shared_ptr<std::string> db_entry_dir1;
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -148,7 +149,8 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
         infinity::InfinityContext::instance().UnInit();
     }
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -190,7 +192,8 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
 
     std::shared_ptr<std::string> table_entry_dir1;
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -219,7 +222,8 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
         infinity::InfinityContext::instance().UnInit();
     }
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -256,7 +260,8 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -311,7 +316,8 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
         infinity::InfinityContext::instance().UnInit();
     }
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -355,7 +361,8 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -393,7 +400,8 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
         infinity::InfinityContext::instance().UnInit();
     }
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -436,7 +444,8 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
 
     std::shared_ptr<std::string> table_entry_dir1;
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -506,7 +515,8 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
     auto table_def_uncommitted = TableDef::Make(db_name, table_name_uncommitted, MakeShared<String>(), {column_def1, column_def2});
 
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -638,7 +648,8 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
 
     // now restart and the table `tb_uncommitted` should exist
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -682,7 +693,8 @@ TEST_P(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     String table_name = "tb1";
     config_path = nullptr;
     RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(config_path);
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
 
     Storage *storage = infinity::InfinityContext::instance().storage();
     BufferManager *buffer_manager = storage->buffer_manager();
@@ -751,7 +763,8 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -905,7 +918,8 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
 
         TxnManager *txn_mgr = storage->txn_manager();
@@ -1071,7 +1085,8 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
 
     {
-        InfinityContext::instance().Init(config_path);
+        InfinityContext::instance().InitPhase1(config_path);
+        InfinityContext::instance().InitPhase2();
         Storage *storage = InfinityContext::instance().storage();
         BufferManager *buffer_manager = storage->buffer_manager();
         CompactionProcessor *compaction_processor = storage->compaction_processor();
