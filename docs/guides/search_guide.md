@@ -8,7 +8,7 @@ slug: /search_guide
 
 Infinity offers powerful search capabilities. This page covers the search usage.  These search operators are available:
 
-## Full text search
+## Full-text search
 
 Full text search will work if full text index is created. There are two kinds of work modes for full text indexing:
 
@@ -92,7 +92,7 @@ Infinity offers two approaches for improving the performance of a tensor search:
 
 ## Hybrid search
 
-Infinity offers you the flexibility to assemble any search methods into the hybrid search pipeline, including full-text search, vector search and sparse vector search. For any combinations, a fusion must be attached to decide the final ranking results. The outputs of fusion can also be further combined with other search ways, for example, you can assemble dense vector search and sparse vector search to build the first stage retrieval, attached with a fusion reranker, then continue assemble the fused results with full text search to build the second stage retrieval.
+Infinity offers you the flexibility to assemble any search methods into the hybrid search pipeline, including full-text search, dense vector search and sparse vector search. For any combinations, a fusion must be attached to decide the final ranking results. The outputs of fusion can be further combined with other search ways, for example, you can assemble dense vector search and sparse vector search to build the first stage retrieval, attached with a fusion reranker, then continue assemble the fused results with full-text search to build the second stage retrieval.
 
 Infinity offers three kinds of rerankers for the fusion:
 
@@ -101,7 +101,7 @@ Infinity offers three kinds of rerankers for the fusion:
 - `weighted_sum`  
   The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.
 - `match_tensor`  
-  The `tensor` based rank fusion, the final results are decided by the `MaxSim` operator between the tensor of query and tensor of each document.
+  The `tensor` based rank fusion, the final results are decided by the MaxSim operator between the tensor of query and tensor of each document.
 
 ## Conditional filters
 
