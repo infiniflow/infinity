@@ -1,10 +1,12 @@
+import random
 import pytest
 from common import common_values
 from infinity.common import ConflictType
-from infinity_runner import InfinityRunner
+from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 import time
 import threading
 from restart_util import *
+from util import RtnThread
 
 
 @pytest.mark.slow
@@ -217,6 +219,63 @@ class TestInsert:
         db_obj.drop_table("test_insert", ConflictType.Error)
         infinity_obj.disconnect()
         infinity_runner.uninit()
+
+    def test_insert_checkpoint(self, infinity_runner: InfinityRunner):
+        infinity_runner.clear()
+        config = "test/data/config/restart_test/test_insert/6.toml"
+        uri = common_values.TEST_LOCAL_HOST
+
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+
+        line_num = 0
+
+        @decorator
+        def create_table(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.create_table("test_insert_checkpoint", {"c1": {"type": "int"}})
+
+        @decorator
+        def part1(infinity_obj, test_i: int):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_insert_checkpoint")
+
+            data_dict, _ = table_obj.output(["count(*)"]).to_result()
+            count_star = data_dict["count(star)"][0]
+            assert count_star == line_num
+
+            stop_insert = False
+
+            def checkpoint_func(infinity_obj):
+                nonlocal stop_insert
+                time.sleep(0.2)
+                infinity_obj.flush_data()
+                time.sleep(0.2)
+                infinity_obj.flush_delta()
+                time.sleep(0.2)
+                stop_insert = True
+
+            def insert_func(table_obj):
+                nonlocal stop_insert, line_num
+                while not stop_insert:
+                    table_obj.insert([{"c1": i} for i in range(8192)])
+                    line_num += 8192
+                print("insert end")
+
+            t1 = RtnThread(target=insert_func, args=(table_obj,))
+            t1.start()
+            checkpoint_func(infinity_obj)
+            t1.join()
+            print(f"join end {test_i}")
+
+        def drop_table(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table("test_insert_checkpoint", ConflictType.Error)
+
+        create_table()
+        test_n = 100
+        for i in range(test_n):
+            part1(i)
+        drop_table()
 
 
 if __name__ == "__main__":

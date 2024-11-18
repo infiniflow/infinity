@@ -1074,7 +1074,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
         VirtualStore::UploadObject(full_path, full_catalog_name);
     }
 
-    global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
+    global_catalog_delta_entry_->SetFullCheckpointTs(max_commit_ts);
 
     LOG_DEBUG(fmt::format("Saved catalog to: {}", full_path));
 }

@@ -409,10 +409,14 @@ public:
 
     SizeT OpSize() const;
 
+    void SetFullCheckpointTs(TxnTimeStamp last_full_ckp_ts);
+
 private:
     void AddDeltaEntryInner(CatalogDeltaEntry *delta_entry);
 
     void PruneOpWithSamePrefix(const String &prefix);
+
+    void RemoveDeltaOp(TxnTimeStamp max_commit_ts);
 
 private:
     u64 last_sequence_{0};
