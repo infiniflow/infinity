@@ -22,6 +22,11 @@ if __name__ == "__main__":
         type=str,
         required=True,
     )
+    parser.add_argument(
+        "--test_case",
+        type=str,
+        required=False,
+    )
 
     args = parser.parse_args()
     infinity_path = args.infinity_path
@@ -31,12 +36,18 @@ if __name__ == "__main__":
     current_path = os.getcwd()
     python_test_dir = current_path + "/python"
 
+    test_case = None
+    if args.test_case:
+        test_case = f"{python_test_dir}/test_cluster/{args.test_case}"
+    else:
+        test_case = f"{python_test_dir}/test_cluster"
+
     cmd = [
         python_executable,
         "-m",
         "pytest",
-        #"-v",
-        f"{python_test_dir}/test_cluster",
+        # "-v",
+        test_case,
         f"--infinity_path={infinity_path}",
         "-x",
         "-s",
