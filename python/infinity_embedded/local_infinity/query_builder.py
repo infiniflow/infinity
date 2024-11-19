@@ -7,10 +7,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pyarrow as pa
-from pyarrow import Table
-from sqlglot import condition, maybe_parse
-
-from infinity_embedded.common import VEC, SparseVector, InfinityException
+from infinity_embedded.common import VEC, SparseVector, InfinityException, SortType
 from infinity_embedded.embedded_infinity_ext import *
 from infinity_embedded.local_infinity.types import logic_type_to_dtype, make_match_tensor_expr
 from infinity_embedded.local_infinity.utils import traverse_conditions, parse_expr
@@ -477,7 +474,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._highlight = highlight_list
         return self
 
-    def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityLocalQueryBuilder:
+    def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]) -> InfinityLocalQueryBuilder:
         sort_list: List[WrapOrderByExpr] = []
         for order_by_expr in order_by_expr_list:
             if isinstance(order_by_expr[0], str):
@@ -491,7 +488,7 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(ParsedExprType.kColumn)
                     parsed_expr.column_expr = column_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
                     sort_list.append(order_by_expr)
                 case "_row_id":
                     func_expr = WrapFunctionExpr()
@@ -502,7 +499,7 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
                     sort_list.append(order_by_expr)
                 case "_score":
                     func_expr = WrapFunctionExpr()
@@ -513,7 +510,7 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
                     sort_list.append(order_by_expr)
                 case "_similarity":
                     func_expr = WrapFunctionExpr()
@@ -524,7 +521,7 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
                     sort_list.append(order_by_expr)
                 case "_distance":
                     func_expr = WrapFunctionExpr()
@@ -535,11 +532,11 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr = WrapParsedExpr(expr_type)
                     parsed_expr.function_expr = func_expr
 
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
                     sort_list.append(order_by_expr)
                 case _:
                     parsed_expr = parse_expr(maybe_parse(order_by_expr[0]))
-                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1])
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
                     sort_list.append(order_by_expr)
 
         self._sort = sort_list

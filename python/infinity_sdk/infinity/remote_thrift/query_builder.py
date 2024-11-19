@@ -21,10 +21,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pyarrow as pa
-from pyarrow import Table
-from sqlglot import condition, maybe_parse
-
-from infinity.common import VEC, SparseVector, InfinityException
+from infinity.common import VEC, SparseVector, InfinityException, SortType
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -382,7 +379,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._highlight = highlight_list
         return self
 
-    def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityThriftQueryBuilder:
+    def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]) -> InfinityThriftQueryBuilder:
         sort_list: List[OrderByExpr] = []
         for order_by_expr in order_by_expr_list:
             if isinstance(order_by_expr[0], str):
@@ -393,35 +390,41 @@ class InfinityThriftQueryBuilder(ABC):
                     column_expr = ColumnExpr(star=True, column_name=[])
                     expr_type = ParsedExprType(column_expr=column_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case "_row_id":
                     func_expr = FunctionExpr(function_name="row_id", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case "_score":
                     func_expr = FunctionExpr(function_name="score", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case "_similarity":
                     func_expr = FunctionExpr(function_name="similarity", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case "_distance":
                     func_expr = FunctionExpr(function_name="distance", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case _:
                     parsed_expr = parse_expr(maybe_parse(order_by_expr[0]))
-                    sort_list.append(OrderByExpr(expr = parsed_expr, asc = order_by_expr[1]))
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    sort_list.append(OrderByExpr(expr=parsed_expr, asc=order_by_flag))
 
         self._sort = sort_list
         return self
@@ -463,7 +466,7 @@ class InfinityThriftQueryBuilder(ABC):
             groupby=self._groupby,
             limit=self._limit,
             offset=self._offset,
-            sort = self._sort,
+            sort=self._sort,
             explain_type=explain_type,
         )
         return self._table._explain_query(query)
