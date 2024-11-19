@@ -120,4 +120,4 @@ Filters based on secondary index can have arbitrary logical combinations. Suppor
 
 ### Full-text index filters
 
-Infinity's full-text index supports conditional filtering through the `filter_fulltext` parameter. Full-text index filters are keyword-based and do not support the logical expressions available for secondary index filters. They use the `minimum_should_match` parameter to specify the minimum number of keywords that must be satisfied during fitlering.
+Infinity's full-text index supports conditional filtering through the `filter_fulltext` parameter. Full-text index filters are keyword-based and do not support the expressions available for secondary index filters. They use the `minimum_should_match` parameter to specify the minimum number of keywords that must be satisfied during fitlering.
