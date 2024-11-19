@@ -80,7 +80,7 @@ class InfinityRunner:
             try:
                 if infinity_obj is None:
                     infinity_obj = infinity.connect(uri)
-                infinity_obj.get_database("default_db")
+                ret = infinity_obj.get_database("default_db")
                 break
             except Exception as e:
                 if infinity_obj is not None:

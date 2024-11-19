@@ -112,8 +112,8 @@ void InfinityContext::InitPhase2() {
 }
 
 Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, u16 node_port) {
-    infinity_context_inited_ = false;
-    DeferFn defer([&]() { infinity_context_inited_ = true; });
+    // infinity_context_inited_ = false;
+    // DeferFn defer([&]() { infinity_context_inited_ = true; });
     NodeRole current_role = GetServerRole();
     if (current_role == target_role) {
         return Status::OK();
