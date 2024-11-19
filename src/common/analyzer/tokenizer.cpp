@@ -117,10 +117,8 @@ bool Tokenizer::NextToken() {
 }
 
 bool Tokenizer::GrowOutputBuffer() {
-    char *new_output_buffer = new char[output_buffer_size_ * 2];
-    memcpy(new_output_buffer, output_buffer_, output_buffer_size_ * sizeof(char));
-    output_buffer_ = new_output_buffer;
     output_buffer_size_ *= 2;
+    output_buffer_ = MakeUnique<char[]>(output_buffer_size_);
     return true;
 }
 

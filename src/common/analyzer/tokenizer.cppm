@@ -60,9 +60,9 @@ public:
 
 export class Tokenizer {
 public:
-    Tokenizer(bool use_def_delim = true) : table_(use_def_delim) { output_buffer_ = new char[output_buffer_size_](); }
+    Tokenizer(bool use_def_delim = true) : table_(use_def_delim) { output_buffer_ = MakeUnique<char[]>(output_buffer_size_); }
 
-    ~Tokenizer() { delete[] output_buffer_; }
+    ~Tokenizer() {}
 
     /// \brief set the user defined char types
     /// \param list char type option list
@@ -74,7 +74,7 @@ public:
 
     bool NextToken();
 
-    inline const char *GetToken() { return output_buffer_; }
+    inline const char *GetToken() { return output_buffer_.get(); }
 
     inline SizeT GetLength() { return output_buffer_cursor_; }
 
@@ -106,7 +106,7 @@ private:
 
     SizeT output_buffer_size_{4096};
 
-    char *output_buffer_{nullptr};
+    UniquePtr<char[]> output_buffer_;
 
     SizeT output_buffer_cursor_{0};
 
