@@ -5,6 +5,8 @@ import os
 import psutil
 import time
 import infinity
+from infinity.common import ConflictType, InfinityException
+from infinity.errors import ErrorCode
 
 
 class InfinityRunner:
@@ -73,13 +75,30 @@ class InfinityRunner:
     def connect(uri: str):
         try_n = 100
         time.sleep(0.5)
+        infinity_obj = None
         for i in range(try_n):
             try:
-                return infinity.connect(uri)
+                if infinity_obj is None:
+                    infinity_obj = infinity.connect(uri)
+                ret = infinity_obj.get_database("default_db")
+                break
             except Exception as e:
-                print(e)
-                time.sleep(0.5)
+                if infinity_obj is not None:
+                    if isinstance(e, InfinityException):
+                        if e.error_code == ErrorCode.INFINITY_IS_INITING:
+                            print("wait infinity starting")
+                            time.sleep(0.5)
+                        else:
+                            raise e
+                    else:
+                        raise e
+                else:
+                    print(e)
+                    time.sleep(0.5)
                 print(f"retry connect {i}")
+        else:
+            raise Exception(f"Cannot connect to infinity after {try_n} retries.")
+        return infinity_obj
 
 
 def infinity_runner_decorator_factory(
