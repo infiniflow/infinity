@@ -34,7 +34,9 @@ class MinioParams:
 
 
 class BaseInfinityRunner:
-    def __init__(self, node_name: str, executable_path: str, config_path: str, init: bool = True):
+    def __init__(
+        self, node_name: str, executable_path: str, config_path: str, init: bool = True
+    ):
         self.node_name = node_name
         self.executable_path = executable_path
         self.config_path = config_path
@@ -71,19 +73,6 @@ class BaseInfinityRunner:
     def load_config(self):
         pass
 
-    def __init_cmd(self, send_f, timeout=10):
-        t1 = time.time()
-        while True:
-            try:
-                send_f()
-            except Exception as e:
-                print(e)
-                time.sleep(1)
-                if time.time() - t1 > timeout:
-                    raise Exception("Timeout")
-                continue
-            break
-
 
 class InfinityRunner(BaseInfinityRunner):
     def __init__(
@@ -119,7 +108,9 @@ class InfinityRunner(BaseInfinityRunner):
         timeout_kill.timeout_kill(timeout, self.process)
 
     def add_client(self, http_addr: str):
-        self.client = infinity_http(net=http_network_util(http_addr))
+        net = http_network_util(http_addr)
+        net.set_retry()
+        self.client = infinity_http(net=net)
 
     def load_config(self):
         with open(self.config_path, "rb") as f:

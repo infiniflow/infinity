@@ -42,6 +42,8 @@ public:
 #endif
     }
 
+    BaseResult(BaseResult &&other) : status_(std::move(other.status_)), result_table_(std::move(other.result_table_)) {}
+
     BaseResult &operator=(BaseResult &&other) noexcept {
         status_ = std::move(other.status_);
         result_table_ = std::move(other.result_table_);

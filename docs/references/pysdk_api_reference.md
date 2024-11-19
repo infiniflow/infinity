@@ -1245,7 +1245,11 @@ A structure containing the following attributes:
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `role`: `str`  
-  One of the five values: `admin`, `standalone`, `leader`, `follower`, and `learner`.
+  - `"admin"`
+  - `"standalone"`
+  - `"leader"`
+  - `"follower"`
+  - `"learner"`.
 
 #### Examples
 
