@@ -34,6 +34,7 @@ import infinity_exception;
 import wal_manager;
 import global_resource_usage;
 import infinity_thrift_service;
+import defer_op;
 
 namespace infinity {
 
@@ -93,6 +94,7 @@ void InfinityContext::InitPhase2() {
 
     if (config_->ServerMode() == "cluster") {
         // Admin mode or cluster start phase
+        infinity_context_inited_ = true;
         return;
     }
 
@@ -100,17 +102,18 @@ void InfinityContext::InitPhase2() {
         Status change_to_standalone = ChangeServerRole(NodeRole::kStandalone);
         if (!change_to_standalone.ok()) {
             UnrecoverableError(change_to_standalone.message());
-            return;
         }
     } else {
         UnrecoverableError(fmt::format("Unexpected server mode: {}", config_->ServerMode()));
-        return;
     }
 
     infinity_context_started_ = true;
+    infinity_context_inited_ = true;
 }
 
 Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader, const String &node_name, String node_ip, u16 node_port) {
+    infinity_context_inited_ = false;
+    DeferFn defer([&]() { infinity_context_inited_ = true; });
     NodeRole current_role = GetServerRole();
     if (current_role == target_role) {
         return Status::OK();

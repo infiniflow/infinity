@@ -1,4 +1,5 @@
 import re
+import time
 
 import requests
 import logging
@@ -22,6 +23,13 @@ class http_network_util:
 
     def __init__(self, url: str = default_url):
         self.base_url = url
+        self.retry = False
+
+    def set_retry(self, retry: bool = True):
+        self.retry = retry
+        if (self.retry):
+            self.retry_time = 100
+            self.retry_sleep = 0.5
 
     def set_up_header(self, param=[], tp={}):
         header = {}
@@ -59,6 +67,33 @@ class http_network_util:
             header = {}
         url = self.base_url + url
         logging.debug("url: " + url)
+        if self.retry:
+            for i in range(self.retry_time):
+                try:
+                    match method:
+                        case "get":
+                            response = requests.get(url, headers=header, json=data)
+                        case "post":
+                            response = requests.post(url, headers=header, json=data)
+                        case "put":
+                            response = requests.put(url, headers=header, json=data)
+                        case "delete":
+                            response = requests.delete(url, headers=header, json=data)
+                    self.raise_exception(response)
+                except InfinityException as e:
+                    if e.error_code == ErrorCode.INFINITY_IS_INITING:
+                        pass
+                    else:
+                        raise e
+                except Exception as e:
+                    raise e
+                else:
+                    break
+                logging.debug(f"retry {i} times")
+                time.sleep(self.retry_sleep)
+            else:
+                raise Exception(f"Cannot connect to {url} after {self.retry_time} retries")
+            return response
         match method:
             case "get":
                 response = requests.get(url, headers=header, json=data)

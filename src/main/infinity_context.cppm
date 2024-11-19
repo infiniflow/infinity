@@ -72,6 +72,7 @@ public:
     void StopThriftServers();
 
     bool InfinityContextStarted() const { return infinity_context_started_; }
+    bool InfinityContextInited() const { return infinity_context_inited_; }
 
 private:
     friend class Singleton;
@@ -86,6 +87,7 @@ private:
     UniquePtr<SessionManager> session_mgr_{};
     UniquePtr<ClusterManager> cluster_manager_{};
     atomic_bool infinity_context_started_{false};
+    atomic_bool infinity_context_inited_{false};
 
     // For fulltext index
     ThreadPool inverting_thread_pool_{4};

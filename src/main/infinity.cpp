@@ -68,6 +68,12 @@ namespace infinity {
 
 std::variant<UniquePtr<QueryContext>, QueryResult> Infinity::GetQueryContext(bool is_admin_stmt, bool is_admin_show_node) const {
     InfinityContext &context = InfinityContext::instance();
+    if (!context.InfinityContextInited()) {
+        QueryResult query_result;
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::InfinityIsIniting();
+        return query_result;
+    }
     bool check_start = !is_admin_stmt || (!context.IsAdminRole() && !is_admin_show_node); // refactor by old code
     bool error = check_start && !context.InfinityContextStarted();
     if (error) {

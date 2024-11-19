@@ -44,6 +44,7 @@ export enum class ErrorCode : long {
     kAdminOnlySupportInMaintenanceMode = 2005,
     kNotSupportInMaintenanceMode = 2006,
     kInfinityIsStarting = 2007,
+    kInfinityIsIniting = 2008,
 
     // 3. syntax error or access rule violation
     kInvalidUsername = 3001,
@@ -220,6 +221,7 @@ public:
     static Status AdminOnlySupportInMaintenanceMode();
     static Status NotSupportInMaintenanceMode();
     static Status InfinityIsStarting();
+    static Status InfinityIsIniting();
 
     // 3. Syntax error or access rule violation`
     static Status InvalidUserName(const String &user_name);

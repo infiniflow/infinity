@@ -85,7 +85,7 @@ class InfinityRunner:
             except Exception as e:
                 if infinity_obj is not None:
                     if isinstance(e, InfinityException):
-                        if e.error_code == ErrorCode.INFINITY_IS_STARTING:
+                        if e.error_code == ErrorCode.INFINITY_IS_INITING:
                             print("wait infinity starting")
                             time.sleep(0.5)
                         else:
