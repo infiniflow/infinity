@@ -6,14 +6,14 @@ slug: /search_guide
 
 ## Overview
 
-Infinity offers powerful search capabilities. This page covers the search usage.  These search operators are available:
+Infinity offers powerful search capabilities. This page covers the search usage.
 
 ## Full-text search
 
 Full text search will work if full text index is created. There are two kinds of work modes for full text indexing:
 
 - Real-time mode - If the full text index is created immediately after the table is created, then the full-text index will work in real time mode if data is ingested at this time. Real time index will accumulate posting data within memory and flush to disk if it reaches up the quota.
-- Offline mode - If the full text index is created after the data is ingested, then it will work under offline mode, where the full text index is constructed through external sorting.
+- Offline mode - If the full-text index is created after the data is inserted, then it will work in offline mode, where the full-text index is constructed through external sorting.
 
 ### Tokenizer
 
@@ -33,7 +33,7 @@ You must specify a tokenizer when creating a full text index, but you don't need
 - Traditional Chinese analyzer: Use `traditional` to specify tokenizer for traditional Chinese, which is actually a conversion between simplified Chinese and traditional Chinese based on the outputs of  [Jieba](https://github.com/yanyiwu/cppjieba) analyzer.
 - Japanese analyzer: Use `japanese` to specify tokenizer for Japanese. It's a wrapper of [mecab](http://taku910.github.io/mecab/).
 - Korean analyzer: Use `korean` to specify tokenizer for Korean. It's also a wrapper of [mecab](http://taku910.github.io/mecab/) but has different Korean dictionary.
-- RAG analyzer: It's a c++ migration of tokenizer imported from [RAGFlow](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py). It's a multilingual tokenizer and currently, both Chinese and English are well supported. RAG analyzer has better recall compared to [Jieba](https://github.com/yanyiwu/cppjieba) analyzer, but lower tokenization throughput due to much more expensive computation.  The English processing within RAG analyzer is also different from Standard analyzer, because it has an extra step of lemmatization before stemming, additionally, the tokenization of latin characters is a c++ migration of [NLTK](https://www.nltk.org/api/nltk.tokenize.punkt.html). RAG analyzer also supports fined grained mode through `rag-fine`, which will output tokenization results with the second highest score. In RAGFlow, both RAG tokenization and fine-grained RAG tokenization are used to guarantee the recall.
+- RAG analyzer: It's a C++ migration of tokenizer imported from [RAGFlow](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py). It's a multilingual tokenizer and currently, both Chinese and English are well supported. RAG analyzer has better recall compared to [Jieba](https://github.com/yanyiwu/cppjieba) analyzer, but lower tokenization throughput due to much more expensive computation.  The English processing within RAG analyzer is also different from Standard analyzer, because it has an extra step of lemmatization before stemming, additionally, the tokenization of latin characters is a c++ migration of [NLTK](https://www.nltk.org/api/nltk.tokenize.punkt.html). RAG analyzer also supports fined grained mode through `rag-fine`, which will output tokenization results with the second highest score. In RAGFlow, both RAG tokenization and fine-grained RAG tokenization are used to guarantee the recall.
 - Keyword analyzer: It's a noop analyzer. This is used if you have columns containing keywords only, and you don't want such traditional scoring approaches as `BM25`to take into effects, the score will return 0 or 1 according to whether any keywords are hit.
 
 ### Search and ranking
@@ -92,29 +92,32 @@ Infinity offers two approaches for improving the performance of a tensor search:
 
 ## Hybrid search
 
-Infinity offers you the flexibility to assemble any search methods into the hybrid search pipeline, including full-text search, dense vector search and sparse vector search. For any combinations, a fusion must be attached to decide the final ranking results. The outputs of fusion can be further combined with other search ways, for example, you can assemble dense vector search and sparse vector search to build the first stage retrieval, attached with a fusion reranker, then continue assemble the fused results with full-text search to build the second stage retrieval.
+Infinity allows you to integrate various search methods, including full-text search, dense vector search, and sparse vector search, into a hybrid search pipeline. For any search combination in a hybrid search, a fusion method is required to determine the final reranking results. The results can be further combined with other search paths. For instance, you can integrate dense vector search with sparse vector search to build the first-stage retrieval, apply a fusion reranker to this path, and integrate the reranking results with a full-text search path to build a second-stage retrieval.
 
-Infinity offers three kinds of rerankers for the fusion:
+Infinity offers three types of rerankers for fusion:
 
-- `rrf`: Reciprocal rank fusion  
-  RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval method.
+- `rrf` (Reciprocal rank fusion)  
+  RRF is a method that combines multiple result sets with varying relevance indicators into a single result set. This method requires no tuning, and the relevance indicators need not be correlated to achieve high-quality results. It is particularly useful when you are uncertain of each retrieval path's relative importance.
 - `weighted_sum`  
-  The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.
+  The weighted sum approach assigns different weights to different retrieval paths, allowing you to emphasize specific paths. It is particularly useful when you are certain of each path's relative importance.
 - `match_tensor`  
-  The `tensor` based rank fusion, the final results are decided by the MaxSim operator between the tensor of query and tensor of each document.
+  The tensor-based rank fusion, where the final results are determined by the MaxSim operator between the query tensor and each document tensor.
 
 ## Conditional filters
 
-Infinity offers comprehensive filters for search operators. Filters must work through indices. There are two kinds of indices to provide conditional filters in Infinity : One is secondary index, which is used to build on columns with type of numeric and string. For string type columns, secondary index does not apply any tokenization. The other is full text index, which is used to build over columns with type of text.  The filters based on full text index will apply tokenization on the column content, but it will not trigger any relevance scoring procedure.
+Conditional filters in Infinity must work through an index to facilitate search. There are two types of indexes in Infinity that support conditional filters:
 
-Infinity offers flexible filter syntax, all kinds of filters can be applied to each search way separately,  which means each search way can have different filter conditions; The filter can also be applied to all search ways, which means all search ways share the same filter conditions.
+- **Secondary index**: Built on numeric or string columns. This index does not apply any tokenization to a string column when using conditional filters.
+- **Full-text index**: Built on full-text columns. This index applies tokenization to the full-text column but does not trigger any relevance scoring procedure.
 
-### Filter based on secondary index
+Infinity offers flexible filter syntax. Filters can be applied to either individual search paths, allowing each path to have different filter conditions, or to all search paths, allowing them to share the same filtering conditions.
 
-Secondary index is built on numeric and string columns. It's optimized for columns with high cardinality. As a result, even if the column has numeric types, the index could still be constructed and searched very fast. Secondary index has built-in real time support.
+### Secondary index filters
 
-Filters based on secondary index can have any number of logical combinations, supported expressions include `<`, `<=`, `>`, `>=`, `=`, `==`, `!=`, `in`, `not in` .
+Infinity's secondary index supports real-time construction and search. Optimized for columns with high cardinality, this index can be built and searched rapidly even on numeric columns.
 
-### Filter based on full-text index
+Filters based on secondary index can have arbitrary logical combinations. Supported expressions include `<`, `<=`, `>`, `>=`, `=`, `==`, `!=`, `in`, and `not in`.
 
-Full text index provides filters through `filter_fulltext` , since it's a keyword based filter, it does not provide similar expressions as filters based on secondary index.  It has a special parameter of `minimum_should_match` , which specifies how many keywords should be satisfied at least during fitlering.
+### Full-text index filters
+
+Infinity's full-text index supports conditional filtering through the `filter_fulltext` parameter. Full-text index filters are keyword-based and do not support the logical expressions available for secondary index filters. They use the `minimum_should_match` parameter to specify the minimum number of keywords that must be satisfied during fitlering.
