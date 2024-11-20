@@ -58,7 +58,7 @@ def test_standalone2admin(cluster: InfinityCluster):
 
 def test_admin2standalone2admin2leader(cluster: InfinityCluster):
     '''
-    test: admin->(standalone, operations)->admin->(standalone, operations)
+    test: admin->(standalone, operations)->admin->(leader, operations)
     '''
     cluster.add_node("test", "conf/leader.toml")
     test_client = cluster.client("test")
