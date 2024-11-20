@@ -7,6 +7,9 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pyarrow as pa
+from pyarrow import Table
+from sqlglot import condition, maybe_parse
+
 from infinity_embedded.common import VEC, SparseVector, InfinityException, SortType
 from infinity_embedded.embedded_infinity_ext import *
 from infinity_embedded.local_infinity.types import logic_type_to_dtype, make_match_tensor_expr
