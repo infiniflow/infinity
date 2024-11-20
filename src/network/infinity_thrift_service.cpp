@@ -1711,7 +1711,7 @@ void InfinityThriftService::ShowCurrentNode(infinity_thrift_rpc::ShowCurrentNode
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 1) {
+        if (row_count != 2) {
             String error_message = "ShowCurrentNode: query result is invalid.";
             UnrecoverableError(error_message);
         }

@@ -387,10 +387,12 @@ class InfinityThriftQueryBuilder(ABC):
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]) -> InfinityThriftQueryBuilder:
         sort_list: List[OrderByExpr] = []
         for order_by_expr in order_by_expr_list:
-            if isinstance(order_by_expr[0], str):
-                order_by_expr[0] = order_by_expr[0].lower()
+            order_by_expr_str = str
 
-            match order_by_expr[0]:
+            if isinstance(order_by_expr[0], str):
+                order_by_expr_str = order_by_expr[0].lower()
+
+            match order_by_expr_str:
                 case "*":
                     column_expr = ColumnExpr(star=True, column_name=[])
                     expr_type = ParsedExprType(column_expr=column_expr)
@@ -427,7 +429,7 @@ class InfinityThriftQueryBuilder(ABC):
                     order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case _:
-                    parsed_expr = parse_expr(maybe_parse(order_by_expr[0]))
+                    parsed_expr = parse_expr(maybe_parse(order_by_expr_str))
                     order_by_flag: bool = order_by_expr[1] == SortType.Asc
                     sort_list.append(OrderByExpr(expr=parsed_expr, asc=order_by_flag))
 

@@ -138,11 +138,11 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
                 return HandleAdminStatement(admin_statement);
             }
 
-            // if (!InfinityContext::instance().InfinityContextStarted()) {
-            //     query_result.result_table_ = nullptr;
-            //     query_result.status_ = Status::InfinityIsStarting();
-            //     return query_result;
-            // }
+            if (!InfinityContext::instance().InfinityContextStarted()) {
+                query_result.result_table_ = nullptr;
+                query_result.status_ = Status::InfinityIsStarting();
+                return query_result;
+            }
 
             switch (admin_statement->admin_type_) {
                 case AdminStmtType::kShowVariable: {
@@ -169,12 +169,12 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
             query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
             return query_result;
         }
-    // } else {
-    //     if (!InfinityContext::instance().InfinityContextStarted()) {
-    //         query_result.result_table_ = nullptr;
-    //         query_result.status_ = Status::InfinityIsStarting();
-    //         return query_result;
-    //     }
+    } else {
+        if (!InfinityContext::instance().InfinityContextStarted()) {
+            query_result.result_table_ = nullptr;
+            query_result.status_ = Status::InfinityIsStarting();
+            return query_result;
+        }
     }
 
     Vector<SharedPtr<LogicalNode>> logical_plans{};
