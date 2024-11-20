@@ -16,6 +16,7 @@
 #
 # __version__ = importlib.metadata.version("infinity_sdk")
 
+import logging
 import os
 # import pkg_resources
 # __version__ = pkg_resources.get_distribution("infinity_sdk").version
@@ -25,8 +26,8 @@ from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 from infinity.errors import ErrorCode
 
-def connect(uri = LOCAL_HOST) -> InfinityConnection:
+def connect(uri = LOCAL_HOST, logger: logging.Logger = None) -> InfinityConnection:
     if isinstance(uri, NetworkAddress):
-        return RemoteThriftInfinityConnection(uri)
+        return RemoteThriftInfinityConnection(uri, logger)
     else:
         raise InfinityException(ErrorCode.INVALID_SERVER_ADDRESS, f"Unknown uri: {uri}")

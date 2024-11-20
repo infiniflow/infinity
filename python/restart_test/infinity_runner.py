@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import logging
 import os
 import subprocess
 import os
@@ -10,7 +11,7 @@ from infinity.errors import ErrorCode
 
 
 class InfinityRunner:
-    def __init__(self, infinity_path: str):
+    def __init__(self, infinity_path: str, *, logger=None):
         self.data_dir = "/var/infinity"
         self.default_config_path = "./conf/infinity_conf.toml"
         self.script_path = "./scripts/timeout_kill.sh"
@@ -20,6 +21,18 @@ class InfinityRunner:
             raise Exception(f"{self.infinity_path} is not executable.")
 
         self.i = 0
+        if logger is not None:
+            self.logger = logger
+            return
+        self.logger = logging.getLogger("infinity_runner")
+        if not self.logger.handlers:
+            self.logger.setLevel(logging.DEBUG)
+            ch = logging.StreamHandler()
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            ch.setFormatter(formatter)
+            self.logger.addHandler(ch)
 
     def clear(self):
         os.system(
@@ -78,7 +91,7 @@ class InfinityRunner:
         for i in range(try_n):
             try:
                 if infinity_obj is None:
-                    infinity_obj = infinity.connect(uri)
+                    infinity_obj = infinity.connect(uri, self.logger)
                 ret = infinity_obj.get_database("default_db")
                 break
             except Exception as e:
