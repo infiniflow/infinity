@@ -147,7 +147,7 @@ class TestInsertImport:
             ),
         ],
     )
-    def test_data(
+    def test_data_with_import(
         self,
         infinity_runner: InfinityRunner,
         total_n: int,
@@ -212,8 +212,8 @@ class TestInsertImport:
                 SiftGenerator.gen_factory(
                     "test/data/benchmark/sift_1m/sift_base.fvecs"
                 ),
-                "test/data/benchmark/sift_1m/sift_learn.fvecs",
-                128,
+                "test/data/benchmark/sift_1m/sift_query.fvecs",
+                10000,
                 {"file_type": "fvecs"},
             ),
             (
@@ -226,7 +226,7 @@ class TestInsertImport:
             ),
         ],
     )
-    def test_index(
+    def test_index_with_import(
         self,
         infinity_runner: InfinityRunner,
         total_n: int,
