@@ -71,8 +71,7 @@ class InfinityRunner:
     def connected(self):
         return self.process is not None
 
-    @staticmethod
-    def connect(uri: str):
+    def connect(self, uri: str):
         try_n = 100
         time.sleep(0.5)
         infinity_obj = None
@@ -107,11 +106,15 @@ def infinity_runner_decorator_factory(
     def decorator(f):
         def wrapper(*args, **kwargs):
             infinity_runner.init(config_path)
-            infinity_obj = InfinityRunner.connect(uri)
+            infinity_obj = infinity_runner.connect(uri)
             try:
                 f(infinity_obj, *args, **kwargs)
             finally:
-                infinity_obj.disconnect()
+                try:
+                    infinity_obj.disconnect()
+                except InfinityException as e:
+                    if e.error_code != ErrorCode.CLIENT_CLOSE:
+                        raise
                 infinity_runner.uninit()
 
         return wrapper

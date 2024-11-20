@@ -1,6 +1,6 @@
 import subprocess
 from common import common_values
-from infinity_runner import InfinityRunner
+from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 import pytest
 import os
 import threading
@@ -10,7 +10,7 @@ import re
 
 
 @pytest.mark.slow
-@pytest.mark.skip(reason="skip")
+@pytest.mark.skip(reason="skip ")
 class TestShutDownPytest:
     finish_one = False
 
@@ -60,6 +60,8 @@ class TestShutDownPytest:
 
         gen = self.run_pytest_seperately(test_dir)
 
+        decorator = infinity_runner_decorator_factory(None, uri, infinity_runner)
+
         def shutdown_func():
             time.sleep(stop_interval)
             while True:
@@ -69,18 +71,19 @@ class TestShutDownPytest:
                     return
                 time.sleep(1)
 
-        while True:
-            infinity_runner.init()
-            infinity_obj = InfinityRunner.connect(uri)  # ensure infinity is started
-            infinity_obj.disconnect()
-
+        @decorator
+        def part1(infinity_obj) -> bool:
             t1 = threading.Thread(target=shutdown_func)
             t1.start()
 
             x = next(gen, None)
             if x is None:
-                break
+                return False
             stop_testfile, stop_test_name = x
             print(f"Stop test: {stop_test_name}")
 
             t1.join()
+
+            return True
+        while part1():
+            pass
