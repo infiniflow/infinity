@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SparseVector, InfinityException
+from infinity.common import VEC, SparseVector, InfinityException, SortType
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -39,15 +39,15 @@ from infinity.remote_thrift.utils import traverse_conditions, parse_expr, get_se
 
 class Query(ABC):
     def __init__(
-        self,
-        columns: Optional[List[ParsedExpr]],
-        highlight: Optional[List[ParsedExpr]],
-        search: Optional[SearchExpr],
-        filter: Optional[ParsedExpr],
-        groupby: Optional[List[ParsedExpr]],
-        limit: Optional[ParsedExpr],
-        offset: Optional[ParsedExpr],
-        sort:  Optional[List[OrderByExpr]],
+            self,
+            columns: Optional[List[ParsedExpr]],
+            highlight: Optional[List[ParsedExpr]],
+            search: Optional[SearchExpr],
+            filter: Optional[ParsedExpr],
+            groupby: Optional[List[ParsedExpr]],
+            limit: Optional[ParsedExpr],
+            offset: Optional[ParsedExpr],
+            sort: Optional[List[OrderByExpr]],
     ):
         self.columns = columns
         self.highlight = highlight
@@ -61,16 +61,16 @@ class Query(ABC):
 
 class ExplainQuery(Query):
     def __init__(
-        self,
-        columns: Optional[List[ParsedExpr]],
-        highlight: Optional[List[ParsedExpr]],
-        search: Optional[SearchExpr],
-        filter: Optional[ParsedExpr],
-        groupby: Optional[List[ParsedExpr]],
-        limit: Optional[ParsedExpr],
-        offset: Optional[ParsedExpr],
-        sort:  Optional[List[OrderByExpr]],
-        explain_type: Optional[ExplainType],
+            self,
+            columns: Optional[List[ParsedExpr]],
+            highlight: Optional[List[ParsedExpr]],
+            search: Optional[SearchExpr],
+            filter: Optional[ParsedExpr],
+            groupby: Optional[List[ParsedExpr]],
+            limit: Optional[ParsedExpr],
+            offset: Optional[ParsedExpr],
+            sort: Optional[List[OrderByExpr]],
+            explain_type: Optional[ExplainType],
     ):
         super().__init__(columns, highlight, search, filter, groupby, limit, offset, sort)
         self.explain_type = explain_type
@@ -99,13 +99,13 @@ class InfinityThriftQueryBuilder(ABC):
         self._sort = None
 
     def match_dense(
-        self,
-        vector_column_name: str,
-        embedding_data: VEC,
-        embedding_data_type: str,
-        distance_type: str,
-        topn: int,
-        knn_params: {} = None,
+            self,
+            vector_column_name: str,
+            embedding_data: VEC,
+            embedding_data_type: str,
+            distance_type: str,
+            topn: int,
+            knn_params: {} = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
@@ -134,7 +134,8 @@ class InfinityThriftQueryBuilder(ABC):
         if embedding_data_type == "bit":
             if len(embedding_data) % 8 != 0:
                 raise InfinityException(
-                    ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Embeddings with data bit must have dimension of times of 8!"
+                    ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
+                    f"Embeddings with data bit must have dimension of times of 8!"
                 )
             else:
                 new_embedding_data = []
@@ -186,7 +187,8 @@ class InfinityThriftQueryBuilder(ABC):
             elem_type = ElementType.ElementBFloat16
             data.bf16_array_value = embedding_data
         else:
-            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
+                                    f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.L2
         if distance_type == "l2":
@@ -223,12 +225,12 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def match_sparse(
-        self,
-        vector_column_name: str,
-        sparse_data: SparseVector | dict,
-        metric_type: str,
-        topn: int,
-        opt_params: Optional[dict] = None,
+            self,
+            vector_column_name: str,
+            sparse_data: SparseVector | dict,
+            metric_type: str,
+            topn: int,
+            opt_params: Optional[dict] = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
@@ -243,7 +245,7 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def match_text(
-        self, fields: str, matching_text: str, topn: int, extra_options: Optional[dict]
+            self, fields: str, matching_text: str, topn: int, extra_options: Optional[dict]
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
@@ -262,12 +264,12 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def match_tensor(
-        self,
-        column_name: str,
-        query_data: VEC,
-        query_data_type: str,
-        topn: int,
-        extra_option: Optional[dict] = None,
+            self,
+            column_name: str,
+            query_data: VEC,
+            query_data_type: str,
+            topn: int,
+            extra_option: Optional[dict] = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
@@ -382,7 +384,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._highlight = highlight_list
         return self
 
-    def sort(self, order_by_expr_list: Optional[List[list[str, bool]]]) -> InfinityThriftQueryBuilder:
+    def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]) -> InfinityThriftQueryBuilder:
         sort_list: List[OrderByExpr] = []
         for order_by_expr in order_by_expr_list:
             if isinstance(order_by_expr[0], str):
@@ -393,35 +395,41 @@ class InfinityThriftQueryBuilder(ABC):
                     column_expr = ColumnExpr(star=True, column_name=[])
                     expr_type = ParsedExprType(column_expr=column_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case "_row_id":
                     func_expr = FunctionExpr(function_name="row_id", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case "_score":
                     func_expr = FunctionExpr(function_name="score", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case "_similarity":
                     func_expr = FunctionExpr(function_name="similarity", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case "_distance":
                     func_expr = FunctionExpr(function_name="distance", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
-                    order_by_expr = OrderByExpr(expr = parsed_expr, asc = order_by_expr[1])
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
                 case _:
                     parsed_expr = parse_expr(maybe_parse(order_by_expr[0]))
-                    sort_list.append(OrderByExpr(expr = parsed_expr, asc = order_by_expr[1]))
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    sort_list.append(OrderByExpr(expr=parsed_expr, asc=order_by_flag))
 
         self._sort = sort_list
         return self
@@ -463,7 +471,7 @@ class InfinityThriftQueryBuilder(ABC):
             groupby=self._groupby,
             limit=self._limit,
             offset=self._offset,
-            sort = self._sort,
+            sort=self._sort,
             explain_type=explain_type,
         )
         return self._table._explain_query(query)

@@ -247,11 +247,17 @@ class TestInsert:
 
             def checkpoint_func(infinity_obj):
                 nonlocal stop_insert
-                time.sleep(0.2)
-                infinity_obj.flush_data()
-                time.sleep(0.2)
-                infinity_obj.flush_delta()
-                time.sleep(0.2)
+
+                try:
+                    time.sleep(0.2)
+                    infinity_obj.flush_data()
+                    time.sleep(0.2)
+                    infinity_obj.flush_delta()
+                    time.sleep(0.2)
+                except Exception as e:
+                    print(e)
+                    stop_insert = True
+                    raise e
                 stop_insert = True
 
             def insert_func(table_obj):

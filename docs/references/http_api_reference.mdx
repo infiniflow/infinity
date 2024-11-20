@@ -3434,7 +3434,7 @@ curl --request POST \
 ##### Request parameters
 
 - `role`: Required (*Body parameter*)
-  Indicating which role the user want the node to be, it must be set to `admin`, `standalone`, `leader` or `follower`.
+  The role of the node. It must be set to `admin`, `standalone`, `leader` or `follower`.
     - Parameter settings for setting a node to `admin` and `standalone` are both empty, no extra parameters are required.
     - Parameter settings for setting a node to `leader`:
         - "name" Required : Name of the node in the cluster.
@@ -3712,7 +3712,7 @@ The response includes a JSON object like the following:
 
 **GET** `/admin/node/{node_name}`
 
-Gets information about a node in the cluster.
+Retrieves information about a node in the cluster.
 
 #### Request
 
