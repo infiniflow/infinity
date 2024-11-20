@@ -49,12 +49,13 @@ class TestMemIdx:
 
         part1()
 
-        # config1 can held 6 rows of hnsw mem index before dump
+        # config1 can hold 6 rows of hnsw mem index before dump
         # 1. recover by dumpindex wal & memindex recovery
         decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
 
         @decorator2
         def part2(infinity_obj):
+            time.sleep(5)
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_memidx1")
             data_dict, data_type_dict = (
@@ -81,6 +82,7 @@ class TestMemIdx:
 
         @decorator3
         def part3(infinity_obj):
+            time.sleep(5)
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_memidx1")
 
@@ -371,3 +373,42 @@ class TestMemIdx:
         part2()
 
         infinity_runner.clear()
+
+    def test_tmp(self, infinity_runner: InfinityRunner):
+        infinity_runner.clear()
+
+        config = "test/data/config/restart_test/test_memidx/1.toml"
+        uri = common_values.TEST_LOCAL_HOST
+
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.create_table(
+                "test_memidx5",
+                {"c1": {"type": "int"}, "c2": {"type": "varchar"}},
+            )
+            table_obj.create_index(
+                "idx1", index.IndexInfo("c2", index.IndexType.FullText)
+            )
+            table_obj.insert(
+                [{"c1": 1, "c2": "hello world. hello world. hello world."}]
+            )
+            infinity_obj.flush_delta()
+
+            table_obj.insert([{"c1": 2, "c2": "hello c++. hello c++. hello c++."}])
+            infinity_obj.flush_delta()
+
+        part1()
+
+        @decorator
+        def part2(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_memidx5")
+            data_dict, data_type_dict = (
+                table_obj.output(["c1"]).match_text("c2", "hello", 2).to_result()
+            )
+            assert data_dict["c1"] == [1, 2]
+
+        part2()

@@ -53,7 +53,7 @@ public:
 protected:
     Atomic<i64> interval_{};
     std::chrono::system_clock::time_point last_check_{};
-    i64 duration_{0};
+    Atomic<i64> duration_{0};
 };
 
 export class CleanupPeriodicTrigger final : public PeriodicTrigger {

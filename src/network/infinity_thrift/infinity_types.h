@@ -5834,10 +5834,11 @@ void swap(ShowCurrentNodeRequest &a, ShowCurrentNodeRequest &b);
 std::ostream& operator<<(std::ostream& out, const ShowCurrentNodeRequest& obj);
 
 typedef struct _ShowCurrentNodeResponse__isset {
-  _ShowCurrentNodeResponse__isset() : error_code(false), error_msg(false), node_role(false) {}
+  _ShowCurrentNodeResponse__isset() : error_code(false), error_msg(false), node_role(false), server_status(false) {}
   bool error_code :1;
   bool error_msg :1;
   bool node_role :1;
+  bool server_status :1;
 } _ShowCurrentNodeResponse__isset;
 
 class ShowCurrentNodeResponse : public virtual ::apache::thrift::TBase {
@@ -5848,13 +5849,15 @@ class ShowCurrentNodeResponse : public virtual ::apache::thrift::TBase {
   ShowCurrentNodeResponse() noexcept
                           : error_code(0),
                             error_msg(),
-                            node_role() {
+                            node_role(),
+                            server_status() {
   }
 
   virtual ~ShowCurrentNodeResponse() noexcept;
   int64_t error_code;
   std::string error_msg;
   std::string node_role;
+  std::string server_status;
 
   _ShowCurrentNodeResponse__isset __isset;
 
@@ -5864,6 +5867,8 @@ class ShowCurrentNodeResponse : public virtual ::apache::thrift::TBase {
 
   void __set_node_role(const std::string& val);
 
+  void __set_server_status(const std::string& val);
+
   bool operator == (const ShowCurrentNodeResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
@@ -5871,6 +5876,8 @@ class ShowCurrentNodeResponse : public virtual ::apache::thrift::TBase {
     if (!(error_msg == rhs.error_msg))
       return false;
     if (!(node_role == rhs.node_role))
+      return false;
+    if (!(server_status == rhs.server_status))
       return false;
     return true;
   }

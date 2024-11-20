@@ -730,7 +730,8 @@ struct ShowCurrentNodeRequest {
 struct ShowCurrentNodeResponse {
 1: i64 error_code,
 2: string error_msg,
-3: string node_role
+3: string node_role,
+4: string server_status
 }
 
 struct CommandRequest {

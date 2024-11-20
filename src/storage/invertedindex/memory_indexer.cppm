@@ -91,7 +91,10 @@ public:
 
     RowID GetBaseRowId() const { return base_row_id_; }
 
-    u32 GetDocCount() const { return doc_count_; }
+    u32 GetDocCount() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return doc_count_;
+    }
 
     u32 GetColumnLengthSum() const { return column_length_sum_.load(); }
 

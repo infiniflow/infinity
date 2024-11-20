@@ -163,11 +163,14 @@ TaskBinding FragmentTask::TaskBinding() const {
 
 bool FragmentTask::CompleteTask() {
     // One thread reach here
-    if (status_ == FragmentTaskStatus::kRunning) {
-        status_ = FragmentTaskStatus::kFinished;
-    } else if (status_ != FragmentTaskStatus::kError) {
-        String error_message = "Status should be an error status";
-        UnrecoverableError(error_message);
+    {
+        std::unique_lock lock(mutex_);
+        if (status_ == FragmentTaskStatus::kRunning) {
+            status_ = FragmentTaskStatus::kFinished;
+        } else if (status_ != FragmentTaskStatus::kError) {
+            String error_message = "Status should be an error status";
+            UnrecoverableError(error_message);
+        }
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     LOG_TRACE(fmt::format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));

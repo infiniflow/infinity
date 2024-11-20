@@ -42,7 +42,8 @@ protected:
         RemoveDbDirs();
 
         auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_bgtask.toml");
-        infinity::InfinityContext::instance().Init(config_path);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
 
         storage_ = InfinityContext::instance().storage();
         txn_mgr_ = storage_->txn_manager();

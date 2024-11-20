@@ -119,7 +119,9 @@ class DockerInfinityRunner(BaseInfinityRunner):
         http_ip, http_port = http_addr.split(":")
         mock_addr = f"http://{self.mock_ip}:{http_port}"
         print(f"add client: {mock_addr}")
-        self.client = infinity_http(net=docker_http_network(self.container, mock_addr))
+        net=docker_http_network(self.container, mock_addr)
+        net.set_retry()
+        self.client = infinity_http(net = net)
 
     def peer_uri(self):
         peer_port = self.network_config["peer_port"]

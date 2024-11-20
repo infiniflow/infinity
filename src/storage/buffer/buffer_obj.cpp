@@ -52,12 +52,12 @@ BufferObj::~BufferObj() {
 #endif
 }
 
-void BufferObj::UpdateFileWorkerInfo(UniquePtr<FileWorker> file_worker) {
+void BufferObj::UpdateFileWorkerInfo(UniquePtr<FileWorker> new_file_worker) {
     switch (file_worker_->Type()) {
         case FileWorkerType::kVarFile: {
-            assert(file_worker->Type() == FileWorkerType::kVarFile);
+            assert(new_file_worker->Type() == FileWorkerType::kVarFile);
             auto *var_file_worker = static_cast<VarFileWorker *>(file_worker_.get());
-            auto *new_var_file_worker = static_cast<VarFileWorker *>(var_file_worker);
+            auto *new_var_file_worker = static_cast<VarFileWorker *>(new_file_worker.get());
             var_file_worker->SetBufferSize(new_var_file_worker->GetBufferSize());
             break;
         }

@@ -131,6 +131,10 @@ Status Status::NotSupportInMaintenanceMode() {
     return Status(ErrorCode::kAdminOnlySupportInMaintenanceMode, MakeUnique<String>("Not support in maintenance mode"));
 }
 
+Status Status::InfinityIsStarting() { return Status(ErrorCode::kInfinityIsStarting, MakeUnique<String>("Infinity is starting")); }
+
+Status Status::InfinityIsIniting() { return Status(ErrorCode::kInfinityIsIniting, MakeUnique<String>("Infinity is initing")); }
+
 // 3. Syntax error or access rule violation
 Status Status::InvalidUserName(const String &user_name) {
     return Status(ErrorCode::kInvalidUsername, MakeUnique<String>(fmt::format("{} is a invalid user name", user_name)));

@@ -92,6 +92,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[23] = String("0.5.0.dev1");
     client_version_map_[24] = String("0.5.0.dev2");
     client_version_map_[25] = String("0.5.0.dev3");
+    client_version_map_[26] = String("0.5.0.dev4");
 }
 
 Pair<const char *, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -1718,6 +1719,11 @@ void InfinityThriftService::ShowCurrentNode(infinity_thrift_rpc::ShowCurrentNode
         {
             Value value = data_block->GetValue(1, 0);
             response.node_role = value.GetVarchar();
+        }
+
+        {
+            Value value = data_block->GetValue(1, 1);
+            response.server_status = value.GetVarchar();
         }
 
         response.__set_error_code((i64)(result.ErrorCode()));

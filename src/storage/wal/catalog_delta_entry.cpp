@@ -1199,9 +1199,9 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
     {
         TxnTimeStamp max_ts = 0;
         for (auto &[_, delta_op] : delta_ops) {
-            if (delta_op->commit_ts_ <= last_full_ckp_ts_) { // skip the delta op that is before full checkpoint
-                continue;
-            }
+            // if (delta_op->commit_ts_ < last_full_ckp_ts_) { // skip the delta op that is before full checkpoint
+            //     continue;
+            // }
             max_ts = std::max(max_ts, delta_op->commit_ts_);
             flush_delta_entry->AddOperation(std::move(delta_op));
         }
@@ -1225,6 +1225,11 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
 SizeT GlobalCatalogDeltaEntry::OpSize() const {
     std::lock_guard<std::mutex> lock(catalog_delta_locker_);
     return delta_ops_.size();
+}
+
+void GlobalCatalogDeltaEntry::SetFullCheckpointTs(TxnTimeStamp last_full_ckp_ts) {
+    last_full_ckp_ts_ = last_full_ckp_ts;
+    RemoveDeltaOp(last_full_ckp_ts);
 }
 
 // background process AddDeltaOp call this.
@@ -1258,7 +1263,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
         bool found = iter != delta_ops_.end();
         if (found) {
             CatalogDeltaOperation *op = iter->second.get();
-            if (op->commit_ts_ <= last_full_ckp_ts_) {
+            if (op->commit_ts_ < last_full_ckp_ts_) {
                 delta_ops_.erase(iter);
                 found = false;
             }
@@ -1311,6 +1316,17 @@ void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1) {
             continue; // not prefix
         }
         iter = delta_ops_.erase(iter); // is prefix
+    }
+}
+
+void GlobalCatalogDeltaEntry::RemoveDeltaOp(TxnTimeStamp max_commit_ts) {
+    std::lock_guard<std::mutex> lock(catalog_delta_locker_);
+    for (auto iter = delta_ops_.begin(); iter != delta_ops_.end();) {
+        if (iter->second->commit_ts_ <= max_commit_ts) {
+            iter = delta_ops_.erase(iter);
+        } else {
+            ++iter;
+        }
     }
 }
 

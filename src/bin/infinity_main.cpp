@@ -231,7 +231,7 @@ auto main(int argc, char **argv) -> int {
         return app.exit(e);
     }
 
-    InfinityContext::instance().Init(config_path, m_flag, nullptr);
+    InfinityContext::instance().InitPhase1(config_path, m_flag, nullptr);
 
     auto start_thrift_servers = [&]() {
         StartThriftServer();
@@ -253,6 +253,8 @@ auto main(int argc, char **argv) -> int {
     shutdown_thread = infinity::Thread([&]() { ShutdownServer(); });
 
     RegisterSignal();
+
+    InfinityContext::instance().InitPhase2();
 
     shutdown_thread.join();
 

@@ -33,8 +33,9 @@ if __name__ == "__main__":
     test_fail = False
     while (time.time() - begin_time) < test_sec and not test_fail:
         print(f"Test {test_i}")
-        try:
-            os.system(f"python3 tools/run_restart_test.py --infinity_path={infinity_path} --slow=true")
-        except Exception as e:
-            print(e)
+        ret = os.system(f"python3 tools/run_restart_test.py --infinity_path={infinity_path} --slow=true")
+        if ret != 0:
+            test_fail = True
+            print(f"Test {test_i} failed")
             sys.exit(1)
+        test_i += 1

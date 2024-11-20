@@ -88,7 +88,8 @@ TEST_F(BufferObjTest, test1) {
     RemoveDbDirs();
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     //    RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(config_path);
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
 
     SizeT memory_limit = 1024;
     String data_dir(GetFullDataDir());
@@ -492,7 +493,8 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 #endif
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj_2.toml");
     //    RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(config_path);
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
 
     constexpr u64 kInsertN = 2;
     constexpr u64 kImportSize = 8192;
@@ -660,7 +662,8 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(config_path);
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
 
     constexpr u64 kInsertN = 256;
     constexpr u64 kImportSize = 8192;
@@ -753,7 +756,8 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 TEST_F(BufferObjTest, test_multiple_threads_read) {
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
     RemoveDbDirs();
-    infinity::InfinityContext::instance().Init(config_path);
+    infinity::InfinityContext::instance().InitPhase1(config_path);
+    infinity::InfinityContext::instance().InitPhase2();
 
     constexpr u64 kInsertN = 256;
     constexpr u64 kImportSize = 8192;

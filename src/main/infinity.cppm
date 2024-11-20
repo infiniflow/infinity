@@ -225,7 +225,7 @@ public:
     QueryResult AdminRemoveNode(String var_name);
 
 private:
-    UniquePtr<QueryContext> GetQueryContext() const;
+    std::variant<UniquePtr<QueryContext>, QueryResult> GetQueryContext(bool is_admin_stmt = false, bool is_admin_show_node = false) const;
 
     SharedPtr<BaseSession> session_{};
 };

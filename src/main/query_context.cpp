@@ -128,18 +128,21 @@ QueryResult QueryContext::Query(const String &query) {
 QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
     QueryResult query_result;
 
-    if (InfinityContext::instance().IsAdminRole()) {
-        if (base_statement->Type() == StatementType::kAdmin) {
+    if (base_statement->Type() == StatementType::kAdmin) {
+        if (InfinityContext::instance().IsAdminRole()) {
             const AdminStatement *admin_statement = static_cast<const AdminStatement *>(base_statement);
             return HandleAdminStatement(admin_statement);
         } else {
-            query_result.result_table_ = nullptr;
-            query_result.status_ = Status::NotSupportInMaintenanceMode();
-            return query_result;
-        }
-    } else {
-        if (base_statement->Type() == StatementType::kAdmin) {
             const AdminStatement *admin_statement = static_cast<const AdminStatement *>(base_statement);
+            if (admin_statement->admin_type_ == AdminStmtType::kShowNode) {
+                return HandleAdminStatement(admin_statement);
+            }
+
+            // if (!InfinityContext::instance().InfinityContextStarted()) {
+            //     query_result.result_table_ = nullptr;
+            //     query_result.status_ = Status::InfinityIsStarting();
+            //     return query_result;
+            // }
 
             switch (admin_statement->admin_type_) {
                 case AdminStmtType::kShowVariable: {
@@ -166,6 +169,12 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
             query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
             return query_result;
         }
+    // } else {
+    //     if (!InfinityContext::instance().InfinityContextStarted()) {
+    //         query_result.result_table_ = nullptr;
+    //         query_result.status_ = Status::InfinityIsStarting();
+    //         return query_result;
+    //     }
     }
 
     Vector<SharedPtr<LogicalNode>> logical_plans{};
