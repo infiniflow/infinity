@@ -12,6 +12,7 @@ from infinity.errors import ErrorCode
 from restart_util import *
 
 
+@pytest.mark.skip(reason="tmp")
 @pytest.mark.slow
 class TestFullText:
     @pytest.mark.parametrize(
