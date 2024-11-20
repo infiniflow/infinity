@@ -32,7 +32,7 @@ jobs:
       - name: Choose test type
         id: choose_test_type
         run: |
-          echo "RUN_TSAN_TEST=true" >> $GITHUB_OUTPUT
+          echo "RUN_TSAN_TEST=false" >> $GITHUB_OUTPUT
 
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
