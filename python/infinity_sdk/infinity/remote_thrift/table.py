@@ -397,14 +397,10 @@ class RemoteTable():
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
         for order_by_expr in order_by_expr_list:
             if len(order_by_expr) != 2:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER,
+                raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE,
                                         "order_by_expr_list must be a list of [column_name, sort_type]")
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER, "sort_type must be SortType.Asc or SortType.Desc")
-            if order_by_expr[1] == SortType.Asc:
-                order_by_expr[1] = True
-            else:
-                order_by_expr[1] = False
+                raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE, "sort_type must be SortType.Asc or SortType.Desc")
         self.query_builder.sort(order_by_expr_list)
         return self
 
