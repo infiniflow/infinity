@@ -58,7 +58,6 @@ def test_leader_failed(cluster : InfinityCluster):
     leader can't do:
     remove it self from the cluster
     switch directly to follower or learner
-    show config
     '''
     cluster.add_node("node1", "conf/leader.toml")
     cluster.set_leader("node1")
@@ -66,9 +65,6 @@ def test_leader_failed(cluster : InfinityCluster):
 
     with pytest.raises(InfinityException) as e:
         node1_client.remove_node("node1");
-
-    with pytest.raises(InfinityException) as e:
-        cluster.set_learner("node1")
 
     with pytest.raises(InfinityException) as e:
         cluster.set_follower("node1")

@@ -118,8 +118,12 @@ class http_network_util:
             if resp.status_code != 200:
                 if resp.status_code == 500:
                     resp_json = resp.json()
-                    print(500, resp_json["error_code"], resp_json["error_message"])
-                    raise InfinityException(resp_json["error_code"], resp_json["error_message"])
+                    if "error_message" in resp_json:
+                        print(500, resp_json["error_code"], resp_json["error_message"])
+                        raise InfinityException(resp_json["error_code"], resp_json["error_message"])
+                    else:
+                        print(500, resp_json["error_code"])
+                        raise InfinityException(resp_json["error_code"], "")
                 elif resp.status_code == 404:
                     # create_database("") return status_code 404 with no json
                     print(404)
