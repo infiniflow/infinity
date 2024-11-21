@@ -131,8 +131,11 @@ def infinity_runner_decorator_factory(
             try:
                 return f(infinity_obj, *args, **kwargs)
             finally:
-                if not shutdown_out:
+                try:
                     infinity_obj.disconnect()
+                except Exception:
+                    if not shutdown_out:
+                        raise
                 infinity_runner.uninit()
 
         return wrapper

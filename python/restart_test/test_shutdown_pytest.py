@@ -92,7 +92,6 @@ class TestShutDownPytest:
                 raise Exception(
                     f"Cannot connect to infinity after {TRY_TIMES} retries."
                 )
-            infinity_obj.disconnect()
 
             t1 = threading.Thread(target=shutdown_func)
             t1.start()
