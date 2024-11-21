@@ -128,8 +128,8 @@ class TestInsertImport:
     @pytest.mark.parametrize(
         "total_n, config",
         [
-            (100000, "test/data/config/restart_test/test_insert/4.toml"),
-            (100000, "test/data/config/restart_test/test_insert/5.toml"),
+            (10000, "test/data/config/restart_test/test_insert/4.toml"),
+            (10000, "test/data/config/restart_test/test_insert/5.toml"),
         ],
     )
     @pytest.mark.parametrize(
@@ -204,6 +204,7 @@ class TestInsertImport:
         "total_n, config",
         [
             (100000, "test/data/config/restart_test/test_insert/4.toml"),
+            (100000, "test/data/config/restart_test/test_insert/5.toml"),
         ],
     )
     @pytest.mark.parametrize(
