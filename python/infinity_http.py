@@ -272,7 +272,7 @@ class infinity_http:
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
         # print(r.json())
-        return database_result(node_role=r.json()["node"]["role"])
+        return database_result(node_role=r.json()["node"]["role"], node_status=r.json()["node"]["status"])
 
     def show_global_variables(self):
         url = "variables/global"
@@ -296,13 +296,12 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result()
 
-    def show_current_node(self):
-        url = f"admin/node/current"
+    def list_nodes(self):
+        url = f"admin/nodes"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
-        # print(r.json())
-        return database_result(node_role=r.json()["node"]["role"])
+        return database_result(data=r.json()["nodes"])
 
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
@@ -911,7 +910,7 @@ class table_http_result:
 
 class database_result():
     def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_list=[],
-                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0):
+                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0, data={}):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
