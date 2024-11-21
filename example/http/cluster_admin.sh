@@ -6,6 +6,16 @@
 # ./cmake-build-debug/src/infinity --config conf/follower.toml
 # ./cmake-build-debug/src/infinity --config conf/learner.toml
 
+echo '\n\n--show admin configs'
+curl --request GET \
+    --url http://localhost:23822/admin/configs \
+    --header 'accept: application/json'
+
+echo '\n\n--show admin variables'
+curl --request GET \
+    --url http://localhost:23822/admin/variables \
+    --header 'accept: application/json'
+
 # setting leader
 echo '--setting leader'
 curl --request POST \
@@ -74,3 +84,4 @@ echo '\n\n--on learner, list all nodes in cluster'
 curl --request GET \
     --url http://localhost:23822/admin/nodes \
     --header 'accept: application/json'
+

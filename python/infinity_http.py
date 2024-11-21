@@ -296,6 +296,20 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result()
 
+    def show_admin_variables(self):
+        url = f"admin/variables"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(data=r.json()["role"])
+
+    def show_admin_configs(self):
+        url = f"admin/configs"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(data=r.json())
+
     def list_nodes(self):
         url = f"admin/nodes"
         h = self.net.set_up_header(["accept"])
@@ -921,6 +935,7 @@ class database_result():
         self.node_status = node_status
         self.index_comment = index_comment
         self.deleted_rows = deleted_rows
+        self.data = data
 
 
 identifier_limit = 65536
