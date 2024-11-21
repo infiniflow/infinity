@@ -9,6 +9,7 @@ import infinity
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 
+PYTEST_LOG_FILE = "restart_test.py.log"
 
 class InfinityRunner:
     def __init__(self, infinity_path: str, *, logger=None):
@@ -27,18 +28,25 @@ class InfinityRunner:
         self.logger = logging.getLogger("infinity_runner")
         if not self.logger.handlers:
             self.logger.setLevel(logging.DEBUG)
-            ch = logging.StreamHandler()
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.INFO)
             formatter = logging.Formatter(
                 "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
             )
-            ch.setFormatter(formatter)
-            self.logger.addHandler(ch)
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+
+            handler = logging.FileHandler(PYTEST_LOG_FILE)
+            handler.setLevel(logging.DEBUG)
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
     def clear(self):
         os.system(
             f"rm -rf {self.data_dir}/data {self.data_dir}/log {self.data_dir}/persistence {self.data_dir}/tmp {self.data_dir}/wal"
         )
         os.system(f"rm -rf restart_test.log.*")
+        os.system(f"rm -rf {PYTEST_LOG_FILE}")
         print(f"clear {self.data_dir}")
         self.i = 0
 

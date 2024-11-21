@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 import pytest
 from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
@@ -37,16 +38,21 @@ class TestInsertImport:
         shutdown = False
         error = False
 
+        lock = threading.Lock()
+
+        logger = infinity_runner.logger
+        write_i = 0
+
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
         def insert_import_func(table_obj):
-            nonlocal cur_n, insert_finish, shutdown, error
+            nonlocal cur_n, insert_finish, shutdown, error, write_i
 
             while cur_n < total_n:
                 r = random.randint(0, 100)
                 if_import = r < import_rate * 100
                 if insert_finish:
-                    print("insert finished")
+                    logger.debug("insert finished")
                 try:
                     if not if_import and not insert_finish:
                         insert_data = []
@@ -66,15 +72,19 @@ class TestInsertImport:
                         else:
                             cur_n = total_n
                         cur_n += insert_batch_size
+                        logger.debug(f"{write_i}. insert {insert_batch_size} data, cur_n: {cur_n}")
                     else:
                         abs_import_file = os.path.abspath(import_file)
                         table_obj.import_data(abs_import_file, import_options)
                         cur_n += import_size
+                        logger.debug(f"{write_i}. import {import_size} data, cur_n: {cur_n}")
+                    write_i += 1
                 except Exception as e:
-                    print(f"insert/import {if_import} error at {cur_n}")
-                    if not shutdown:
-                        error = True
-                        raise e
+                    logger.debug(f"insert/import {if_import} error at {cur_n}")
+                    with lock:
+                        if not shutdown:
+                            error = True
+                            raise e
                     break
 
         shutdown_time = 0
@@ -87,12 +97,13 @@ class TestInsertImport:
                 if cur_n >= total_n or (
                     stop_n != 0 and cur_n - last_shutdown_n >= interval_n
                 ):
-                    shutdown = True
-                    infinity_runner.uninit()
-                    print("shutdown infinity")
+                    with lock:
+                        shutdown = True
+                        infinity_runner.uninit()
+                        logger.debug("shutdown infinity")
                     shutdown_time += 1
                     return
-                print(f"cur_n inner: {cur_n}")
+                logger.debug(f"cur_n inner: {cur_n}")
                 time.sleep(0.1)
 
         @decorator
@@ -103,7 +114,7 @@ class TestInsertImport:
             data_dict, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
             assert count_star == cur_n
-            print(f"cur_n: {cur_n}")
+            logger.debug(f"cur_n: {cur_n}")
 
             t1 = RtnThread(target=shutdown_func)
             t1.start()
@@ -220,8 +231,8 @@ class TestInsertImport:
                 LChYDataGenerato.columns(),
                 LChYDataGenerato.index(),
                 LChYDataGenerato.gen_factory("test/data/jsonl/test_table.jsonl"),
-                "test/data/jsonl/test_table.jsonl",
-                10,
+                LChYDataGenerato.import_file(),
+                LChYDataGenerato.import_size(),
                 {"file_type": "jsonl"},
             ),
         ],

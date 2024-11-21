@@ -354,23 +354,9 @@ Tuple<SharedPtr<TableIndexInfo>, Status> Txn::GetTableIndexInfo(const String &db
 
 Pair<Vector<SegmentIndexEntry *>, Status>
 Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
-    auto *table_entry = table_ref->table_entry_ptr_;
     auto [segment_index_entries, status] = table_index_entry->CreateIndexPrepare(table_ref, this, prepare, false, check_ts);
     if (!status.ok()) {
         return {segment_index_entries, status};
-    }
-
-    {
-        std::lock_guard guard(txn_store_.mtx_);
-        auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
-        for (auto &segment_index_entry : segment_index_entries) {
-            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            SharedPtr<MemoryIndexer> memory_indexer;
-            segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, this);
-            for (auto &chunk_index_intry : chunk_index_entries) {
-                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
-            }
-        }
     }
 
     return {segment_index_entries, Status::OK()};
