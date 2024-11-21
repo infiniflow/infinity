@@ -623,7 +623,13 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_dup
         }
     } else {
         // Rename the current wal file to a new one.
-        VirtualStore::Rename(wal_path_, new_file_path);
+        if (VirtualStore::Exists(wal_path_)) {
+            VirtualStore::Rename(wal_path_, new_file_path);
+        }
+    }
+
+    if (!VirtualStore::Exists(wal_dir_)) {
+        VirtualStore::MakeDirectory(wal_dir_);
     }
 
     // Create a new wal file with the original name.
