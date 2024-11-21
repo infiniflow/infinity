@@ -1330,7 +1330,7 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
             auto batch = maybe_batch.MoveValueUnsafe();
             const auto batch_row_count = batch->num_rows();
             const auto batch_col_count = batch->num_columns();
-            if (batch_col_count != table_entry_->ColumnCount()) {
+            if (static_cast<u64>(batch_col_count) != table_entry_->ColumnCount()) {
                 RecoverableError(
                     Status::ColumnCountMismatch(fmt::format("Column count mismatch: {} != {}", batch_col_count, table_entry_->ColumnCount())));
             }
