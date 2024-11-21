@@ -3662,34 +3662,39 @@ public:
         auto result = infinity->AdminShowCatalogs();
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-            DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
-            auto row_count = data_block->row_count();
-            for (int row = 0; row < row_count; ++row) {
-                nlohmann::json node_json;
-                {
-                    String index = data_block->GetValue(0, row).ToString();
-                    node_json["index"] = index;
+            if(result.result_table_->data_blocks_.empty()) {
+                ;
+            } else {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json node_json;
+                    {
+                        String index = data_block->GetValue(0, row).ToString();
+                        node_json["index"] = index;
+                    }
+                    {
+                        String full_ckp = data_block->GetValue(1, row).ToString();
+                        node_json["full_checkpoint"] = full_ckp;
+                    }
+                    {
+                        String max_commit_ts = data_block->GetValue(2, row).ToString();
+                        node_json["max_commit_ts"] = max_commit_ts;
+                    }
+                    {
+                        String path = data_block->GetValue(3, row).ToString();
+                        node_json["path"] = path;
+                    }
+                    {
+                        String file = data_block->GetValue(4, row).ToString();
+                        node_json["file"] = file;
+                    }
+                    nodes_json.push_back(node_json);
                 }
-                {
-                    String full_ckp = data_block->GetValue(1, row).ToString();
-                    node_json["full_checkpoint"] = full_ckp;
-                }
-                {
-                    String max_commit_ts = data_block->GetValue(2, row).ToString();
-                    node_json["max_commit_ts"] = max_commit_ts;
-                }
-                {
-                    String path = data_block->GetValue(3, row).ToString();
-                    node_json["path"] = path;
-                }
-                {
-                    String file = data_block->GetValue(4, row).ToString();
-                    node_json["file"] = file;
-                }
-                nodes_json.push_back(node_json);
             }
             json_response["catalogs"] = nodes_json;
             http_status = HTTPStatus::CODE_200;
+
         } else {
             json_response["error_code"] = result.ErrorCode();
             json_response["error_message"] = result.ErrorMsg();
