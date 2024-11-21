@@ -170,6 +170,8 @@ export using Status = arrow::Status;
 export using ReadableFile = arrow::io::ReadableFile;
 export using RandomAccessFile = arrow::io::RandomAccessFile;
 export using Table = arrow::Table;
+export template <class T>
+using ArrowResult = arrow::Result<T>;
 
 export using ChunkedArray = arrow::ChunkedArray;
 export using ArrayBuilder = arrow::ArrayBuilder;
@@ -224,7 +226,10 @@ export using FieldVector = arrow::FieldVector;
 export using Schema = arrow::Schema;
 export using ParquetFileReader = parquet::arrow::FileReader;
 export using ParquetFileWriter = parquet::arrow::FileWriter;
+export using ParquetFileReaderBuilder = parquet::arrow::FileReaderBuilder;
 export using ArrowWriterProperties = parquet::ArrowWriterProperties;
+export using ParquetReaderProperties = parquet::ReaderProperties;
+export using ParquetArrowReaderProperties = parquet::ArrowReaderProperties;
 } // namespace arrow
 
 namespace parquet {

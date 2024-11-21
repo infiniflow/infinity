@@ -1281,74 +1281,87 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 }
 
 void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state) {
-    Txn *txn = query_context->GetTxn();
-    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SizeT row_count = 0;
-
     arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
-    SharedPtr<arrow::RandomAccessFile> file;
 
-    file = arrow::ReadableFile::Open(file_path_, pool).ValueOrDie();
-    UniquePtr<arrow::ParquetFileReader> arrow_reader;
+    // Configure general Parquet reader settings
+    auto reader_properties = arrow::ParquetReaderProperties(pool);
+    reader_properties.enable_buffered_stream();
 
-    SharedPtr<arrow::Table> table;
-    auto status = parquet::OpenFile(file, pool, &arrow_reader);
-    if (!status.ok()) {
-        RecoverableError(Status::FileNotFound(file_path_));
+    // Configure Arrow-specific Parquet reader settings
+    auto arrow_reader_props = arrow::ParquetArrowReaderProperties();
+    arrow_reader_props.set_batch_size(DEFAULT_BLOCK_CAPACITY);
+
+    arrow::ParquetFileReaderBuilder reader_builder;
+    if (const auto status = reader_builder.OpenFile(file_path_, /*memory_map=*/true, reader_properties); !status.ok()) {
+        RecoverableError(Status::IOError(status.ToString()));
     }
-    status = arrow_reader->ReadTable(&table);
-    if (!status.ok()) {
+    reader_builder.memory_pool(pool);
+    reader_builder.properties(arrow_reader_props);
+
+    auto build_result = reader_builder.Build();
+    if (!build_result.ok()) {
+        RecoverableError(Status::ImportFileFormatError(build_result.status().ToString()));
+    }
+    std::unique_ptr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
+
+    std::shared_ptr<arrow::RecordBatchReader> rb_reader;
+    if (auto status = arrow_reader->GetRecordBatchReader(&rb_reader); !status.ok()) {
         RecoverableError(Status::ImportFileFormatError(status.ToString()));
     }
 
-    row_count = table->num_rows();
-    SizeT col_count = table->num_columns();
-    if (col_count != table_entry_->ColumnCount()) {
-        RecoverableError(Status::ColumnCountMismatch(fmt::format("Column count mismatch: {} != {}", col_count, table_entry_->ColumnCount())));
-    }
-
+    Txn *txn = query_context->GetTxn();
+    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+    SizeT row_count = 0;
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
-    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
-
+    UniquePtr<BlockEntry> block_entry{};
     Vector<ColumnVector> column_vectors;
-    for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
-        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
-    }
-
-    Vector<i64> chunk_idxs(table_entry_->ColumnCount(), 0);
-    Vector<i64> value_idxs(table_entry_->ColumnCount(), 0);
-    for (SizeT i = 0; i < row_count; ++i) {
-        for (SizeT column_idx = 0; column_idx < table_entry_->ColumnCount(); ++column_idx) {
-            SharedPtr<arrow::ChunkedArray> column = table->column(column_idx);
-            auto &column_vector = column_vectors[column_idx];
-            auto array = column->chunk(chunk_idxs[column_idx]);
-            try {
-                ParquetValueHandler(array, column_vector, value_idxs[column_idx]);
-            } catch (const RecoverableException &e) {
-                column_vectors.clear();
-                std::move(*block_entry).Cleanup();
-                std::move(*segment_entry).Cleanup();
-                throw;
-            }
-            if (++value_idxs[column_idx] >= array->length()) {
-                ++chunk_idxs[column_idx];
-                value_idxs[column_idx] = 0;
-            }
+    auto init_column_vectors_and_block_entry = [&] {
+        block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+        column_vectors.clear();
+        for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+            column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
         }
+    };
+    init_column_vectors_and_block_entry();
 
-        block_entry->IncreaseRowCount(1);
-        if (block_entry->GetAvailableCapacity() <= 0) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            if (segment_entry->Room() <= 0) {
-                SaveSegmentData(table_entry_, txn, segment_entry);
-                segment_id = Catalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    for (arrow::ArrowResult<std::shared_ptr<arrow::RecordBatch>> maybe_batch : *rb_reader) {
+        // Operate on each batch...
+        if (maybe_batch.ok()) {
+            auto batch = maybe_batch.MoveValueUnsafe();
+            const auto batch_row_count = batch->num_rows();
+            const auto batch_col_count = batch->num_columns();
+            if (static_cast<u64>(batch_col_count) != table_entry_->ColumnCount()) {
+                RecoverableError(
+                    Status::ColumnCountMismatch(fmt::format("Column count mismatch: {} != {}", batch_col_count, table_entry_->ColumnCount())));
             }
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
-            column_vectors.clear();
-            for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
-                column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
+            for (i64 batch_row_id = 0; batch_row_id < batch_row_count; ++batch_row_id) {
+                for (int column_idx = 0; column_idx < batch_col_count; ++column_idx) {
+                    SharedPtr<arrow::Array> column = batch->column(column_idx);
+                    if (column->length() != batch_row_count) {
+                        UnrecoverableError("column length mismatch");
+                    }
+                    try {
+                        ParquetValueHandler(column, column_vectors[column_idx], batch_row_id);
+                    } catch (const RecoverableException &) {
+                        column_vectors.clear();
+                        std::move(*block_entry).Cleanup();
+                        std::move(*segment_entry).Cleanup();
+                        throw;
+                    }
+                }
+
+                block_entry->IncreaseRowCount(1);
+                if (block_entry->GetAvailableCapacity() <= 0) {
+                    segment_entry->AppendBlockEntry(std::move(block_entry));
+                    if (segment_entry->Room() <= 0) {
+                        SaveSegmentData(table_entry_, txn, segment_entry);
+                        segment_id = Catalog::GetNextSegmentID(table_entry_);
+                        segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+                    }
+                    init_column_vectors_and_block_entry();
+                }
             }
+            row_count += batch_row_count;
         }
     }
 
