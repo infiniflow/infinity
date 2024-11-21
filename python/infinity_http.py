@@ -310,6 +310,20 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result(data=r.json())
 
+    def show_admin_catalogs(self):
+        url = f"admin/catalogs"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(data=r.json())
+
+    def show_admin_logs(self):
+        url = f"admin/logs"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(data=r.json())
+
     def list_nodes(self):
         url = f"admin/nodes"
         h = self.net.set_up_header(["accept"])

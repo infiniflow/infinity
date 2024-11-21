@@ -16,6 +16,16 @@ curl --request GET \
     --url http://localhost:23822/admin/variables \
     --header 'accept: application/json'
 
+echo '\n\n--show admin catalogs'
+curl --request GET \
+    --url http://localhost:23820/admin/catalogs \
+    --header 'accept: application/json'
+
+echo '\n\n--show admin wal'
+curl --request GET \
+    --url http://localhost:23822/admin/logs \
+    --header 'accept: application/json'
+
 # setting leader
 echo '--setting leader'
 curl --request POST \

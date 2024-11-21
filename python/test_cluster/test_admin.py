@@ -28,6 +28,12 @@ def test_admin(cluster: InfinityCluster):
     res = infinity1.show_admin_configs()
     logger.info(res.data)
 
+    res = infinity1.show_admin_catalogs()
+    logger.info(res.data)
+
+    res = infinity1.show_admin_logs()
+    logger.info(res.data)
+
     cluster.remove_node("test")
     cluster.clear()
 
@@ -49,3 +55,6 @@ def test_admin_fail0(cluster: InfinityCluster):
 
     cluster.remove_node("test")
     cluster.clear()
+
+# show catalogs
+# show wal
