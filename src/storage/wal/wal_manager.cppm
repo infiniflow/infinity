@@ -88,7 +88,7 @@ public:
     // checkpoint for a batch of sync.
     void Flush();
 
-    void FlushLogByReplication(const Vector<String> &synced_logs);
+    void FlushLogByReplication(const Vector<String> &synced_logs, bool on_startup);
 
     bool TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task);
 
@@ -96,7 +96,7 @@ public:
 
     void Checkpoint(ForceCheckpointTask *ckp_task);
 
-    void SwapWalFile(TxnTimeStamp max_commit_ts);
+    void SwapWalFile(TxnTimeStamp max_commit_ts, bool error_if_duplicate);
 
     String GetWalFilename() const;
 

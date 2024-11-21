@@ -274,6 +274,7 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
             UnrecoverableError(error_message);
         }
 
+        // LOG_TRACE(fmt::format("SYNC: {}", log_entry->ToString()));
         log_strings.emplace_back(buf_ptr);
     }
 
@@ -310,7 +311,7 @@ void WalManager::Flush() {
                 // UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
             if (txn_mgr->InCheckpointProcess(entry->commit_ts_)) {
-                this->SwapWalFile(max_commit_ts_);
+                this->SwapWalFile(max_commit_ts_, true);
             }
 
             for (const SharedPtr<WalCmd> &cmd : entry->cmds_) {
@@ -378,7 +379,7 @@ void WalManager::Flush() {
         try {
             auto file_size = VirtualStore::GetFileSize(wal_path_);
             if (file_size > cfg_wal_size_threshold_) {
-                this->SwapWalFile(max_commit_ts_);
+                this->SwapWalFile(max_commit_ts_, true);
             }
         } catch (RecoverableException &e) {
             LOG_ERROR(e.what());
@@ -401,8 +402,49 @@ void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush mainloop end");
 }
 
-void WalManager::FlushLogByReplication(const Vector<String> &synced_logs) {
-    // Rename the old WAL file and open new WAL file.
+void WalManager::FlushLogByReplication(const Vector<String> &synced_logs, bool on_startup) {
+    if (on_startup) {
+        // To get max commit TS
+        Vector<String> wal_list{};
+        {
+            auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
+            if (!wal_infos.empty()) {
+                std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
+                    return a.max_commit_ts_ > b.max_commit_ts_;
+                });
+            }
+            if (temp_wal_info.has_value()) {
+                wal_list.push_back(temp_wal_info->path_);
+                LOG_INFO(fmt::format("Find temp wal file: {}", temp_wal_info->path_));
+            }
+            for (const auto &wal_info : wal_infos) {
+                wal_list.push_back(wal_info.path_);
+                LOG_INFO(fmt::format("Find wal file: {}", wal_info.path_));
+            }
+            // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
+        }
+
+        TxnTimeStamp max_commit_ts = 0;
+        if (!wal_list.empty()) {
+            WalListIterator iterator(wal_list);
+            while (iterator.HasNext()) {
+                auto wal_entry = iterator.Next();
+                if (wal_entry.get() == nullptr) {
+                    String error_message = "Found unexpected bad wal entry when got replicate logs";
+                    LOG_ERROR(error_message);
+                    break;
+                }
+                LOG_TRACE(wal_entry->ToString());
+                max_commit_ts = std::max(max_commit_ts, wal_entry->commit_ts_);
+            }
+            LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
+        }
+
+        // Rename the old WAL file and open new WAL file, use the max_commit_ts. If duplicate filename, just remove current WAL file and create a new
+        // one.
+        SwapWalFile(max_commit_ts, false);
+    }
+
     for (const String &synced_log : synced_logs) {
         ofs_.write(synced_log.c_str(), synced_log.size());
     }
@@ -565,7 +607,7 @@ i64 WalManager::GetLastCkpWalSize() {
  * @param max_commit_ts The max commit timestamp of the transactions in the
  * current wal file.
  */
-void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
+void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_duplicate) {
     if (ofs_.is_open()) {
         ofs_.close();
     }
@@ -573,8 +615,22 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     String new_file_path = fmt::format("{}/{}", wal_dir_, WalFile::WalFilename(max_commit_ts));
     LOG_INFO(fmt::format("Wal {} swap to new path: {}", wal_path_, new_file_path));
 
-    // Rename the current wal file to a new one.
-    VirtualStore::Rename(wal_path_, new_file_path);
+    if (VirtualStore::Exists(new_file_path)) {
+        if (error_if_duplicate) {
+            UnrecoverableError(fmt::format("File: {}, exists!", new_file_path));
+        } else {
+            VirtualStore::DeleteFile(wal_path_);
+        }
+    } else {
+        // Rename the current wal file to a new one.
+        if (VirtualStore::Exists(wal_path_)) {
+            VirtualStore::Rename(wal_path_, new_file_path);
+        }
+    }
+
+    if (!VirtualStore::Exists(wal_dir_)) {
+        VirtualStore::MakeDirectory(wal_dir_);
+    }
 
     // Create a new wal file with the original name.
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
