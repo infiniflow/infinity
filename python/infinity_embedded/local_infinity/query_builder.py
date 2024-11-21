@@ -479,11 +479,13 @@ class InfinityLocalQueryBuilder(ABC):
 
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]) -> InfinityLocalQueryBuilder:
         sort_list: List[WrapOrderByExpr] = []
+
+        order_by_expr_str = str
         for order_by_expr in order_by_expr_list:
             if isinstance(order_by_expr[0], str):
-                order_by_expr[0] = order_by_expr[0].lower()
+                order_by_expr_str = order_by_expr[0].lower()
 
-            match order_by_expr[0]:
+            match order_by_expr_str:
                 case "*":
                     column_expr = WrapColumnExpr()
                     column_expr.star = True
@@ -538,7 +540,7 @@ class InfinityLocalQueryBuilder(ABC):
                     order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
                     sort_list.append(order_by_expr)
                 case _:
-                    parsed_expr = parse_expr(maybe_parse(order_by_expr[0]))
+                    parsed_expr = parse_expr(maybe_parse(order_by_expr_str))
                     order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
                     sort_list.append(order_by_expr)
 
