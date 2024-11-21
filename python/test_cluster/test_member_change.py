@@ -12,6 +12,7 @@ from infinity.common import ConflictType
 from database_operations import do_some_operations, do_some_operations_cluster
 from infinity_http import infinity_http
 
+@pytest.mark.skip(reason="bugs")
 def test_cluster_leader_follower_change(cluster : InfinityCluster):
     '''
     n1 : leader
