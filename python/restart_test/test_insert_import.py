@@ -43,7 +43,7 @@ class TestInsertImport:
         logger = infinity_runner.logger
         write_i = 0
 
-        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, True)
 
         def insert_import_func(table_obj):
             nonlocal cur_n, insert_finish, shutdown, error, write_i

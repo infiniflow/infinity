@@ -122,20 +122,17 @@ class InfinityRunner:
 
 
 def infinity_runner_decorator_factory(
-    config_path: str | None, uri: str, infinity_runner: InfinityRunner
+    config_path: str | None, uri: str, infinity_runner: InfinityRunner, shutdown_out: bool = False
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
             infinity_runner.init(config_path)
             infinity_obj = infinity_runner.connect(uri)
             try:
-                f(infinity_obj, *args, **kwargs)
+                return f(infinity_obj, *args, **kwargs)
             finally:
-                try:
+                if not shutdown_out:
                     infinity_obj.disconnect()
-                except InfinityException as e:
-                    if e.error_code != ErrorCode.CLIENT_CLOSE:
-                        raise
                 infinity_runner.uninit()
 
         return wrapper

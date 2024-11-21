@@ -37,6 +37,7 @@ class TestFullText:
         infinity_runner.clear()
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+        decorator2 = infinity_runner_decorator_factory(config, uri, infinity_runner, True)
 
         @decorator
         def part1(infinity_obj):
@@ -185,7 +186,7 @@ class TestFullText:
             print(f"cur_insert_n: {cur_insert_n}")
             print("shutdown infinity")
 
-        @decorator
+        @decorator2
         def part2(infinity_obj):
             nonlocal shutdown
 

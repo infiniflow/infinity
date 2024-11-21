@@ -12,11 +12,15 @@ import re
 @pytest.mark.slow
 @pytest.mark.skip(reason="skip ")
 class TestShutDownPytest:
+    test_i = 0
+    log_prefix = "restart_test.log."
     finish_one = False
 
     def run_pytest_seperately(
         self, test_dir: str, pytest_mark="not complex and not slow"
     ):
+        self.finish_one = False
+
         cmd = f'pytest {test_dir} --collect-only -q -m "{pytest_mark}"'
         output = os.popen(cmd).read()
         lines = output.splitlines()
@@ -34,33 +38,36 @@ class TestShutDownPytest:
             cmd = f"pytest {test_dir} -k {test_name} -x"  # exit after first failure
             print(f"Test cmd: {cmd}")
 
-            while True:
-                process = subprocess.Popen(cmd, shell=True)
-                process.wait()
-                if process.returncode == 0:
-                    break
-                yield test_file, test_name
-                self.finish_one = False
-            self.finish_one = True
+            outfile = f"{self.log_prefix}{self.test_i}.log"
+            with open(outfile, "w") as f:
+                while True:
+                    process = subprocess.Popen(cmd, shell=True, stdout=f, stderr=f)
+                    process.wait()
+                    if process.returncode == 0:
+                        self.finish_one = True
+                        break
+                    yield test_name
+                    self.finish_one = False
 
     @pytest.mark.parametrize(
-        "test_name",
-        [
-            "test_pysdk"
-            # "parallel_test",  "test_http_api"
-        ],
+        "pytest_mark",
+        ["not complex and not slow"],
     )
-    def test_shutdown_pytest(self, infinity_runner: InfinityRunner, test_name: str):
+    def test_shutdown_pytest(self, infinity_runner: InfinityRunner, pytest_mark: str):
         stop_interval = 10
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
+        test_name = "test_pysdk"
+        config = "conf/pytest_parallel_infinity_conf.toml"
 
         current_path = os.getcwd()
         test_dir = current_path + "/python/" + test_name
 
-        gen = self.run_pytest_seperately(test_dir)
+        gen = self.run_pytest_seperately(test_dir, pytest_mark=pytest_mark)
 
-        decorator = infinity_runner_decorator_factory(None, uri, infinity_runner)
+        decorator = infinity_runner_decorator_factory(
+            config, uri, infinity_runner, True
+        )
 
         def shutdown_func():
             time.sleep(stop_interval)
@@ -73,17 +80,31 @@ class TestShutDownPytest:
 
         @decorator
         def part1(infinity_obj) -> bool:
+            TRY_TIMES = 100
+            for i in range(TRY_TIMES):
+                try:
+                    infinity_obj.get_database("default_db")
+                    break
+                except Exception as e:
+                    infinity_runner.logger.debug(f"retry connect {i}")
+                    time.sleep(0.5)
+            else:
+                raise Exception(
+                    f"Cannot connect to infinity after {TRY_TIMES} retries."
+                )
+            infinity_obj.disconnect()
+
             t1 = threading.Thread(target=shutdown_func)
             t1.start()
 
-            x = next(gen, None)
-            if x is None:
+            test_name = next(gen, None)
+            if test_name is None:
                 return False
-            stop_testfile, stop_test_name = x
-            print(f"Stop test: {stop_test_name}")
+            print(f"Stop at {test_name}")
 
             t1.join()
 
             return True
+
         while part1():
             pass
