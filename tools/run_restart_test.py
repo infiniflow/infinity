@@ -34,7 +34,7 @@ if __name__ == "__main__":
                 "pytest",
                 f"{python_test_dir}/restart_test",
                 f"--infinity_path={infinity_path}",
-                "-x",
+                # "-x",
                 "-s",
                 "-m",
                 "not slow",

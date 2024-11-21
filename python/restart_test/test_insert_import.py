@@ -2,11 +2,12 @@ import os
 import threading
 import time
 import pytest
-from infinity_runner import InfinityRunner
+from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 from restart_util import *
 from common import common_values
 from infinity.common import ConflictType
 import random
+from util import RtnThread
 
 
 class TestInsertImport:
@@ -37,14 +38,21 @@ class TestInsertImport:
         shutdown = False
         error = False
 
+        lock = threading.Lock()
+
+        logger = infinity_runner.logger
+        write_i = 0
+
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, True)
+
         def insert_import_func(table_obj):
-            nonlocal cur_n, insert_finish, shutdown, error
+            nonlocal cur_n, insert_finish, shutdown, error, write_i
 
             while cur_n < total_n:
                 r = random.randint(0, 100)
                 if_import = r < import_rate * 100
                 if insert_finish:
-                    print("insert finished")
+                    logger.debug("insert finished")
                 try:
                     if not if_import and not insert_finish:
                         insert_data = []
@@ -64,15 +72,19 @@ class TestInsertImport:
                         else:
                             cur_n = total_n
                         cur_n += insert_batch_size
+                        logger.debug(f"{write_i}. insert {insert_batch_size} data, cur_n: {cur_n}")
                     else:
                         abs_import_file = os.path.abspath(import_file)
                         table_obj.import_data(abs_import_file, import_options)
                         cur_n += import_size
+                        logger.debug(f"{write_i}. import {import_size} data, cur_n: {cur_n}")
+                    write_i += 1
                 except Exception as e:
-                    print(f"insert/import {if_import} error at {cur_n}")
-                    if not shutdown:
-                        error = True
-                        raise e
+                    logger.debug(f"insert/import {if_import} error at {cur_n}")
+                    with lock:
+                        if not shutdown:
+                            error = True
+                            raise e
                     break
 
         shutdown_time = 0
@@ -85,37 +97,39 @@ class TestInsertImport:
                 if cur_n >= total_n or (
                     stop_n != 0 and cur_n - last_shutdown_n >= interval_n
                 ):
-                    shutdown = True
-                    infinity_runner.uninit()
-                    print("shutdown infinity")
+                    with lock:
+                        shutdown = True
+                        infinity_runner.uninit()
+                        logger.debug("shutdown infinity")
                     shutdown_time += 1
                     return
-                print(f"cur_n inner: {cur_n}")
+                logger.debug(f"cur_n inner: {cur_n}")
                 time.sleep(0.1)
 
-        while cur_n < total_n:
-            infinity_runner.init(config)
-            infinity_obj = InfinityRunner.connect(uri)
-
+        @decorator
+        def part1(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_insert")
 
             data_dict, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
             assert count_star == cur_n
-            print(f"cur_n: {cur_n}")
+            logger.debug(f"cur_n: {cur_n}")
 
-            t1 = threading.Thread(target=shutdown_func)
+            t1 = RtnThread(target=shutdown_func)
             t1.start()
             insert_import_func(table_obj)
             t1.join()
+
+        while cur_n < total_n:
+            part1()
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
         "total_n, config",
         [
-            (100000, "test/data/config/restart_test/test_insert/4.toml"),
-            (100000, "test/data/config/restart_test/test_insert/5.toml"),
+            (10000, "test/data/config/restart_test/test_insert/4.toml"),
+            (10000, "test/data/config/restart_test/test_insert/5.toml"),
         ],
     )
     @pytest.mark.parametrize(
@@ -144,7 +158,7 @@ class TestInsertImport:
             ),
         ],
     )
-    def test_data(
+    def test_data_with_import(
         self,
         infinity_runner: InfinityRunner,
         total_n: int,
@@ -158,13 +172,14 @@ class TestInsertImport:
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
 
-        infinity_runner.init(config)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.create_table("test_insert", columns, ConflictType.Error)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.create_table("test_insert", columns, ConflictType.Error)
+
+        part1()
 
         self.insert_import_inner(
             infinity_runner,
@@ -177,18 +192,19 @@ class TestInsertImport:
             import_options,
         )
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert", ConflictType.Error)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        @decorator
+        def part2(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table("test_insert", ConflictType.Error)
+
+        part2()
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
         "total_n, config",
         [
             (100000, "test/data/config/restart_test/test_insert/4.toml"),
+            (100000, "test/data/config/restart_test/test_insert/5.toml"),
         ],
     )
     @pytest.mark.parametrize(
@@ -208,21 +224,21 @@ class TestInsertImport:
                 SiftGenerator.gen_factory(
                     "test/data/benchmark/sift_1m/sift_base.fvecs"
                 ),
-                "test/data/benchmark/sift_1m/sift_learn.fvecs",
-                128,
+                "test/data/benchmark/sift_1m/sift_query.fvecs",
+                10000,
                 {"file_type": "fvecs"},
             ),
             (
                 LChYDataGenerato.columns(),
                 LChYDataGenerato.index(),
                 LChYDataGenerato.gen_factory("test/data/jsonl/test_table.jsonl"),
-                "test/data/jsonl/test_table.jsonl",
-                10,
+                LChYDataGenerato.import_file(),
+                LChYDataGenerato.import_size(),
                 {"file_type": "jsonl"},
             ),
         ],
     )
-    def test_index(
+    def test_index_with_import(
         self,
         infinity_runner: InfinityRunner,
         total_n: int,
@@ -237,15 +253,16 @@ class TestInsertImport:
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
 
-        infinity_runner.init(config)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
-        for idx in indexes:
-            table_obj.create_index(f"idx_{idx.column_name}", idx)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
+            for idx in indexes:
+                table_obj.create_index(f"idx_{idx.column_name}", idx)
+
+        part1()
 
         self.insert_import_inner(
             infinity_runner,
@@ -258,9 +275,9 @@ class TestInsertImport:
             import_options,
         )
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert", ConflictType.Error)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        @decorator
+        def part2(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table("test_insert", ConflictType.Error)
+
+        part2()

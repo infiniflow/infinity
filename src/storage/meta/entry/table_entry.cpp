@@ -396,7 +396,6 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
     // Populate index entirely for the segment
 
     // create txn_table_store in Txn::Import
-    TxnTableStore *txn_table_store = txn->GetExistTxnTableStore(this);
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, txn->BeginTS());
@@ -421,15 +420,7 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
             }
         }
         PopulateEntireConfig populate_entire_config{.prepare_ = false, .check_ts_ = false};
-        SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
-        if (segment_index_entry.get() != nullptr) {
-            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            SharedPtr<MemoryIndexer> memory_indexer;
-            segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, txn);
-            for (auto &chunk_index_entry : chunk_index_entries) {
-                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-            }
-        }
+        [[maybe_unused]] SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
     }
 }
 
@@ -801,23 +792,6 @@ bool TableEntry::CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id, Tx
     }
     return false;
 }
-
-// void TableEntry::MemIndexDump(Txn *txn, bool spill) {
-//     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
-//     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-//     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
-//         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-//         if (!status.ok())
-//             continue;
-//         TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
-//         SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(txn, txn_index_store, spill);
-//         if (chunk_index_entry.get() != nullptr) {
-//             chunk_index_entry->Commit(txn->CommitTS());
-//             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-//             table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
-//         }
-//     }
-// }
 
 void TableEntry::MemIndexCommit() {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();

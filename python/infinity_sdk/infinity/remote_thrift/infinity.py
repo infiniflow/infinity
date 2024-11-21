@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from abc import ABC
+import logging
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity import InfinityConnection
@@ -24,10 +25,10 @@ from infinity.common import ConflictType, InfinityException
 
 
 class RemoteThriftInfinityConnection(InfinityConnection, ABC):
-    def __init__(self, uri):
+    def __init__(self, uri, logger: logging.Logger = None):
         super().__init__(uri)
         self.db_name = "default_db"
-        self._client = ThriftInfinityClient(uri)
+        self._client = ThriftInfinityClient(uri, logger=logger)
         self._is_connected = True
 
     def __del__(self):
