@@ -63,7 +63,7 @@ def test_leader_failed(cluster : InfinityCluster):
     cluster.add_node("node1", "conf/leader.toml")
     cluster.set_leader("node1")
     node1_client = cluster.client("node1")
-    
+
     with pytest.raises(InfinityException) as e:
         node1_client.remove_node("node1");
 
