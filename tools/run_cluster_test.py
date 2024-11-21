@@ -46,7 +46,7 @@ if __name__ == "__main__":
         python_executable,
         "-m",
         "pytest",
-        # "-v",
+        "-v",
         test_case,
         f"--infinity_path={infinity_path}",
         "-x",
