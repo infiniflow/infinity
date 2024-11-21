@@ -30,12 +30,12 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
     node1_client = cluster.client("node1")
     node2_client = cluster.client("node2")
 
-    res = node1_client.show_node("node1");
+    res = node1_client.show_node("node1")
     assert (res.node_name == "node1")
     assert (res.node_role == "leader")
     assert (res.node_status == "alive")
 
-    res = node1_client.show_node("node2");
+    res = node1_client.show_node("node2")
     assert (res.node_name == "node2")
     assert (res.node_role == "follower")
     assert (res.node_status == "alive")
@@ -44,14 +44,14 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
 
     cluster.set_admin("node1")
     cluster.set_leader("node2")
-    cluster.set_follower("node1");
+    cluster.set_follower("node1")
 
-    res = node1_client.show_node("node1");
+    res = node1_client.show_node("node1")
     assert (res.node_name == "node1")
     assert (res.node_role == "follower")
     assert (res.node_status == "alive")
 
-    res = node1_client.show_node("node2");
+    res = node1_client.show_node("node2")
     assert (res.node_name == "node2")
     assert (res.node_role == "leader")
     assert (res.node_status == "alive")
