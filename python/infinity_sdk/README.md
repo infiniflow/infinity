@@ -59,10 +59,14 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 Infinity supports two working modes, embedded mode and client-server mode. The following shows how to operate in client-server mode:
 
+1. Deploy Infinity in client-server mode. check the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
+
+2. Install the `infinity-sdk` package:
    ```bash
    pip install infinity-sdk==0.5.0.dev4
    ```
-1. Use Infinity to conduct a dense vector search:
+
+3. Use Infinity to conduct a dense vector search:
    ```python
    import infinity
 
@@ -82,14 +86,6 @@ Infinity supports two working modes, embedded mode and client-server mode. The f
                      .to_pl()
    print(res)
    ```
-
-#### 🔧 Deploy Infinity in client-server mode
-
-If you wish to deploy Infinity with the server and client as separate processes, see the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
-
-#### 🔧 Build from Source
-
-See the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) guide.
 
 > 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/pysdk_api_reference).
 
