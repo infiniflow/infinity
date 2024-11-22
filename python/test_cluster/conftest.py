@@ -58,19 +58,19 @@ def pytest_generate_tests(metafunc):
     print("infinity_dir: ", infinity_dir)
     # print(metafunc.fixturenames)
 
+    test_name = metafunc.function.__name__
     if "docker_cluster" in metafunc.fixturenames:
         docker_infinity_cluster = DockerInfinityCluster(
             infinity_path, minio_params=minio_params, infinity_dir=infinity_dir
         )
         metafunc.parametrize("docker_cluster", [docker_infinity_cluster])
     elif "cluster" in metafunc.fixturenames:
-        test_name = metafunc.function.__name__
         infinity_cluster = InfinityCluster(
             infinity_path, minio_params=minio_params, test_name=test_name
         )
         metafunc.parametrize("cluster", [infinity_cluster])
     elif "mock_cluster" in metafunc.fixturenames:
         mock_infinity_cluster = MockInfinityCluster(
-            infinity_path, minio_params=minio_params
+            infinity_path, minio_params=minio_params, test_name=test_name
         )
         metafunc.parametrize("mock_cluster", [mock_infinity_cluster])

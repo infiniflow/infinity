@@ -3,13 +3,8 @@ import time
 import pytest
 from infinity_cluster import InfinityCluster
 from mocked_infinity_cluster import MockInfinityCluster
-from docker_infinity_cluster import DockerInfinityCluster, MinioParams
-from numpy import dtype
-import pandas as pd
+from docker_infinity_cluster import DockerInfinityCluster
 import time
-from infinity.errors import ErrorCode
-from infinity.common import InfinityException
-from infinity.common import ConflictType
 
 
 def test_admin(cluster: InfinityCluster):
@@ -48,28 +43,25 @@ def test_0(cluster: InfinityCluster):
 
 
 @pytest.mark.skip(reason="deprecated")
-@pytest.mark.docker
 def test_mock(mock_cluster: MockInfinityCluster):
     cluster = mock_cluster
+    with cluster:
+        cluster.add_node("node1", "conf/leader.toml")
+        cluster.add_node("node2", "conf/follower.toml")
 
-    cluster.add_node("node1", "conf/leader.toml")
-    cluster.add_node("node2", "conf/follower.toml")
+        cluster.set_leader("node1")
+        cluster.set_follower("node2")
 
-    cluster.set_leader("node1")
-    cluster.set_follower("node2")
+        time.sleep(1)
 
-    time.sleep(1)
+        cluster.disconnect("node2")
+        time.sleep(0.1)
+        cluster.reconnect("node2")
 
-    cluster.disconnect("node2")
-    time.sleep(0.1)
-    cluster.reconnect("node2")
+        time.sleep(1)
 
-    time.sleep(1)
-
-    cluster.remove_node("node2")
-    cluster.remove_node("node1")
-
-    cluster.clear()
+        cluster.remove_node("node2")
+        cluster.remove_node("node1")
 
 
 @pytest.mark.docker
