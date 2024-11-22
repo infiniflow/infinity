@@ -85,8 +85,6 @@ class http_network_util:
                         pass
                     else:
                         raise e
-                except Exception as e:
-                    raise e
                 else:
                     break
                 logging.debug(f"retry {i} times")
@@ -820,9 +818,6 @@ class table_http_result:
         self._search_exprs.append(tmp_fusion_expr)
         return self
 
-    def to_result(self):
-        self.select()
-
     def to_pl(self):
         return pl.from_pandas(self.to_df())
 
@@ -868,7 +863,7 @@ class table_http_result:
                     new_tup = tup + (res[k],)
                 df_dict[k] = new_tup
         # print(self.output_res)
-        print(df_dict)
+        # print(df_dict)
 
         df_type = {}
         for k in df_dict:

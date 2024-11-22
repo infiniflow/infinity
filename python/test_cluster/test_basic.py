@@ -48,6 +48,7 @@ def test_0(cluster: InfinityCluster):
 
 
 @pytest.mark.skip(reason="deprecated")
+@pytest.mark.docker
 def test_mock(mock_cluster: MockInfinityCluster):
     cluster = mock_cluster
 

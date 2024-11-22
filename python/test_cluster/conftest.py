@@ -1,4 +1,3 @@
-import os
 import pytest
 from infinity_cluster import InfinityCluster, MinioParams
 from docker_infinity_cluster import DockerInfinityCluster
@@ -60,20 +59,13 @@ def pytest_generate_tests(metafunc):
     # print(metafunc.fixturenames)
 
     if "docker_cluster" in metafunc.fixturenames:
-        # skip if docker is in option and the testcase is marked with docker
-        if (
-            not metafunc.config.getoption("--docker")
-            and "docker" in metafunc.definition.keywords
-        ):
-            return
-
-        print("Init DockerInfinityCluster")
         docker_infinity_cluster = DockerInfinityCluster(
             infinity_path, minio_params=minio_params, infinity_dir=infinity_dir
         )
         metafunc.parametrize("docker_cluster", [docker_infinity_cluster])
     elif "cluster" in metafunc.fixturenames:
-        infinity_cluster = InfinityCluster(infinity_path, minio_params=minio_params)
+        test_name = metafunc.function.__name__
+        infinity_cluster = InfinityCluster(infinity_path, minio_params=minio_params, test_name=test_name)
         metafunc.parametrize("cluster", [infinity_cluster])
     elif "mock_cluster" in metafunc.fixturenames:
         mock_infinity_cluster = MockInfinityCluster(

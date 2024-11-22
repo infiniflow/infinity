@@ -1,7 +1,6 @@
 from abc import abstractmethod
 import json
-import random
-import string
+import logging
 import subprocess
 import time
 import docker
@@ -34,8 +33,14 @@ class MinioParams:
 
 
 class BaseInfinityRunner:
+
     def __init__(
-        self, node_name: str, executable_path: str, config_path: str, init: bool = True
+        self,
+        node_name: str,
+        executable_path: str,
+        config_path: str,
+        init: bool = True,
+        logger: logging.Logger = None,
     ):
         self.node_name = node_name
         self.executable_path = executable_path
@@ -43,8 +48,11 @@ class BaseInfinityRunner:
         self.load_config()
         http_ip, http_port = self.http_uri()
         self.add_client(f"http://{http_ip}:{http_port}/")
+        if logger is None:
+            self.logger = logging.root
+        else:
+            self.logger = logger
         if init:
-            print(f"Initializing node {self.node_name}")
             self.init(config_path)
 
     @abstractmethod
@@ -76,10 +84,15 @@ class BaseInfinityRunner:
 
 class InfinityRunner(BaseInfinityRunner):
     def __init__(
-        self, node_name: str, executable_path: str, config_path: str, init=True
+        self,
+        node_name: str,
+        executable_path: str,
+        config_path: str,
+        init=True,
+        logger: logging.Logger = None,
     ):
         self.process = None
-        super().__init__(node_name, executable_path, config_path, init)
+        super().__init__(node_name, executable_path, config_path, init, logger)
 
     def init(self, config_path: str | None):
         if self.process is not None:
@@ -89,23 +102,35 @@ class InfinityRunner(BaseInfinityRunner):
             self.load_config()
 
         cmd = [self.executable_path, f"--config={self.config_path}"]
+        self.logger.debug(f"Start process for node {self.node_name}: {cmd}")
         my_env = os.environ.copy()
         my_env["LD_PRELOAD"] = ""
         my_env["ASAN_OPTIONS"] = ""
         self.process = subprocess.Popen(cmd, shell=False, env=my_env)
-        time.sleep(1)  # Give the process a moment to start
-        if self.process.poll() is not None:
+
+        timeout = 10  # Give the process a moment to start
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self.process.poll() is None:
+                break
+            self.logger.debug(
+                f"Waiting for process to start for node {self.node_name}, wait time: {time.time() - start_time}"
+            )
+            time.sleep(0.5)
+        else:
             raise RuntimeError(
                 f"Failed to start process for node {self.node_name}, return code: {self.process.returncode}"
             )
-        print(f"Launch {self.node_name} successfully. pid: {self.process.pid}")
+        self.logger.info(
+            f"Launch {self.node_name} successfully. pid: {self.process.pid}"
+        )
 
     def uninit(self):
-        print(f"Uniniting node {self.node_name}")
+        self.logger.info(f"Uninit node {self.node_name}")
         if self.process is None:
             return
         timeout = 60
-        timeout_kill.timeout_kill(timeout, self.process)
+        timeout_kill.timeout_kill(timeout, self.process, self.logger)
 
     def add_client(self, http_addr: str):
         net = http_network_util(http_addr)
@@ -119,19 +144,45 @@ class InfinityRunner(BaseInfinityRunner):
 
 
 class InfinityCluster:
-    def __init__(self, executable_path: str, *, minio_params: MinioParams):
+    def __init__(
+        self, executable_path: str, *, minio_params: MinioParams, test_name: str = None
+    ):
         self.executable_path = executable_path
         self.runners: dict[str, InfinityRunner] = {}
         self.leader_runner: InfinityRunner | None = None
         self.leader_name = None
+        self.logger_name = test_name
         self.minio_params = minio_params
 
+    def _log_filename(self):
+        if self.logger_name is None:
+            return "cluster.log"
+        return f"{self.logger_name}.log"
+
+    def init_logger(self, logger_name: str):
+        logger = logging.getLogger(logger_name)
+        logger.handlers.clear()
+        logger.setLevel(logging.DEBUG)
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(logging.INFO)
+        logger.addHandler(stream_handler)
+
+        file_handler = logging.FileHandler(self._log_filename(), mode="w", delay=True)
+        file_handler.setLevel(logging.DEBUG)
+        logger.addHandler(file_handler)
+        self.logger = logger
+
     def __enter__(self):
+        self.init_logger(self.logger_name)
         self.add_minio(self.minio_params)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.clear()
+        if exc_type is not None:
+            self.logger.error(f"Exception: {exc_val}")
+        else:
+            self.clear_log()
 
     def clear(self):
         # shutdown follower and learner first
@@ -145,11 +196,34 @@ class InfinityCluster:
                 runner.uninit()
         self.runners.clear()
 
+    def clear_log(self):
+        log_file = self._log_filename()
+        if os.path.exists(log_file):
+            os.remove(log_file)
+
         # if self.minio_container is not None:
         #     self.minio_container.remove(force=True, v=True)
 
     def add_node(self, node_name: str, config_path: str, init=True):
-        runner = InfinityRunner(node_name, self.executable_path, config_path, init)
+        runner = InfinityRunner(
+            node_name, self.executable_path, config_path, init, self.logger
+        )
+        if init:
+            ip, port = runner.http_uri()
+            timeout = 3
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                result = subprocess.run(
+                    ["lsof", "-i", f":{port}"], capture_output=True, text=True
+                )
+                if result.stdout:
+                    break
+                self.logger.debug(
+                    f"Waiting for node {node_name} to open port {port} for {time.time() - start_time} seconds."
+                )
+                time.sleep(0.5)
+            else:
+                raise Exception
         if node_name in self.runners:
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
@@ -163,6 +237,8 @@ class InfinityCluster:
 
         try:
             self.minio_container = docker_client.containers.get(container_name)
+            self.minio_container.start()
+            self.logger.debug(f"Minio container {container_name} already exists.")
         except docker.errors.NotFound:
             self.minio_container = docker_client.containers.run(
                 image=minio_image_name,
@@ -176,6 +252,7 @@ class InfinityCluster:
                 command=minio_cmd,
                 network="host",
             )
+            self.logger.debug(f"Minio container {container_name} created.")
 
     def set_standalone(self, node_name: str):
         if self.leader_runner is not None and self.leader_name == node_name:
@@ -185,6 +262,7 @@ class InfinityCluster:
             raise ValueError(f"Node {node_name} not found in the runners.")
         runner = self.runners[node_name]
         runner.client.set_role_standalone(node_name)
+        self.logger.info(f"Set node {node_name} as standalone.")
 
     def set_admin(self, node_name: str):
         if self.leader_runner is not None and self.leader_name == node_name:
@@ -194,6 +272,7 @@ class InfinityCluster:
             raise ValueError(f"Node {node_name} not found in the runners.")
         runner = self.runners[node_name]
         runner.client.set_role_admin()
+        self.logger.info(f"Set node {node_name} as admin.")
 
     def set_leader(self, leader_name: str):
         if self.leader_runner is not None:
@@ -206,6 +285,7 @@ class InfinityCluster:
         self.leader_name = leader_name
         self.leader_runner = leader_runner
         leader_runner.client.set_role_leader(leader_name)
+        self.logger.info(f"Set node {leader_name} as leader.")
 
     def set_follower(self, follower_name: str):
         if follower_name not in self.runners:
@@ -217,6 +297,7 @@ class InfinityCluster:
         follower_runner.client.set_role_follower(
             follower_name, f"{leader_ip}:{leader_port}"
         )
+        self.logger.info(f"Set node {follower_name} as follower.")
 
     def set_learner(self, learner_name: str):
         if learner_name not in self.runners:
@@ -228,6 +309,7 @@ class InfinityCluster:
         learner_runner.client.set_role_learner(
             learner_name, f"{leader_ip}:{leader_port}"
         )
+        self.logger.info(f"Set node {learner_name} as learner.")
 
     def client(self, node_name: str) -> infinity_http | None:
         if node_name not in self.runners:

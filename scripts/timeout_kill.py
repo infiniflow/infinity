@@ -1,3 +1,4 @@
+import logging
 from subprocess import Popen, TimeoutExpired
 import sys
 import time
@@ -46,14 +47,17 @@ def timeout_kill(duration: int, pids: list[int]):
         time.sleep(1)
 
 
-def timeout_kill(timeout: int, process: Popen[bytes]):
+def timeout_kill(timeout: int, process: Popen[bytes], logger:logging.Logger = None):
+    if logger is None:
+        logger = logging.root
     process.terminate()
     try:
         ret = process.wait(timeout)
-    except TimeoutExpired as e:
+        logger.debug(f"process {process.pid} exited with code {ret}")
+    except TimeoutExpired:
+        logger.error(f"process {process.pid} timeout, killed.")
         ret = process.kill()
-        print(f"process {process.pid} timeout, killed.")
-        exit(1)
+        raise
 
 
 if __name__ == "__main__":
