@@ -97,9 +97,7 @@ public:
 private:
     SharedPtr<arrow::DataType> GetArrowType(ColumnDef *column_def);
 
-    // this performs filtering deleted entries
-    SharedPtr<arrow::Array>
-    BuildArrowArray(ColumnDef *column_def, const ColumnVector &column_vectors, const DeleteFilter &visible, const SegmentOffset seg_off);
+    SharedPtr<arrow::Array> BuildArrowArray(ColumnDef *column_def, const ColumnVector &column_vectors, const Vector<u32> &block_rows_for_output);
 
 private:
     SharedPtr<Vector<String>> output_names_{};

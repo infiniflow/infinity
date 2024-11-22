@@ -239,12 +239,12 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 file_handle->Append(line.c_str(), line.size());
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
-                    return row_count;
+                    goto label_return;
                 }
             }
         }
     }
-
+label_return:
     LOG_DEBUG(fmt::format("Export to CSV, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -383,11 +383,12 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
 
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
-                    return row_count;
+                    goto label_return;
                 }
             }
         }
     }
+label_return:
     LOG_DEBUG(fmt::format("Export to JSONL, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -486,11 +487,12 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 ++row_count;
                 if (limit_ != 0 && row_count == limit_) {
-                    return row_count;
+                    goto label_return;
                 }
             }
         }
     }
+label_return:
     LOG_DEBUG(fmt::format("Export to FVECS, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
@@ -521,7 +523,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
     SharedPtr<arrow::Schema> schema = ::arrow::schema(std::move(fields));
     SharedPtr<::arrow::io::FileOutputStream> file_stream;
-    SharedPtr<::parquet::arrow::FileWriter> file_writer;
+    UniquePtr<::parquet::arrow::FileWriter> file_writer;
 
     String parent_path = VirtualStore::GetParentPath(file_path_);
     if (!parent_path.empty()) {
@@ -531,10 +533,77 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
         }
     }
 
-    file_stream = ::arrow::io::FileOutputStream::Open(file_path_, pool).ValueOrDie();
-    file_writer = ::parquet::arrow::FileWriter::Open(*schema, pool, file_stream, ::parquet::default_writer_properties()).ValueOrDie();
+    auto init_file_stream_writer = [&pool, &schema, &file_stream, &file_writer](const String &output_file_path) {
+        file_writer.reset();
+        file_stream.reset();
+        auto file_stream_result = ::arrow::io::FileOutputStream::Open(output_file_path, pool);
+        if (!file_stream_result.ok()) {
+            RecoverableError(Status::IOError(file_stream_result.status().ToString()));
+        }
+        file_stream = std::move(file_stream_result).ValueOrDie();
+        auto file_writer_result = ::parquet::arrow::FileWriter::Open(*schema, pool, file_stream, ::parquet::default_writer_properties());
+        if (!file_writer_result.ok()) {
+            RecoverableError(Status::IOError(file_writer_result.status().ToString()));
+        }
+        file_writer = std::move(file_writer_result).ValueOrDie();
+    };
+    init_file_stream_writer(file_path_);
 
+    SizeT offset = offset_;
     SizeT row_count{0};
+    SizeT file_no_{0};
+    bool switch_to_new_file = false;
+    auto consume_block =
+        [&](Vector<ColumnVector> &column_vectors, const DeleteFilter &visible, const SegmentOffset seg_off, const SizeT block_row_count) -> bool {
+        Vector<u32> block_rows_for_output;
+        for (SizeT start_block_row_idx = 0; start_block_row_idx < block_row_count; ++start_block_row_idx) {
+            bool need_switch_to_new_file = false;
+            for (block_rows_for_output.clear(); start_block_row_idx < block_row_count; ++start_block_row_idx) {
+                if (!visible(seg_off + start_block_row_idx)) {
+                    continue;
+                }
+                if (offset > 0) {
+                    --offset;
+                    continue;
+                }
+                block_rows_for_output.push_back(start_block_row_idx);
+                ++row_count;
+                if (row_limit_ != 0 && row_count % row_limit_ == 0) {
+                    need_switch_to_new_file = true;
+                    break;
+                }
+                if (row_count == limit_) {
+                    break;
+                }
+            }
+            if (block_rows_for_output.empty()) {
+                continue;
+            }
+            if (switch_to_new_file) {
+                if (auto status = file_writer->Close(); !status.ok()) {
+                    RecoverableError(Status::IOError(fmt::format("Failed to close parquet file: {}", status.ToString())));
+                }
+                const String new_file_path = fmt::format("{}.part{}", file_path_, ++file_no_);
+                init_file_stream_writer(new_file_path);
+            }
+            Vector<SharedPtr<arrow::Array>> block_arrays;
+            for (SizeT i = 0; i < select_column_count; ++i) {
+                const auto select_column_idx = select_columns[i];
+                ColumnDef *column_def = column_defs[select_column_idx].get();
+                ColumnVector &column_vector = column_vectors[i];
+                block_arrays.emplace_back(BuildArrowArray(column_def, column_vector, block_rows_for_output));
+            }
+            SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_rows_for_output.size(), std::move(block_arrays));
+            if (auto status = file_writer->WriteRecordBatch(*block_batch); !status.ok()) {
+                RecoverableError(Status::IOError(fmt::format("Failed to write record batch to parquet file: {}", status.ToString())));
+            }
+            switch_to_new_file = need_switch_to_new_file;
+            if (row_count == limit_) {
+                return false;
+            }
+        }
+        return true;
+    };
     Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     Txn *txn = query_context->GetTxn();
@@ -582,29 +651,14 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                     }
                 }
             }
-
-            Vector<SharedPtr<arrow::Array>> block_arrays;
-            for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
-                ColumnID select_column_idx = select_columns[block_column_idx];
-                ColumnDef *column_def = column_defs[select_column_idx].get();
-                ColumnVector &column_vector = column_vectors[block_column_idx];
-                block_arrays.emplace_back(BuildArrowArray(column_def, column_vector, visible, seg_off));
+            if (!consume_block(column_vectors, visible, seg_off, block_row_count)) {
+                goto label_return;
             }
-
-            SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
-            auto status = file_writer->WriteRecordBatch(*block_batch);
-            if (!status.ok()) {
-                String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
-                UnrecoverableError(error_message);
-            }
-            row_count += block_row_count;
         }
     }
-
-    auto status = file_writer->Close();
-    if (!status.ok()) {
-        String error_message = fmt::format("Failed to close parquet file: {}", status.message());
-        UnrecoverableError(error_message);
+label_return:
+    if (auto status = file_writer->Close(); !status.ok()) {
+        RecoverableError(Status::IOError(fmt::format("Failed to close parquet file: {}", status.ToString())));
     }
     LOG_DEBUG(fmt::format("Export to PARQUET, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
@@ -810,7 +864,7 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
 }
 
 SharedPtr<arrow::Array>
-PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &column_vector, const DeleteFilter &visible, const SegmentOffset seg_off) {
+PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &column_vector, const Vector<u32> &block_rows_for_output) {
     SharedPtr<arrow::ArrayBuilder> array_builder = nullptr;
     auto &column_type = column_def->type();
 
@@ -1053,24 +1107,14 @@ PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &colum
         }
     }
 
-    SizeT offset = offset_;
-    for (SizeT i = 0; i < column_vector.Size(); ++i) {
-        if (!visible(seg_off + i)) {
-            continue;
-        }
-        if (offset > 0) {
-            --offset;
-            continue;
-        }
-        auto value = column_vector.GetValue(i);
+    for (const auto idx : block_rows_for_output) {
+        auto value = column_vector.GetValue(idx);
         value.AppendToArrowArray(column_type, array_builder);
     }
 
     SharedPtr<arrow::Array> array;
-    auto status = array_builder->Finish(&array);
-    if (!status.ok()) {
-        String error_message = fmt::format("Failed to build arrow array: {}", status.message());
-        UnrecoverableError(error_message);
+    if (auto status = array_builder->Finish(&array); !status.ok()) {
+        UnrecoverableError(fmt::format("Failed to build arrow array: {}", status.message()));
     }
     return array;
 }
