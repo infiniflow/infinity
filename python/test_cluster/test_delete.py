@@ -11,7 +11,7 @@ from infinity.errors import ErrorCode
 
 class TestDelete:
     def test_delete(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -66,16 +66,8 @@ class TestDelete:
             res = db_obj.drop_table("test_delete")
             assert res.error_code == ErrorCode.OK
 
-
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()
-
     def test_delete_on_follower(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -122,11 +114,3 @@ class TestDelete:
 
             res = db_obj.drop_table("test_delete")
             assert res.error_code == ErrorCode.OK
-
-
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()

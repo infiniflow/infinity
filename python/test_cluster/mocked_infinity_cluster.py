@@ -49,9 +49,9 @@ class MockedInfinityRunner(InfinityRunner):
         executable_path: str,
         config_path: str,
     ):
-        super().__init__(node_name, executable_path, config_path)
         self.mock_ip = mock_ip
         self.ns_name = ns_name
+        super().__init__(node_name, executable_path, config_path)
 
     def init(self, config_path: str | None):
         if self.process is not None:
@@ -78,16 +78,25 @@ class MockInfinityCluster(InfinityCluster):
         executable_path: str,
         *,
         minio_params: MinioParams = None,
+        test_name: str = None,
     ):
-        super().__init__(executable_path, minio_params=minio_params)
+        super().__init__(executable_path, minio_params=minio_params, test_name=test_name)
         self.ns_prefix = "ns"
         self.bridge_name = "br0"
         self.mock_ip_prefix = "17.0.0."
         self.mock_ip_mask = 24
         self.cur_ip_suffix = 1
         self.first_mock_ip = None  # for ping test
+
+    def __enter__(self):
+        super().__enter__()
         self.__check_prerequisites()
         self.__prepare_bridge()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.clear()
+        super().__exit__(exc_type, exc_value, traceback)
 
     def clear(self):
         subprocess.run(f"sudo ip link set {self.bridge_name} down".split())

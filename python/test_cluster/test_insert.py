@@ -11,7 +11,7 @@ import timeout_decorator
 
 class TestInsert:
     def __test_inner_1(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -55,12 +55,6 @@ class TestInsert:
 
             res = db1.drop_table(table_name)
             assert res.error_code == ErrorCode.OK
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()
 
     def test_insert_11(self, cluster: InfinityCluster):
         self.__test_inner_1(cluster)
@@ -72,7 +66,7 @@ class TestInsert:
     # read/write when leader/follower is disconnected
     @pytest.mark.docker
     def test_insert_2(self, docker_cluster: DockerInfinityCluster):
-        try:
+        with docker_cluster:
             docker_cluster.add_node("node1", "conf/leader.toml")
             docker_cluster.add_node("node2", "conf/follower.toml")
             print("init nodes")
@@ -128,12 +122,6 @@ class TestInsert:
             docker_cluster.reconnect("node1")
 
             db1.drop_table(table_name)
-        except Exception as e:
-            print(e)
-            docker_cluster.clear()
-            raise
-        else:
-            docker_cluster.clear()
 
     @pytest.mark.skip("Bug")
     @pytest.mark.docker

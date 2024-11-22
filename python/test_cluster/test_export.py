@@ -20,7 +20,7 @@ def delete_file(file_path: str):
 
 class TestExport:
     def test_export_csv(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -61,10 +61,3 @@ class TestExport:
 
             res = db_obj.drop_table("test_export_csv", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()

@@ -11,7 +11,7 @@ import common_values
 
 class TestImport:
     def test1(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -58,10 +58,3 @@ class TestImport:
             pd.testing.assert_frame_equal(res, res_gt)
 
             db_obj1.drop_table(table_name)
-
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()

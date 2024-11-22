@@ -87,7 +87,7 @@ log_output_file = "run_parallel_test.log"
 def pytest_configure(config):
     logger = logging.getLogger("run_parallel_test")
     logger.setLevel(logging.INFO)
-    handler = logging.FileHandler(log_output_file)
+    handler = logging.FileHandler(log_output_file, delay=True)
     logger.addHandler(handler)
     logger.addHandler(logging.StreamHandler())
     formatter = logging.Formatter('%(asctime)s - %(threadName)s - %(levelname)s - %(message)s')
