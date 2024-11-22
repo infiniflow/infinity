@@ -132,6 +132,12 @@ class InfinityRunner(BaseInfinityRunner):
         timeout = 60
         timeout_kill.timeout_kill(timeout, self.process, self.logger)
 
+    def kill(self):
+        self.logger.info("Kill node {self.node_name}")
+        if self.process is None:
+            return
+        self.process.kill()
+
     def add_client(self, http_addr: str):
         net = http_network_util(http_addr)
         net.set_retry()
@@ -321,11 +327,14 @@ class InfinityCluster:
             raise ValueError("Leader runner is not initialized.")
         return self.leader_runner.peer_uri()
 
-    def remove_node(self, node_name: str):
+    def remove_node(self, node_name: str, kill: bool = False):
         if node_name not in self.runners:
             raise ValueError(f"Node {node_name} not found in the cluster.")
         runner = self.runners[node_name]
-        runner.uninit()
+        if kill:
+            runner.kill()
+        else:
+            runner.uninit()
         del self.runners[node_name]
         if self.leader_name is not None and self.leader_name == node_name:
             self.leader_name = None

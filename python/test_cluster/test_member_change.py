@@ -66,7 +66,8 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
 
 
 @pytest.mark.skip(reason="bugs")
-def test_cluster_leader_shutdown_and_recover_in_follower(cluster: InfinityCluster):
+@pytest.mark.parametrize("kill_leader", [True, False])
+def test_cluster_leader_shutdown_and_recover_in_follower(cluster: InfinityCluster, kill_leader: bool):
     with cluster:
         logger = cluster.logger
 
@@ -105,7 +106,7 @@ def test_cluster_leader_shutdown_and_recover_in_follower(cluster: InfinityCluste
                 nonlocal leader_shutdown
                 time.sleep(sleep)
                 leader_shutdown = True
-                cluster.remove_node(cluster.leader_name)
+                cluster.remove_node(cluster.leader_name, kill=kill_leader)
                 logger.debug(
                     f"test_i: {i}, shutdown leader {leader_name}, insert_line: {insert_line}"
                 )
