@@ -7,6 +7,7 @@ import docker
 import tomli
 import sys
 import os
+import socket
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from scripts import timeout_kill
@@ -24,6 +25,12 @@ def convert_request_to_curl(method: str, header: dict, data: dict, url: str):
     headers = " ".join([f"--header '{key}:{value}'" for key, value in header.items()])
     data = json.dumps(data)
     return cmd.format(method=method, headers=headers, data=data, url=url)
+
+
+# https://stackoverflow.com/questions/2470971/fast-way-to-test-if-a-port-is-in-use-using-python
+def is_port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("localhost", port)) == 0
 
 
 class MinioParams:
@@ -219,10 +226,7 @@ class InfinityCluster:
             timeout = 3
             start_time = time.time()
             while time.time() - start_time < timeout:
-                result = subprocess.run(
-                    ["lsof", "-i", f":{port}"], capture_output=True, text=True
-                )
-                if result.stdout:
+                if is_port_in_use(port):
                     break
                 self.logger.debug(
                     f"Waiting for node {node_name} to open port {port} for {time.time() - start_time} seconds."
