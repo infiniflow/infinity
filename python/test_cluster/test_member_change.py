@@ -66,8 +66,11 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
 
 
 @pytest.mark.skip(reason="bugs")
-@pytest.mark.parametrize("kill_leader", [False, True])
-def test_cluster_leader_shutdown_and_recover_in_follower(cluster: InfinityCluster, kill_leader: bool):
+@pytest.mark.parametrize("kill", [False, True])
+@pytest.mark.parametrize("leader_shutdown", [True, False])
+def test_cluster_shutdown_and_recover(
+    cluster: InfinityCluster, kill: bool, leader_shutdown: bool
+):
     with cluster:
         logger = cluster.logger
 
@@ -77,18 +80,16 @@ def test_cluster_leader_shutdown_and_recover_in_follower(cluster: InfinityCluste
         cluster.set_leader("node1")
         cluster.set_follower("node2")
 
-        table_name = "test_data"
+        table_name = "test_cluster_leader_shutdown_and_recover_in_follower"
 
         def init():
             infinity_n1 = cluster.client("node1")
-            infinity_n2 = cluster.client("node2")
             infinity_n1.get_database("default_db").drop_table(
                 table_name, ConflictType.Ignore
             )
             table_n1 = infinity_n1.get_database("default_db").create_table(
                 table_name, {"c1": {"type": "int"}}
             )
-            table_n2 = infinity_n2.get_database("default_db").get_table(table_name)
 
         init()
 
@@ -97,31 +98,37 @@ def test_cluster_leader_shutdown_and_recover_in_follower(cluster: InfinityCluste
         shutdown_num = 10
 
         for i in range(shutdown_num):
-            leader_shutdown = False
+            shutdown = False
             leader_name = cluster.leader_name
             follower_name = "node2" if leader_name == "node1" else "node1"
             infinity_leader: infinity_http = cluster.client(leader_name)
 
-            def shutdown_leader(sleep: int):
-                nonlocal leader_shutdown
+            def shutdown_leader(sleep: int, shutdown_leader: bool):
+                nonlocal shutdown
                 time.sleep(sleep)
-                leader_shutdown = True
-                cluster.remove_node(cluster.leader_name, kill=kill_leader)
-                logger.debug(
-                    f"test_i: {i}, shutdown leader {leader_name}, insert_line: {insert_line}"
-                )
+                shutdown = True
+                if shutdown_leader:
+                    cluster.remove_node(cluster.leader_name, kill=kill)
+                    logger.debug(
+                        f"test_i: {i}, shutdown leader {leader_name}, insert_line: {insert_line}"
+                    )
+                else:
+                    cluster.remove_node(follower_name, kill=kill)
+                    logger.debug(
+                        f"test_i: {i}, shutdown follower {follower_name}, insert_line: {insert_line}"
+                    )
 
             def insert_data():
                 nonlocal insert_line
                 table_leader = infinity_leader.get_database("default_db").get_table(
                     table_name
                 )
-                while not leader_shutdown:
+                while not shutdown:
                     data = {"c1": insert_line}
                     try:
                         table_leader.insert([data])
                     except Exception:
-                        if not leader_shutdown:
+                        if not shutdown:
                             raise
                         else:
                             logger.debug(
@@ -130,7 +137,7 @@ def test_cluster_leader_shutdown_and_recover_in_follower(cluster: InfinityCluste
                     else:
                         insert_line += 1
 
-            t1 = threading.Thread(target=shutdown_leader, args=(insert_time_in_sec,))
+            t1 = threading.Thread(target=shutdown_leader, args=(insert_time_in_sec, leader_shutdown,))
             t1.start()
             insert_data()
             t1.join()
@@ -146,10 +153,28 @@ def test_cluster_leader_shutdown_and_recover_in_follower(cluster: InfinityCluste
                 expected = pd.DataFrame({"c1": list(range(insert_line))}, dtype="int32")
                 pd.testing.assert_frame_equal(res, expected)
 
-            verify_data(follower_name)
+            if leader_shutdown:
+                verify_data(follower_name)
 
-            cluster.set_leader(follower_name)
-            # restart leader as follower
-            cluster.add_node(leader_name, "conf/follower.toml")
+                cluster.set_leader(follower_name)
+                # restart leader as follower
+                follower_config = (
+                    "conf/leader.toml" if leader_name == "node1" else "conf/follower.toml"
+                )
+                cluster.add_node(leader_name, follower_config)
+                cluster.set_follower(leader_name)
 
-            verify_data(leader_name)
+                verify_data(leader_name)
+            else:
+                verify_data(leader_name)
+
+                cluster.add_node(follower_name, "conf/follower.toml")
+                cluster.set_follower(follower_name)
+
+                verify_data(follower_name)
+
+        def clear():
+            infinity_n1 = cluster.client("node1")
+            infinity_n1.get_database("default_db").drop_table(table_name)
+
+        clear()
