@@ -14,6 +14,7 @@ import polars as pl
 import pyarrow as pa
 from infinity.table import ExplainType
 from typing import List
+from dataclasses import dataclass
 
 
 class http_network_util:
@@ -115,8 +116,12 @@ class http_network_util:
             if resp.status_code != 200:
                 if resp.status_code == 500:
                     resp_json = resp.json()
-                    print(500, resp_json["error_code"], resp_json["error_message"])
-                    raise InfinityException(resp_json["error_code"], resp_json["error_message"])
+                    if "error_message" in resp_json:
+                        print(500, resp_json["error_code"], resp_json["error_message"])
+                        raise InfinityException(resp_json["error_code"], resp_json["error_message"])
+                    else:
+                        print(500, resp_json["error_code"])
+                        raise InfinityException(resp_json["error_code"], "")
                 elif resp.status_code == 404:
                     # create_database("") return status_code 404 with no json
                     print(404)
@@ -255,6 +260,20 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result(database_name=r.json()["database_name"])
 
+    def show_nodes(self):
+        url = f"admin/nodes"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(nodes=r.json()["nodes"])
+
+    def remove_node(self, node_name):
+        url = f"admin/node/{node_name}"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "delete", h, {})
+        self.net.raise_exception(r)
+        return database_result()
+
     def show_node(self, node_name):
         url = f"admin/node/{node_name}"
         h = self.net.set_up_header(["accept"])
@@ -270,7 +289,7 @@ class infinity_http:
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
         # print(r.json())
-        return database_result(node_role=r.json()["node"]["role"])
+        return database_result(node_role=r.json()["node"]["role"], node_status=r.json()["node"]["status"])
 
     def show_global_variables(self):
         url = "variables/global"
@@ -294,13 +313,40 @@ class infinity_http:
         self.net.raise_exception(r)
         return database_result()
 
-    def show_current_node(self):
-        url = f"admin/node/current"
+    def show_admin_variables(self):
+        url = f"admin/variables"
         h = self.net.set_up_header(["accept"])
         r = self.net.request(url, "get", h, {})
         self.net.raise_exception(r)
-        # print(r.json())
-        return database_result(node_role=r.json()["node"]["role"])
+        return database_result(data=r.json()["role"])
+
+    def show_admin_configs(self):
+        url = f"admin/configs"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(data=r.json())
+
+    def show_admin_catalogs(self):
+        url = f"admin/catalogs"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(data=r.json())
+
+    def show_admin_logs(self):
+        url = f"admin/logs"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(data=r.json())
+
+    def list_nodes(self):
+        url = f"admin/nodes"
+        h = self.net.set_up_header(["accept"])
+        r = self.net.request(url, "get", h, {})
+        self.net.raise_exception(r)
+        return database_result(data=r.json()["nodes"])
 
 
 ####################3####################3####################3####################3####################3####################3####################3####################3
@@ -904,9 +950,10 @@ class table_http_result:
         return pa.Table.from_pandas(self.to_df())
 
 
+@dataclass
 class database_result():
     def __init__(self, list=[], database_name: str = "", error_code=ErrorCode.OK, columns=[], index_list=[],
-                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0):
+                 node_name="", node_role="", node_status="", index_comment=None, deleted_rows=0, data={}, nodes=[]):
         self.db_names = list
         self.database_name = database_name  # get database
         self.error_code = error_code
@@ -917,6 +964,8 @@ class database_result():
         self.node_status = node_status
         self.index_comment = index_comment
         self.deleted_rows = deleted_rows
+        self.data = data
+        self.nodes = nodes
 
 
 identifier_limit = 65536
