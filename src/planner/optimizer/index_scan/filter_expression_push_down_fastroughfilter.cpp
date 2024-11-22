@@ -28,6 +28,7 @@ import function_expression;
 import filter_expression_push_down_helper;
 import infinity_exception;
 import third_party;
+import column_expression;
 
 namespace infinity {
 
@@ -129,7 +130,8 @@ struct ExpressionFastRoughFilterInfo {
                 break;
             }
             case ExpressionType::kColumn: {
-                if (expression->Type().SupportMinMaxFilter()) {
+                if (const auto *col_expr = static_cast<const ColumnExpression *>(expression.get());
+                    !col_expr->special() && col_expr->Type().SupportMinMaxFilter()) {
                     tree.info = Enum::kColumnExprOrAfterCast;
                 }
                 break;
