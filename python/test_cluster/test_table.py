@@ -10,7 +10,7 @@ from infinity.common import InfinityException
 
 class TestTable:
     def test_create_100_table(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -67,15 +67,9 @@ class TestTable:
                 if table_name.startswith("test_cluster_table_name") :
                     res_tables.append(table_name)
             assert len(res_tables) == 0
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()
 
     def test_create_table_on_follower(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -94,10 +88,3 @@ class TestTable:
             except InfinityException as e:
                 print(e)
                 assert(e.error_code == 8007)
-
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()

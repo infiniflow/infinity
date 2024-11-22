@@ -36,7 +36,7 @@ class InfinityRunner:
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
 
-            handler = logging.FileHandler(PYTEST_LOG_FILE)
+            handler = logging.FileHandler(PYTEST_LOG_FILE, delay=True)
             handler.setLevel(logging.DEBUG)
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)

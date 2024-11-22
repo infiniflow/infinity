@@ -10,7 +10,7 @@ import infinity.index as index
 
 class TestIndex:
     def test1(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -78,10 +78,3 @@ class TestIndex:
 
             print("uninit cluster")
             db_obj1.drop_table(table_name)
-
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()

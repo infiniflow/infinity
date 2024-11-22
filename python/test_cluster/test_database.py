@@ -10,7 +10,7 @@ from infinity.common import InfinityException
 
 class TestDatabase:
     def test_create_100_db(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -67,15 +67,9 @@ class TestDatabase:
                 if db_name.startswith("test_cluster_db_name") or db_name == "default_db":
                     res_dbs.append(db_name)
             assert len(res_dbs) == (1)
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()
 
     def test_create_database_on_follower(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -92,9 +86,3 @@ class TestDatabase:
             except InfinityException as e:
                 print(e)
                 assert(e.error_code == 8007)
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()
