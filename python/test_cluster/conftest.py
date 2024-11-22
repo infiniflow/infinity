@@ -2,7 +2,7 @@ import pytest
 from infinity_cluster import InfinityCluster, MinioParams
 from docker_infinity_cluster import DockerInfinityCluster
 from mocked_infinity_cluster import MockInfinityCluster
-import logging
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -29,18 +29,10 @@ def pytest_addoption(parser):
     parser.addoption("--docker", action="store_true", default=False)
 
 
-log_output_file = "run_cluster_test.log"
 def pytest_configure(config):
     config.addinivalue_line(
         "markers", "docker: mark test to run only when --docker option is provided"
     )
-    logger = logging.getLogger("run_parallel_test")
-    logger.setLevel(logging.INFO)
-    handler = logging.FileHandler(log_output_file)
-    logger.addHandler(handler)
-    logger.addHandler(logging.StreamHandler())
-    formatter = logging.Formatter('%(asctime)s - %(threadName)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
 
 
 def pytest_collection_modifyitems(config, items):
@@ -73,7 +65,9 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("docker_cluster", [docker_infinity_cluster])
     elif "cluster" in metafunc.fixturenames:
         test_name = metafunc.function.__name__
-        infinity_cluster = InfinityCluster(infinity_path, minio_params=minio_params, test_name=test_name)
+        infinity_cluster = InfinityCluster(
+            infinity_path, minio_params=minio_params, test_name=test_name
+        )
         metafunc.parametrize("cluster", [infinity_cluster])
     elif "mock_cluster" in metafunc.fixturenames:
         mock_infinity_cluster = MockInfinityCluster(
