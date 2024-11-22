@@ -41,6 +41,16 @@ def collect_log(executable_path, log_dir, output_dir, failure):
         if failure:
             shutil.copy(executable_path, f"{output_dir}/{random_name}.exe")
 
+    py_log_files: list[str] = []
+    for file in os.listdir("./"):
+        if file.endswith(".log"):
+            py_log_files.append(file)
+    print(f"Found py log files with .log suffix: {py_log_files}")
+    if failure:
+        for py_log_file in py_log_files:
+            shutil.copy(py_log_file, f"{output_dir}/{random_name}_{py_log_file}")
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Python cluster test for infinity")
