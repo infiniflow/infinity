@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import logging
 import os
 import subprocess
 import os
@@ -8,9 +9,10 @@ import infinity
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 
+PYTEST_LOG_FILE = "restart_test.py.log"
 
 class InfinityRunner:
-    def __init__(self, infinity_path: str):
+    def __init__(self, infinity_path: str, *, logger=None):
         self.data_dir = "/var/infinity"
         self.default_config_path = "./conf/infinity_conf.toml"
         self.script_path = "./scripts/timeout_kill.sh"
@@ -20,12 +22,31 @@ class InfinityRunner:
             raise Exception(f"{self.infinity_path} is not executable.")
 
         self.i = 0
+        if logger is not None:
+            self.logger = logger
+            return
+        self.logger = logging.getLogger("infinity_runner")
+        if not self.logger.handlers:
+            self.logger.setLevel(logging.DEBUG)
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.INFO)
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+
+            handler = logging.FileHandler(PYTEST_LOG_FILE)
+            handler.setLevel(logging.DEBUG)
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
     def clear(self):
         os.system(
             f"rm -rf {self.data_dir}/data {self.data_dir}/log {self.data_dir}/persistence {self.data_dir}/tmp {self.data_dir}/wal"
         )
         os.system(f"rm -rf restart_test.log.*")
+        os.system(f"rm -rf {PYTEST_LOG_FILE}")
         print(f"clear {self.data_dir}")
         self.i = 0
 
@@ -71,15 +92,14 @@ class InfinityRunner:
     def connected(self):
         return self.process is not None
 
-    @staticmethod
-    def connect(uri: str):
+    def connect(self, uri: str):
         try_n = 100
         time.sleep(0.5)
         infinity_obj = None
         for i in range(try_n):
             try:
                 if infinity_obj is None:
-                    infinity_obj = infinity.connect(uri)
+                    infinity_obj = infinity.connect(uri, self.logger)
                 ret = infinity_obj.get_database("default_db")
                 break
             except Exception as e:
@@ -102,16 +122,20 @@ class InfinityRunner:
 
 
 def infinity_runner_decorator_factory(
-    config_path: str | None, uri: str, infinity_runner: InfinityRunner
+    config_path: str | None, uri: str, infinity_runner: InfinityRunner, shutdown_out: bool = False
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
             infinity_runner.init(config_path)
-            infinity_obj = InfinityRunner.connect(uri)
+            infinity_obj = infinity_runner.connect(uri)
             try:
-                f(infinity_obj, *args, **kwargs)
+                return f(infinity_obj, *args, **kwargs)
             finally:
-                infinity_obj.disconnect()
+                try:
+                    infinity_obj.disconnect()
+                except Exception:
+                    if not shutdown_out:
+                        raise
                 infinity_runner.uninit()
 
         return wrapper

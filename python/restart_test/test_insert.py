@@ -9,7 +9,6 @@ from restart_util import *
 from util import RtnThread
 
 
-@pytest.mark.slow
 class TestInsert:
     def insert_inner(
         self,
@@ -28,6 +27,8 @@ class TestInsert:
         cur_insert_n = 0
         shutdown = False
         error = False
+
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, True)
 
         def insert_func(table_obj):
             nonlocal cur_insert_n, shutdown, error
@@ -77,10 +78,8 @@ class TestInsert:
                 print(f"cur_insert_n inner: {cur_insert_n}")
                 time.sleep(0.1)
 
-        while cur_insert_n < insert_n:
-            infinity_runner.init(config)
-            infinity_obj = InfinityRunner.connect(uri)
-
+        @decorator
+        def part1(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_insert")
 
@@ -94,6 +93,10 @@ class TestInsert:
             insert_func(table_obj)
             t1.join()
 
+        while cur_insert_n < insert_n:
+            part1()
+
+    @pytest.mark.slow
     @pytest.mark.parametrize(
         "insert_n, config",
         [
@@ -143,23 +146,23 @@ class TestInsert:
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
 
-        infinity_runner.init(config)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.create_table("test_insert", columns, ConflictType.Error)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.create_table("test_insert", columns, ConflictType.Error)
+        part1()
 
         self.insert_inner(insert_n, infinity_runner, config, columns, data_gen_factory)
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert", ConflictType.Error)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        @decorator
+        def part2(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table("test_insert", ConflictType.Error)
+        part2()
 
+    @pytest.mark.slow
     @pytest.mark.parametrize(
         "insert_n,config",
         [
@@ -201,26 +204,27 @@ class TestInsert:
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
 
-        infinity_runner.init(config)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
 
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
-        for idx in indexes:
-            table_obj.create_index(f"idx_{idx.column_name}", idx)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.create_table("test_insert", columns, ConflictType.Error)
+            for idx in indexes:
+                table_obj.create_index(f"idx_{idx.column_name}", idx)
+        part1()
 
         self.insert_inner(insert_n, infinity_runner, config, columns, data_gen_factory)
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert", ConflictType.Error)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        @decorator
+        def part2(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table("test_insert", ConflictType.Error)
+        part2()
 
-    def test_insert_checkpoint(self, infinity_runner: InfinityRunner):
+    def _test_insert_checkpoint_inner(
+        self, infinity_runner: InfinityRunner, test_n: int
+    ):
         infinity_runner.clear()
         config = "test/data/config/restart_test/test_insert/6.toml"
         uri = common_values.TEST_LOCAL_HOST
@@ -273,15 +277,22 @@ class TestInsert:
             t1.join()
             print(f"join end {test_i}")
 
+        @decorator
         def drop_table(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             db_obj.drop_table("test_insert_checkpoint", ConflictType.Error)
 
         create_table()
-        test_n = 100
         for i in range(test_n):
             part1(i)
         drop_table()
+
+    def test_insert_checkpoint(self, infinity_runner: InfinityRunner):
+        self._test_insert_checkpoint_inner(infinity_runner, 10)
+
+    @pytest.mark.slow
+    def test_insert_checkpoint_slow(self, infinity_runner: InfinityRunner):
+        self._test_insert_checkpoint_inner(infinity_runner, 100)
 
 
 if __name__ == "__main__":

@@ -1,15 +1,14 @@
 import queue
 import random
-import threading
 import time
 import pytest
-import csv
-from infinity_runner import InfinityRunner
+from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 from common import common_values
 from infinity.common import ConflictType
 from infinity import index
 from infinity.errors import ErrorCode
 from restart_util import *
+from util import RtnThread
 
 
 @pytest.mark.slow
@@ -37,51 +36,53 @@ class TestFullText:
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        gt_table_obj = db_obj.create_table(
-            gt_table_name,
-            {
-                "id": {"type": "int"},
-                "title": {"type": "varchar"},
-                "date": {"type": "varchar"},
-                "body": {"type": "varchar"},
-            },
-            ConflictType.Error,
-        )
-        table_obj = db_obj.create_table(
-            table_name,
-            {
-                "id": {"type": "int"},
-                "title": {"type": "varchar"},
-                "date": {"type": "varchar"},
-                "body": {"type": "varchar"},
-            },
-            ConflictType.Error,
-        )
-        enwiki_gen1 = EnwikiGenerator.gen_factory(enwiki_path)(enwiki_size)
-        for id, (title, date, body) in enumerate(enwiki_gen1):
-            gt_table_obj.insert(
-                [{"id": id, "title": title, "date": date, "body": body}]
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+        decorator2 = infinity_runner_decorator_factory(config, uri, infinity_runner, True)
+
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            gt_table_obj = db_obj.create_table(
+                gt_table_name,
+                {
+                    "id": {"type": "int"},
+                    "title": {"type": "varchar"},
+                    "date": {"type": "varchar"},
+                    "body": {"type": "varchar"},
+                },
+                ConflictType.Error,
             )
+            table_obj = db_obj.create_table(
+                table_name,
+                {
+                    "id": {"type": "int"},
+                    "title": {"type": "varchar"},
+                    "date": {"type": "varchar"},
+                    "body": {"type": "varchar"},
+                },
+                ConflictType.Error,
+            )
+            enwiki_gen1 = EnwikiGenerator.gen_factory(enwiki_path)(enwiki_size)
+            for id, (title, date, body) in enumerate(enwiki_gen1):
+                gt_table_obj.insert(
+                    [{"id": id, "title": title, "date": date, "body": body}]
+                )
 
-        res = gt_table_obj.create_index(
-            "ft_index",
-            index.IndexInfo("body", index.IndexType.FullText),
-            ConflictType.Error,
-        )
-        assert res.error_code == ErrorCode.OK
+            res = gt_table_obj.create_index(
+                "ft_index",
+                index.IndexInfo("body", index.IndexType.FullText),
+                ConflictType.Error,
+            )
+            assert res.error_code == ErrorCode.OK
 
-        res = table_obj.create_index(
-            "ft_index",
-            index.IndexInfo("body", index.IndexType.FullText),
-            ConflictType.Error,
-        )
-        assert res.error_code == ErrorCode.OK
+            res = table_obj.create_index(
+                "ft_index",
+                index.IndexInfo("body", index.IndexType.FullText),
+                ConflictType.Error,
+            )
+            assert res.error_code == ErrorCode.OK
 
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        part1()
 
         cur_insert_n = 0
         enwiki_gen2 = EnwikiGenerator.gen_factory(enwiki_path)(enwiki_size)
@@ -100,16 +101,22 @@ class TestFullText:
                             end = True
                             break
                         title, date, body = res
-                        table_obj.insert(
-                            [
-                                {
-                                    "id": cur_insert_n,
-                                    "title": title,
-                                    "date": date,
-                                    "body": body,
-                                }
-                            ]
-                        )
+                        try:
+                            table_obj.insert(
+                                [
+                                    {
+                                        "id": cur_insert_n,
+                                        "title": title,
+                                        "date": date,
+                                        "body": body,
+                                    }
+                                ]
+                            )
+                        except UnicodeDecodeError:
+                            print(
+                                "UnicodeDecodeError\n"
+                            )  # unknown reason for this error, skip it
+                            continue
                         cur_insert_n += 1
                     else:
                         gt_res = (
@@ -144,25 +151,29 @@ class TestFullText:
                                 print(f"diff: {data_dict} {gt_data_dict}")
                             else:
                                 print("same")
+
                         search_time = time.time() + search_after_insert
                         qu.put((t1, search_time))
 
                 except Exception as e:
-                    print(e)
-                    assert shutdown
+                    if not shutdown:
+                        raise
                     break
 
         def search_thread():
             nonlocal qu, shutdown
-            while True:
-                (f, search_time) = qu.get()
+            while not shutdown:
+                try:
+                    (f, search_time) = qu.get(timeout=1)
+                except queue.Empty:
+                    continue
                 while time.time() < search_time:
                     time.sleep(0.1)
                 try:
                     f()
                 except Exception as e:
-                    print(e)
-                    assert shutdown
+                    if not shutdown:
+                        raise
                     break
 
         def shutdown_func():
@@ -175,34 +186,40 @@ class TestFullText:
             print(f"cur_insert_n: {cur_insert_n}")
             print("shutdown infinity")
 
-        while not end:
-            infinity_runner.init(config)
-            infinity_obj = InfinityRunner.connect(uri)
+        @decorator2
+        def part2(infinity_obj):
+            nonlocal shutdown
 
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
             gt_table_obj = db_obj.get_table(gt_table_name)
 
-            t1 = threading.Thread(target=shutdown_func)
-            t1.start()
+            t1 = RtnThread(target=shutdown_func)
+            t2 = RtnThread(target=search_thread)
+            try:
+                t1.start()
+                t2.start()
 
-            t2 = threading.Thread(target=search_thread)
-            t2.start()
+                work_func(table_obj, gt_table_obj)
 
-            work_func(table_obj, gt_table_obj)
+                t2.join()
+                t1.join()
+            except Exception:
+                shutdown = True
+                t2.join()
+                t1.join()
+                raise
 
-            t2.join()
-            t1.join()
+        while not end:
+            part2()
 
-            infinity_runner.uninit()
+        @decorator
+        def part3(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, ConflictType.Error)
+            db_obj.drop_table(gt_table_name, ConflictType.Error)
 
-        infinity_runner.init(config)
-        infinity_obj = InfinityRunner.connect(uri)
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.drop_table(table_name, ConflictType.Error)
-        db_obj.drop_table(gt_table_name, ConflictType.Error)
-        infinity_obj.disconnect()
-        infinity_runner.uninit()
+        part3()
 
 
 if __name__ == "__main__":

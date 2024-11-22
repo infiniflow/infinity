@@ -1,3 +1,4 @@
+import os
 from infinity import index
 import csv
 import json
@@ -186,6 +187,23 @@ class LChYDataGenerato:
                 {"block_size": "8", "compress_type": "compress"},
             ),
         ]
+
+    def import_file() -> str:
+        base_filepath = "test/data/jsonl/test_table.jsonl"
+        filepath = "test/data/jsonl/test_table_gen.jsonl"
+        if not os.path.exists("test/data/jsonl"):
+            os.makedirs("test/data/jsonl")
+        with open(base_filepath, "r") as base_file:
+            base_data = base_file.readlines()
+
+        with open(filepath, "w") as new_file:
+            for _ in range(100):
+                new_file.writelines(base_data)
+
+        return filepath
+
+    def import_size() -> int:
+        return 1000
 
 
 if __name__ == "__main__":
