@@ -11,7 +11,7 @@ import common_values
 
 class TestUpdate:
     def test_update(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -56,15 +56,8 @@ class TestUpdate:
             res = db_obj.drop_table("test_update", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()
-
     def test_update_on_follower(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -101,10 +94,3 @@ class TestUpdate:
         
             res = db_obj.drop_table("test_update", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()

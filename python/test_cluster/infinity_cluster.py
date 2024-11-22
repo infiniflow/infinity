@@ -124,7 +124,14 @@ class InfinityCluster:
         self.runners: dict[str, InfinityRunner] = {}
         self.leader_runner: InfinityRunner | None = None
         self.leader_name = None
-        self.add_minio(minio_params)
+        self.minio_params = minio_params
+
+    def __enter__(self):
+        self.add_minio(self.minio_params)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.clear()
 
     def clear(self):
         # shutdown follower and learner first

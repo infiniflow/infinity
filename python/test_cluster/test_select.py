@@ -11,7 +11,7 @@ import common_values
 
 class TestSelect:
     def test_select(self, cluster: InfinityCluster):
-        try:
+        with cluster:
             cluster.add_node("node1", "conf/leader.toml")
             cluster.add_node("node2", "conf/follower.toml")
 
@@ -77,10 +77,3 @@ class TestSelect:
 
             res = db_obj.drop_table("test_select", ConflictType.Error)
             assert res.error_code == ErrorCode.OK
-
-        except Exception as e:
-            print(e)
-            cluster.clear()
-            raise
-        else:
-            cluster.clear()
