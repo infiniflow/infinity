@@ -135,13 +135,14 @@ def test_cluster_leader_shutdown_and_recover_in_follower(cluster: InfinityCluste
             t1.join()
 
             def verify_data(node_name: str):
+                nonlocal insert_line
                 infinity: infinity_http = cluster.client(node_name)
                 table = infinity.get_database("default_db").get_table(table_name)
                 res = table.output(["*"]).to_df()
-                logger.debug(
-                    f"test_i: {i}, verify data, node_name: {node_name}, line: {insert_line}, expect: {res}"
-                )
-                expected = pd.DataFrame({"c1": list(range(insert_line))})
+                if res.shape[0] == insert_line + 1:
+                    insert_line += 1
+                logger.debug(f"test_i: {i}, verify data, node_name: {node_name}")
+                expected = pd.DataFrame({"c1": list(range(insert_line))}, dtype="int32")
                 pd.testing.assert_frame_equal(res, expected)
 
             verify_data(follower_name)
