@@ -864,10 +864,7 @@ class table_http_result:
         self._search_exprs.append(tmp_fusion_expr)
         return self
 
-    def to_pl(self):
-        return pl.from_pandas(self.to_df())
-
-    def to_df(self):
+    def to_result(self):
         if self.output_res == []:
             self.select()
 
@@ -944,6 +941,13 @@ class table_http_result:
                     if (function_name in bool_functions):
                         df_type[k] = dtype('bool')
                         break
+        return df_dict, df_type
+
+    def to_pl(self):
+        return pl.from_pandas(self.to_df())
+
+    def to_df(self):
+        df_dict, df_type = self.to_result()
         return pd.DataFrame(df_dict).astype(df_type)
 
     def to_arrow(self):
