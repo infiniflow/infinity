@@ -4,7 +4,7 @@ import os
 filepath_pair = [
     ("benchmark/enwiki/enwiki-10w.csv", "test/data/benchmark/enwiki-10w.csv"),
     ("benchmark/sift1M/sift_base.fvecs", "test/data/benchmark/sift_1m/sift_base.fvecs"),
-    ("benchmark/sift1M/sift_learn.fvecs", "test/data/benchmark/sift_1m/sift_learn.fvecs"),
+    ("benchmark/sift1M/sift_query.fvecs", "test/data/benchmark/sift_1m/sift_query.fvecs"),
 ]
 
 parser = argparse.ArgumentParser(description="Prepare Restart Test Data")

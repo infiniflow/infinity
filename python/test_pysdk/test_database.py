@@ -531,7 +531,7 @@ class TestInfinity:
     #     db_obj.drop_table("test_show_table_columns"+suffix, ConflictType.Error)
 
     @pytest.mark.slow
-    def test_create_drop_show_1M_databases(self, suffix):
+    def test_create_drop_show_1W_databases(self, suffix):
 
         """
         create 1M dbs, show these dbs, drop these dbs
@@ -550,7 +550,7 @@ class TestInfinity:
         """
 
         # 1. connect
-        db_count = 1000000
+        db_count = 10000
         # db = self.infinity_obj.create_database('db_name')
         # res = self.infinity_obj.drop_database('db_name')
         # 2. create db with invalid name

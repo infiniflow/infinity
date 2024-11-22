@@ -7,6 +7,7 @@ import string
 import glob
 import collect_thread_sanitizer_log
 
+PYTEST_LOG_FILE = "restart_test.py.log"
 
 def collect_log(executable_path, output_dir, failure, show_lines):
     if not os.path.isdir(output_dir):
@@ -54,6 +55,13 @@ def collect_log(executable_path, output_dir, failure, show_lines):
             copy_n += 1
         if copy_n == 0:
             print("No FULL.*.json file found")
+    
+    if failure:
+        # copy pytest log file
+        if os.path.isfile(PYTEST_LOG_FILE):
+            shutil.copy(PYTEST_LOG_FILE, f"{output_dir}/{random_name}_pytest.log")
+        else:
+            print(f"{PYTEST_LOG_FILE} not found")
 
 
 if "__main__" == __name__:

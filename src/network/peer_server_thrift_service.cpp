@@ -153,7 +153,7 @@ void PeerServerThriftService::SyncLog(infinity_peer_server::SyncLogResponse &res
         UnrecoverableError("No log is synced from leader node");
     }
 
-    InfinityContext::instance().storage()->wal_manager()->FlushLogByReplication(request.log_entries);
+    InfinityContext::instance().storage()->wal_manager()->FlushLogByReplication(request.log_entries, request.on_startup);
 
     Status status = Status::OK();
     if (request.on_startup) {

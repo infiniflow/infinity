@@ -13,7 +13,8 @@ dependencies = [
     "pyarrow~=17.0.0",
     "polars~=1.9.0",
     "openpyxl~=3.1.0",
-    "requests~=2.32.0"
+    "requests~=2.32.0",
+    "readerwriterlock~=1.0.9"
 ]
 description = "infinity"
 readme = "README.md"
