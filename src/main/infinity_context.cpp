@@ -95,6 +95,7 @@ void InfinityContext::InitPhase2() {
     if (config_->ServerMode() == "cluster") {
         // Admin mode or cluster start phase
         infinity_context_inited_ = true;
+//        fmt::print("Infinity is started as a cluster node.\n");
         return;
     }
 
@@ -148,6 +149,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         return set_storage_status;
                     }
                     infinity_context_started_ = true;
+                    fmt::print("Infinity is started in standalone mode.\n");
                     break;
                 }
                 case NodeRole::kLeader: {
@@ -163,6 +165,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         return set_storage_status;
                     }
                     infinity_context_started_ = true;
+                    fmt::print("Infinity is started as a leader node.\n");
                     break;
                 }
                 case NodeRole::kFollower: {
@@ -182,6 +185,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         return init_status;
                     }
                     infinity_context_started_ = true;
+                    fmt::print("Infinity is started as a follower node.\n");
                     break;
                 }
                 case NodeRole::kLearner: {
@@ -201,6 +205,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         return init_status;
                     }
                     infinity_context_started_ = true;
+                    fmt::print("Infinity is started as a learner node.\n");
                     break;
                 }
                 case NodeRole::kUnInitialized: {
@@ -304,6 +309,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         return init_status;
                     }
                     infinity_context_started_ = true;
+                    fmt::print("Infinity is started as a follower node.\n");
                     break;
                 }
                 case NodeRole::kLearner: {
@@ -326,6 +332,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         return init_status;
                     }
                     infinity_context_started_ = true;
+                    fmt::print("Infinity is started as a learner node.\n");
                     break;
                 }
                 case NodeRole::kStandalone: {
@@ -415,6 +422,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                         UnrecoverableError("Failed to set node storage to leader.");
                     }
                     infinity_context_started_ = true;
+                    fmt::print("Infinity is started as a leader node.\n");
                     break;
                 }
                 default: {
