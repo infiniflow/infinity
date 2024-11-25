@@ -208,6 +208,7 @@ class InfinityCluster:
             for runner in self.runners.values():
                 runner.uninit()
         self.runners.clear()
+        self.leader_runner = None
 
     def clear_log(self):
         log_file = self._log_filename()

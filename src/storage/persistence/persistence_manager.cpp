@@ -252,7 +252,6 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("GetObjCache Failed to find object for local path {}", local_path);
         LOG_WARN(error_message);
-        result.cached_ = true;
         return result;
     }
     result.obj_addr_ = it->second;
@@ -262,16 +261,13 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
             String error_message = fmt::format("GetObjCache object {} is empty", it->second.obj_key_);
             UnrecoverableError(error_message);
         }
-        result.cached_ = true;
     } else if (ObjStat *obj_stat = objects_->Get(it->second.obj_key_); obj_stat != nullptr) {
         LOG_TRACE(fmt::format("GetObjCache object {}, file_path: {}, ref count {}", it->second.obj_key_, file_path, obj_stat->ref_count_));
         String read_path = GetObjPath(result.obj_addr_.obj_key_);
         if (!VirtualStore::Exists(read_path)) {
-            obj_stat->cached_ = false;
-            result.cached_ = false;
+            auto expect = ObjCached::kCached;
+            obj_stat->cached_.compare_exchange_strong(expect, ObjCached::kNotCached);
             result.obj_stat_ = obj_stat;
-        } else {
-            result.cached_ = true;
         }
     } else {
         if (it->second.obj_key_ != current_object_key_) {
@@ -280,7 +276,6 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
         }
         current_object_ref_count_++;
         LOG_TRACE(fmt::format("GetObjCache current object {} ref count {}", it->second.obj_key_, current_object_ref_count_));
-        result.cached_ = true;
     }
     return result;
 }
@@ -634,7 +629,7 @@ void AddrSerializer::InitializeValid(PersistenceManager *persistence_manager) {
             UnrecoverableError(fmt::format("Invalid object address for path {}", paths_[i]));
         } else {
             ObjStat obj_stat = persistence_manager->GetObjStatByObjAddr(obj_addr);
-            obj_stats_[i] = obj_stat;
+            obj_stats_[i] = std::move(obj_stat);
         }
     }
 }
