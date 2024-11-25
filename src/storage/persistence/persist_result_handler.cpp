@@ -25,6 +25,7 @@ import infinity_context;
 import peer_task;
 import logger;
 import admin_statement;
+import obj_status;
 
 namespace infinity {
 
@@ -51,13 +52,23 @@ void PersistResultHandler::HandleWriteResult(const PersistWriteResult &result) {
 }
 
 ObjAddr PersistResultHandler::HandleReadResult(const PersistReadResult &result) {
-    if (!result.cached_) {
-        String read_path = InfinityContext::instance().persistence_manager()->GetObjPath(result.obj_addr_.obj_key_);
-        VirtualStore::DownloadObject(read_path, result.obj_addr_.obj_key_);
-        LOG_TRACE(fmt::format("GetObjCache download object {}", read_path));
-        result.obj_stat_->cached_ = true;
+    if (result.obj_stat_ != nullptr) {
+        ObjCached expect = ObjCached::kNotCached;
+        Atomic<ObjCached> &cached = result.obj_stat_->cached_;
+        if (cached.compare_exchange_strong(expect, ObjCached::kDownloading)) {
+            String read_path = InfinityContext::instance().persistence_manager()->GetObjPath(result.obj_addr_.obj_key_);
+            LOG_TRACE(fmt::format("GetObjCache download object {}.", read_path));
+            VirtualStore::DownloadObject(read_path, result.obj_addr_.obj_key_);
+            LOG_TRACE(fmt::format("GetObjCache download object {} done.", read_path));
+            cached.store(ObjCached::kCached);
+            cached.notify_all();
+        } else if (expect == ObjCached::kDownloading) {
+            LOG_TRACE(fmt::format("GetObjCache waiting downloading object {}", result.obj_addr_.obj_key_));
+            cached.wait(ObjCached::kDownloading);
+            LOG_TRACE(fmt::format("GetObjCache finish waiting object {}", result.obj_addr_.obj_key_));
+        }
     }
     return result.obj_addr_;
 }
 
-}
+} // namespace infinity

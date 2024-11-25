@@ -22,6 +22,7 @@ module obj_stat_accessor;
 import infinity_exception;
 import logger;
 import third_party;
+import obj_status;
 
 namespace infinity {
 
@@ -100,10 +101,10 @@ void ObjectStatMap::Recover(const String &key) {
         UnrecoverableError(fmt::format("Recover object {} ref count is {}", key, lru_iter->obj_stat_.ref_count_));
     }
     lru_list_.splice(lru_list_.begin(), cleanuped_list_, lru_iter);
-    if (obj_stat.cached_) {
+    auto expect = ObjCached::kNotCached;
+    if (not obj_stat.cached_.compare_exchange_strong(expect, ObjCached::kCached)) {
         UnrecoverableError(fmt::format("Recover object {} not cleaned", key));
     }
-    obj_stat.cached_ = true;
 }
 
 Optional<ObjStat> ObjectStatMap::Invalidate(const String &key) {
@@ -116,7 +117,11 @@ Optional<ObjStat> ObjectStatMap::Invalidate(const String &key) {
     if (obj_stat.ref_count_ > 0) {
         UnrecoverableError(fmt::format("Invalidate object {} ref count is {}", key, obj_stat.ref_count_));
     }
-    if (obj_stat.cached_) {
+    ObjCached cached = obj_stat.cached_.load();
+    if (cached == ObjCached::kDownloading) {
+        UnrecoverableError(fmt::format("Invalidate object {} is downloading", key));
+    }
+    if (cached == ObjCached::kCached) {
         lru_list_.erase(lru_iter);
     } else {
         cleanuped_list_.erase(lru_iter);
@@ -134,10 +139,10 @@ LRUListEntry *ObjectStatMap::EnvictLast() {
     if (obj_stat.ref_count_ > 0) {
         UnrecoverableError(fmt::format("EnvictLast object {} ref count is {}", lru_iter->key_, obj_stat.ref_count_));
     }
-    if (!obj_stat.cached_) {
+    auto expect = ObjCached::kCached;
+    if (not obj_stat.cached_.compare_exchange_strong(expect, ObjCached::kNotCached)) {
         UnrecoverableError(fmt::format("EnvictLast object {} is already cleaned", lru_iter->key_));
     }
-    obj_stat.cached_ = false;
     cleanuped_list_.splice(cleanuped_list_.begin(), lru_list_, lru_iter);
     return &(*lru_iter);
 }
@@ -192,12 +197,12 @@ void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat
     if (map_iter != obj_map_.end()) {
         UnrecoverableError(fmt::format("PutNew object {} is already in object map", key));
     }
-    obj_stat.cached_ = true;
+    obj_stat.cached_ = ObjCached::kCached;
     obj_map_.emplace_hint(map_iter, key, std::move(obj_stat));
 }
 
 void ObjectStatAccessor_LocalStorage::PutNoCount(const String &key, ObjStat obj_stat) {
-    obj_stat.cached_ = true;
+    obj_stat.cached_ = ObjCached::kCached;
     auto [iter, insert_ok] = obj_map_.insert_or_assign(key, std::move(obj_stat));
     if (!insert_ok) {
         LOG_DEBUG(fmt::format("PutNew: {} is already in object map", key));
@@ -243,8 +248,8 @@ void ObjectStatAccessor_LocalStorage::Deserialize(const nlohmann::json &obj) {
         String obj_key = json_pair["obj_key"];
         ObjStat obj_stat;
         obj_stat.Deserialize(json_pair["obj_stat"]);
-        obj_stat.cached_ = true;
-        obj_map_.emplace(obj_key, obj_stat);
+        obj_stat.cached_ = ObjCached::kCached;
+        obj_map_.emplace(obj_key, std::move(obj_stat));
         LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
     }
 }
@@ -331,7 +336,7 @@ void ObjectStatAccessor_ObjectStorage::Deserialize(const nlohmann::json &obj) {
         String obj_key = json_pair["obj_key"];
         ObjStat obj_stat;
         obj_stat.Deserialize(json_pair["obj_stat"]);
-        obj_stat.cached_ = false;
+        obj_stat.cached_ = ObjCached::kNotCached;
         obj_map_.PutNew(obj_key, std::move(obj_stat));
         LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
     }

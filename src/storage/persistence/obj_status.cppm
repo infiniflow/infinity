@@ -32,17 +32,49 @@ export struct Range {
     bool Intersect(const Range &rhs) const { return start_ < rhs.end_ && rhs.start_ < end_; }
 };
 
+export enum class ObjCached {
+    kNotCached,
+    kDownloading,
+    kCached,
+};
+
 export struct ObjStat {
     SizeT obj_size_{}; // footer (if present) is excluded
     SizeT parts_{};    // an object attribute
     SizeT ref_count_{}; // the number of user (R and W) of some part of this object
     Set<Range> deleted_ranges_{};
 
-    bool cached_ = true; // whether the object is in localdisk cache
+    Atomic<ObjCached> cached_ = ObjCached::kCached; // whether the object is in localdisk cache
 
     ObjStat() = default;
 
-    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count, bool cached = true) : obj_size_(obj_size), parts_(parts), ref_count_(ref_count), cached_(cached) {}
+    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count, ObjCached cached = ObjCached::kCached) : obj_size_(obj_size), parts_(parts), ref_count_(ref_count), cached_(cached) {}
+
+    ObjStat(const ObjStat &other) : obj_size_(other.obj_size_), parts_(other.parts_), ref_count_(other.ref_count_), deleted_ranges_(other.deleted_ranges_), cached_(other.cached_.load()) {}
+
+    ObjStat &operator=(const ObjStat &other) {
+        if (this != &other) {
+            obj_size_ = other.obj_size_;
+            parts_ = other.parts_;
+            ref_count_ = other.ref_count_;
+            deleted_ranges_ = other.deleted_ranges_;
+            cached_.store(other.cached_.load());
+        }
+        return *this;
+    }
+
+    ObjStat(ObjStat &&other) : obj_size_(other.obj_size_), parts_(other.parts_), ref_count_(other.ref_count_), deleted_ranges_(std::move(other.deleted_ranges_)), cached_(other.cached_.load()) {}
+
+    ObjStat &operator=(ObjStat &&other) {
+        if (this != &other) {
+            obj_size_ = other.obj_size_;
+            parts_ = other.parts_;
+            ref_count_ = other.ref_count_;
+            deleted_ranges_ = std::move(other.deleted_ranges_);
+            cached_.store(other.cached_.load());
+        }
+        return *this;
+    }
 
     nlohmann::json Serialize() const;
 

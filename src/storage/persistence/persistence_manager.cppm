@@ -54,7 +54,6 @@ export struct PersistWriteResult {
 
 export struct PersistReadResult {
     ObjAddr obj_addr_;                     // where data should read from
-    bool cached_;                          // whether the object is in localdisk cache
     Vector<String> drop_keys_;             // object that should be removed from local disk. because of 1. disk used over limit
     Vector<String> drop_from_remote_keys_; // object that should be removed from remote storage. because of object's all parts are deleted
     ObjStat *obj_stat_{nullptr};           // object stat
