@@ -23,7 +23,9 @@ class instance_state:
                 for table_name in tables:
                     table_object = db_object.get_table(table_name)
                     df = table_object.output(["*"]).to_df()
-                    print(df)
+                    res = table_object.output(["*"]).to_result()
+                    # print(f"instance_state initializing, table {db_name}.{table_name}")
+                    # print(res)
                     self.add_table(db_name, table_name, ConflictType.Ignore)
                     self.set_table_df(db_name, table_name, df)
                     indexes = table_object.list_indexes().index_list
@@ -134,43 +136,46 @@ class instance_state:
 
     def set_table_df(self, db_name : str, table_name :str, df : pd.DataFrame) :
         df = df.reset_index(drop=True)
-        print(f"setting {db_name}.{table_name} = ")
-        print(df)
+        # print(f"setting {db_name}.{table_name} = ")
+        # print(df)
         self.check_table_exist(db_name, table_name)
         self.dbtable2df[(db_name, table_name)] = df
+
+# this will clear a instance to its initial state:
+# only a default_db is remained
+def clear_instance(state : instance_state, client : infinity_http.infinity_http):
+    for db_name, tables in state.db2tables.items():
+        if db_name == "default_db":
+            db_obj = client.get_database(db_name)
+            for table_name in tables:
+                db_obj.drop_table(table_name)
+        else:
+            client.drop_database(db_name)
 
 def check_instance_table_equal(state : instance_state, client : infinity_http.infinity_http, db_name : str, table_name : str):
     db_obj = client.get_database(db_name)
     table_obj = db_obj.get_table(table_name)
     res = table_obj.output(["*"]).to_df()
     expected = state.get_table_df(db_name, table_name)
-    print("res = ")
-    print(res)
-    print("expected = ")
-    print(expected)
+    # print("res = ")
+    # print(res)
+    # print("expected = ")
+    # print(expected)
     pd.testing.assert_frame_equal(res, expected)
 
 def check_instance_equal(state : instance_state, client : infinity_http.infinity_http):
-    client_state = instance_state()
-    databases = client.list_databases().db_names
-    for db_name in databases:
-        client_state.add_database(db_name)
-        db_object = client.get_database(db_name)
-        tables = db_object.get_all_tables()
-        for table_name in tables:
-            table_object = db_object.get_table(table_name)
-            df = table_object.output(["*"]).to_df()
-            client_state.add_table(db_name, table_name, df)
-            indexes = table_object.list_indexes().index_list
-            for index in indexes:
-                client_state.add_index(db_name, table_name, index["index_name"])
-
+    client_state = instance_state(client)
     assert state.db2tables == client_state.db2tables
     assert state.dbtable2index == client_state.dbtable2index
     for db_name, tables in state.db2tables.items():
         for table_name in tables:
             pd.testing.assert_frame_equal(state.dbtable2df[(db_name, table_name)], client_state.dbtable2df[(db_name, table_name)])
 
+# do operations on a single node
+def do_some_operations(client : infinity_http.infinity_http, state : instance_state):
+    table_create_insert_delete_modify(client, state)
+
+# do operations on a cluster of nodes
 def do_some_operations_cluster(leader_client : infinity_http.infinity_http, other_clients : [infinity_http.infinity_http], leader_state : instance_state):
     table_create_insert_delete_modify(leader_client, leader_state)
     time.sleep(1)
@@ -179,15 +184,15 @@ def do_some_operations_cluster(leader_client : infinity_http.infinity_http, othe
     return
 
 def table_create_insert_delete_modify_verify(client : infinity_http.infinity_http, leader_state : instance_state):
-    check_instance_table_equal(leader_state, client, "default_db", "test_data")
+    check_instance_equal(leader_state, client)
 
 def table_create_insert_delete_modify(client : infinity_http.infinity_http, leader_state : instance_state):
     db = client.get_database("default_db")
-    table = db.create_table("test_data", {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}}, ConflictType.Ignore) 
+    table = db.create_table("test_data", {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}}, ConflictType.Ignore)
     leader_state.add_table("default_db", "test_data", ConflictType.Ignore)
     table_df = leader_state.get_table_df("default_db", "test_data")
-    print("got the exsiting table_df")
-    print(table_df)
+    # print("got the exsiting table_df")
+    # print(table_df)
 
     for i in range(0, 10):
         table.insert([{"c1": i, "c2": [1.0, 2.0, 3.0, 4.0]}])
