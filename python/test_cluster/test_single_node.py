@@ -1,6 +1,6 @@
 from infinity_cluster import InfinityCluster
 import time
-from database_operations import do_some_operations
+from database_operations import do_some_operations, instance_state, clear_instance
 
 def test_admin2standalone(cluster: InfinityCluster):
     '''
@@ -12,16 +12,18 @@ def test_admin2standalone(cluster: InfinityCluster):
         assert test_client.show_current_node().node_role == "admin"
 
         cluster.set_standalone("test")
+        state = instance_state(test_client)
         assert test_client.show_current_node().node_role == "standalone"
-        do_some_operations(test_client)
+        do_some_operations(test_client, state)
 
         cluster.set_admin("test") 
         assert test_client.show_current_node().node_role == "admin"
 
         cluster.set_standalone("test")
         assert test_client.show_current_node().node_role == "standalone"
-        do_some_operations(test_client)
+        do_some_operations(test_client, state)
 
+        clear_instance(state, test_client)
         cluster.remove_node("test")
 
 def test_standalone2admin(cluster: InfinityCluster):
@@ -31,15 +33,17 @@ def test_standalone2admin(cluster: InfinityCluster):
     with cluster:
         cluster.add_node("test", "conf/infinity_conf.toml")
         test_client = cluster.client("test")
+        state = instance_state(test_client)
         assert test_client.show_current_node().node_role == "standalone"
-        do_some_operations(test_client)
+        do_some_operations(test_client, state)
 
         cluster.set_admin("test")
         assert test_client.show_current_node().node_role == "admin"
 
         cluster.set_standalone("test")
         assert test_client.show_current_node().node_role == "standalone"
-        do_some_operations(test_client)
+        do_some_operations(test_client, state)
+        clear_instance(state, test_client)
 
         cluster.set_admin("test")
         assert test_client.show_current_node().node_role == "admin"
@@ -56,8 +60,9 @@ def test_admin2standalone2admin2leader(cluster: InfinityCluster):
         assert test_client.show_current_node().node_role == "admin"
 
         cluster.set_standalone("test")
+        state = instance_state(test_client)
         assert test_client.show_current_node().node_role == "standalone"
-        do_some_operations(test_client)
+        do_some_operations(test_client, state)
 
         cluster.set_admin("test") 
         assert test_client.show_current_node().node_role == "admin"
@@ -66,8 +71,9 @@ def test_admin2standalone2admin2leader(cluster: InfinityCluster):
         assert test_client.show_node("test").node_role == "leader"
         assert test_client.show_node("test").node_name == "test"
         assert test_client.show_node("test").node_status == "alive"
-        do_some_operations(test_client)
+        do_some_operations(test_client, state)
 
+        clear_instance(state, test_client)
         cluster.remove_node("test")
 
 def test_standalone2admin2leader2admin(cluster: InfinityCluster):
@@ -77,8 +83,9 @@ def test_standalone2admin2leader2admin(cluster: InfinityCluster):
     with cluster:
         cluster.add_node("test", "conf/infinity_conf.toml")
         test_client = cluster.client("test")
+        state = instance_state(test_client)
         assert test_client.show_current_node().node_role == "standalone"
-        do_some_operations(test_client)
+        do_some_operations(test_client, state)
 
         cluster.set_admin("test")
         assert test_client.show_current_node().node_role == "admin"
@@ -87,7 +94,8 @@ def test_standalone2admin2leader2admin(cluster: InfinityCluster):
         assert test_client.show_node("test").node_role == "leader"
         assert test_client.show_node("test").node_name == "test"
         assert test_client.show_node("test").node_status == "alive"
-        do_some_operations(test_client)
+        do_some_operations(test_client, state)
+        clear_instance(state, test_client)
 
         cluster.set_admin("test")
         assert test_client.show_current_node().node_role == "admin"

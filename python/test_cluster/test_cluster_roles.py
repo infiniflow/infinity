@@ -8,7 +8,7 @@ import time
 from infinity.errors import ErrorCode
 from infinity.common import InfinityException
 from infinity.common import ConflictType
-from database_operations import do_some_operations, do_some_operations_cluster
+from database_operations import do_some_operations_cluster, instance_state, clear_instance
 from infinity_http import database_result
 import logging
 
@@ -105,9 +105,10 @@ def test_followerlearner_failed(cluster : InfinityCluster):
 
         cluster.set_leader("node1")
         cluster.set_follower("node2")
+        leader_state = instance_state(node1_client)
 
         with pytest.raises(InfinityException) as e:
             node2_client.remove_node("node1")
 
         with pytest.raises(InfinityException) as e:
-            do_some_operations_cluster(node2_client, [node1_client])
+            do_some_operations_cluster(node2_client, [node1_client], leader_state)
