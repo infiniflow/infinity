@@ -71,15 +71,7 @@ class http_network_util:
         if self.retry:
             for i in range(self.retry_time):
                 try:
-                    match method:
-                        case "get":
-                            response = requests.get(url, headers=header, json=data)
-                        case "post":
-                            response = requests.post(url, headers=header, json=data)
-                        case "put":
-                            response = requests.put(url, headers=header, json=data)
-                        case "delete":
-                            response = requests.delete(url, headers=header, json=data)
+                    response = self.request_inner(url, method, header, data)
                     self.raise_exception(response)
                 except InfinityException as e:
                     if e.error_code == ErrorCode.INFINITY_IS_INITING:
@@ -93,6 +85,9 @@ class http_network_util:
             else:
                 raise Exception(f"Cannot connect to {url} after {self.retry_time} retries")
             return response
+        return self.request_inner(url, method, header, data)
+    
+    def request_inner(self, url, method, header={}, data={}):
         match method:
             case "get":
                 response = requests.get(url, headers=header, json=data)

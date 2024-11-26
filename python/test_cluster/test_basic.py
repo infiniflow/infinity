@@ -42,7 +42,6 @@ def test_0(cluster: InfinityCluster):
         cluster.remove_node("node1")
 
 
-@pytest.mark.skip(reason="deprecated")
 def test_mock(mock_cluster: MockInfinityCluster):
     cluster = mock_cluster
     with cluster:

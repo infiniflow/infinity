@@ -7,6 +7,7 @@ import time
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 import timeout_decorator
+from mocked_infinity_cluster import MockInfinityCluster
 
 
 class TestInsert:
@@ -59,8 +60,11 @@ class TestInsert:
     def test_insert_11(self, cluster: InfinityCluster):
         self.__test_inner_1(cluster)
 
+    def test_insert_12(self, mock_cluster: MockInfinityCluster):
+        self.__test_inner_1(mock_cluster)
+
     @pytest.mark.docker
-    def test_insert_12(self, docker_cluster: DockerInfinityCluster):
+    def test_insert_13(self, docker_cluster: DockerInfinityCluster):
         self.__test_inner_1(docker_cluster)
 
     # read/write when leader/follower is disconnected

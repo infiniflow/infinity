@@ -52,13 +52,13 @@ class BaseInfinityRunner:
         self.node_name = node_name
         self.executable_path = executable_path
         self.config_path = config_path
-        self.load_config()
-        http_ip, http_port = self.http_uri()
-        self.add_client(f"http://{http_ip}:{http_port}/")
         if logger is None:
             self.logger = logging.root
         else:
             self.logger = logger
+        self.load_config()
+        http_ip, http_port = self.http_uri()
+        self.add_client(f"http://{http_ip}:{http_port}/")
         if init:
             self.init(config_path)
 
@@ -114,7 +114,9 @@ class InfinityRunner(BaseInfinityRunner):
         my_env["LD_PRELOAD"] = ""
         my_env["ASAN_OPTIONS"] = ""
         self.process = subprocess.Popen(cmd, shell=False, env=my_env)
+        self.check_start()
 
+    def check_start(self):
         timeout = 10  # Give the process a moment to start
         start_time = time.time()
         while time.time() - start_time < timeout:
