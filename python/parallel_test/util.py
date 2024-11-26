@@ -18,6 +18,6 @@ class RtnThread(threading.Thread):
 
     def join(self, *args):
         super().join(*args)
-        if self.exception_:
-            raise self.exception_
+        # if self.exception_:
+        #     raise self.exception_
         return self._rtn
