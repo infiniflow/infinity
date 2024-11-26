@@ -8,7 +8,7 @@ from infinity.common import ConflictType
 from infinity import index
 from infinity.errors import ErrorCode
 from restart_util import *
-from parallel_test.util import RtnThread
+from util import RtnThread
 
 
 @pytest.mark.slow

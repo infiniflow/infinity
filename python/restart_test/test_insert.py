@@ -6,7 +6,7 @@ from infinity_runner import InfinityRunner, infinity_runner_decorator_factory
 import time
 import threading
 from restart_util import *
-from parallel_test.util import RtnThread
+from util import RtnThread
 
 
 class TestInsert:

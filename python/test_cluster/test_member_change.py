@@ -12,7 +12,7 @@ from infinity.common import ConflictType
 from database_operations import do_some_operations_cluster, clear_instance
 from infinity_http import infinity_http
 from database_operations import instance_state
-from parallel_test.util import RtnThread
+from util import RtnThread
 
 # FIXME: when running multiple times without clear_instance, this test case will fail.
 def test_cluster_leader_follower_change(cluster : InfinityCluster):

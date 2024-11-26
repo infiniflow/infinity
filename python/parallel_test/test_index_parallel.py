@@ -12,7 +12,7 @@ from infinity.connection_pool import ConnectionPool
 from infinity.errors import ErrorCode
 
 from test_sdkbase import TestSdk
-from parallel_test.util import RtnThread
+from util import RtnThread
 
 TEST_DATA_DIR = "/test/data/"
 kInsertThreadNum = 4
