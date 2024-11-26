@@ -45,7 +45,10 @@ class mocked_http_network(http_network_util):
         cmd = convert_request_to_curl(method, header, data, url)
         cmd = f"sudo ip netns exec {self.ns_name} {cmd}"
         self.logger.debug(f"cmd: {cmd}")
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        try:
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+        except subprocess.CalledProcessError as e:
+            raise InfinityException(error_code=ErrorCode.INFINITY_IS_INITING, error_message=str(e))
         if len(result.stdout) == 0:
             return http_result(0, None)
         try:
@@ -94,7 +97,7 @@ class MockedInfinityRunner(InfinityRunner):
 
     def add_client(self, http_addr: str):
         net = mocked_http_network(self.ns_name, self.logger, http_addr)
-        # net.set_retry()
+        net.set_retry()
         self.client = infinity_http(net=net)
 
     def peer_uri(self):
@@ -231,7 +234,7 @@ class MockInfinityCluster(InfinityCluster):
             f"sudo iptables -A FORWARD -i {self.bridge_name} -j ACCEPT".split(),
             check=True,
         )
-        subprocess.run(f"sudo sysctl -w net.ipv4.ip_forward=1".split(), check=True)
+        # subprocess.run(f"sudo sysctl -w net.ipv4.ip_forward=1".split(), check=True)
 
     def __veth_name_pair(self, ns_name: str):
         veth_name = f"{ns_name}_v"
