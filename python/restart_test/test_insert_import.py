@@ -7,7 +7,7 @@ from restart_util import *
 from common import common_values
 from infinity.common import ConflictType
 import random
-from util import RtnThread
+from parallel_test.util import RtnThread
 
 
 class TestInsertImport:

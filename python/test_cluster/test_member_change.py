@@ -11,6 +11,7 @@ from infinity.common import InfinityException
 from infinity.common import ConflictType
 from database_operations import do_some_operations, do_some_operations_cluster
 from infinity_http import infinity_http
+from parallel_test.util import RtnThread
 
 def test_cluster_leader_follower_change(cluster : InfinityCluster):
     '''
@@ -65,10 +66,9 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
         cluster.remove_node("node2")
 
 
-# @pytest.mark.parametrize("kill", [False, True])
-@pytest.mark.parametrize("leader_shutdown", [True, False])
-def test_cluster_shutdown_and_recover(cluster: InfinityCluster, leader_shutdown: bool):
-    kill = False
+@pytest.mark.parametrize("kill", [False, True])
+@pytest.mark.parametrize("leader_shutdown", [False])
+def test_cluster_shutdown_and_recover(cluster: InfinityCluster, kill: bool, leader_shutdown: bool):
     with cluster:
         logger = cluster.logger
 
@@ -135,7 +135,7 @@ def test_cluster_shutdown_and_recover(cluster: InfinityCluster, leader_shutdown:
                     else:
                         insert_line += 1
 
-            t1 = threading.Thread(target=shutdown_leader, args=(insert_time_in_sec, leader_shutdown,))
+            t1 = RtnThread(target=shutdown_leader, args=(insert_time_in_sec, leader_shutdown,))
             t1.start()
             insert_data()
             t1.join()
