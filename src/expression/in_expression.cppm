@@ -146,6 +146,10 @@ public:
 
     inline DataType TypeOfArguments() const { return set_.Type(); }
 
+    u64 Hash() const override;
+
+    bool Eq(const BaseExpression &other) const override;
+
 private:
     SharedPtr<BaseExpression> left_operand_ptr_;
     InType in_type_;
