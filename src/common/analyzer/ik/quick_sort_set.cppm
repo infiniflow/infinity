@@ -13,8 +13,8 @@ export class QuickSortSet {
 public:
     class Cell {
     public:
-        Cell *prev_;
-        Cell *next_;
+        Cell *prev_{nullptr};
+        Cell *next_{nullptr};
         Lexeme *lexeme_;
 
         Cell(Lexeme *lexeme) {
@@ -22,8 +22,6 @@ public:
                 throw std::invalid_argument("lexeme must not be null");
             }
             lexeme_ = lexeme;
-            prev_ = nullptr;
-            next_ = nullptr;
         }
 
         int CompareTo(Cell *other) { return lexeme_->CompareTo(*(other->lexeme_)); }
@@ -35,11 +33,13 @@ public:
         Lexeme *GetLexeme() { return lexeme_; }
     };
 
-    Cell *head_;
-    Cell *tail_;
-    int size_;
+    Cell *head_{nullptr};
+    Cell *tail_{nullptr};
+    int size_{0};
 
     QuickSortSet();
+
+    virtual ~QuickSortSet();
 
     bool AddLexeme(Lexeme *lexeme);
 

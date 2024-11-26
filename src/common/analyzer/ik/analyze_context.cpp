@@ -20,9 +20,6 @@ namespace infinity {
 AnalyzeContext::AnalyzeContext() {
     segment_buff_.resize(BUFF_SIZE);
     char_types_.resize(BUFF_SIZE);
-    buff_locker_ = HashSet<std::wstring>();
-    org_lexemes_ = QuickSortSet();
-    path_map_ = HashMap<int, LexemePath *>();
     results_ = List<Lexeme *>();
     buff_offset_ = 0;
     cursor_ = 0;
@@ -75,7 +72,7 @@ void AnalyzeContext::AddLexeme(Lexeme *lexeme) { org_lexemes_.AddLexeme(lexeme);
 
 void AnalyzeContext::AddLexemePath(LexemePath *path) {
     if (path != nullptr) {
-        path_map_[path->GetPathBegin()] = path;
+        path_map_[path->GetPathBegin()] = UniquePtr<LexemePath>(path);
     }
 }
 
@@ -88,7 +85,7 @@ void AnalyzeContext::OutputToResult() {
             continue;
         }
         last_useless_char_num_ = 0;
-        LexemePath *path = path_map_[index];
+        LexemePath *path = path_map_[index].get();
         if (path != nullptr) {
             Lexeme *l = path->PollFirst();
             while (l != nullptr) {

@@ -35,11 +35,11 @@ public:
 
     QuickSortSet org_lexemes_;
 
-    HashMap<int, LexemePath *> path_map_;
+    HashMap<int, UniquePtr<LexemePath>> path_map_;
 
     List<Lexeme *> results_;
 
-    Dictionary *dict_;
+    Dictionary *dict_{nullptr};
 
     AnalyzeContext();
 

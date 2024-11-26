@@ -19,7 +19,7 @@ public:
     void Process(AnalyzeContext *context, bool use_smart);
 
 private:
-    LexemePath *Judge(QuickSortSet::Cell *lexeme_cell, int fullTextLength);
+    LexemePath *Judge(QuickSortSet::Cell *lexeme_cell, int fulltext_length);
 
     std::stack<QuickSortSet::Cell *> ForwardPath(QuickSortSet::Cell *lexeme_cell, LexemePath *option);
 
