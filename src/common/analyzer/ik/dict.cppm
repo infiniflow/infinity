@@ -9,18 +9,21 @@ import hit;
 namespace infinity {
 export class Dictionary {
 public:
-    DictSegment *main_dict_{nullptr};
-    DictSegment *quantifier_dict_{nullptr};
-    DictSegment *stop_words_{nullptr};
+    UniquePtr<DictSegment> main_dict_;
+    UniquePtr<DictSegment> quantifier_dict_;
+    UniquePtr<DictSegment> stop_words_;
+    UniquePtr<DictSegment> surname_dict_;
+    UniquePtr<DictSegment> suffix_dict_;
+    UniquePtr<DictSegment> prep_dict_;
 
-    String conf_dir;
-    HashMap<String, String> props;
+    String conf_dir_;
+    HashMap<String, String> props_;
 
     Dictionary(const String &dir);
 
     String GetProperty(const String &key) {
-        if (props.find(key) != props.end()) {
-            return props[key];
+        if (props_.find(key) != props_.end()) {
+            return props_[key];
         }
         return "";
     }
@@ -35,21 +38,21 @@ public:
 
     Vector<String> GetExtStopWordDictionarys();
 
-    String GetDictRoot() { return conf_dir; }
+    String GetDictRoot() { return conf_dir_; }
 
     void AddWords(const Vector<String> &words);
 
     void DisableWords(const Vector<String> &words);
 
-    Hit *MatchInMainDict(const Vector<wchar_t> &charArray);
+    Hit *MatchInMainDict(const Vector<wchar_t> &char_array);
 
-    Hit *MatchInMainDict(const Vector<wchar_t> &charArray, int begin, int length);
+    Hit *MatchInMainDict(const Vector<wchar_t> &char_array, int begin, int length);
 
-    Hit *MatchInQuantifierDict(const Vector<wchar_t> &charArray, int begin, int length);
+    Hit *MatchInQuantifierDict(const Vector<wchar_t> &char_array, int begin, int length);
 
-    Hit *MatchWithHit(const Vector<wchar_t> &charArray, int currentIndex, Hit *matchedHit);
+    Hit *MatchWithHit(const Vector<wchar_t> &char_array, int current_index, Hit *matched_hit);
 
-    bool IsStopWord(const Vector<wchar_t> &charArray, int begin, int length);
+    bool IsStopWord(const Vector<wchar_t> &char_array, int begin, int length);
 
     void LoadMainDict();
 

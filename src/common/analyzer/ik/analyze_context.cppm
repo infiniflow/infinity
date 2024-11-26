@@ -59,9 +59,9 @@ public:
 
     bool MoveCursor();
 
-    void LockBuffer(const std::wstring &segmenterName) { buff_locker_.insert(segmenterName); }
+    void LockBuffer(const std::wstring &segmenter_name) { buff_locker_.insert(segmenter_name); }
 
-    void UnlockBuffer(const std::wstring &segmenterName) { buff_locker_.erase(segmenterName); }
+    void UnlockBuffer(const std::wstring &segmenter_name) { buff_locker_.erase(segmenter_name); }
 
     bool IsBufferLocked() const { return !buff_locker_.empty(); }
 

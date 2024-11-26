@@ -22,46 +22,42 @@ public:
 
     bool HasNextNode() const { return store_size_ > 0; }
 
-    Hit *Match(const Vector<wchar_t> &charArray) { return Match(charArray, 0, charArray.size(), nullptr); }
+    Hit *Match(const Vector<wchar_t> &char_array) { return Match(char_array, 0, char_array.size(), nullptr); }
 
-    Hit *Match(const Vector<wchar_t> &charArray, int begin, int length) { return Match(charArray, begin, length, nullptr); }
+    Hit *Match(const Vector<wchar_t> &char_array, int begin, int length) { return Match(char_array, begin, length, nullptr); }
 
-    Hit *Match(const Vector<wchar_t> &charArray, int begin, int length, Hit *searchHit);
+    Hit *Match(const Vector<wchar_t> &char_array, int begin, int length, Hit *search_hit);
 
-    void FillSegment(const Vector<wchar_t> &charArray) { FillSegment(charArray, 0, charArray.size(), 1); }
+    void FillSegment(const Vector<wchar_t> &char_array) { FillSegment(char_array, 0, char_array.size(), 1); }
 
-    void DisableSegment(const Vector<wchar_t> &charArray) { FillSegment(charArray, 0, charArray.size(), 0); }
+    void DisableSegment(const Vector<wchar_t> &char_array) { FillSegment(char_array, 0, char_array.size(), 0); }
 
 private:
-    HashMap<wchar_t, DictSegment *> children_map_;
+    HashMap<wchar_t, UniquePtr<DictSegment>> children_map_;
 
-    Vector<DictSegment *> children_array_;
+    Vector<UniquePtr<DictSegment>> children_array_;
 
-    void FillSegment(const Vector<wchar_t> &charArray, int begin, int length, int enabled);
+    void FillSegment(const Vector<wchar_t> &char_array, int begin, int length, int enabled);
 
-    DictSegment *LookforSegment(wchar_t keyChar, int create);
+    DictSegment *LookforSegment(wchar_t key_char, int create);
 
-    Vector<DictSegment *> &GetChildrenArray() {
+    Vector<UniquePtr<DictSegment>> &GetChildrenArray() {
         if (children_array_.empty()) {
             children_array_.resize(ARRAY_LENGTH_LIMIT);
         }
         return children_array_;
     }
 
-    HashMap<wchar_t, DictSegment *> &GetChildrenMap() {
-        std::lock_guard<std::mutex> lock(mutex);
+    HashMap<wchar_t, UniquePtr<DictSegment>> &GetChildrenMap() {
         if (children_map_.empty()) {
             children_map_.reserve(ARRAY_LENGTH_LIMIT * 2);
         }
         return children_map_;
     }
 
-    void Migrate(const Vector<DictSegment *> &segmentArray, HashMap<wchar_t, DictSegment *> &segmentMap);
+    void Migrate(Vector<UniquePtr<DictSegment>> &segment_array, HashMap<wchar_t, UniquePtr<DictSegment>> &segment_map);
 
     int CompareTo(const DictSegment &o) const { return node_char_ - o.node_char_; }
-
-private:
-    std::mutex mutex;
 };
 
 } // namespace infinity
