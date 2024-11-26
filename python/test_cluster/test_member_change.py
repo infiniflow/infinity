@@ -9,10 +9,12 @@ import time
 from infinity.errors import ErrorCode
 from infinity.common import InfinityException
 from infinity.common import ConflictType
-from database_operations import do_some_operations, do_some_operations_cluster
+from database_operations import do_some_operations_cluster, clear_instance
 from infinity_http import infinity_http
+from database_operations import instance_state
 from parallel_test.util import RtnThread
 
+# FIXME: when running multiple times without clear_instance, this test case will fail.
 def test_cluster_leader_follower_change(cluster : InfinityCluster):
     '''
     n1 : leader
@@ -33,6 +35,7 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
         cluster.set_follower("node2")
         node1_client = cluster.client("node1")
         node2_client = cluster.client("node2")
+        leader_state = instance_state(node1_client)
 
         res = node1_client.show_node("node1")
         assert (res.node_name == "node1")
@@ -44,7 +47,7 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
         assert (res.node_role == "follower")
         assert (res.node_status == "alive")
 
-        do_some_operations_cluster(node1_client, [node2_client])
+        do_some_operations_cluster(node1_client, [node2_client], leader_state)
 
         cluster.set_admin("node1")
         cluster.set_leader("node2")
@@ -60,8 +63,9 @@ def test_cluster_leader_follower_change(cluster : InfinityCluster):
         assert (res.node_role == "leader")
         assert (res.node_status == "alive")
 
-        do_some_operations_cluster(node2_client, [node1_client])
+        do_some_operations_cluster(node2_client, [node1_client], leader_state)
 
+        clear_instance(leader_state, node2_client)
         cluster.remove_node("node1")
         cluster.remove_node("node2")
 
