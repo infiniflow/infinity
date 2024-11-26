@@ -61,4 +61,37 @@ String InExpression::ToString() const {
     return op.str();
 }
 
+u64 InExpression::Hash() const {
+    auto h = left_operand_ptr_->Hash();
+    for (const auto &arg : arguments_) {
+        h ^= arg->Hash();
+    }
+    if (in_type_ != InType::kIn) {
+        h ^= 0x1;
+    }
+    return h;
+}
+
+bool InExpression::Eq(const BaseExpression &other_base) const {
+    if (other_base.type() != ExpressionType::kIn) {
+        return false;
+    }
+    const auto &other = static_cast<const InExpression &>(other_base);
+    if (in_type_ != other.in_type_) {
+        return false;
+    }
+    if (!left_operand_ptr_->Eq(*other.left_operand_ptr_)) {
+        return false;
+    }
+    if (arguments_.size() != other.arguments_.size()) {
+        return false;
+    }
+    for (SizeT i = 0; i < arguments_.size(); ++i) {
+        if (!arguments_[i]->Eq(*other.arguments_[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace infinity
