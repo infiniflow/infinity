@@ -248,6 +248,7 @@ class MockInfinityCluster(InfinityCluster):
         subprocess.run(f"ip netns add {ns_name}".split(), check=True)
         veth_name, veth_br_name = self.__veth_name_pair(ns_name)
         subprocess.run(f"ip link delete {veth_name}".split())
+        subprocess.run(f"ip link delete {veth_br_name}".split())
         subprocess.run(
             f"ip link add {veth_name} type veth peer name {veth_br_name}".split(),
             check=True,
