@@ -43,7 +43,7 @@ class mocked_http_network(http_network_util):
         logging.debug("url: " + url)
 
         cmd = convert_request_to_curl(method, header, data, url)
-        cmd = f"sudo ip netns exec {self.ns_name} {cmd}"
+        cmd = f"ip netns exec {self.ns_name} {cmd}"
         self.logger.debug(f"cmd: {cmd}")
         try:
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
@@ -91,7 +91,7 @@ class MockedInfinityRunner(InfinityRunner):
             self.load_config()
 
         run_cmd = f"{self.executable_path} --config={self.config_path} 2>&1"
-        run_cmd = f"sudo ip netns exec {self.ns_name} {run_cmd}"
+        run_cmd = f"ip netns exec {self.ns_name} {run_cmd}"
         self.process = subprocess.Popen(run_cmd, shell=True)
         self.check_start()
 
@@ -156,16 +156,16 @@ class MockInfinityCluster(InfinityCluster):
         veth_name, veth_br_name = self.__veth_name_pair(ns_name)
 
         subprocess.run(
-            f"sudo ip netns exec {ns_name} ip link set {veth_name} down".split(),
+            f"ip netns exec {ns_name} ip link set {veth_name} down".split(),
             check=True,
         )
-        subprocess.run(f"sudo ip link set {veth_br_name} down".split(), check=True)
-        subprocess.run(f"sudo ip link delete {veth_br_name}".split(), check=True)
-        subprocess.run(f"sudo ip netns delete {ns_name}".split(), check=True)
+        subprocess.run(f"ip link set {veth_br_name} down".split(), check=True)
+        subprocess.run(f"ip link delete {veth_br_name}".split(), check=True)
+        subprocess.run(f"ip netns delete {ns_name}".split(), check=True)
 
     def clear(self):
-        subprocess.run(f"sudo ip link set {self.bridge_name} down".split(), check=True)
-        subprocess.run(f"sudo ip link delete {self.bridge_name}".split(), check=True)
+        subprocess.run(f"ip link set {self.bridge_name} down".split(), check=True)
+        subprocess.run(f"ip link delete {self.bridge_name}".split(), check=True)
         for node_name in self.runners.keys():
             self._clear_node_ns(node_name)
         super().clear()
@@ -195,8 +195,8 @@ class MockInfinityCluster(InfinityCluster):
             raise ValueError(f"Node {node_name} not found in the cluster.")
         cur_runner: MockedInfinityRunner = self.runners[node_name]
         veth_name, veth_br_name = self.__veth_name_pair(cur_runner.ns_name)
-        subprocess.run(f"sudo ip link set {veth_br_name} down".split())
-        subprocess.run(f"sudo ip link set {veth_br_name} nomaster".split())
+        subprocess.run(f"ip link set {veth_br_name} down".split())
+        subprocess.run(f"ip link set {veth_br_name} nomaster".split())
 
     def reconnect(self, node_name: str):
         if node_name not in self.runners:
@@ -204,9 +204,9 @@ class MockInfinityCluster(InfinityCluster):
         cur_runner: MockedInfinityRunner = self.runners[node_name]
         veth_name, veth_br_name = self.__veth_name_pair(cur_runner.ns_name)
         subprocess.run(
-            f"sudo ip link set {veth_br_name} master {self.bridge_name}".split()
+            f"ip link set {veth_br_name} master {self.bridge_name}".split()
         )
-        subprocess.run(f"sudo ip link set {veth_br_name} up".split())
+        subprocess.run(f"ip link set {veth_br_name} up".split())
 
     def _next_mock_ip(self):
         mock_ip = f"{self.mock_ip_prefix}{self.cur_ip_suffix}/{self.mock_ip_mask}"
@@ -219,22 +219,22 @@ class MockInfinityCluster(InfinityCluster):
             exit()
 
     def _prepare_bridge(self):
-        subprocess.run(f"sudo ip link set {self.bridge_name} down".split())
-        subprocess.run(f"sudo ip link delete {self.bridge_name}".split())
+        subprocess.run(f"ip link set {self.bridge_name} down".split())
+        subprocess.run(f"ip link delete {self.bridge_name}".split())
         subprocess.run(
-            f"sudo ip link add {self.bridge_name} type bridge".split(), check=True
+            f"ip link add {self.bridge_name} type bridge".split(), check=True
         )
         mock_ip = self._next_mock_ip()
         subprocess.run(
-            f"sudo ip addr add {mock_ip} dev {self.bridge_name}".split(), check=True
+            f"ip addr add {mock_ip} dev {self.bridge_name}".split(), check=True
         )
         self.host_ip, mask = mock_ip.split("/")
-        subprocess.run(f"sudo ip link set {self.bridge_name} up".split(), check=True)
+        subprocess.run(f"ip link set {self.bridge_name} up".split(), check=True)
         subprocess.run(
-            f"sudo iptables -A FORWARD -i {self.bridge_name} -j ACCEPT".split(),
+            f"iptables -A FORWARD -i {self.bridge_name} -j ACCEPT".split(),
             check=True,
         )
-        # subprocess.run(f"sudo sysctl -w net.ipv4.ip_forward=1".split(), check=True)
+        # subprocess.run(f"sysctl -w net.ipv4.ip_forward=1".split(), check=True)
 
     def __veth_name_pair(self, ns_name: str):
         veth_name = f"{ns_name}_v"
@@ -244,38 +244,38 @@ class MockInfinityCluster(InfinityCluster):
         return veth_name, veth_br_name
 
     def _connect_to_bridge(self, ns_name: str, ping: bool = False):
-        subprocess.run(f"sudo ip netns delete {ns_name}".split())
-        subprocess.run(f"sudo ip netns add {ns_name}".split(), check=True)
+        subprocess.run(f"ip netns delete {ns_name}".split())
+        subprocess.run(f"ip netns add {ns_name}".split(), check=True)
         veth_name, veth_br_name = self.__veth_name_pair(ns_name)
-        subprocess.run(f"sudo ip link delete {veth_name}".split())
+        subprocess.run(f"ip link delete {veth_name}".split())
         subprocess.run(
-            f"sudo ip link add {veth_name} type veth peer name {veth_br_name}".split(),
+            f"ip link add {veth_name} type veth peer name {veth_br_name}".split(),
             check=True,
         )
         subprocess.run(
-            f"sudo ip link set {veth_name} netns {ns_name}".split(), check=True
+            f"ip link set {veth_name} netns {ns_name}".split(), check=True
         )
         subprocess.run(
-            f"sudo ip netns exec {ns_name} ip link set lo up".split(), check=True
+            f"ip netns exec {ns_name} ip link set lo up".split(), check=True
         )
         subprocess.run(
-            f"sudo ip link set {veth_br_name} master {self.bridge_name}".split()
+            f"ip link set {veth_br_name} master {self.bridge_name}".split()
         )
         mock_ip = self._next_mock_ip()
         self.logger.info(f"ns_name: {ns_name}, mock_ip: {mock_ip}")
         subprocess.run(
-            f"sudo ip netns exec {ns_name} ip addr add {mock_ip} dev {veth_name}".split(),
+            f"ip netns exec {ns_name} ip addr add {mock_ip} dev {veth_name}".split(),
         )
         subprocess.run(
-            f"sudo ip netns exec {ns_name} ip link set {veth_name} up".split(),
+            f"ip netns exec {ns_name} ip link set {veth_name} up".split(),
             check=True,
         )
-        subprocess.run(f"sudo ip link set {veth_br_name} up".split(), check=True)
+        subprocess.run(f"ip link set {veth_br_name} up".split(), check=True)
 
         if ping:
             if self.host_ip is not None:
                 subprocess.run(
-                    f"sudo ip netns exec {ns_name} ping -c 1 {self.host_ip}".split(),
+                    f"ip netns exec {ns_name} ping -c 1 {self.host_ip}".split(),
                     check=True,
                 )
         mock_ip, mask = mock_ip.split("/")
