@@ -48,7 +48,7 @@ public:
     String GetCleanupInfo() const;
 
 private:
-    std::mutex mutex_;
+    mutable std::mutex mutex_;
     TxnTimeStamp cleanup_ts_ = 0;
 
     Vector<String> cleanup_info_;
