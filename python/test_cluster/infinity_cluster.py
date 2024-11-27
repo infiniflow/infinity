@@ -52,13 +52,13 @@ class BaseInfinityRunner:
         self.node_name = node_name
         self.executable_path = executable_path
         self.config_path = config_path
-        self.load_config()
-        http_ip, http_port = self.http_uri()
-        self.add_client(f"http://{http_ip}:{http_port}/")
         if logger is None:
             self.logger = logging.root
         else:
             self.logger = logger
+        self.load_config()
+        http_ip, http_port = self.http_uri()
+        self.add_client(f"http://{http_ip}:{http_port}/")
         if init:
             self.init(config_path)
 
@@ -114,7 +114,9 @@ class InfinityRunner(BaseInfinityRunner):
         my_env["LD_PRELOAD"] = ""
         my_env["ASAN_OPTIONS"] = ""
         self.process = subprocess.Popen(cmd, shell=False, env=my_env)
+        self.check_start()
 
+    def check_start(self):
         timeout = 10  # Give the process a moment to start
         start_time = time.time()
         while time.time() - start_time < timeout:
@@ -140,7 +142,7 @@ class InfinityRunner(BaseInfinityRunner):
         timeout_kill.timeout_kill(timeout, self.process, self.logger)
 
     def kill(self):
-        self.logger.info("Kill node {self.node_name}")
+        self.logger.info(f"Kill node {self.node_name}")
         if self.process is None:
             return
         self.process.kill()
@@ -344,6 +346,21 @@ class InfinityCluster:
         if self.leader_name is not None and self.leader_name == node_name:
             self.leader_name = None
             self.leader_runner = None
+        if kill and self.leader_runner is not None:
+            infinity_leader = self.leader_runner.client
+            wait_timeout_sec = 10
+            start_time = time.time()
+            while time.time() - start_time < wait_timeout_sec:
+                node_info = infinity_leader.show_node(node_name)
+
+                if node_info.node_status == "alive":
+                    time.sleep(0.5)
+                else:
+                    break
+            else:
+                raise Exception(f"Node {node_name} is still alive after {wait_timeout_sec} seconds.")
+            infinity_leader.remove_node(node_name)
+            self.logger.debug(f"Remove node {node_name} from the cluster because status is {node_info.node_status}.")
 
 
 if __name__ == "__main__":

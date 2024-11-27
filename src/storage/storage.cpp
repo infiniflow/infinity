@@ -218,8 +218,15 @@ Status Storage::AdminToWriter() {
     }
 
     if (config_ptr_->StorageType() == StorageType::kMinio) {
-        Status status = VirtualStore::CreateBucket();
+        Status status;
+        try {
+            status = VirtualStore::CreateBucket();
+        } catch (std::exception &e) {
+            status = Status::Unknown(e.what());
+        }
         if (!status.ok()) {
+            std::unique_lock<std::mutex> lock(mutex_);
+            current_storage_mode_ = StorageMode::kAdmin;
             return status;
         }
     }
@@ -649,14 +656,7 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
                     break;
                 }
                 case StorageMode::kReadable: {
-                    Status status = AdminToReader();
-                    if (!status.ok()) {
-                        Status to_admin_status = ReaderToAdmin();
-                        if (!status.ok()) {
-                            UnrecoverableError(fmt::format("Fail to restore to admin status: {}", to_admin_status.message()));
-                        }
-                    }
-                    return status;
+                    return AdminToReader();
                 }
                 case StorageMode::kWritable: {
                     return AdminToWriter();
