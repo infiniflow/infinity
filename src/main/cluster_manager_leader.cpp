@@ -162,11 +162,14 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
     }
 
     SharedPtr<PeerClient> client_{nullptr};
+    NodeStatus old_status = NodeStatus::kInvalid;
     {
         std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         auto node_iter = other_node_map_.find(node_name);
         if (node_iter != other_node_map_.end()) {
-            node_iter->second->set_node_status(NodeStatus::kRemoved);
+            NodeInfo &node_info = *node_iter->second;
+            old_status = node_info.node_status();
+            node_info.set_node_status(NodeStatus::kRemoved);
         } else {
             return Status::NotExistNode(node_name);
         }
@@ -174,29 +177,31 @@ Status ClusterManager::RemoveNodeInfo(const String &node_name) {
         auto client_iter = reader_client_map_.find(node_name);
         if (client_iter != reader_client_map_.end()) {
             client_ = client_iter->second;
-        } else {
+        } else if (old_status == NodeStatus::kAlive) {
             UnrecoverableError(fmt::format("Cant' find node {} in client collection.", node_name));
         }
     }
 
-    SharedPtr<ChangeRoleTask> change_role_task = MakeShared<ChangeRoleTask>(node_name, "admin");
-    client_->Send(change_role_task);
-    change_role_task->Wait();
+    if (old_status == NodeStatus::kAlive) {
+        SharedPtr<ChangeRoleTask> change_role_task = MakeShared<ChangeRoleTask>(node_name, "admin");
+        client_->Send(change_role_task);
+        change_role_task->Wait();
 
+        if (change_role_task->error_code_ != 0) {
+            Status status = Status::OK();
+            LOG_ERROR(fmt::format("Fail to change {} to the role of ADMIN, error: ", node_name, change_role_task->error_message_));
+            status.code_ = static_cast<ErrorCode>(change_role_task->error_code_);
+            status.msg_ = MakeUnique<String>(change_role_task->error_message_);
+            return status;
+        }
+    }
     {
         std::unique_lock<std::mutex> cluster_lock(cluster_mutex_);
         other_node_map_.erase(node_name);
         clients_for_cleanup_.emplace_back(reader_client_map_[node_name]);
         reader_client_map_.erase(node_name);
     }
-
-    Status status = Status::OK();
-    if (change_role_task->error_code_ != 0) {
-        LOG_ERROR(fmt::format("Fail to change {} to the role of ADMIN, error: ", node_name, change_role_task->error_message_));
-        status.code_ = static_cast<ErrorCode>(change_role_task->error_code_);
-        status.msg_ = MakeUnique<String>(change_role_task->error_message_);
-    }
-    return status;
+    return Status::OK();
 }
 
 Status ClusterManager::UpdateNodeByLeader(const String &node_name, UpdateNodeOp update_node_op) {
