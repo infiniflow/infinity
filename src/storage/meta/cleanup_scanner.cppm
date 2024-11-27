@@ -41,16 +41,14 @@ public:
 #endif
     }
 
-    void ResetInfo(TxnTimeStamp cleanup_ts) {
-        cleanup_ts_ = cleanup_ts;
-        cleanup_info_.clear();
-    }
+    void ResetInfo(TxnTimeStamp cleanup_ts);
 
-    void AddCleanupInfo(String path) { cleanup_info_.emplace_back(std::move(path)); }
+    void AddCleanupInfo(String path);
 
     String GetCleanupInfo() const;
 
 private:
+    std::mutex mutex_;
     TxnTimeStamp cleanup_ts_ = 0;
 
     Vector<String> cleanup_info_;
