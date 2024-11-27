@@ -21,6 +21,7 @@ import hnsw_simd_func;
 import maxsim_simd_funcs;
 import emvb_simd_funcs;
 import search_top_1_sgemm;
+import batch_bm25_simd_funcs;
 
 namespace infinity {
 
@@ -595,6 +596,15 @@ SearchTop1WithDisF32U32FuncType GetSearchTop1WithDisF32U32FuncPtr() {
     }
 #endif
     return &search_top_1_simple_with_dis<f32, f32, u32, f32>;
+}
+
+BatchBM25FuncType GetBatchBM25FuncPtr() {
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &BatchBM25AVX2;
+    }
+#endif
+    return &BatchBM25Simple;
 }
 
 } // namespace infinity

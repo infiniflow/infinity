@@ -135,7 +135,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     bool use_block_max_iter = false;
 
     switch (early_term_algo_) {
-        case EarlyTermAlgo::kBMM: {
+        case EarlyTermAlgo::kBMW: {
             use_block_max_iter = true;
             break;
         }
@@ -148,7 +148,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
             use_block_max_iter = true;
             break;
         }
-        case EarlyTermAlgo::kBMW:
         default: {
             use_block_max_iter = true;
             break;
@@ -182,7 +181,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
 
     if (use_block_max_iter) {
-        full_text_query_context.early_term_algo_ = early_term_algo_;
+        full_text_query_context.early_term_algo_ = EarlyTermAlgo::kBMW;
         et_iter = query_builder.CreateSearch(full_text_query_context);
         // et_iter is nullptr if fulltext index is present but there's no data
         if (et_iter != nullptr) {
