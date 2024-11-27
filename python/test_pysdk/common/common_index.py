@@ -2,9 +2,7 @@ from enum import Enum
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 
-from infinity_embedded.embedded_infinity_ext import IndexType as LocalIndexType, WrapIndexInfo
-from infinity_embedded.embedded_infinity_ext import InitParameter as LocalInitParameter
-from infinity_embedded.embedded_infinity_ext import WrapIndexInfo as LocalIndexInfo
+
 from infinity.errors import ErrorCode
 
 
@@ -38,6 +36,7 @@ class IndexType(Enum):
                 raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
 
     def to_local_type(self):
+        from infinity_embedded.embedded_infinity_ext import IndexType as LocalIndexType
         from infinity_embedded.common import InfinityException
         match self:
             case IndexType.IVF:
@@ -73,6 +72,8 @@ class InitParameter:
         return ttypes.InitParameter(self.param_name, self.param_value)
 
     def to_local_type(self):
+        from infinity_embedded.embedded_infinity_ext import InitParameter as LocalInitParameter
+
         local_init_parameter = LocalInitParameter()
         local_init_parameter.param_name = self.param_name
         local_init_parameter.param_value = self.param_value
