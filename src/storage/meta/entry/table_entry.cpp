@@ -137,6 +137,12 @@ UniquePtr<TableEntry> TableEntry::Clone(TableMeta *meta) const {
     if (meta != nullptr) {
         ret->table_meta_ = meta;
     }
+    {
+        auto map_guard = index_meta_map_.GetMetaMap();
+        for (const auto &[index_name, index_meta] : *map_guard) {
+            ret->index_meta_map_.AddNewMetaNoLock(index_name, index_meta->Clone(ret.get()));
+        }
+    }
     for (const auto &[segment_id, segment_entry] : segment_map_) {
         ret->segment_map_[segment_id] = segment_entry->Clone(ret.get());
     }
