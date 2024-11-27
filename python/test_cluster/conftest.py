@@ -60,6 +60,9 @@ def pytest_generate_tests(metafunc):
 
     test_name = metafunc.function.__name__
     if "docker_cluster" in metafunc.fixturenames:
+        # skip if docker is in option and the testcase is marked with docker
+        if not metafunc.config.getoption("--docker"):
+            return
         docker_infinity_cluster = DockerInfinityCluster(
             infinity_path, minio_params=minio_params, infinity_dir=infinity_dir
         )
