@@ -11,9 +11,6 @@ namespace infinity {
 Lexeme::Lexeme(int offset, int begin, int length, int lexeme_type) {
     offset_ = offset;
     begin_ = begin;
-    if (length_ < 0) {
-        throw std::invalid_argument("length_ < 0");
-    }
     length_ = length;
     lexeme_type_ = lexeme_type;
 }

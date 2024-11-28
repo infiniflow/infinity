@@ -18,7 +18,6 @@ module analyze_context;
 
 namespace infinity {
 AnalyzeContext::AnalyzeContext(Dictionary *dict) : dict_(dict) {
-    results_ = List<Lexeme *>();
     buff_offset_ = 0;
     cursor_ = 0;
     last_useless_char_num_ = 0;
@@ -128,11 +127,9 @@ void AnalyzeContext::Reset() {
     available_ = 0;
     buff_offset_ = 0;
     char_types_.clear();
-    char_types_.resize(BUFF_SIZE);
     cursor_ = 0;
     results_.clear();
     segment_buff_.clear();
-    segment_buff_.resize(BUFF_SIZE);
     path_map_.clear();
 }
 

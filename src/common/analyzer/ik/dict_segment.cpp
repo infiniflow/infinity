@@ -10,12 +10,7 @@ module ik_dict_segment;
 namespace infinity {
 
 HashMap<wchar_t, wchar_t> DictSegment::char_map_;
-DictSegment::DictSegment(wchar_t node_char) {
-    if (node_char == L'\0') {
-        throw std::invalid_argument("node char cannot be empty");
-    }
-    node_char_ = node_char;
-}
+DictSegment::DictSegment(wchar_t node_char) : node_char_(node_char) {}
 
 Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length, Hit *search_hit) {
     if (search_hit == nullptr) {
