@@ -1,0 +1,36 @@
+statement ok
+DROP TABLE IF EXISTS table1;
+
+statement ok
+CREATE TABLE table1 (a INT, b VARCHAR, c EMBEDDING(float, 4), d SPARSE(float, 30000), e INT);
+
+statement ok
+CREATE INDEX idx_b ON table1 (b) USING FULLTEXT;
+
+statement ok
+CREATE INDEX idx_c ON table1 (c) USING Hnsw WITH (metric = l2);
+
+statement ok
+CREATE INDEX idx_d ON table1 (d) USING BMP WITH (block_size = 16);
+
+statement ok
+INSERT INTO table1 VALUES (1, 'text', [0.1, 0.2, 0.3, 0.4], [10000:1.0, 20000:2.0], 1);
+
+query I
+SELECT a FROM table1 SEARCH MATCH TEXT('b', 'text', 'topn=1'), MATCH VECTOR(c, [0.1, 0.2, 0.3, 0.4], 'float', 'l2', 1), MATCH SPARSE(d, [10000:1.0], 'ip', 1), FUSION('rrf');
+----
+1
+
+statement ok
+ALTER TABLE table1 DROP COLUMN(e);
+
+statement ok
+INSERT INTO table1 VALUES (1, 'text', [0.1, 0.2, 0.3, 0.4], [10000:1.0, 20000:2.0]);
+
+query I
+SELECT a FROM table1 SEARCH MATCH TEXT('b', 'text', 'topn=1'), MATCH VECTOR(c, [0.1, 0.2, 0.3, 0.4], 'float', 'l2', 1), MATCH SPARSE(d, [10000:1.0], 'ip', 1), FUSION('rrf');
+----
+1
+
+statement ok
+DROP TABLE table1;

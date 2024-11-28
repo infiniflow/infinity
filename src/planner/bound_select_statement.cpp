@@ -220,8 +220,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     iter = search_ops.options_.find("block_max");
                     if (iter == search_ops.options_.end() or iter->second == "true" or iter->second == "bmw") {
                         match_node->early_term_algo_ = EarlyTermAlgo::kBMW;
-                    } else if (iter->second == "bmm") {
-                        match_node->early_term_algo_ = EarlyTermAlgo::kBMM;
+                    } else if (iter->second == "batch") {
+                        match_node->early_term_algo_ = EarlyTermAlgo::kBatch;
                     } else if (iter->second == "false") {
                         match_node->early_term_algo_ = EarlyTermAlgo::kNaive;
                     } else if (iter->second == "compare") {
