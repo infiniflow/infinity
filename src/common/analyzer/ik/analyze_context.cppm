@@ -41,7 +41,7 @@ public:
 
     Dictionary *dict_{nullptr};
 
-    AnalyzeContext();
+    AnalyzeContext(Dictionary *dict);
 
     int GetCursor() const { return cursor_; }
 

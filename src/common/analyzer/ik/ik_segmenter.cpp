@@ -10,25 +10,43 @@ import letter_segmenter;
 import analyze_context;
 import lexeme;
 import arbitrator;
+import term;
+import status;
+import character_util;
 
 module ik_segmenter;
 
 namespace infinity {
 
-IKSegmenter::IKSegmenter() { Init(); }
+IKSegmenter::IKSegmenter(const String &path) : dict_path_(path) {}
 
-void IKSegmenter::Init() {
-    context_ = MakeShared<AnalyzeContext>();
+IKSegmenter::IKSegmenter(const IKSegmenter &other) : own_dict_(false), dict_(other.dict_) {}
+
+IKSegmenter::~IKSegmenter() {
+    if (own_dict_) {
+        delete dict_;
+    }
+}
+
+Status IKSegmenter::Load() {
+    context_ = MakeShared<AnalyzeContext>(dict_);
     segmenters_ = LoadSegmenters();
     arbitrator_ = MakeShared<IKArbitrator>();
+    dict_ = new Dictionary(dict_path_);
+    Status load_status = dict_->Load();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    own_dict_ = true;
+    return Status::OK();
 }
 
 Vector<SharedPtr<Segmenter>> IKSegmenter::LoadSegmenters() {
     Vector<SharedPtr<Segmenter>> segmenters_;
     segmenters_.reserve(4);
     segmenters_.push_back(MakeShared<LetterSegmenter>());
-    segmenters_.push_back(MakeShared<CNQuantifierSegmenter>());
-    segmenters_.push_back(MakeShared<CJKSegmenter>());
+    segmenters_.push_back(MakeShared<CNQuantifierSegmenter>(dict_));
+    segmenters_.push_back(MakeShared<CJKSegmenter>(dict_));
     return segmenters_;
 }
 
@@ -68,5 +86,18 @@ void IKSegmenter::Reset() {
 }
 
 int IKSegmenter::GetLastUselessCharNum() { return context_->GetLastUselessCharNum(); }
+
+int IKSegmenter::AnalyzeImpl(const Term &input, void *data, HookType func) {
+    unsigned level = 0;
+    unsigned offset = 0;
+    Lexeme *lexeme = nullptr;
+    while ((lexeme = Next()) != nullptr) {
+        std::wstring text = lexeme->GetLexemeText();
+        String token = CharacterUtil::UTF16ToUTF8(text);
+        func(data, token.c_str(), token.size(), offset++, 0, Term::AND, level, false);
+        delete lexeme;
+    };
+    return 0;
+}
 
 } // namespace infinity

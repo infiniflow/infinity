@@ -17,7 +17,7 @@ import ik_dict;
 module analyze_context;
 
 namespace infinity {
-AnalyzeContext::AnalyzeContext() {
+AnalyzeContext::AnalyzeContext(Dictionary *dict) : dict_(dict) {
     segment_buff_.resize(BUFF_SIZE);
     char_types_.resize(BUFF_SIZE);
     results_ = List<Lexeme *>();

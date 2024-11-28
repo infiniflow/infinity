@@ -15,7 +15,7 @@ module cjk_segmenter;
 namespace infinity {
 const std::wstring CJKSegmenter::SEGMENTER_NAME = L"CJK_SEGMENTER";
 
-CJKSegmenter::CJKSegmenter() { tmp_hits_ = List<Hit *>(); }
+CJKSegmenter::CJKSegmenter(Dictionary *dict) : dict_(dict) { tmp_hits_ = List<Hit *>(); }
 
 void CJKSegmenter::Analyze(AnalyzeContext *context) {
     if (CharacterUtil::CHAR_USELESS != context->GetCurrentCharType()) {

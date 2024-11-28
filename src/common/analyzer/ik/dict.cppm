@@ -5,6 +5,7 @@ export module ik_dict;
 import stl;
 import ik_dict_segment;
 import hit;
+import status;
 
 namespace infinity {
 export class Dictionary {
@@ -28,11 +29,11 @@ public:
         return "";
     }
 
-    void Initial();
+    Status Load();
 
     void WalkFileTree(Vector<String> &files, const String &path_str);
 
-    void LoadDictFile(DictSegment *dict, const String &file_path, bool critical, const String &name);
+    Status LoadDictFile(DictSegment *dict, const String &file_path, bool critical, const String &name);
 
     Vector<String> GetExtDictionarys();
 
@@ -54,19 +55,19 @@ public:
 
     bool IsStopWord(const Vector<wchar_t> &char_array, int begin, int length);
 
-    void LoadMainDict();
+    Status LoadMainDict();
 
-    void LoadExtDict();
+    Status LoadExtDict();
 
-    void LoadStopWordDict();
+    Status LoadStopWordDict();
 
-    void LoadQuantifierDict();
+    Status LoadQuantifierDict();
 
-    void LoadSurnameDict();
+    Status LoadSurnameDict();
 
-    void LoadSuffixDict();
+    Status LoadSuffixDict();
 
-    void LoadPrepDict();
+    Status LoadPrepDict();
 
 private:
     void ParseProperties(const String &content);

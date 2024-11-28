@@ -1,6 +1,5 @@
 module;
 
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -12,29 +11,32 @@ module ik_dict;
 import ik_dict_segment;
 import hit;
 import stl;
+import status;
 
 namespace fs = std::filesystem;
 
 namespace infinity {
 
-const String PATH_DIC_MAIN = "main.dic";
-const String PATH_DIC_SURNAME = "surname.dic";
-const String PATH_DIC_QUANTIFIER = "quantifier.dic";
-const String PATH_DIC_SUFFIX = "suffix.dic";
-const String PATH_DIC_PREP = "preposition.dic";
-const String PATH_DIC_STOP = "stopword.dic";
-const String FILE_NAME = "IKAnalyzer.cfg.xml";
-const String EXT_DICT = "ext_dict";
-const String EXT_STOP = "ext_stopwords";
+const String PATH_DIC_MAIN = "ik/main.dic";
+const String PATH_DIC_SURNAME = "ik/surname.dic";
+const String PATH_DIC_QUANTIFIER = "ik/quantifier.dic";
+const String PATH_DIC_SUFFIX = "ik/suffix.dic";
+const String PATH_DIC_PREP = "ik/preposition.dic";
+const String PATH_DIC_STOP = "ik/stopword.dic";
+const String FILE_NAME = "ik/IKAnalyzer.cfg.xml";
+const String EXT_DICT = "ik/ext_dict";
+const String EXT_STOP = "ik/ext_stopwords";
 
-Dictionary::Dictionary(const String &dir) {
-    conf_dir_ = dir;
+Dictionary::Dictionary(const String &dir) : conf_dir_(dir) {}
+
+Status Dictionary::Load() {
+    Status load_status;
     fs::path root(conf_dir_);
-    fs::path configFile = root / FILE_NAME;
+    fs::path config_file = root / FILE_NAME;
 
-    std::ifstream input(configFile);
+    std::ifstream input(config_file);
     if (!input.is_open()) {
-        throw std::runtime_error("Config file not found: " + configFile.string());
+        return Status::InvalidAnalyzerFile(config_file);
     }
 
     if (input.is_open()) {
@@ -43,15 +45,32 @@ Dictionary::Dictionary(const String &dir) {
         String content = buffer.str();
         ParseProperties(content);
     }
-}
 
-void Dictionary::Initial() {
-    LoadMainDict();
-    LoadSurnameDict();
-    LoadQuantifierDict();
-    LoadSuffixDict();
-    LoadPrepDict();
-    LoadStopWordDict();
+    load_status = LoadMainDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadSurnameDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadQuantifierDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadSuffixDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadPrepDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadStopWordDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
 void Dictionary::WalkFileTree(Vector<String> &files, const String &path_str) {
@@ -67,14 +86,11 @@ void Dictionary::WalkFileTree(Vector<String> &files, const String &path_str) {
     }
 }
 
-void Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool critical, const String &name) {
+Status Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool critical, const String &name) {
     fs::path file(file_path);
     std::wifstream is(file);
     if (!is.is_open()) {
-        std::cerr << "ik-analyzer: " << name << " not found" << std::endl;
-        if (critical)
-            throw std::runtime_error("ik-analyzer: " + name + " not found!!!");
-        return;
+        return Status::InvalidAnalyzerFile(file_path);
     }
 
     std::wstring word;
@@ -86,6 +102,7 @@ void Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool c
             dict->FillSegment(Vector<wchar_t>(word.begin(), word.end()));
         }
     }
+    return Status::OK();
 }
 
 Vector<String> Dictionary::GetExtDictionarys() {
@@ -157,63 +174,97 @@ bool Dictionary::IsStopWord(const Vector<wchar_t> &char_array, int begin, int le
     return stop_words_->Match(char_array, begin, length)->IsMatch();
 }
 
-void Dictionary::LoadMainDict() {
+Status Dictionary::LoadMainDict() {
     main_dict_ = MakeUnique<DictSegment>(L'\0');
     String file = fs::path(conf_dir_) / fs::path(PATH_DIC_MAIN).string();
-    LoadDictFile(main_dict_.get(), file, false, "Main Dict");
-    LoadExtDict();
+    Status load_status = LoadDictFile(main_dict_.get(), file, false, "Main Dict");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadExtDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
-void Dictionary::LoadExtDict() {
+Status Dictionary::LoadExtDict() {
     Vector<String> ext_dict_files = GetExtDictionarys();
+    Status load_status;
     if (!ext_dict_files.empty()) {
         for (const String &ext_dict_name : ext_dict_files) {
             std::cout << "[Dict Loading] " << ext_dict_name << std::endl;
             String file = fs::path(conf_dir_) / fs::path(ext_dict_name).string();
-            LoadDictFile(main_dict_.get(), file, false, "Extra Dict");
+            load_status = LoadDictFile(main_dict_.get(), file, false, "Extra Dict");
+            if (!load_status.ok()) {
+                return load_status;
+            }
         }
     }
+    return Status::OK();
 }
 
-void Dictionary::LoadStopWordDict() {
+Status Dictionary::LoadStopWordDict() {
     stop_words_ = MakeUnique<DictSegment>(L'\0');
-
+    Status load_status;
     String file = fs::path(conf_dir_) / fs::path(PATH_DIC_STOP).string();
-    LoadDictFile(stop_words_.get(), file, false, "Main Stopwords");
+    load_status = LoadDictFile(stop_words_.get(), file, false, "Main Stopwords");
+    if (!load_status.ok()) {
+        return load_status;
+    }
 
     Vector<String> ext_stopword_dict_files = GetExtStopWordDictionarys();
     if (!ext_stopword_dict_files.empty()) {
         for (const String &ext_stopword_dict_file : ext_stopword_dict_files) {
             std::cout << "[Dict Loading] " << ext_stopword_dict_file << std::endl;
-
             String file = fs::path(conf_dir_) / fs::path(ext_stopword_dict_file).string();
-            LoadDictFile(stop_words_.get(), file, false, "Extra Stopwords");
+            load_status = LoadDictFile(stop_words_.get(), file, false, "Extra Stopwords");
+            if (!load_status.ok()) {
+                return load_status;
+            }
         }
     }
+    return Status::OK();
 }
 
-void Dictionary::LoadQuantifierDict() {
+Status Dictionary::LoadQuantifierDict() {
     quantifier_dict_ = MakeUnique<DictSegment>(L'\0');
     String file = fs::path(conf_dir_) / fs::path(PATH_DIC_QUANTIFIER).string();
-    LoadDictFile(quantifier_dict_.get(), file, false, "Quantifier");
+    Status load_status = LoadDictFile(quantifier_dict_.get(), file, false, "Quantifier");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
-void Dictionary::LoadSurnameDict() {
+Status Dictionary::LoadSurnameDict() {
     surname_dict_ = MakeUnique<DictSegment>(L'\0');
     String file = fs::path(conf_dir_) / fs::path(PATH_DIC_SURNAME).string();
-    LoadDictFile(surname_dict_.get(), file, true, "Surname");
+    Status load_status = LoadDictFile(surname_dict_.get(), file, true, "Surname");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
-void Dictionary::LoadSuffixDict() {
+Status Dictionary::LoadSuffixDict() {
     suffix_dict_ = MakeUnique<DictSegment>(L'\0');
     String file = fs::path(conf_dir_) / fs::path(PATH_DIC_SUFFIX).string();
-    LoadDictFile(suffix_dict_.get(), file, true, "Suffix");
+    Status load_status = LoadDictFile(suffix_dict_.get(), file, true, "Suffix");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
-void Dictionary::LoadPrepDict() {
+Status Dictionary::LoadPrepDict() {
     prep_dict_ = MakeUnique<DictSegment>(L'\0');
     String file = fs::path(conf_dir_) / fs::path(PATH_DIC_PREP).string();
-    LoadDictFile(prep_dict_.get(), file, true, "Preposition");
+    Status load_status = LoadDictFile(prep_dict_.get(), file, true, "Preposition");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
 void Dictionary::ParseProperties(const String &content) {
