@@ -143,8 +143,14 @@ UniquePtr<TableEntry> TableEntry::Clone(TableMeta *meta) const {
             ret->index_meta_map_.AddNewMetaNoLock(index_name, index_meta->Clone(ret.get()));
         }
     }
+    {
+        ret->SetCompactionAlg(
+            MakeUnique<DBTCompactionAlg>(DBT_COMPACTION_M, DBT_COMPACTION_C, DBT_COMPACTION_S, DEFAULT_SEGMENT_CAPACITY, ret.get()));
+        ret->compaction_alg_->Enable({});
+    }
     for (const auto &[segment_id, segment_entry] : segment_map_) {
         ret->segment_map_[segment_id] = segment_entry->Clone(ret.get());
+        ret->compaction_alg_->AddSegment(ret->segment_map_[segment_id].get());
     }
     if (unsealed_segment_.get() != nullptr) {
         ret->unsealed_segment_ = ret->segment_map_[ret->unsealed_id_];
