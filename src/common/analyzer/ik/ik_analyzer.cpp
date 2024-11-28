@@ -14,21 +14,21 @@ import term;
 import status;
 import character_util;
 
-module ik_segmenter;
+module ik_analyzer;
 
 namespace infinity {
 
-IKSegmenter::IKSegmenter(const String &path) : dict_path_(path) {}
+IKAnalyzer::IKAnalyzer(const String &path) : dict_path_(path) {}
 
-IKSegmenter::IKSegmenter(const IKSegmenter &other) : own_dict_(false), dict_(other.dict_) {}
+IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), dict_(other.dict_) {}
 
-IKSegmenter::~IKSegmenter() {
+IKAnalyzer::~IKAnalyzer() {
     if (own_dict_) {
         delete dict_;
     }
 }
 
-Status IKSegmenter::Load() {
+Status IKAnalyzer::Load() {
     context_ = MakeShared<AnalyzeContext>(dict_);
     segmenters_ = LoadSegmenters();
     arbitrator_ = MakeShared<IKArbitrator>();
@@ -41,7 +41,7 @@ Status IKSegmenter::Load() {
     return Status::OK();
 }
 
-Vector<SharedPtr<Segmenter>> IKSegmenter::LoadSegmenters() {
+Vector<SharedPtr<Segmenter>> IKAnalyzer::LoadSegmenters() {
     Vector<SharedPtr<Segmenter>> segmenters_;
     segmenters_.reserve(4);
     segmenters_.push_back(MakeShared<LetterSegmenter>());
@@ -50,7 +50,7 @@ Vector<SharedPtr<Segmenter>> IKSegmenter::LoadSegmenters() {
     return segmenters_;
 }
 
-Lexeme *IKSegmenter::Next() {
+Lexeme *IKAnalyzer::Next() {
     Lexeme *l = nullptr;
     while ((l = context_->GetNextLexeme()) == nullptr) {
         context_->InitCursor();
@@ -72,16 +72,16 @@ Lexeme *IKSegmenter::Next() {
     return l;
 }
 
-void IKSegmenter::Reset() {
+void IKAnalyzer::Reset() {
     context_->Reset();
     for (auto &segmenter : segmenters_) {
         segmenter->Reset();
     }
 }
 
-int IKSegmenter::GetLastUselessCharNum() { return context_->GetLastUselessCharNum(); }
+int IKAnalyzer::GetLastUselessCharNum() { return context_->GetLastUselessCharNum(); }
 
-int IKSegmenter::AnalyzeImpl(const Term &input, void *data, HookType func) {
+int IKAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     unsigned level = 0;
     unsigned offset = 0;
     std::wstring line = CharacterUtil::UTF8ToUTF16(input.text_);

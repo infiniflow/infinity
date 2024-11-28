@@ -2,7 +2,7 @@ module;
 
 #include <fstream>
 
-export module ik_segmenter;
+export module ik_analyzer;
 
 import stl;
 import analyze_context;
@@ -16,7 +16,7 @@ import status;
 
 namespace infinity {
 
-class IKSegmenter : public Analyzer {
+class IKAnalyzer : public Analyzer {
 private:
     String dict_path_;
 
@@ -31,11 +31,11 @@ private:
     SharedPtr<IKArbitrator> arbitrator_;
 
 public:
-    IKSegmenter(const String &path);
+    IKAnalyzer(const String &path);
 
-    IKSegmenter(const IKSegmenter &other);
+    IKAnalyzer(const IKAnalyzer &other);
 
-    ~IKSegmenter();
+    ~IKAnalyzer();
 
     Status Load();
 
