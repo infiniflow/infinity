@@ -27,11 +27,18 @@ if __name__ == "__main__":
         type=str,
         required=False,
     )
+    parser.add_argument(
+        "--use_sudo",
+        action="store_true",
+        default=False,
+        help="Use sudo to run command",
+    )
 
     args = parser.parse_args()
     infinity_path = args.infinity_path
     docker = args.docker
     infinity_dir = args.infinity_dir
+    use_sudo = args.use_sudo
 
     current_path = os.getcwd()
     python_test_dir = current_path + "/python"
@@ -55,6 +62,8 @@ if __name__ == "__main__":
         "not slow",
         f"--infinity_dir={infinity_dir}",
     ]
+    if use_sudo:
+        cmd.append("--use_sudo")
     if docker:
         cmd.append("--docker")
     process = subprocess.Popen(cmd)
