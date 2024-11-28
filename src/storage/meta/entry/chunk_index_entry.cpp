@@ -79,11 +79,11 @@ ChunkIndexEntry::ChunkIndexEntry(const ChunkIndexEntry &other)
 UniquePtr<ChunkIndexEntry> ChunkIndexEntry::Clone(SegmentIndexEntry *segment_index_entry) const {
     auto ret = UniquePtr<ChunkIndexEntry>(new ChunkIndexEntry(*this));
     if (buffer_obj_ != nullptr) {
-        buffer_obj_->SubObjRc();
+        buffer_obj_->AddObjRc();
     }
     for (auto *part_buffer_obj : part_buffer_objs_) {
         if (part_buffer_obj != nullptr) {
-            part_buffer_obj->SubObjRc();
+            part_buffer_obj->AddObjRc();
         }
     }
     ret->segment_index_entry_ = segment_index_entry;

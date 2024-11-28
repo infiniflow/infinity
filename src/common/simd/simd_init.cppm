@@ -39,6 +39,7 @@ export using MaxSimI32BitIPFuncType = i32(*)(const i32 *, const u8 *, SizeT);
 export using MaxSimI64BitIPFuncType = i64(*)(const i64 *, const u8 *, SizeT);
 export using FilterScoresOutputIdsFuncType = u32 * (*)(u32 *, f32, const f32 *, u32);
 export using SearchTop1WithDisF32U32FuncType = void(*)(u32, u32, const f32 *, u32, const f32 *, u32 *, f32 *);
+export using BatchBM25FuncType = void(*)(u32, u32, const f32 *, const f32 *, const f32 *, const u32 *, const u32 *, u32 *, f32 *);
 
 // F32 distance functions
 export F32DistanceFuncType GetL2DistanceFuncPtr();
@@ -83,5 +84,7 @@ export MaxSimI64BitIPFuncType GetMaxSimI64BitIPFuncPtr();
 export FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr();
 // K-means
 export SearchTop1WithDisF32U32FuncType GetSearchTop1WithDisF32U32FuncPtr();
+// Batch BM25
+export BatchBM25FuncType GetBatchBM25FuncPtr();
 
 } // namespace infinity

@@ -24,6 +24,7 @@ import minimum_should_match_iterator;
 import parse_fulltext_options;
 import keyword_iterator;
 import must_first_iterator;
+import batch_or_iterator;
 
 namespace infinity {
 
@@ -554,6 +555,34 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
                 msm_iter = MakeUnique<BlockMaxWandIterator>(std::move(sub_doc_iters));
             } else if (params.minimum_should_match < sub_doc_iters.size()) {
                 msm_iter = MakeUnique<MinimumShouldMatchWrapper<BlockMaxWandIterator>>(std::move(sub_doc_iters), params.minimum_should_match);
+            } else {
+                msm_iter = MakeUnique<AndIterator>(std::move(sub_doc_iters));
+            }
+            if (keyword_iters.empty()) {
+                return msm_iter;
+            } else {
+                keyword_iters.insert(keyword_iters.begin(), std::move(msm_iter));
+                return MakeUnique<MustFirstIterator>(std::move(keyword_iters));
+            }
+        }
+    } else if (is_top_level && all_are_term && params.ft_similarity == FulltextSimilarity::kBM25 && params.early_term_algo == EarlyTermAlgo::kBatch) {
+        if (params.minimum_should_match > sub_doc_iters.size()) {
+            return nullptr;
+        } else if (params.minimum_should_match <= msm_bar) {
+            auto msm_iter = MakeUnique<BatchOrIterator>(std::move(sub_doc_iters));
+            if (keyword_iters.empty()) {
+                return msm_iter;
+            } else {
+                keyword_iters.emplace_back(std::move(msm_iter));
+                return MakeUnique<OrIterator>(std::move(keyword_iters));
+            }
+        } else {
+            // must use minimum_should_match
+            UniquePtr<DocIterator> msm_iter;
+            if (params.minimum_should_match <= 1) {
+                msm_iter = MakeUnique<BatchOrIterator>(std::move(sub_doc_iters));
+            } else if (params.minimum_should_match < sub_doc_iters.size()) {
+                msm_iter = MakeUnique<MinimumShouldMatchWrapper<BatchOrIterator>>(std::move(sub_doc_iters), params.minimum_should_match);
             } else {
                 msm_iter = MakeUnique<AndIterator>(std::move(sub_doc_iters));
             }

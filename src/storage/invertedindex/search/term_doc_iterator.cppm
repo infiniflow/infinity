@@ -85,6 +85,10 @@ public:
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
 
+    [[nodiscard]] Tuple<float, float, float> Get_f1_f2_bm25_common_score() const { return {f1, f2, bm25_common_score_}; }
+
+    void BatchDecodeTo(RowID buffer_start_doc_id, RowID buffer_end_doc_id, u32 *tf_ptr, u32 *doc_len_ptr);
+
     // debug info
     const String *term_ptr_ = nullptr;
     const String *column_name_ptr_ = nullptr;
