@@ -478,8 +478,8 @@ private:
                         early_term_algo = EarlyTermAlgo::kNaive;
                     } else if (iter->second == "true" || iter->second == "bmw") {
                         early_term_algo = EarlyTermAlgo::kBMW;
-                    } else if (iter->second == "bmm") {
-                        early_term_algo = EarlyTermAlgo::kBMM;
+                    } else if (iter->second == "batch") {
+                        early_term_algo = EarlyTermAlgo::kBatch;
                     } else if (iter->second == "compare") {
                         early_term_algo = EarlyTermAlgo::kCompare;
                     } else {

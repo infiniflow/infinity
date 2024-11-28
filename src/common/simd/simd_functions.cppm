@@ -67,6 +67,9 @@ export struct SIMD_FUNCTIONS {
 
     // K-means
     SearchTop1WithDisF32U32FuncType SearchTop1WithDisF32U32_func_ptr_ = GetSearchTop1WithDisF32U32FuncPtr();
+
+    // Batch BM25
+    BatchBM25FuncType BatchBM25_func_ptr_ = GetBatchBM25FuncPtr();
 };
 
 export const SIMD_FUNCTIONS &GetSIMD_FUNCTIONS() {

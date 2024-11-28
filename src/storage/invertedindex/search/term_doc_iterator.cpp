@@ -150,4 +150,18 @@ void TermDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_
     os << '\n';
 }
 
+void TermDocIterator::BatchDecodeTo(const RowID buffer_start_doc_id, const RowID buffer_end_doc_id, u32 *tf_ptr, u32 *doc_len_ptr) {
+    auto iter_doc_id = iter_->DocID();
+    assert((buffer_start_doc_id <= iter_doc_id && iter_doc_id < buffer_end_doc_id));
+    while (iter_doc_id < buffer_end_doc_id) {
+        const auto pos = iter_doc_id - buffer_start_doc_id;
+        const auto tf = iter_->GetCurrentTF();
+        const auto doc_len = column_length_reader_->GetColumnLength(iter_doc_id);
+        tf_ptr[pos] = tf;
+        doc_len_ptr[pos] = doc_len;
+        iter_doc_id = iter_->SeekDoc(iter_doc_id + 1);
+    }
+    doc_id_ = iter_doc_id;
+}
+
 } // namespace infinity
