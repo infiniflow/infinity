@@ -89,3 +89,7 @@ def test_docker(docker_cluster: DockerInfinityCluster):
     print("remove nodes")
 
     cluster.clear()
+
+# n1 admin, n2 admin, n2 connect n1 as follower-> failed, n2 connect n1 as learner-> failed
+# n1 leader, n2 follower, n3 connect n2 as follower-> failed, n3 connect n2 as learner-> failed
+#

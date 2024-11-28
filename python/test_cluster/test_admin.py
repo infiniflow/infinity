@@ -47,6 +47,3 @@ def test_admin_fail0(cluster: InfinityCluster):
         logger.info(e.value)
 
         cluster.remove_node("test")
-
-# show catalogs
-# show wal
