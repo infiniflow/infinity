@@ -287,6 +287,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Peer send timeout
+        i64 peer_send_timeout = DEFAULT_PEER_SEND_TIMEOUT;
+        UniquePtr<IntegerOption> peer_send_timeout_option = MakeUnique<IntegerOption>(PEER_SEND_TIMEOUT_OPTION_NAME, peer_send_timeout, 10000, 0);
+        status = global_options_.AddOption(std::move(peer_send_timeout_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Client pool size
         i64 connection_pool_size = 256;
         UniquePtr<IntegerOption> connection_pool_size_option =
