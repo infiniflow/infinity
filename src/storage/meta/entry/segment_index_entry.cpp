@@ -117,6 +117,7 @@ SegmentIndexEntry::~SegmentIndexEntry() = default;
 
 UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Clone(TableIndexEntry *table_index_entry) const {
     auto ret = UniquePtr<SegmentIndexEntry>(new SegmentIndexEntry(*this));
+    ret->table_index_entry_ = table_index_entry;
     std::shared_lock lock(rw_locker_);
     for (const auto &chunk_index_entry : chunk_index_entries_) {
         ret->chunk_index_entries_.emplace_back(chunk_index_entry->Clone(ret.get()));

@@ -75,16 +75,17 @@ class TestAlter:
         part2()
 
     @pytest.mark.parametrize(
-        "config, sleep, flush_mid",
+        "flush, flush_mid",
         [
-            ("test/data/config/restart_test/test_alter/1.toml", 0, False),
-            ("test/data/config/restart_test/test_alter/2.toml", 2, False),
-            ("test/data/config/restart_test/test_alter/2.toml", 2, True),
+            (False, False),
+            (True, False),
+            (True, True),
         ],
     )
     def test_alter_complex(
-        self, infinity_runner: InfinityRunner, config: str, sleep: int, flush_mid: bool
+        self, infinity_runner: InfinityRunner, flush: bool, flush_mid: bool
     ):
+        config = "test/data/config/restart_test/test_alter/1.toml"
         table_name = "test_alter2"
 
         infinity_runner.clear()
@@ -111,9 +112,8 @@ class TestAlter:
 
             table_obj.insert([{"c1": 1, "c2": 2, "c3": "test"}])
 
-            if sleep > 0 and flush_mid:
-                print(f"sleep {sleep} seconds")
-                time.sleep(sleep)  # wait for delta log flush
+            if flush and flush_mid:
+                infinity_obj.flush_delta()
 
             res = table_obj.add_columns({"c4": {"type": "varchar", "default": "tttt"}})
             assert res.error_code == ErrorCode.OK
@@ -129,9 +129,8 @@ class TestAlter:
             res = table_obj.add_columns({"c5": {"type": "int", "default": 0}})
             assert res.error_code == ErrorCode.OK
 
-            if sleep > 0:
-                print(f"sleep {sleep} seconds")
-                time.sleep(sleep)  # wait for delta log flush
+            if flush:
+                infinity_obj.flush_delta()
 
         @decorator
         def part2(infinity_obj):
@@ -160,6 +159,16 @@ class TestAlter:
             )
             dropped_column_dirs = pathlib.Path("/var/infinity/data").rglob("1.col")
             assert len(list(dropped_column_dirs)) == 0
+
+            res = table_obj.list_indexes()
+            assert len(res.index_names) == 1
+
+            data_dict, _ = (
+                table_obj.output(["c1"])
+                .match_text(fields="c3", matching_text="test", topn=1)
+                .to_result()
+            )
+            assert data_dict == {"c1": [1]}
 
             db_obj.drop_table(table_name)
 

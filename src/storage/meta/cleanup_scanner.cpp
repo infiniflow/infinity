@@ -63,6 +63,11 @@ CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, Buffer
 // dropped is true denotes the data file can be cleaned up, or only metadata can be cleaned up
 void CleanupScanner::AddEntry(SharedPtr<BaseEntry> entry, bool dropped) {
     switch (entry->entry_type_) {
+        case EntryType::kTable: {
+            auto *table_entry = static_cast<TableEntry *>(entry.get());
+            table_entry->InvalidateFullTextIndexCache();
+            break;
+        }
         case EntryType::kTableIndex: {
             auto *table_index_entry = static_cast<TableIndexEntry *>(entry.get());
             TableEntry *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
