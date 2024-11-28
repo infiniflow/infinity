@@ -289,6 +289,8 @@ public:
         return fulltext_column_index_cache_->UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
 
+    void InvalidateFullTextIndexCache() { fulltext_column_index_cache_->Invalidate(); }
+
     void InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry);
 
     void InvalidateFullTextSegmentIndexCache(SegmentIndexEntry *segment_index_entry);

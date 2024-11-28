@@ -1410,7 +1410,6 @@ void TableEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     if (this->deleted_) {
         return;
     }
-    fulltext_column_index_cache_->Invalidate();
     for (auto &[segment_id, segment] : segment_map_) {
         segment->Cleanup(info_tracer, dropped);
     }
