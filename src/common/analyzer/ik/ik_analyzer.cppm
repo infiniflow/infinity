@@ -16,20 +16,7 @@ import status;
 
 namespace infinity {
 
-class IKAnalyzer : public Analyzer {
-private:
-    String dict_path_;
-
-    bool own_dict_{};
-
-    Dictionary *dict_{nullptr};
-
-    SharedPtr<AnalyzeContext> context_;
-
-    Vector<SharedPtr<Segmenter>> segmenters_;
-
-    SharedPtr<IKArbitrator> arbitrator_;
-
+export class IKAnalyzer : public Analyzer {
 public:
     IKAnalyzer(const String &path);
 
@@ -39,7 +26,13 @@ public:
 
     Status Load();
 
-    Vector<SharedPtr<Segmenter>> LoadSegmenters();
+protected:
+    int AnalyzeImpl(const Term &input, void *data, HookType func) override;
+
+private:
+    void Init();
+
+    void LoadSegmenters();
 
     Lexeme *Next();
 
@@ -47,7 +40,17 @@ public:
 
     int GetLastUselessCharNum();
 
-protected:
-    int AnalyzeImpl(const Term &input, void *data, HookType func) override;
+private:
+    String dict_path_;
+
+    bool own_dict_{};
+
+    Dictionary *dict_{nullptr};
+
+    UniquePtr<AnalyzeContext> context_;
+
+    Vector<UniquePtr<Segmenter>> segmenters_;
+
+    UniquePtr<IKArbitrator> arbitrator_;
 };
 } // namespace infinity

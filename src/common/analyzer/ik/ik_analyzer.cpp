@@ -20,7 +20,7 @@ namespace infinity {
 
 IKAnalyzer::IKAnalyzer(const String &path) : dict_path_(path) {}
 
-IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), dict_(other.dict_) {}
+IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), dict_(other.dict_) { Init(); }
 
 IKAnalyzer::~IKAnalyzer() {
     if (own_dict_) {
@@ -28,26 +28,28 @@ IKAnalyzer::~IKAnalyzer() {
     }
 }
 
+void IKAnalyzer::Init() {
+    context_ = MakeUnique<AnalyzeContext>(dict_);
+    LoadSegmenters();
+    arbitrator_ = MakeUnique<IKArbitrator>();
+}
+
 Status IKAnalyzer::Load() {
-    context_ = MakeShared<AnalyzeContext>(dict_);
-    segmenters_ = LoadSegmenters();
-    arbitrator_ = MakeShared<IKArbitrator>();
     dict_ = new Dictionary(dict_path_);
     Status load_status = dict_->Load();
     if (!load_status.ok()) {
         return load_status;
     }
     own_dict_ = true;
+    Init();
     return Status::OK();
 }
 
-Vector<SharedPtr<Segmenter>> IKAnalyzer::LoadSegmenters() {
-    Vector<SharedPtr<Segmenter>> segmenters_;
+void IKAnalyzer::LoadSegmenters() {
     segmenters_.reserve(4);
-    segmenters_.push_back(MakeShared<LetterSegmenter>());
-    segmenters_.push_back(MakeShared<CNQuantifierSegmenter>(dict_));
-    segmenters_.push_back(MakeShared<CJKSegmenter>(dict_));
-    return segmenters_;
+    segmenters_.push_back(MakeUnique<LetterSegmenter>());
+    segmenters_.push_back(MakeUnique<CNQuantifierSegmenter>(dict_));
+    segmenters_.push_back(MakeUnique<CJKSegmenter>(dict_));
 }
 
 Lexeme *IKAnalyzer::Next() {
