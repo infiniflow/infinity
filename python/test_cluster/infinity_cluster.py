@@ -271,9 +271,7 @@ class InfinityCluster:
         if self.leader_runner is not None and self.leader_name == node_name:
             self.leader_name = None
             self.leader_runner = None
-        if node_name not in self.runners:
-            raise ValueError(f"Node {node_name} not found in the runners.")
-        runner = self.runners[node_name]
+        runner = self._get_runner(node_name)
         runner.client.set_role_standalone(node_name)
         self.logger.info(f"Set node {node_name} as standalone.")
 
@@ -281,9 +279,7 @@ class InfinityCluster:
         if self.leader_runner is not None and self.leader_name == node_name:
             self.leader_name = None
             self.leader_runner = None
-        if node_name not in self.runners:
-            raise ValueError(f"Node {node_name} not found in the runners.")
-        runner = self.runners[node_name]
+        runner = self._get_runner(node_name)
         runner.client.set_role_admin()
         self.logger.info(f"Set node {node_name} as admin.")
 
@@ -292,20 +288,16 @@ class InfinityCluster:
             raise ValueError(
                 f"Leader {self.leader_runner.node_name} has already been initialized."
             )
-        if leader_name not in self.runners:
-            raise ValueError(f"Leader {leader_name} not found in the runners.")
-        leader_runner = self.runners[leader_name]
+        leader_runner = self._get_runner(leader_name)
         self.leader_name = leader_name
         self.leader_runner = leader_runner
         leader_runner.client.set_role_leader(leader_name)
         self.logger.info(f"Set node {leader_name} as leader.")
 
     def set_follower(self, follower_name: str):
-        if follower_name not in self.runners:
-            raise ValueError(f"Follower {follower_name} not found in the runners")
-        if self.leader_runner is None:
+        if self. is None:
             raise ValueError("Leader has not been initialized.")
-        follower_runner = self.runners[follower_name]
+        follower_runner = self._get_runner(follower_name)
         leader_ip, leader_port = self.leader_addr()
         follower_runner.client.set_role_follower(
             follower_name, f"{leader_ip}:{leader_port}"
@@ -313,11 +305,9 @@ class InfinityCluster:
         self.logger.info(f"Set node {follower_name} as follower.")
 
     def set_learner(self, learner_name: str):
-        if learner_name not in self.runners:
-            raise ValueError(f"Learner {learner_name} not found in the runners")
         if self.leader_runner is None:
             raise ValueError("Learner has not been initialized.")
-        learner_runner = self.runners[learner_name]
+        learner_runner = self._get_runner(learner_name)
         leader_ip, leader_port = self.leader_addr()
         learner_runner.client.set_role_learner(
             learner_name, f"{leader_ip}:{leader_port}"
@@ -325,9 +315,7 @@ class InfinityCluster:
         self.logger.info(f"Set node {learner_name} as learner.")
 
     def client(self, node_name: str) -> infinity_http | None:
-        if node_name not in self.runners:
-            raise ValueError(f"Node {node_name} not found in the runners.")
-        return self.runners[node_name].client
+        return self._get_runner(node_name).client
 
     def leader_addr(self):
         if self.leader_runner is None:
@@ -335,9 +323,7 @@ class InfinityCluster:
         return self.leader_runner.peer_uri()
 
     def remove_node(self, node_name: str, kill: bool = False):
-        if node_name not in self.runners:
-            raise ValueError(f"Node {node_name} not found in the cluster.")
-        runner = self.runners[node_name]
+        runner = self._get_runner(node_name)
         if kill:
             runner.kill()
         else:
@@ -358,9 +344,18 @@ class InfinityCluster:
                 else:
                     break
             else:
-                raise Exception(f"Node {node_name} is still alive after {wait_timeout_sec} seconds.")
+                raise Exception(
+                    f"Node {node_name} is still alive after {wait_timeout_sec} seconds."
+                )
             infinity_leader.remove_node(node_name)
-            self.logger.debug(f"Remove node {node_name} from the cluster because status is {node_info.node_status}.")
+            self.logger.debug(
+                f"Remove node {node_name} from the cluster because status is {node_info.node_status}."
+            )
+
+    def _get_runner(self, node_name: str) -> InfinityRunner:
+        if node_name not in self.runners:
+            raise ValueError(f"Node {node_name} not found in the cluster.")
+        return self.runners[node_name]
 
 
 if __name__ == "__main__":

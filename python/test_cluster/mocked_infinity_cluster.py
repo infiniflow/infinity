@@ -46,9 +46,13 @@ class mocked_http_network(http_network_util):
         cmd = f"ip netns exec {self.ns_name} {cmd}"
         self.logger.debug(f"cmd: {cmd}")
         try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True, check=True
+            )
         except subprocess.CalledProcessError as e:
-            raise InfinityException(error_code=ErrorCode.INFINITY_IS_INITING, error_message=str(e))
+            raise InfinityException(
+                error_code=ErrorCode.INFINITY_IS_INITING, error_message=str(e)
+            )
         if len(result.stdout) == 0:
             return http_result(0, None)
         try:
@@ -191,22 +195,26 @@ class MockInfinityCluster(InfinityCluster):
         super().remove_node(node_name)
 
     def disconnect(self, node_name: str):
-        if node_name not in self.runners:
-            raise ValueError(f"Node {node_name} not found in the cluster.")
-        cur_runner: MockedInfinityRunner = self.runners[node_name]
+        cur_runner: MockedInfinityRunner = self._get_runner(node_name)
         veth_name, veth_br_name = self.__veth_name_pair(cur_runner.ns_name)
         subprocess.run(f"ip link set {veth_br_name} down".split())
         subprocess.run(f"ip link set {veth_br_name} nomaster".split())
 
     def reconnect(self, node_name: str):
-        if node_name not in self.runners:
-            raise ValueError(f"Node {node_name} not found in the cluster.")
-        cur_runner: MockedInfinityRunner = self.runners[node_name]
+        cur_runner: MockedInfinityRunner = self._get_runner(node_name)
         veth_name, veth_br_name = self.__veth_name_pair(cur_runner.ns_name)
-        subprocess.run(
-            f"ip link set {veth_br_name} master {self.bridge_name}".split()
-        )
+        subprocess.run(f"ip link set {veth_br_name} master {self.bridge_name}".split())
         subprocess.run(f"ip link set {veth_br_name} up".split())
+
+    def block_peer_net(self, node_name: str):
+        cur_runner: MockedInfinityRunner = self._get_runner(node_name)
+        peer_ip, peer_port = cur_runner.peer_uri()
+        self._iptables_drop_from(peer_ip, peer_port)
+
+    def restore_peer_net(self, node_name: str):
+        cur_runner: MockedInfinityRunner = self._get_runner(node_name)
+        peer_ip, peer_port = cur_runner.peer_uri()
+        self._iptables_accept_from(peer_ip, peer_port)
 
     def _next_mock_ip(self):
         mock_ip = f"{self.mock_ip_prefix}{self.cur_ip_suffix}/{self.mock_ip_mask}"
@@ -253,15 +261,9 @@ class MockInfinityCluster(InfinityCluster):
             f"ip link add {veth_name} type veth peer name {veth_br_name}".split(),
             check=True,
         )
-        subprocess.run(
-            f"ip link set {veth_name} netns {ns_name}".split(), check=True
-        )
-        subprocess.run(
-            f"ip netns exec {ns_name} ip link set lo up".split(), check=True
-        )
-        subprocess.run(
-            f"ip link set {veth_br_name} master {self.bridge_name}".split()
-        )
+        subprocess.run(f"ip link set {veth_name} netns {ns_name}".split(), check=True)
+        subprocess.run(f"ip netns exec {ns_name} ip link set lo up".split(), check=True)
+        subprocess.run(f"ip link set {veth_br_name} master {self.bridge_name}".split())
         mock_ip = self._next_mock_ip()
         self.logger.info(f"ns_name: {ns_name}, mock_ip: {mock_ip}")
         subprocess.run(
@@ -281,6 +283,18 @@ class MockInfinityCluster(InfinityCluster):
                 )
         mock_ip, mask = mock_ip.split("/")
         return mock_ip
+
+    def _iptables_drop_from(self, ip: str, port: int):
+        subprocess.run(
+            f"sudo ip netns exec {self.bridge_name} iptables -A INPUT -s {ip} -p tcp --dport {port} -j DROP".split(),
+            check=True,
+        )
+
+    def _iptables_accept_from(self, ip: str, port: int):
+        subprocess.run(
+            f"sudo ip netns exec {self.bridge_name} iptables -D INPUT -s {ip} -p tcp --dport {port} -j DROP".split(),
+            check=True,
+        )
 
 
 if __name__ == "__main__":
