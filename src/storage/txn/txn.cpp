@@ -274,6 +274,7 @@ Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef
         return db_status;
     }
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
+    new_table_entry->InitCompactionAlg(begin_ts);
     TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
     new_table_entry->AddColumns(column_defs, txn_table_store);
     auto add_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true /*add_if_found*/);
@@ -293,6 +294,7 @@ Status Txn::DropColumns(TableEntry *table_entry, const Vector<String> &column_na
         return db_status;
     }
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
+    new_table_entry->InitCompactionAlg(begin_ts);
     TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
     new_table_entry->DropColumns(column_names, txn_table_store);
     auto drop_status = db_entry->AddTable(std::move(new_table_entry), txn_id_, begin_ts, txn_mgr_, true /*add_if_found*/);

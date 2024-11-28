@@ -150,7 +150,6 @@ UniquePtr<TableEntry> TableEntry::Clone(TableMeta *meta) const {
     }
     for (const auto &[segment_id, segment_entry] : segment_map_) {
         ret->segment_map_[segment_id] = segment_entry->Clone(ret.get());
-        ret->compaction_alg_->AddSegment(ret->segment_map_[segment_id].get());
     }
     if (unsealed_segment_.get() != nullptr) {
         ret->unsealed_segment_ = ret->segment_map_[ret->unsealed_id_];
