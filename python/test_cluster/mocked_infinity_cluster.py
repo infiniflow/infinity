@@ -34,16 +34,21 @@ class http_result:
 
 
 class mocked_http_network(http_network_util):
-    def __init__(self, ns_name: str, logger: logging.Logger, *args, **kwargs):
+    def __init__(
+        self, ns_name: str, logger: logging.Logger, use_sudo: bool, *args, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.ns_name = ns_name
         self.logger = logger
+        self.use_sudo = use_sudo
 
     def request_inner(self, url, method, header={}, data={}) -> http_result:
         logging.debug("url: " + url)
 
         cmd = convert_request_to_curl(method, header, data, url)
         cmd = f"ip netns exec {self.ns_name} {cmd}"
+        if self.use_sudo:
+            cmd = f"sudo {cmd}"
         self.logger.debug(f"cmd: {cmd}")
         try:
             result = subprocess.run(
@@ -81,10 +86,13 @@ class MockedInfinityRunner(InfinityRunner):
         executable_path: str,
         config_path: str,
         logger: logging.Logger,
+        *,
+        use_sudo: bool = False,
     ):
         self.mock_ip = mock_ip
         self.host_ip = host_ip
         self.ns_name = ns_name
+        self.use_sudo = use_sudo
         super().__init__(node_name, executable_path, config_path, logger=logger)
 
     def init(self, config_path: str | None):
@@ -96,11 +104,13 @@ class MockedInfinityRunner(InfinityRunner):
 
         run_cmd = f"{self.executable_path} --config={self.config_path} 2>&1"
         run_cmd = f"ip netns exec {self.ns_name} {run_cmd}"
+        if self.use_sudo:
+            run_cmd = f"sudo {run_cmd}"
         self.process = subprocess.Popen(run_cmd, shell=True)
         self.check_start()
 
     def add_client(self, http_addr: str):
-        net = mocked_http_network(self.ns_name, self.logger, http_addr)
+        net = mocked_http_network(self.ns_name, self.logger, self.use_sudo, http_addr)
         net.set_retry()
         self.client = infinity_http(net=net)
 
@@ -138,7 +148,9 @@ class MockInfinityCluster(InfinityCluster):
         *,
         minio_params: MinioParams = None,
         test_name: str = None,
+        use_sudo: bool = False,
     ):
+        self.use_sudo = use_sudo
         super().__init__(
             executable_path, minio_params=minio_params, test_name=test_name
         )
@@ -159,17 +171,14 @@ class MockInfinityCluster(InfinityCluster):
         ns_name = cur_runner.ns_name
         veth_name, veth_br_name = self.__veth_name_pair(ns_name)
 
-        subprocess.run(
-            f"ip netns exec {ns_name} ip link set {veth_name} down".split(),
-            check=True,
-        )
-        subprocess.run(f"ip link set {veth_br_name} down".split(), check=True)
-        subprocess.run(f"ip link delete {veth_br_name}".split(), check=True)
-        subprocess.run(f"ip netns delete {ns_name}".split(), check=True)
+        self._run_cmd(f"ip netns exec {ns_name} ip link set {veth_name} down")
+        self._run_cmd(f"ip link set {veth_br_name} down")
+        self._run_cmd(f"ip link delete {veth_br_name}")
+        self._run_cmd(f"ip netns delete {ns_name}")
 
     def clear(self):
-        subprocess.run(f"ip link set {self.bridge_name} down".split(), check=True)
-        subprocess.run(f"ip link delete {self.bridge_name}".split(), check=True)
+        self._run_cmd(f"ip link set {self.bridge_name} down")
+        self._run_cmd(f"ip link delete {self.bridge_name}")
         for node_name in self.runners.keys():
             self._clear_node_ns(node_name)
         super().clear()
@@ -187,6 +196,7 @@ class MockInfinityCluster(InfinityCluster):
             self.executable_path,
             config_path,
             self.logger,
+            use_sudo=self.use_sudo,
         )
         self.runners[node_name] = runner
 
@@ -197,24 +207,32 @@ class MockInfinityCluster(InfinityCluster):
     def disconnect(self, node_name: str):
         cur_runner: MockedInfinityRunner = self._get_runner(node_name)
         veth_name, veth_br_name = self.__veth_name_pair(cur_runner.ns_name)
-        subprocess.run(f"ip link set {veth_br_name} down".split())
-        subprocess.run(f"ip link set {veth_br_name} nomaster".split())
+        self._run_cmd(f"ip link set {veth_br_name} down")
+        self._run_cmd(f"ip link set {veth_br_name} nomaster")
 
     def reconnect(self, node_name: str):
         cur_runner: MockedInfinityRunner = self._get_runner(node_name)
         veth_name, veth_br_name = self.__veth_name_pair(cur_runner.ns_name)
-        subprocess.run(f"ip link set {veth_br_name} master {self.bridge_name}".split())
-        subprocess.run(f"ip link set {veth_br_name} up".split())
+        self._run_cmd(f"ip link set {veth_br_name} master {self.bridge_name}")
+        self._run_cmd(f"ip link set {veth_br_name} up")
 
     def block_peer_net(self, node_name: str):
         cur_runner: MockedInfinityRunner = self._get_runner(node_name)
         peer_ip, peer_port = cur_runner.peer_uri()
-        self._iptables_drop_from(peer_ip, peer_port)
+        ns = cur_runner.ns_name
+        self._run_cmd(
+            f"ip netns exec {ns} iptables -A INPUT -s {peer_ip} -p tcp --dport {peer_port} -j DROP",
+            check=True,
+        )
 
     def restore_peer_net(self, node_name: str):
         cur_runner: MockedInfinityRunner = self._get_runner(node_name)
         peer_ip, peer_port = cur_runner.peer_uri()
-        self._iptables_accept_from(peer_ip, peer_port)
+        ns = cur_runner.ns_name
+        self._run_cmd(
+            f"ip netns exec {ns} iptables -D INPUT -s {peer_ip} -p tcp --dport {peer_port} -j DROP",
+            check=True,
+        )
 
     def _next_mock_ip(self):
         mock_ip = f"{self.mock_ip_prefix}{self.cur_ip_suffix}/{self.mock_ip_mask}"
@@ -227,22 +245,15 @@ class MockInfinityCluster(InfinityCluster):
             exit()
 
     def _prepare_bridge(self):
-        subprocess.run(f"ip link set {self.bridge_name} down".split())
-        subprocess.run(f"ip link delete {self.bridge_name}".split())
-        subprocess.run(
-            f"ip link add {self.bridge_name} type bridge".split(), check=True
-        )
+        self._run_cmd(f"ip link set {self.bridge_name} down", check=False)
+        self._run_cmd(f"ip link delete {self.bridge_name}", check=False)
+        self._run_cmd(f"ip link add {self.bridge_name} type bridge")
         mock_ip = self._next_mock_ip()
-        subprocess.run(
-            f"ip addr add {mock_ip} dev {self.bridge_name}".split(), check=True
-        )
+        self._run_cmd(f"ip addr add {mock_ip} dev {self.bridge_name}")
         self.host_ip, mask = mock_ip.split("/")
-        subprocess.run(f"ip link set {self.bridge_name} up".split(), check=True)
-        subprocess.run(
-            f"iptables -A FORWARD -i {self.bridge_name} -j ACCEPT".split(),
-            check=True,
-        )
-        # subprocess.run(f"sysctl -w net.ipv4.ip_forward=1".split(), check=True)
+        self._run_cmd(f"ip link set {self.bridge_name} up")
+        self._run_cmd(f"iptables -A FORWARD -i {self.bridge_name} -j ACCEPT")
+        # self._run_cmd(f"sysctl -w net.ipv4.ip_forward=1")
 
     def __veth_name_pair(self, ns_name: str):
         veth_name = f"{ns_name}_v"
@@ -252,49 +263,40 @@ class MockInfinityCluster(InfinityCluster):
         return veth_name, veth_br_name
 
     def _connect_to_bridge(self, ns_name: str, ping: bool = False):
-        subprocess.run(f"ip netns delete {ns_name}".split())
-        subprocess.run(f"ip netns add {ns_name}".split(), check=True)
+        self._run_cmd(f"ip netns delete {ns_name}", check=False)
+        self._run_cmd(f"ip netns add {ns_name}")
         veth_name, veth_br_name = self.__veth_name_pair(ns_name)
-        subprocess.run(f"ip link delete {veth_name}".split())
-        subprocess.run(f"ip link delete {veth_br_name}".split())
-        subprocess.run(
-            f"ip link add {veth_name} type veth peer name {veth_br_name}".split(),
-            check=True,
-        )
-        subprocess.run(f"ip link set {veth_name} netns {ns_name}".split(), check=True)
-        subprocess.run(f"ip netns exec {ns_name} ip link set lo up".split(), check=True)
-        subprocess.run(f"ip link set {veth_br_name} master {self.bridge_name}".split())
+        self._run_cmd(f"ip link delete {veth_name}", check=False)
+        self._run_cmd(f"ip link delete {veth_br_name}", check=False)
+        self._run_cmd(f"ip link add {veth_name} type veth peer name {veth_br_name}")
+        self._run_cmd(f"ip link set {veth_name} netns {ns_name}")
+        self._run_cmd(f"ip netns exec {ns_name} ip link set lo up")
+        self._run_cmd(f"ip link set {veth_br_name} master {self.bridge_name}")
         mock_ip = self._next_mock_ip()
         self.logger.info(f"ns_name: {ns_name}, mock_ip: {mock_ip}")
-        subprocess.run(
-            f"ip netns exec {ns_name} ip addr add {mock_ip} dev {veth_name}".split(),
+        self._run_cmd(
+            f"ip netns exec {ns_name} ip addr add {mock_ip} dev {veth_name}",
         )
-        subprocess.run(
-            f"ip netns exec {ns_name} ip link set {veth_name} up".split(),
+        self._run_cmd(
+            f"ip netns exec {ns_name} ip link set {veth_name} up",
             check=True,
         )
-        subprocess.run(f"ip link set {veth_br_name} up".split(), check=True)
+        self._run_cmd(f"ip link set {veth_br_name} up", check=True)
 
         if ping:
             if self.host_ip is not None:
-                subprocess.run(
-                    f"ip netns exec {ns_name} ping -c 1 {self.host_ip}".split(),
+                self._run_cmd(
+                    f"ip netns exec {ns_name} ping -c 1 {self.host_ip}",
                     check=True,
                 )
         mock_ip, mask = mock_ip.split("/")
         return mock_ip
 
-    def _iptables_drop_from(self, ip: str, port: int):
-        subprocess.run(
-            f"sudo ip netns exec {self.bridge_name} iptables -A INPUT -s {ip} -p tcp --dport {port} -j DROP".split(),
-            check=True,
-        )
-
-    def _iptables_accept_from(self, ip: str, port: int):
-        subprocess.run(
-            f"sudo ip netns exec {self.bridge_name} iptables -D INPUT -s {ip} -p tcp --dport {port} -j DROP".split(),
-            check=True,
-        )
+    def _run_cmd(self, cmd: str, **kwargs):
+        if self.use_sudo:
+            cmd = f"sudo {cmd}"
+        self.logger.debug(f"cmd: {cmd}")
+        subprocess.run(cmd.split(), **kwargs)
 
 
 if __name__ == "__main__":

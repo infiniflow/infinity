@@ -295,7 +295,7 @@ class InfinityCluster:
         self.logger.info(f"Set node {leader_name} as leader.")
 
     def set_follower(self, follower_name: str):
-        if self. is None:
+        if self.leader_runner is None:
             raise ValueError("Leader has not been initialized.")
         follower_runner = self._get_runner(follower_name)
         leader_ip, leader_port = self.leader_addr()
