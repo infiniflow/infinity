@@ -10,6 +10,12 @@ http_port               = 24821
 client_port             = 24817
 connection_pool_size    = 128
 
+peer_retry_delay         = 1000
+peer_retry_num           = 2
+peer_connect_timeout     = 2000
+peer_recv_timeout        = 2000
+peer_send_timeout        = 2000
+
 [log]
 log_filename            = "infinity.log"
 log_dir                 = "/var/infinity/log"

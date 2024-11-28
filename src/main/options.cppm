@@ -160,8 +160,13 @@ export enum class GlobalOptionIndex : i8 {
     kObjectStorageAccessKey = 44,
     kObjectStorageSecretKey = 45,
     kObjectStorageHttps = 46,
+    kPeerRetryDelay = 47,
+    kPeerRetryNum = 48,
+    kPeerConnectTimeout = 49,
+    kPeerRecvTimeout = 50,
+    kPeerSendTimeout = 51,
 
-    kInvalid = 47,
+    kInvalid = 52,
 };
 
 export struct GlobalOptions {

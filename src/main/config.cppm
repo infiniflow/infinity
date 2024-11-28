@@ -69,6 +69,12 @@ public:
     i64 ConnectionPoolSize();
     i64 PeerServerConnectionPoolSize();
 
+    i64 PeerRetryDelay();
+    i64 PeerRetryNum();
+    i64 PeerConnectTimeout();
+    i64 PeerRecvTimeout();
+    i64 PeerSendTimeout();
+
     // Log
     String LogFileName();
     String LogDir();

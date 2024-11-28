@@ -59,6 +59,8 @@ public:
 
 private:
     void Process();
+    void Call(std::function<void()> call_func);
+
     void Register(RegisterPeerTask *peer_task);
     void Unregister(UnregisterPeerTask *peer_task);
     void HeartBeat(HeartBeatPeerTask *peer_task);
