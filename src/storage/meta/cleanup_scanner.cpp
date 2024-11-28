@@ -34,7 +34,21 @@ import chunk_index_entry;
 
 namespace infinity {
 
+void CleanupInfoTracer::ResetInfo(TxnTimeStamp cleanup_ts) {
+    std::scoped_lock lock(mutex_);
+
+    cleanup_ts_ = cleanup_ts;
+    cleanup_info_.clear();
+}
+
+void CleanupInfoTracer::AddCleanupInfo(String path) {
+    std::scoped_lock lock(mutex_);
+    cleanup_info_.emplace_back(std::move(path));
+}
+
 String CleanupInfoTracer::GetCleanupInfo() const {
+    std::scoped_lock lock(mutex_);
+
     String info;
     info += fmt::format("Cleanup ts: {}\n", cleanup_ts_);
     for (const auto &path : cleanup_info_) {

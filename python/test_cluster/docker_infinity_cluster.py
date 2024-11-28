@@ -195,6 +195,7 @@ class DockerInfinityCluster(InfinityCluster):
 
         try:
             self.minio_container = docker_client.containers.get(container_name)
+            self.minio_container.start()
         except docker.errors.NotFound:
             self.minio_container = docker_client.containers.run(
                 image=minio_image_name,
