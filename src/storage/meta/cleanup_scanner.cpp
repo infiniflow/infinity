@@ -62,34 +62,32 @@ CleanupScanner::CleanupScanner(Catalog *catalog, TxnTimeStamp visible_ts, Buffer
 
 // dropped is true denotes the data file can be cleaned up, or only metadata can be cleaned up
 void CleanupScanner::AddEntry(SharedPtr<BaseEntry> entry, bool dropped) {
-    if (dropped) {
-        switch (entry->entry_type_) {
-            case EntryType::kTable: {
-                auto *table_entry = static_cast<TableEntry *>(entry.get());
-                table_entry->InvalidateFullTextIndexCache();
-                break;
-            }
-            case EntryType::kTableIndex: {
-                auto *table_index_entry = static_cast<TableIndexEntry *>(entry.get());
-                TableEntry *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-                table_entry->InvalidateFullTextIndexCache(table_index_entry);
-                break;
-            }
-            case EntryType::kSegmentIndex: {
-                auto *segment_index_entry = static_cast<SegmentIndexEntry *>(entry.get());
-                TableEntry *table_entry = segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry();
-                table_entry->InvalidateFullTextSegmentIndexCache(segment_index_entry);
-                break;
-            }
-            case EntryType::kChunkIndex: {
-                auto *chunk_index_entry = static_cast<ChunkIndexEntry *>(entry.get());
-                SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
-                TableEntry *table_entry = segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry();
-                table_entry->InvalidateFullTextChunkIndexCache(chunk_index_entry);
-                break;
-            }
-            default: {
-            }
+    switch (entry->entry_type_) {
+        case EntryType::kTable: {
+            auto *table_entry = static_cast<TableEntry *>(entry.get());
+            table_entry->InvalidateFullTextIndexCache();
+            break;
+        }
+        case EntryType::kTableIndex: {
+            auto *table_index_entry = static_cast<TableIndexEntry *>(entry.get());
+            TableEntry *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+            table_entry->InvalidateFullTextIndexCache(table_index_entry);
+            break;
+        }
+        case EntryType::kSegmentIndex: {
+            auto *segment_index_entry = static_cast<SegmentIndexEntry *>(entry.get());
+            TableEntry *table_entry = segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry();
+            table_entry->InvalidateFullTextSegmentIndexCache(segment_index_entry);
+            break;
+        }
+        case EntryType::kChunkIndex: {
+            auto *chunk_index_entry = static_cast<ChunkIndexEntry *>(entry.get());
+            SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
+            TableEntry *table_entry = segment_index_entry->table_index_entry()->table_index_meta()->GetTableEntry();
+            table_entry->InvalidateFullTextChunkIndexCache(chunk_index_entry);
+            break;
+        }
+        default: {
         }
     }
     entries_.emplace_back(std::move(entry), dropped);

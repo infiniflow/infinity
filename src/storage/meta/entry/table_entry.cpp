@@ -110,7 +110,7 @@ TableEntry::TableEntry(bool is_delete,
     : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
       table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), table_comment_(std::move(table_comment)), columns_(columns),
       next_column_id_(next_column_id), table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id),
-      fulltext_column_index_cache_(MakeShared<TableIndexReaderCache>(this)) {
+      fulltext_column_index_cache_(this) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -124,11 +124,10 @@ TableEntry::TableEntry(bool is_delete,
 TableEntry::TableEntry(const TableEntry &other)
     : BaseEntry(other), table_meta_(other.table_meta_), table_entry_dir_(other.table_entry_dir_), table_name_(other.table_name_),
       table_comment_(other.table_comment_), columns_(other.columns_), next_column_id_(other.next_column_id_),
-      table_entry_type_(other.table_entry_type_) {
+      table_entry_type_(other.table_entry_type_), fulltext_column_index_cache_(this) {
     row_count_ = other.row_count_.load();
     unsealed_id_ = other.unsealed_id_;
     next_segment_id_ = other.next_segment_id_.load();
-    fulltext_column_index_cache_ = other.fulltext_column_index_cache_;
 }
 
 UniquePtr<TableEntry> TableEntry::Clone(TableMeta *meta) const {
@@ -1444,7 +1443,12 @@ Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
     return res;
 }
 
-IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_->GetIndexReader(txn); }
+IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
+
+void TableEntry::InvalidateFullTextIndexCache() { 
+    LOG_DEBUG(fmt::format("Invalidate fulltext index cache: table_name: {}", *table_name_));
+    fulltext_column_index_cache_.Invalidate();
+}
 
 void TableEntry::InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry) {
     const IndexBase *index_base = table_index_entry->index_base();
@@ -1452,7 +1456,7 @@ void TableEntry::InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry
     String column_name = index_base->column_name();
     LOG_DEBUG(fmt::format("Invalidate fulltext index cache: {}, column_name: {}, table_name: {}", index_name, column_name, *table_name_));
     ColumnID column_id = GetColumnIdByName(column_name);
-    fulltext_column_index_cache_->InvalidateColumn(column_id, column_name);
+    fulltext_column_index_cache_.InvalidateColumn(column_id, column_name);
 }
 
 void TableEntry::InvalidateFullTextSegmentIndexCache(SegmentIndexEntry *segment_index_entry) {
@@ -1467,7 +1471,7 @@ void TableEntry::InvalidateFullTextSegmentIndexCache(SegmentIndexEntry *segment_
                           *table_name_,
                           segment_id));
     ColumnID column_id = GetColumnIdByName(column_name);
-    fulltext_column_index_cache_->InvalidateSegmentColumn(column_id, segment_id);
+    fulltext_column_index_cache_.InvalidateSegmentColumn(column_id, segment_id);
 }
 
 void TableEntry::InvalidateFullTextChunkIndexCache(ChunkIndexEntry *chunk_index_entry) {
@@ -1485,7 +1489,7 @@ void TableEntry::InvalidateFullTextChunkIndexCache(ChunkIndexEntry *chunk_index_
                           segment_id,
                           chunk_id));
     ColumnID column_id = GetColumnIdByName(column_name);
-    fulltext_column_index_cache_->InvalidateChunkColumn(column_id, segment_id, chunk_id);
+    fulltext_column_index_cache_.InvalidateChunkColumn(column_id, segment_id, chunk_id);
 }
 
 Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {

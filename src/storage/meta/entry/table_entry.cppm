@@ -286,10 +286,10 @@ public:
     IndexReader GetFullTextIndexReader(Txn *txn);
 
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
-        return fulltext_column_index_cache_->UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
+        return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
 
-    void InvalidateFullTextIndexCache() { fulltext_column_index_cache_->Invalidate(); }
+    void InvalidateFullTextIndexCache();
 
     void InvalidateFullTextIndexCache(TableIndexEntry *table_index_entry);
 
@@ -322,7 +322,7 @@ private:
     Atomic<SegmentID> next_segment_id_{};
 
     // for full text search cache
-    SharedPtr<TableIndexReaderCache> fulltext_column_index_cache_;
+    TableIndexReaderCache fulltext_column_index_cache_;
 
     TxnTimeStamp max_commit_ts_ = 0;
 
