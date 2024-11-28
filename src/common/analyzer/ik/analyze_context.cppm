@@ -15,9 +15,9 @@ namespace infinity {
 
 export class AnalyzeContext {
 public:
-    static const int BUFF_SIZE = 4096;
+    static constexpr int BUFF_SIZE = 4096;
 
-    static const int BUFF_EXHAUST_CRITICAL = 100;
+    static constexpr int BUFF_EXHAUST_CRITICAL = 100;
 
     Vector<wchar_t> segment_buff_;
 
@@ -53,7 +53,7 @@ public:
 
     int GetBufferOffset() const { return buff_offset_; }
 
-    int FillBuffer(std::wifstream &reader);
+    int FillBuffer(std::wstring &text);
 
     void InitCursor();
 

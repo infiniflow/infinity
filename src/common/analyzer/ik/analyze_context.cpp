@@ -18,8 +18,6 @@ module analyze_context;
 
 namespace infinity {
 AnalyzeContext::AnalyzeContext(Dictionary *dict) : dict_(dict) {
-    segment_buff_.resize(BUFF_SIZE);
-    char_types_.resize(BUFF_SIZE);
     results_ = List<Lexeme *>();
     buff_offset_ = 0;
     cursor_ = 0;
@@ -27,21 +25,12 @@ AnalyzeContext::AnalyzeContext(Dictionary *dict) : dict_(dict) {
     available_ = 0;
 }
 
-int AnalyzeContext::FillBuffer(std::wifstream &reader) {
-    int read_count = 0;
-    if (buff_offset_ == 0) {
-        reader.read(&segment_buff_[0], BUFF_SIZE);
-        read_count = reader.gcount();
-        last_useless_char_num_ = 0;
-    } else {
-        int offset = available_ - cursor_;
-        if (offset > 0) {
-            std::copy(segment_buff_.begin() + cursor_, segment_buff_.begin() + available_, segment_buff_.begin());
-            read_count = offset;
-        }
-        reader.read(&segment_buff_[offset], BUFF_SIZE - offset);
-        read_count += reader.gcount();
-    }
+int AnalyzeContext::FillBuffer(std::wstring &text) {
+    cursor_ = 0;
+    int read_count = text.size();
+    segment_buff_.assign(text.begin(), text.end());
+    char_types_.resize(segment_buff_.size());
+    last_useless_char_num_ = 0;
     available_ = read_count;
     cursor_ = 0;
     return read_count;

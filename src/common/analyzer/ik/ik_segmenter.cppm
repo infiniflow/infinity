@@ -30,8 +30,6 @@ private:
 
     SharedPtr<IKArbitrator> arbitrator_;
 
-    std::wifstream input_;
-
 public:
     IKSegmenter(const String &path);
 

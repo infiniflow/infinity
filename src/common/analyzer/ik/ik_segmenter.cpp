@@ -53,23 +53,17 @@ Vector<SharedPtr<Segmenter>> IKSegmenter::LoadSegmenters() {
 Lexeme *IKSegmenter::Next() {
     Lexeme *l = nullptr;
     while ((l = context_->GetNextLexeme()) == nullptr) {
-        int available = context_->FillBuffer(input_);
-        if (available <= 0) {
-            context_->Reset();
-            return nullptr;
-        } else {
-            context_->InitCursor();
-            do {
-                for (auto &segmenter : segmenters_) {
-                    segmenter->Analyze(context_.get());
-                }
-                if (context_->NeedRefillBuffer()) {
-                    break;
-                }
-            } while (context_->MoveCursor());
+        context_->InitCursor();
+        do {
             for (auto &segmenter : segmenters_) {
-                segmenter->Reset();
+                segmenter->Analyze(context_.get());
             }
+            if (context_->NeedRefillBuffer()) {
+                break;
+            }
+        } while (context_->MoveCursor());
+        for (auto &segmenter : segmenters_) {
+            segmenter->Reset();
         }
         arbitrator_->Process(context_.get(), true);
         context_->OutputToResult();
@@ -90,6 +84,8 @@ int IKSegmenter::GetLastUselessCharNum() { return context_->GetLastUselessCharNu
 int IKSegmenter::AnalyzeImpl(const Term &input, void *data, HookType func) {
     unsigned level = 0;
     unsigned offset = 0;
+    std::wstring line = CharacterUtil::UTF8ToUTF16(input.text_);
+    context_->FillBuffer(line);
     Lexeme *lexeme = nullptr;
     while ((lexeme = Next()) != nullptr) {
         std::wstring text = lexeme->GetLexemeText();
