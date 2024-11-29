@@ -94,6 +94,8 @@ Pair<u32, const f32 *> IVF_Centroids_Storage::GetCentroidDataForMetric(const Knn
 
 // IVF_Index_Storage
 
+SizeT IVF_Index_Storage::MemoryUsed() const { return ivf_centroids_storage_.MemoryUsed() + ivf_parts_storage_->MemoryUsed(); }
+
 void IVF_Index_Storage::Save(LocalFileHandle &file_handle) const {
     file_handle.Append(&row_count_, sizeof(row_count_));
     file_handle.Append(&embedding_count_, sizeof(embedding_count_));
@@ -227,10 +229,10 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset start_segment_off
                                   ivf_centroids_storage_.data(),
                                   part_ids.data());
     for (u32 i = 0; i < embedding_num; ++i) {
-        ivf_parts_storage_->AppendOneEmbedding(part_ids[i],
-                                               embedding_ptr + i * embedding_dimension_,
-                                               start_segment_offset + i,
-                                               &ivf_centroids_storage_);
+        ivf_parts_storage_->AppendOneEmbeddingWithStat(part_ids[i],
+                                                       embedding_ptr + i * embedding_dimension_,
+                                                       start_segment_offset + i,
+                                                       &ivf_centroids_storage_);
     }
     embedding_count_ += embedding_num;
     row_count_ += embedding_num;
@@ -252,7 +254,10 @@ void IVF_Index_Storage::AddEmbeddingBatchT(const SegmentOffset *segment_offset_p
                                   ivf_centroids_storage_.data(),
                                   part_ids.data());
     for (u32 i = 0; i < embedding_num; ++i) {
-        ivf_parts_storage_->AppendOneEmbedding(part_ids[i], embedding_ptr + i * embedding_dimension_, segment_offset_ptr[i], &ivf_centroids_storage_);
+        ivf_parts_storage_->AppendOneEmbeddingWithStat(part_ids[i],
+                                                       embedding_ptr + i * embedding_dimension_,
+                                                       segment_offset_ptr[i],
+                                                       &ivf_centroids_storage_);
     }
     embedding_count_ += embedding_num;
     row_count_ += embedding_num;
@@ -274,7 +279,10 @@ void IVF_Index_Storage::AddMultiVectorT(const SegmentOffset segment_offset,
                                   ivf_centroids_storage_.data(),
                                   part_ids.data());
     for (u32 i = 0; i < embedding_num; ++i) {
-        ivf_parts_storage_->AppendOneEmbedding(part_ids[i], multi_vector_ptr + i * embedding_dimension_, segment_offset, &ivf_centroids_storage_);
+        ivf_parts_storage_->AppendOneEmbeddingWithStat(part_ids[i],
+                                                       multi_vector_ptr + i * embedding_dimension_,
+                                                       segment_offset,
+                                                       &ivf_centroids_storage_);
     }
     embedding_count_ += embedding_num;
     ++row_count_;

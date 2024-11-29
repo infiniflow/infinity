@@ -190,6 +190,7 @@ void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
         TxnTableStore *txn_table_store = dump_txn->GetTxnTableStore(table_entry);
         SizeT dump_size = 0;
         table_index_entry->MemIndexDump(dump_txn, txn_table_store, false /*spill*/, &dump_size);
+        LOG_TRACE(fmt::format("Dump size = {}", dump_size));
 
         txn_mgr_->CommitTxn(dump_txn);
 
