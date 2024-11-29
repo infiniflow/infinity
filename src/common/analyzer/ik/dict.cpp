@@ -12,6 +12,7 @@ import ik_dict_segment;
 import hit;
 import stl;
 import status;
+import character_util;
 
 namespace fs = std::filesystem;
 
@@ -88,13 +89,13 @@ void Dictionary::WalkFileTree(Vector<String> &files, const String &path_str) {
 
 Status Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool critical, const String &name) {
     fs::path file(file_path);
-    std::wifstream is(file);
+    std::ifstream is(file);
     if (!is.is_open()) {
         return Status::InvalidAnalyzerFile(file_path);
     }
-
-    std::wstring word;
-    while (std::getline(is, word)) {
+    std::string line;
+    while (std::getline(is, line)) {
+        std::wstring word = CharacterUtil::UTF8ToUTF16(line);
         if (!word.empty() && word[0] == L'\uFEFF') {
             word = word.substr(1);
         }

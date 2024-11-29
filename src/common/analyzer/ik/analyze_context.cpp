@@ -105,14 +105,12 @@ void AnalyzeContext::OutputSingleCJK(int index) {
 }
 
 Lexeme *AnalyzeContext::GetNextLexeme() {
-    Lexeme *result = results_.front();
-    results_.pop_front();
-    while (result != nullptr) {
+    Lexeme *result = nullptr;
+    while (!results_.empty()) {
+        result = results_.front();
+        results_.pop_front();
         Compound(result);
-        if (dict_->IsStopWord(segment_buff_, result->GetBegin(), result->GetLength())) {
-            result = results_.front();
-            results_.pop_front();
-        } else {
+        if (!dict_->IsStopWord(segment_buff_, result->GetBegin(), result->GetLength())) {
             result->SetLexemeText(
                 std::wstring(segment_buff_.begin() + result->GetBegin(), segment_buff_.begin() + result->GetBegin() + result->GetLength()));
             break;
