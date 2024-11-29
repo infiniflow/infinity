@@ -27,6 +27,12 @@ def pytest_addoption(parser):
         help="Path to infinity directory. For local test, $pwd is ok",
     )
     parser.addoption("--docker", action="store_true", default=False)
+    parser.addoption(
+        "--use_sudo",
+        action="store_true",
+        default=False,
+        help="Use sudo to run command",
+    )
 
 
 def pytest_configure(config):
@@ -52,6 +58,8 @@ def pytest_generate_tests(metafunc):
     minio_params = MinioParams(minio_dir, minio_port)
 
     infinity_dir = metafunc.config.getoption("infinity_dir")
+    use_sudo = metafunc.config.getoption("use_sudo")
+
     if len(infinity_dir) == 0:
         # raise ValueError("Please provide a valid infinity_dir")
         pass
@@ -74,6 +82,9 @@ def pytest_generate_tests(metafunc):
         metafunc.parametrize("cluster", [infinity_cluster])
     elif "mock_cluster" in metafunc.fixturenames:
         mock_infinity_cluster = MockInfinityCluster(
-            infinity_path, minio_params=minio_params, test_name=test_name
+            infinity_path,
+            minio_params=minio_params,
+            test_name=test_name,
+            use_sudo=use_sudo,
         )
         metafunc.parametrize("mock_cluster", [mock_infinity_cluster])

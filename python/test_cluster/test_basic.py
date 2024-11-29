@@ -57,6 +57,10 @@ def test_mock(mock_cluster: MockInfinityCluster):
         time.sleep(0.1)
         cluster.reconnect("node2")
 
+        cluster.block_peer_net("node2")
+        time.sleep(0.1)
+        cluster.restore_peer_net("node2")
+
         time.sleep(1)
 
         cluster.remove_node("node2")
