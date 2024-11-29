@@ -74,6 +74,21 @@ client_port              = 23817
 # The maximum number of connections. Defaults to 256.
 # Range: [1, 65536]
 connection_pool_size     = 128
+# The IP address of the Infinity peer server to be accessed by a peer node
+peer_ip                  = "0.0.0.0"
+# The port of the Infinity peer server to be accessed by a peer node
+peer_port                = 23850
+
+# The delay time for reconnecting to the Infinity peer server after a failed connection
+peer_retry_delay         = 0
+# The maximum number of reconnection attempts to the Infinity peer server after a failed connection
+peer_retry_count           = 0
+# Timeout for connecting to the Infinity peer server
+peer_connect_timeout     = 2000
+# Timeout for the Infinity peer server to receive data
+peer_recv_timeout        = 0
+# Timeout for the Infinity peer server to send data
+peer_send_timeout        = 0
 
 # Log configuration
 [log]
