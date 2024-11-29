@@ -55,7 +55,7 @@ def test_leader(cluster : InfinityCluster):
 def test_leader_failed(cluster : InfinityCluster):
     '''
     leader can't do:
-    remove it self from the cluster
+    remove itself from the cluster
     switch directly to follower or learner
     '''
     with cluster:
