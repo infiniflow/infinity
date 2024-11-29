@@ -13,6 +13,7 @@ import arbitrator;
 import term;
 import status;
 import character_util;
+import third_party;
 
 module ik_analyzer;
 
@@ -50,13 +51,6 @@ void IKAnalyzer::LoadSegmenters() {
     segmenters_.push_back(MakeUnique<LetterSegmenter>());
     segmenters_.push_back(MakeUnique<CNQuantifierSegmenter>(dict_));
     segmenters_.push_back(MakeUnique<CJKSegmenter>(dict_));
-}
-
-Lexeme *IKAnalyzer::Next() {
-    Lexeme *l = context_->GetNextLexeme();
-    while (l == nullptr) {
-    }
-    return l;
 }
 
 void IKAnalyzer::Reset() {

@@ -168,7 +168,7 @@ Hit *Dictionary::MatchInQuantifierDict(const Vector<wchar_t> &char_array, int be
 }
 
 Hit *Dictionary::MatchWithHit(const Vector<wchar_t> &char_array, int current_index, Hit *matched_hit) {
-    DictSegment *ds = matched_hit->getMatchedDictSegment();
+    DictSegment *ds = matched_hit->GetMatchedDictSegment();
     return ds->Match(char_array, current_index, 1, matched_hit);
 }
 

@@ -80,7 +80,7 @@ public:
     std::wstring GetLexemeText() const { return lexeme_text_; }
 
     void SetLexemeText(const std::wstring &lexeme_text) {
-        if (lexeme_text_.empty()) {
+        if (lexeme_text.empty()) {
             lexeme_text_ = L"";
             length_ = 0;
         } else {

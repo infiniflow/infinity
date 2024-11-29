@@ -34,8 +34,6 @@ private:
 
     void LoadSegmenters();
 
-    Lexeme *Next();
-
     void Reset();
 
     int GetLastUselessCharNum();
