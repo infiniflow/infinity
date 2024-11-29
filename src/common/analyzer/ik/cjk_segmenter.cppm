@@ -18,9 +18,9 @@ public:
 
     List<Hit *> tmp_hits_;
 
-    Dictionary *dict_;
+    Dictionary *dict_{nullptr};
 
-    CJKSegmenter();
+    CJKSegmenter(Dictionary *dict);
 
     void Analyze(AnalyzeContext *context) override;
 

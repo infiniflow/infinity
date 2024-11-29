@@ -15,9 +15,9 @@ namespace infinity {
 
 export class AnalyzeContext {
 public:
-    static const int BUFF_SIZE = 4096;
+    static constexpr int BUFF_SIZE = 4096;
 
-    static const int BUFF_EXHAUST_CRITICAL = 100;
+    static constexpr int BUFF_EXHAUST_CRITICAL = 100;
 
     Vector<wchar_t> segment_buff_;
 
@@ -35,13 +35,13 @@ public:
 
     QuickSortSet org_lexemes_;
 
-    HashMap<int, LexemePath *> path_map_;
+    HashMap<int, UniquePtr<LexemePath>> path_map_;
 
     List<Lexeme *> results_;
 
-    Dictionary *dict_;
+    Dictionary *dict_{nullptr};
 
-    AnalyzeContext();
+    AnalyzeContext(Dictionary *dict);
 
     int GetCursor() const { return cursor_; }
 
@@ -53,15 +53,15 @@ public:
 
     int GetBufferOffset() const { return buff_offset_; }
 
-    int FillBuffer(std::wifstream &reader);
+    int FillBuffer(std::wstring &text);
 
     void InitCursor();
 
     bool MoveCursor();
 
-    void LockBuffer(const std::wstring &segmenterName) { buff_locker_.insert(segmenterName); }
+    void LockBuffer(const std::wstring &segmenter_name) { buff_locker_.insert(segmenter_name); }
 
-    void UnlockBuffer(const std::wstring &segmenterName) { buff_locker_.erase(segmenterName); }
+    void UnlockBuffer(const std::wstring &segmenter_name) { buff_locker_.erase(segmenter_name); }
 
     bool IsBufferLocked() const { return !buff_locker_.empty(); }
 

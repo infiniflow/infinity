@@ -1,6 +1,5 @@
 module;
 
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -12,29 +11,33 @@ module ik_dict;
 import ik_dict_segment;
 import hit;
 import stl;
+import status;
+import character_util;
 
 namespace fs = std::filesystem;
 
 namespace infinity {
 
-const String PATH_DIC_MAIN = "main.dic";
-const String PATH_DIC_SURNAME = "surname.dic";
-const String PATH_DIC_QUANTIFIER = "quantifier.dic";
-const String PATH_DIC_SUFFIX = "suffix.dic";
-const String PATH_DIC_PREP = "preposition.dic";
-const String PATH_DIC_STOP = "stopword.dic";
-const String FILE_NAME = "IKAnalyzer.cfg.xml";
-const String EXT_DICT = "ext_dict";
-const String EXT_STOP = "ext_stopwords";
+const String PATH_DIC_MAIN = "ik/main.dic";
+const String PATH_DIC_SURNAME = "ik/surname.dic";
+const String PATH_DIC_QUANTIFIER = "ik/quantifier.dic";
+const String PATH_DIC_SUFFIX = "ik/suffix.dic";
+const String PATH_DIC_PREP = "ik/preposition.dic";
+const String PATH_DIC_STOP = "ik/stopword.dic";
+const String FILE_NAME = "ik/IKAnalyzer.cfg.xml";
+const String EXT_DICT = "ik/ext_dict";
+const String EXT_STOP = "ik/ext_stopwords";
 
-Dictionary::Dictionary(const String &dir) {
-    conf_dir = dir;
-    fs::path root(conf_dir);
-    fs::path configFile = root / FILE_NAME;
+Dictionary::Dictionary(const String &dir) : conf_dir_(dir) {}
 
-    std::ifstream input(configFile);
+Status Dictionary::Load() {
+    Status load_status;
+    fs::path root(conf_dir_);
+    fs::path config_file = root / FILE_NAME;
+
+    std::ifstream input(config_file);
     if (!input.is_open()) {
-        throw std::runtime_error("Config file not found: " + configFile.string());
+        return Status::InvalidAnalyzerFile(config_file);
     }
 
     if (input.is_open()) {
@@ -43,15 +46,32 @@ Dictionary::Dictionary(const String &dir) {
         String content = buffer.str();
         ParseProperties(content);
     }
-}
 
-void Dictionary::Initial() {
-    LoadMainDict();
-    LoadSurnameDict();
-    LoadQuantifierDict();
-    LoadSuffixDict();
-    LoadPrepDict();
-    LoadStopWordDict();
+    load_status = LoadMainDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadSurnameDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadQuantifierDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadSuffixDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadPrepDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadStopWordDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
 void Dictionary::WalkFileTree(Vector<String> &files, const String &path_str) {
@@ -67,18 +87,15 @@ void Dictionary::WalkFileTree(Vector<String> &files, const String &path_str) {
     }
 }
 
-void Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool critical, const String &name) {
+Status Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool critical, const String &name) {
     fs::path file(file_path);
-    std::wifstream is(file);
+    std::ifstream is(file);
     if (!is.is_open()) {
-        std::cerr << "ik-analyzer: " << name << " not found" << std::endl;
-        if (critical)
-            throw std::runtime_error("ik-analyzer: " + name + " not found!!!");
-        return;
+        return Status::InvalidAnalyzerFile(file_path);
     }
-
-    std::wstring word;
-    while (std::getline(is, word)) {
+    std::string line;
+    while (std::getline(is, line)) {
+        std::wstring word = CharacterUtil::UTF8ToUTF16(line);
         if (!word.empty() && word[0] == L'\uFEFF') {
             word = word.substr(1);
         }
@@ -86,38 +103,39 @@ void Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool c
             dict->FillSegment(Vector<wchar_t>(word.begin(), word.end()));
         }
     }
+    return Status::OK();
 }
 
 Vector<String> Dictionary::GetExtDictionarys() {
-    Vector<String> extDictFiles;
-    String extDictCfg = GetProperty(EXT_DICT);
-    if (!extDictCfg.empty()) {
-        std::stringstream ss(extDictCfg);
-        String filePath;
-        while (std::getline(ss, filePath, ';')) {
-            if (!filePath.empty()) {
-                String path = fs::path(conf_dir) / fs::path(filePath).string();
-                WalkFileTree(extDictFiles, path);
+    Vector<String> ext_dict_files;
+    String ext_dict_cfg = GetProperty(EXT_DICT);
+    if (!ext_dict_cfg.empty()) {
+        std::stringstream ss(ext_dict_cfg);
+        String file_path;
+        while (std::getline(ss, file_path, ';')) {
+            if (!file_path.empty()) {
+                String path = fs::path(conf_dir_) / fs::path(file_path).string();
+                WalkFileTree(ext_dict_files, path);
             }
         }
     }
-    return extDictFiles;
+    return ext_dict_files;
 }
 
 Vector<String> Dictionary::GetExtStopWordDictionarys() {
-    Vector<String> extStopWordDictFiles;
-    String extStopWordDictCfg = GetProperty(EXT_STOP);
-    if (!extStopWordDictCfg.empty()) {
-        std::stringstream ss(extStopWordDictCfg);
-        String filePath;
-        while (std::getline(ss, filePath, ';')) {
-            if (!filePath.empty()) {
-                String path = fs::path(conf_dir) / fs::path(filePath).string();
-                WalkFileTree(extStopWordDictFiles, path);
+    Vector<String> ext_stopword_dict_files;
+    String ext_stopword_dict_cfg = GetProperty(EXT_STOP);
+    if (!ext_stopword_dict_cfg.empty()) {
+        std::stringstream ss(ext_stopword_dict_cfg);
+        String file_path;
+        while (std::getline(ss, file_path, ';')) {
+            if (!file_path.empty()) {
+                String path = fs::path(conf_dir_) / fs::path(file_path).string();
+                WalkFileTree(ext_stopword_dict_files, path);
             }
         }
     }
-    return extStopWordDictFiles;
+    return ext_stopword_dict_files;
 }
 
 void Dictionary::AddWords(const Vector<String> &words) {
@@ -140,80 +158,114 @@ void Dictionary::DisableWords(const Vector<String> &words) {
     }
 }
 
-Hit *Dictionary::MatchInMainDict(const Vector<wchar_t> &charArray) { return main_dict_->Match(charArray); }
+Hit *Dictionary::MatchInMainDict(const Vector<wchar_t> &char_array) { return main_dict_->Match(char_array); }
 
-Hit *Dictionary::MatchInMainDict(const Vector<wchar_t> &charArray, int begin, int length) { return main_dict_->Match(charArray, begin, length); }
+Hit *Dictionary::MatchInMainDict(const Vector<wchar_t> &char_array, int begin, int length) { return main_dict_->Match(char_array, begin, length); }
 
-Hit *Dictionary::MatchInQuantifierDict(const Vector<wchar_t> &charArray, int begin, int length) {
-    return quantifier_dict_->Match(charArray, begin, length);
+Hit *Dictionary::MatchInQuantifierDict(const Vector<wchar_t> &char_array, int begin, int length) {
+    return quantifier_dict_->Match(char_array, begin, length);
 }
 
-Hit *Dictionary::MatchWithHit(const Vector<wchar_t> &charArray, int currentIndex, Hit *matchedHit) {
-    DictSegment *ds = matchedHit->getMatchedDictSegment();
-    return ds->Match(charArray, currentIndex, 1, matchedHit);
+Hit *Dictionary::MatchWithHit(const Vector<wchar_t> &char_array, int current_index, Hit *matched_hit) {
+    DictSegment *ds = matched_hit->getMatchedDictSegment();
+    return ds->Match(char_array, current_index, 1, matched_hit);
 }
 
-bool Dictionary::IsStopWord(const Vector<wchar_t> &charArray, int begin, int length) {
-    return stop_words_->Match(charArray, begin, length)->IsMatch();
+bool Dictionary::IsStopWord(const Vector<wchar_t> &char_array, int begin, int length) {
+    return stop_words_->Match(char_array, begin, length)->IsMatch();
 }
 
-void Dictionary::LoadMainDict() {
-    main_dict_ = new DictSegment(L'\0');
-    String file = fs::path(conf_dir) / fs::path(PATH_DIC_MAIN).string();
-    LoadDictFile(main_dict_, file, false, "Main Dict");
-    LoadExtDict();
+Status Dictionary::LoadMainDict() {
+    main_dict_ = MakeUnique<DictSegment>(L'\0');
+    String file = fs::path(conf_dir_) / fs::path(PATH_DIC_MAIN).string();
+    Status load_status = LoadDictFile(main_dict_.get(), file, false, "Main Dict");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    load_status = LoadExtDict();
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
-void Dictionary::LoadExtDict() {
-    Vector<String> extDictFiles = GetExtDictionarys();
-    if (!extDictFiles.empty()) {
-        for (const String &extDictName : extDictFiles) {
-            std::cout << "[Dict Loading] " << extDictName << std::endl;
-            String file = fs::path(conf_dir) / fs::path(extDictName).string();
-            LoadDictFile(main_dict_, file, false, "Extra Dict");
+Status Dictionary::LoadExtDict() {
+    Vector<String> ext_dict_files = GetExtDictionarys();
+    Status load_status;
+    if (!ext_dict_files.empty()) {
+        for (const String &ext_dict_name : ext_dict_files) {
+            std::cout << "[Dict Loading] " << ext_dict_name << std::endl;
+            String file = fs::path(conf_dir_) / fs::path(ext_dict_name).string();
+            load_status = LoadDictFile(main_dict_.get(), file, false, "Extra Dict");
+            if (!load_status.ok()) {
+                return load_status;
+            }
         }
     }
+    return Status::OK();
 }
 
-void Dictionary::LoadStopWordDict() {
-    stop_words_ = new DictSegment(L'\0');
+Status Dictionary::LoadStopWordDict() {
+    stop_words_ = MakeUnique<DictSegment>(L'\0');
+    Status load_status;
+    String file = fs::path(conf_dir_) / fs::path(PATH_DIC_STOP).string();
+    load_status = LoadDictFile(stop_words_.get(), file, false, "Main Stopwords");
+    if (!load_status.ok()) {
+        return load_status;
+    }
 
-    String file = fs::path(conf_dir) / fs::path(PATH_DIC_STOP).string();
-    LoadDictFile(stop_words_, file, false, "Main Stopwords");
-
-    Vector<String> extStopWordDictFiles = GetExtStopWordDictionarys();
-    if (!extStopWordDictFiles.empty()) {
-        for (const String &extStopWordDictName : extStopWordDictFiles) {
-            std::cout << "[Dict Loading] " << extStopWordDictName << std::endl;
-
-            String file = fs::path(conf_dir) / fs::path(extStopWordDictName).string();
-            LoadDictFile(stop_words_, file, false, "Extra Stopwords");
+    Vector<String> ext_stopword_dict_files = GetExtStopWordDictionarys();
+    if (!ext_stopword_dict_files.empty()) {
+        for (const String &ext_stopword_dict_file : ext_stopword_dict_files) {
+            std::cout << "[Dict Loading] " << ext_stopword_dict_file << std::endl;
+            String file = fs::path(conf_dir_) / fs::path(ext_stopword_dict_file).string();
+            load_status = LoadDictFile(stop_words_.get(), file, false, "Extra Stopwords");
+            if (!load_status.ok()) {
+                return load_status;
+            }
         }
     }
+    return Status::OK();
 }
 
-void Dictionary::LoadQuantifierDict() {
-    quantifier_dict_ = new DictSegment(L'\0');
-    String file = fs::path(conf_dir) / fs::path(PATH_DIC_QUANTIFIER).string();
-    LoadDictFile(quantifier_dict_, file, false, "Quantifier");
+Status Dictionary::LoadQuantifierDict() {
+    quantifier_dict_ = MakeUnique<DictSegment>(L'\0');
+    String file = fs::path(conf_dir_) / fs::path(PATH_DIC_QUANTIFIER).string();
+    Status load_status = LoadDictFile(quantifier_dict_.get(), file, false, "Quantifier");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
-void Dictionary::LoadSurnameDict() {
-    DictSegment *_SurnameDict = new DictSegment(L'\0');
-    String file = fs::path(conf_dir) / fs::path(PATH_DIC_SURNAME).string();
-    LoadDictFile(_SurnameDict, file, true, "Surname");
+Status Dictionary::LoadSurnameDict() {
+    surname_dict_ = MakeUnique<DictSegment>(L'\0');
+    String file = fs::path(conf_dir_) / fs::path(PATH_DIC_SURNAME).string();
+    Status load_status = LoadDictFile(surname_dict_.get(), file, true, "Surname");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
-void Dictionary::LoadSuffixDict() {
-    DictSegment *_SuffixDict = new DictSegment(L'\0');
-    String file = fs::path(conf_dir) / fs::path(PATH_DIC_SUFFIX).string();
-    LoadDictFile(_SuffixDict, file, true, "Suffix");
+Status Dictionary::LoadSuffixDict() {
+    suffix_dict_ = MakeUnique<DictSegment>(L'\0');
+    String file = fs::path(conf_dir_) / fs::path(PATH_DIC_SUFFIX).string();
+    Status load_status = LoadDictFile(suffix_dict_.get(), file, true, "Suffix");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
-void Dictionary::LoadPrepDict() {
-    DictSegment *_PrepDict = new DictSegment(L'\0');
-    String file = fs::path(conf_dir) / fs::path(PATH_DIC_PREP).string();
-    LoadDictFile(_PrepDict, file, true, "Preposition");
+Status Dictionary::LoadPrepDict() {
+    prep_dict_ = MakeUnique<DictSegment>(L'\0');
+    String file = fs::path(conf_dir_) / fs::path(PATH_DIC_PREP).string();
+    Status load_status = LoadDictFile(prep_dict_.get(), file, true, "Preposition");
+    if (!load_status.ok()) {
+        return load_status;
+    }
+    return Status::OK();
 }
 
 void Dictionary::ParseProperties(const String &content) {
@@ -224,7 +276,7 @@ void Dictionary::ParseProperties(const String &content) {
         if (pos != String::npos) {
             String key = line.substr(0, pos);
             String value = line.substr(pos + 1);
-            props[key] = value;
+            props_[key] = value;
         }
     }
 }

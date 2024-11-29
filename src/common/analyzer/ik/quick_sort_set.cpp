@@ -5,10 +5,14 @@ import lexeme;
 module quick_sort_set;
 
 namespace infinity {
-QuickSortSet::QuickSortSet() {
-    size_ = 0;
-    head_ = nullptr;
-    tail_ = nullptr;
+QuickSortSet::QuickSortSet() {}
+
+QuickSortSet::~QuickSortSet() {
+    while (size_ > 0) {
+        Lexeme *tail = PollLast();
+        delete tail;
+        size_--;
+    }
 }
 
 bool QuickSortSet::AddLexeme(Lexeme *lexeme) {
@@ -35,7 +39,6 @@ bool QuickSortSet::AddLexeme(Lexeme *lexeme) {
             size_++;
             return true;
         } else {
-            // 从尾部上逆
             Cell *index = tail_;
             while (index != nullptr && index->CompareTo(new_cell) > 0) {
                 index = index->prev_;

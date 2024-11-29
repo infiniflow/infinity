@@ -17,34 +17,19 @@ import ik_dict;
 module analyze_context;
 
 namespace infinity {
-AnalyzeContext::AnalyzeContext() {
-    segment_buff_.resize(BUFF_SIZE);
-    char_types_.resize(BUFF_SIZE);
-    buff_locker_ = HashSet<std::wstring>();
-    org_lexemes_ = QuickSortSet();
-    path_map_ = HashMap<int, LexemePath *>();
-    results_ = List<Lexeme *>();
+AnalyzeContext::AnalyzeContext(Dictionary *dict) : dict_(dict) {
     buff_offset_ = 0;
     cursor_ = 0;
     last_useless_char_num_ = 0;
     available_ = 0;
 }
 
-int AnalyzeContext::FillBuffer(std::wifstream &reader) {
-    int read_count = 0;
-    if (buff_offset_ == 0) {
-        reader.read(&segment_buff_[0], BUFF_SIZE);
-        read_count = reader.gcount();
-        last_useless_char_num_ = 0;
-    } else {
-        int offset = available_ - cursor_;
-        if (offset > 0) {
-            std::copy(segment_buff_.begin() + cursor_, segment_buff_.begin() + available_, segment_buff_.begin());
-            read_count = offset;
-        }
-        reader.read(&segment_buff_[offset], BUFF_SIZE - offset);
-        read_count += reader.gcount();
-    }
+int AnalyzeContext::FillBuffer(std::wstring &text) {
+    cursor_ = 0;
+    int read_count = text.size();
+    segment_buff_.assign(text.begin(), text.end());
+    char_types_.resize(segment_buff_.size());
+    last_useless_char_num_ = 0;
     available_ = read_count;
     cursor_ = 0;
     return read_count;
@@ -75,7 +60,7 @@ void AnalyzeContext::AddLexeme(Lexeme *lexeme) { org_lexemes_.AddLexeme(lexeme);
 
 void AnalyzeContext::AddLexemePath(LexemePath *path) {
     if (path != nullptr) {
-        path_map_[path->GetPathBegin()] = path;
+        path_map_[path->GetPathBegin()] = UniquePtr<LexemePath>(path);
     }
 }
 
@@ -88,7 +73,7 @@ void AnalyzeContext::OutputToResult() {
             continue;
         }
         last_useless_char_num_ = 0;
-        LexemePath *path = path_map_[index];
+        LexemePath *path = path_map_[index].get();
         if (path != nullptr) {
             Lexeme *l = path->PollFirst();
             while (l != nullptr) {
@@ -120,14 +105,12 @@ void AnalyzeContext::OutputSingleCJK(int index) {
 }
 
 Lexeme *AnalyzeContext::GetNextLexeme() {
-    Lexeme *result = results_.front();
-    results_.pop_front();
-    while (result != nullptr) {
+    Lexeme *result = nullptr;
+    while (!results_.empty()) {
+        result = results_.front();
+        results_.pop_front();
         Compound(result);
-        if (dict_->IsStopWord(segment_buff_, result->GetBegin(), result->GetLength())) {
-            result = results_.front();
-            results_.pop_front();
-        } else {
+        if (!dict_->IsStopWord(segment_buff_, result->GetBegin(), result->GetLength())) {
             result->SetLexemeText(
                 std::wstring(segment_buff_.begin() + result->GetBegin(), segment_buff_.begin() + result->GetBegin() + result->GetLength()));
             break;
@@ -142,11 +125,9 @@ void AnalyzeContext::Reset() {
     available_ = 0;
     buff_offset_ = 0;
     char_types_.clear();
-    char_types_.resize(BUFF_SIZE);
     cursor_ = 0;
     results_.clear();
     segment_buff_.clear();
-    segment_buff_.resize(BUFF_SIZE);
     path_map_.clear();
 }
 

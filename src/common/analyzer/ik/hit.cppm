@@ -9,9 +9,9 @@ namespace infinity {
 class DictSegment;
 export class Hit {
 public:
-    static const int UNMATCH;
-    static const int MATCH;
-    static const int PREFIX;
+    static constexpr int UNMATCH = 0x00000000;
+    static constexpr int MATCH = 0x00000001;
+    static constexpr int PREFIX = 0x00000010;
 
     int hit_state_{UNMATCH};
 

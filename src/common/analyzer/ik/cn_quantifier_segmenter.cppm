@@ -18,16 +18,16 @@ public:
 
     static const std::wstring ChnNum;
     static HashSet<wchar_t> ChnNumberChars;
-    static void initializeChnNumberChars();
+    static void InitChnNumber();
 
     int nstart_;
     int nend_;
 
     List<Hit *> count_hits_;
 
-    Dictionary *dict_;
+    Dictionary *dict_{nullptr};
 
-    CNQuantifierSegmenter();
+    CNQuantifierSegmenter(Dictionary *dict);
 
     void Analyze(AnalyzeContext *context) override;
 

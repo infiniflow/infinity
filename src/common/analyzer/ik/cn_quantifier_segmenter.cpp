@@ -18,17 +18,17 @@ const std::wstring CNQuantifierSegmenter::SEGMENTER_NAME = L"QUAN_SEGMENTER";
 const std::wstring CNQuantifierSegmenter::ChnNum = L"一二两三四五六七八九十零壹贰叁肆伍陆柒捌玖拾百千万亿拾佰仟萬億兆卅廿";
 HashSet<wchar_t> CNQuantifierSegmenter::ChnNumberChars;
 
-void CNQuantifierSegmenter::initializeChnNumberChars() {
+void CNQuantifierSegmenter::InitChnNumber() {
     for (wchar_t nChar : ChnNum) {
         ChnNumberChars.insert(nChar);
     }
 }
 
-CNQuantifierSegmenter::CNQuantifierSegmenter() {
+CNQuantifierSegmenter::CNQuantifierSegmenter(Dictionary *dict) : dict_(dict) {
     nstart_ = -1;
     nend_ = -1;
     count_hits_ = List<Hit *>();
-    initializeChnNumberChars();
+    InitChnNumber();
 }
 
 void CNQuantifierSegmenter::Analyze(AnalyzeContext *context) {
