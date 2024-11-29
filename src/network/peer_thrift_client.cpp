@@ -186,6 +186,8 @@ void PeerClient::Process() {
     }
 }
 
+#define RETRY_IF_FAIL
+
 void PeerClient::Call(std::function<void()> call_func) {
     Config *config_ptr = InfinityContext::instance().config();
     i64 retry_num = config_ptr->PeerRetryCount();
@@ -235,7 +237,11 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
 
     try {
         LOG_INFO(fmt::format("Register to leader {}:{}", request.node_ip, request.node_port));
+#ifdef RETRY_IF_FAIL
         Call([this, &request, &response] { client_->Register(response, request); });
+#else
+        client_->Register(response, request);
+#endif
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
@@ -268,7 +274,11 @@ void PeerClient::Unregister(UnregisterPeerTask *peer_task) {
     request.node_name = peer_task->node_name_;
 
     try {
+#ifdef RETRY_IF_FAIL
         Call([this, &request, &response] { client_->Unregister(response, request); });
+#else
+        client_->Unregister(response, request);
+#endif
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
@@ -314,7 +324,11 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
     request.txn_timestamp = peer_task->txn_ts_;
 
     try {
+#ifdef RETRY_IF_FAIL
         Call([this, &request, &response] { client_->HeartBeat(response, request); });
+#else
+        client_->HeartBeat(response, request);
+#endif
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
@@ -432,7 +446,11 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
     }
 
     try {
+#ifdef RETRY_IF_FAIL
         Call([this, &request, &response] { client_->SyncLog(response, request); });
+#else
+        client_->SyncLog(response, request);
+#endif
         if (response.error_code != 0) {
             // Error
             peer_task->error_code_ = response.error_code;
@@ -470,7 +488,11 @@ void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
         request.node_type = infinity_peer_server::NodeType::kAdmin;
     }
     try {
+#ifdef RETRY_IF_FAIL
         Call([this, &request, &response] { client_->ChangeRole(response, request); });
+#else
+        client_->ChangeRole(response, request);
+#endif
         if (response.error_code != 0) {
             // Error
             change_role_task->error_code_ = response.error_code;
