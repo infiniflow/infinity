@@ -15,13 +15,13 @@ module cjk_segmenter;
 namespace infinity {
 const std::wstring CJKSegmenter::SEGMENTER_NAME = L"CJK_SEGMENTER";
 
-CJKSegmenter::CJKSegmenter(Dictionary *dict) : dict_(dict) { tmp_hits_ = List<Hit *>(); }
+CJKSegmenter::CJKSegmenter(Dictionary *dict) : dict_(dict) {}
 
 void CJKSegmenter::Analyze(AnalyzeContext *context) {
     if (CharacterUtil::CHAR_USELESS != context->GetCurrentCharType()) {
         if (!tmp_hits_.empty()) {
-            std::vector<Hit *> tmp_array(tmp_hits_.begin(), tmp_hits_.end());
-            for (Hit *hit : tmp_array) {
+            for (auto it = tmp_hits_.begin(); it != tmp_hits_.end();) {
+                Hit *hit = (*it).get();
                 hit = dict_->MatchWithHit(context->GetSegmentBuff(), context->GetCursor(), hit);
                 if (hit->IsMatch()) {
                     Lexeme *newLexeme =
@@ -29,11 +29,15 @@ void CJKSegmenter::Analyze(AnalyzeContext *context) {
                     context->AddLexeme(newLexeme);
 
                     if (!hit->IsPrefix()) {
-                        tmp_hits_.remove(hit);
+                        it = tmp_hits_.erase(it);
+                    } else {
+                        ++it;
                     }
 
                 } else if (hit->IsUnmatch()) {
-                    tmp_hits_.remove(hit);
+                    it = tmp_hits_.erase(it);
+                } else {
+                    ++it;
                 }
             }
         }
@@ -44,10 +48,10 @@ void CJKSegmenter::Analyze(AnalyzeContext *context) {
             context->AddLexeme(newLexeme);
 
             if (single_char_hit->IsPrefix()) {
-                tmp_hits_.push_back(single_char_hit);
+                tmp_hits_.push_back(UniquePtr<Hit>(single_char_hit));
             }
         } else if (single_char_hit->IsPrefix()) {
-            tmp_hits_.push_back(single_char_hit);
+            tmp_hits_.push_back(UniquePtr<Hit>(single_char_hit));
         }
 
     } else {

@@ -13,6 +13,7 @@ import hit;
 import stl;
 import status;
 import character_util;
+import third_party;
 
 namespace fs = std::filesystem;
 
@@ -172,7 +173,8 @@ Hit *Dictionary::MatchWithHit(const Vector<wchar_t> &char_array, int current_ind
 }
 
 bool Dictionary::IsStopWord(const Vector<wchar_t> &char_array, int begin, int length) {
-    return stop_words_->Match(char_array, begin, length)->IsMatch();
+    UniquePtr<Hit> hit(stop_words_->Match(char_array, begin, length));
+    return hit->IsMatch();
 }
 
 Status Dictionary::LoadMainDict() {
