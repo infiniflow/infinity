@@ -190,20 +190,22 @@ void PeerClient::Call(std::function<void()> call_func) {
     Config *config_ptr = InfinityContext::instance().config();
     i64 retry_num = config_ptr->PeerRetryNum();
     i64 retry_delay = config_ptr->PeerRetryDelay();
-    bool success = false;
+    Optional<apache::thrift::transport::TTransportException> exception;
     for (i64 retry_count = 0; retry_count <= retry_num; ++retry_count) {
         try {
             call_func();
-            success = true;
+            exception.reset();
             break;
-        } catch (const apache::thrift::transport::TTransportException &e) {
-            LOG_ERROR(fmt::format("Error in data transfer to leader: {}. Retry({})", e.what(), retry_count));
+        } catch (apache::thrift::transport::TTransportException e) {
+            LOG_ERROR(fmt::format("Error in data transfer in peer: {}. Retry({})", e.what(), retry_count));
+            exception = std::move(e);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(retry_delay));
         this->Reconnect();
     }
-    if (!success) {
-        std::rethrow_exception(std::current_exception());
+    if (exception.has_value()) {
+        LOG_CRITICAL(fmt::format("Error in data transfer in peer: {} after retrying {} times.", from_node_name_, retry_num));
+        throw exception.value();
     }
 }
 

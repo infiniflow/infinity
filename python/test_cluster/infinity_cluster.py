@@ -337,11 +337,10 @@ class InfinityCluster:
             wait_timeout_sec = 10
             start_time = time.time()
             while time.time() - start_time < wait_timeout_sec:
+                time.sleep(0.5)
                 node_info = infinity_leader.show_node(node_name)
 
-                if node_info.node_status == "alive":
-                    time.sleep(0.5)
-                else:
+                if node_info.node_status != "alive":
                     break
             else:
                 raise Exception(
