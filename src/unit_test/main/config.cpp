@@ -22,6 +22,7 @@ import third_party;
 import status;
 import compilation_config;
 import virtual_store;
+import default_values;
 
 using namespace infinity;
 class ConfigTest : public BaseTest {};
@@ -49,6 +50,12 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(config.PostgresPort(), 5432);
     EXPECT_EQ(config.HTTPPort(), 23820u);
     EXPECT_EQ(config.ClientPort(), 23817u);
+
+    EXPECT_EQ(config.PeerRetryDelay(), DEFAULT_PEER_RETRY_DELAY);
+    EXPECT_EQ(config.PeerRetryCount(), DEFAULT_PEER_RETRY_COUNT);
+    EXPECT_EQ(config.PeerConnectTimeout(), DEFAULT_PEER_CONNECT_TIMEOUT);
+    EXPECT_EQ(config.PeerRecvTimeout(), DEFAULT_PEER_RECV_TIMEOUT);
+    EXPECT_EQ(config.PeerSendTimeout(), DEFAULT_PEER_SEND_TIMEOUT);
 
     // Log
     EXPECT_EQ(config.LogFileName(), "infinity.log");
@@ -91,6 +98,12 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.PostgresPort(), 25432);
     EXPECT_EQ(config.HTTPPort(), 24821);
     EXPECT_EQ(config.ClientPort(), 24817);
+
+    EXPECT_EQ(config.PeerRetryDelay(), 1000);
+    EXPECT_EQ(config.PeerRetryCount(), 2);
+    EXPECT_EQ(config.PeerConnectTimeout(), 2000);
+    EXPECT_EQ(config.PeerRecvTimeout(), 2000);
+    EXPECT_EQ(config.PeerSendTimeout(), 2000);
 
     EXPECT_EQ(config.LogFileName(), "infinity.log");
     EXPECT_EQ(config.LogDir(), "/var/infinity/log");
@@ -208,6 +221,12 @@ TEST_F(ConfigTest, TestValidValues) {
     EXPECT_EQ(config.HTTPPort(), 23820u);
     EXPECT_EQ(config.ClientPort(), 23817u);
     EXPECT_EQ(config.ConnectionPoolSize(), 128);
+
+    EXPECT_EQ(config.PeerRetryDelay(), 100);
+    EXPECT_EQ(config.PeerRetryCount(), 1);
+    EXPECT_EQ(config.PeerConnectTimeout(), 200);
+    EXPECT_EQ(config.PeerRecvTimeout(), 200);
+    EXPECT_EQ(config.PeerSendTimeout(), 200);
 
     // Log
     EXPECT_EQ(config.LogFileName(), "infinity.log");

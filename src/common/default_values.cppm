@@ -217,6 +217,12 @@ export {
     constexpr SizeT DEFAULT_POSTGRES_PORT = 5432;
     constexpr SizeT DEFAULT_CLIENT_PORT = 23817;
 
+    constexpr SizeT DEFAULT_PEER_RETRY_DELAY = 1000; // 1 second
+    constexpr SizeT DEFAULT_PEER_RETRY_COUNT = 2;
+    constexpr SizeT DEFAULT_PEER_CONNECT_TIMEOUT = 2000; // 2 seconds
+    constexpr SizeT DEFAULT_PEER_RECV_TIMEOUT = 0;    // not set
+    constexpr SizeT DEFAULT_PEER_SEND_TIMEOUT = 0;    // not set
+
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";
     constexpr std::string_view SERVER_MODE_OPTION_NAME = "server_mode";
@@ -226,6 +232,12 @@ export {
     constexpr std::string_view SERVER_ADDRESS_OPTION_NAME = "server_address";
     constexpr std::string_view PEER_SERVER_IP_OPTION_NAME = "peer_ip";
     constexpr std::string_view PEER_SERVER_PORT_OPTION_NAME = "peer_port";
+
+    constexpr std::string_view PEER_RETRY_DELAY_OPTION_NAME = "peer_retry_delay";
+    constexpr std::string_view PEER_RETRY_COUNT_OPTION_NAME = "peer_retry_count";
+    constexpr std::string_view PEER_CONNECT_TIMEOUT_OPTION_NAME = "peer_connect_timeout";
+    constexpr std::string_view PEER_RECV_TIMEOUT_OPTION_NAME = "peer_recv_timeout";
+    constexpr std::string_view PEER_SEND_TIMEOUT_OPTION_NAME = "peer_send_timeout";
 
     constexpr std::string_view POSTGRES_PORT_OPTION_NAME = "postgres_port";
     constexpr std::string_view HTTP_PORT_OPTION_NAME = "http_port";

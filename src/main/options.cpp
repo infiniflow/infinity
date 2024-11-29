@@ -37,6 +37,12 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(PEER_SERVER_IP_OPTION_NAME)] = GlobalOptionIndex::kPeerServerIP;
     name2index_[String(PEER_SERVER_PORT_OPTION_NAME)] = GlobalOptionIndex::kPeerServerPort;
 
+    name2index_[String(PEER_RETRY_DELAY_OPTION_NAME)] = GlobalOptionIndex::kPeerRetryDelay;
+    name2index_[String(PEER_RETRY_COUNT_OPTION_NAME)] = GlobalOptionIndex::kPeerRetryCount;
+    name2index_[String(PEER_CONNECT_TIMEOUT_OPTION_NAME)] = GlobalOptionIndex::kPeerConnectTimeout;
+    name2index_[String(PEER_RECV_TIMEOUT_OPTION_NAME)] = GlobalOptionIndex::kPeerRecvTimeout;
+    name2index_[String(PEER_SEND_TIMEOUT_OPTION_NAME)] = GlobalOptionIndex::kPeerSendTimeout;
+
     name2index_[String(POSTGRES_PORT_OPTION_NAME)] = GlobalOptionIndex::kPostgresPort;
     name2index_[String(HTTP_PORT_OPTION_NAME)] = GlobalOptionIndex::kHTTPPort;
     name2index_[String(CLIENT_PORT_OPTION_NAME)] = GlobalOptionIndex::kClientPort;

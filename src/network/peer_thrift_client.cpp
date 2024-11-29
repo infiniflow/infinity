@@ -14,6 +14,8 @@
 
 module;
 
+#include <exception>
+
 module peer_thrift_client;
 
 import stl;
@@ -28,6 +30,7 @@ import infinity_context;
 import cluster_manager;
 import admin_statement;
 import node_info;
+import config;
 
 namespace infinity {
 
@@ -76,12 +79,20 @@ Status PeerClient::Reconnect() {
     }
 
     try {
+        Config *config_ptr = InfinityContext::instance().config();
+
         socket_ = MakeShared<TSocket>(ip_address_, port_);
 
         TSocket *socket = static_cast<TSocket *>(socket_.get());
-        socket->setConnTimeout(2000); // 2s to timeout
-                                      //        socket->setRecvTimeout(2000);
-                                      //        socket->setSendTimeout(2000);
+        if (i64 timeout = config_ptr->PeerConnectTimeout(); timeout > 0) {
+            socket->setConnTimeout(timeout);
+        }
+        if (i64 timeout = config_ptr->PeerRecvTimeout(); timeout > 0) {
+            socket->setRecvTimeout(timeout);
+        }
+        if (i64 timeout = config_ptr->PeerSendTimeout(); timeout > 0) {
+            socket->setSendTimeout(timeout);
+        }
         transport_ = MakeShared<TBufferedTransport>(socket_);
         protocol_ = MakeShared<TBinaryProtocol>(transport_);
         client_ = MakeUnique<PeerServiceClient>(protocol_);
@@ -175,6 +186,31 @@ void PeerClient::Process() {
     }
 }
 
+#define RETRY_IF_FAIL
+
+void PeerClient::Call(std::function<void()> call_func) {
+    Config *config_ptr = InfinityContext::instance().config();
+    i64 retry_num = config_ptr->PeerRetryCount();
+    i64 retry_delay = config_ptr->PeerRetryDelay();
+    Optional<apache::thrift::transport::TTransportException> exception;
+    for (i64 retry_count = 0; retry_count <= retry_num; ++retry_count) {
+        try {
+            call_func();
+            exception.reset();
+            break;
+        } catch (apache::thrift::transport::TTransportException e) {
+            LOG_ERROR(fmt::format("Error in data transfer in peer: {}. Retry({})", e.what(), retry_count));
+            exception = std::move(e);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(retry_delay));
+        this->Reconnect();
+    }
+    if (exception.has_value()) {
+        LOG_CRITICAL(fmt::format("Error in data transfer in peer: {} after retrying {} times.", from_node_name_, retry_num));
+        throw exception.value();
+    }
+}
+
 void PeerClient::Register(RegisterPeerTask *peer_task) {
 
     RegisterRequest request;
@@ -201,7 +237,11 @@ void PeerClient::Register(RegisterPeerTask *peer_task) {
 
     try {
         LOG_INFO(fmt::format("Register to leader {}:{}", request.node_ip, request.node_port));
+#ifdef RETRY_IF_FAIL
+        Call([this, &request, &response] { client_->Register(response, request); });
+#else
         client_->Register(response, request);
+#endif
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
@@ -234,7 +274,11 @@ void PeerClient::Unregister(UnregisterPeerTask *peer_task) {
     request.node_name = peer_task->node_name_;
 
     try {
+#ifdef RETRY_IF_FAIL
+        Call([this, &request, &response] { client_->Unregister(response, request); });
+#else
         client_->Unregister(response, request);
+#endif
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
@@ -280,7 +324,11 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
     request.txn_timestamp = peer_task->txn_ts_;
 
     try {
+#ifdef RETRY_IF_FAIL
+        Call([this, &request, &response] { client_->HeartBeat(response, request); });
+#else
         client_->HeartBeat(response, request);
+#endif
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
         server_connected_ = false;
         switch (thrift_exception.getType()) {
@@ -398,7 +446,11 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
     }
 
     try {
+#ifdef RETRY_IF_FAIL
+        Call([this, &request, &response] { client_->SyncLog(response, request); });
+#else
         client_->SyncLog(response, request);
+#endif
         if (response.error_code != 0) {
             // Error
             peer_task->error_code_ = response.error_code;
@@ -436,7 +488,11 @@ void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
         request.node_type = infinity_peer_server::NodeType::kAdmin;
     }
     try {
+#ifdef RETRY_IF_FAIL
+        Call([this, &request, &response] { client_->ChangeRole(response, request); });
+#else
         client_->ChangeRole(response, request);
+#endif
         if (response.error_code != 0) {
             // Error
             change_role_task->error_code_ = response.error_code;

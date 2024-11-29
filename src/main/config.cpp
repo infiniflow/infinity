@@ -251,6 +251,51 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Peer retry delay
+        i64 peer_retry_delay = DEFAULT_PEER_RETRY_DELAY;
+        UniquePtr<IntegerOption> peer_retry_delay_option = MakeUnique<IntegerOption>(PEER_RETRY_DELAY_OPTION_NAME, peer_retry_delay, 10000, 0);
+        status = global_options_.AddOption(std::move(peer_retry_delay_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Peer retry num
+        i64 peer_retry_count = DEFAULT_PEER_RETRY_COUNT;
+        UniquePtr<IntegerOption> peer_retry_count_option = MakeUnique<IntegerOption>(PEER_RETRY_COUNT_OPTION_NAME, peer_retry_count, 10, 0);
+        status = global_options_.AddOption(std::move(peer_retry_count_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Peer connect timeout
+        i64 peer_connect_timeout = DEFAULT_PEER_CONNECT_TIMEOUT;
+        UniquePtr<IntegerOption> peer_connect_timeout_option = MakeUnique<IntegerOption>(PEER_CONNECT_TIMEOUT_OPTION_NAME, peer_connect_timeout, 10000, 0);
+        status = global_options_.AddOption(std::move(peer_connect_timeout_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Peer recv timeout
+        i64 peer_recv_timeout = DEFAULT_PEER_RECV_TIMEOUT;
+        UniquePtr<IntegerOption> peer_recv_timeout_option = MakeUnique<IntegerOption>(PEER_RECV_TIMEOUT_OPTION_NAME, peer_recv_timeout, 10000, 0);
+        status = global_options_.AddOption(std::move(peer_recv_timeout_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Peer send timeout
+        i64 peer_send_timeout = DEFAULT_PEER_SEND_TIMEOUT;
+        UniquePtr<IntegerOption> peer_send_timeout_option = MakeUnique<IntegerOption>(PEER_SEND_TIMEOUT_OPTION_NAME, peer_send_timeout, 10000, 0);
+        status = global_options_.AddOption(std::move(peer_send_timeout_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Client pool size
         i64 connection_pool_size = 256;
         UniquePtr<IntegerOption> connection_pool_size_option =
@@ -893,6 +938,106 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kPeerRetryDelay: {
+                            // Peer retry delay
+                            i64 peer_retry_delay = DEFAULT_PEER_RETRY_DELAY;
+                            if (elem.second.is_integer()) {
+                                peer_retry_delay = elem.second.value_or(peer_retry_delay);
+                            } else {
+                                return Status::InvalidConfig("'peer_retry_delay' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> peer_retry_delay_option =
+                                MakeUnique<IntegerOption>(PEER_RETRY_DELAY_OPTION_NAME, peer_retry_delay, 10000, 0);
+                            if (!peer_retry_delay_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer retry delay: {}", peer_retry_delay));
+                            }
+                            Status status = global_options_.AddOption(std::move(peer_retry_delay_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kPeerRetryCount: {
+                            // Peer retry num
+                            i64 peer_retry_count = DEFAULT_PEER_RETRY_COUNT;
+                            if (elem.second.is_integer()) {
+                                peer_retry_count = elem.second.value_or(peer_retry_count);
+                            } else {
+                                return Status::InvalidConfig("'peer_retry_count' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> peer_retry_count_option =
+                                MakeUnique<IntegerOption>(PEER_RETRY_COUNT_OPTION_NAME, peer_retry_count, 10, 0);
+                            if (!peer_retry_count_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer retry num: {}", peer_retry_count));
+                            }
+                            Status status = global_options_.AddOption(std::move(peer_retry_count_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kPeerConnectTimeout: {
+                            // Peer connect timeout
+                            i64 peer_connect_timeout = DEFAULT_PEER_CONNECT_TIMEOUT;
+                            if (elem.second.is_integer()) {
+                                peer_connect_timeout = elem.second.value_or(peer_connect_timeout);
+                            } else {
+                                return Status::InvalidConfig("'peer_connect_timeout' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> peer_connect_timeout_option =
+                                MakeUnique<IntegerOption>(PEER_CONNECT_TIMEOUT_OPTION_NAME, peer_connect_timeout, 10000, 0);
+                            if (!peer_connect_timeout_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer connect timeout: {}", peer_connect_timeout));
+                            }
+                            Status status = global_options_.AddOption(std::move(peer_connect_timeout_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kPeerRecvTimeout: {
+                            // Peer recv timeout
+                            i64 peer_recv_timeout = DEFAULT_PEER_RECV_TIMEOUT;
+                            if (elem.second.is_integer()) {
+                                peer_recv_timeout = elem.second.value_or(peer_recv_timeout);
+                            } else {
+                                return Status::InvalidConfig("'peer_recv_timeout' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> peer_recv_timeout_option =
+                                MakeUnique<IntegerOption>(PEER_RECV_TIMEOUT_OPTION_NAME, peer_recv_timeout, 10000, 0);
+                            if (!peer_recv_timeout_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer recv timeout: {}", peer_recv_timeout));
+                            }
+                            Status status = global_options_.AddOption(std::move(peer_recv_timeout_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kPeerSendTimeout: {
+                            // Peer send timeout
+                            i64 peer_send_timeout = DEFAULT_PEER_SEND_TIMEOUT;
+                            if (elem.second.is_integer()) {
+                                peer_send_timeout = elem.second.value_or(peer_send_timeout);
+                            } else {
+                                return Status::InvalidConfig("'peer_send_timeout' field isn't integer.");
+                            }
+
+                            UniquePtr<IntegerOption> peer_send_timeout_option =
+                                MakeUnique<IntegerOption>(PEER_SEND_TIMEOUT_OPTION_NAME, peer_send_timeout, 10000, 0);
+                            if (!peer_send_timeout_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer send timeout: {}", peer_send_timeout));
+                            }
+                            Status status = global_options_.AddOption(std::move(peer_send_timeout_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
                         case GlobalOptionIndex::kConnectionPoolSize: {
                             // Client pool size
                             i64 connection_pool_size = 256;
@@ -997,6 +1142,61 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     i64 rpc_client_port = DEFAULT_CLIENT_PORT;
                     UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>(CLIENT_PORT_OPTION_NAME, rpc_client_port, 65535, 1024);
                     Status status = global_options_.AddOption(std::move(client_port_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerRetryDelay) == nullptr) {
+                    // Peer retry delay
+                    i64 peer_retry_delay = DEFAULT_PEER_RETRY_DELAY;
+                    UniquePtr<IntegerOption> peer_retry_delay_option =
+                        MakeUnique<IntegerOption>(PEER_RETRY_DELAY_OPTION_NAME, peer_retry_delay, 10000, 0);
+                    Status status = global_options_.AddOption(std::move(peer_retry_delay_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerRetryCount) == nullptr) {
+                    // Peer retry num
+                    i64 peer_retry_count = DEFAULT_PEER_RETRY_COUNT;
+                    UniquePtr<IntegerOption> peer_retry_count_option =
+                        MakeUnique<IntegerOption>(PEER_RETRY_COUNT_OPTION_NAME, peer_retry_count, 10, 0);
+                    Status status = global_options_.AddOption(std::move(peer_retry_count_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerConnectTimeout) == nullptr) {
+                    // Peer connect timeout
+                    i64 peer_connect_timeout = DEFAULT_PEER_CONNECT_TIMEOUT;
+                    UniquePtr<IntegerOption> peer_connect_timeout_option =
+                        MakeUnique<IntegerOption>(PEER_CONNECT_TIMEOUT_OPTION_NAME, peer_connect_timeout, 10000, 0);
+                    Status status = global_options_.AddOption(std::move(peer_connect_timeout_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerRecvTimeout) == nullptr) {
+                    // Peer recv timeout
+                    i64 peer_recv_timeout = DEFAULT_PEER_RECV_TIMEOUT;
+                    UniquePtr<IntegerOption> peer_recv_timeout_option =
+                        MakeUnique<IntegerOption>(PEER_RECV_TIMEOUT_OPTION_NAME, peer_recv_timeout, 10000, 0);
+                    Status status = global_options_.AddOption(std::move(peer_recv_timeout_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerSendTimeout) == nullptr) {
+                    // Peer send timeout
+                    i64 peer_send_timeout = DEFAULT_PEER_SEND_TIMEOUT;
+                    UniquePtr<IntegerOption> peer_send_timeout_option =
+                        MakeUnique<IntegerOption>(PEER_SEND_TIMEOUT_OPTION_NAME, peer_send_timeout, 10000, 0);
+                    Status status = global_options_.AddOption(std::move(peer_send_timeout_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2188,6 +2388,31 @@ i64 Config::ConnectionPoolSize() {
 i64 Config::PeerServerConnectionPoolSize() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerServerConnectionPoolSize);
+}
+
+i64 Config::PeerRetryDelay() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerRetryDelay);
+}
+
+i64 Config::PeerRetryCount() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerRetryCount);
+}
+
+i64 Config::PeerConnectTimeout() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerConnectTimeout);
+}
+
+i64 Config::PeerRecvTimeout() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerRecvTimeout);
+}
+
+i64 Config::PeerSendTimeout() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerSendTimeout);
 }
 
 // Log
