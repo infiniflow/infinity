@@ -33,7 +33,7 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
         function_expr.function_name = binary_exp_to_paser_exp(
-            cons.key)  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
+            cons.key.lower())  # key is the function name cover to >, <, >=, <=, =, and, or, etc.
 
         arguments = []
         for value in cons.hashable_args:
@@ -92,7 +92,7 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             case _:
                 parsed_expr = ttypes.ParsedExpr()
                 column_expr = ttypes.ColumnExpr()
-                column_name = [cons.alias_or_name]
+                column_name = [cons.alias_or_name.lower()]
                 if cons.alias_or_name == "*":
                     column_expr.star = True
                 else:
@@ -178,13 +178,13 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
     elif isinstance(cons, exp.In):
         left_operand = parse_expr(cons.args['this'])
         arguments = []
-        for arg in cons.args['expressions'] :
-            if arg :
+        for arg in cons.args['expressions']:
+            if arg:
                 arguments.append(parse_expr(arg))
         in_expr = ttypes.InExpr(
-            left_operand = left_operand,
-            arguments = arguments,
-            in_type = True
+            left_operand=left_operand,
+            arguments=arguments,
+            in_type=True
         )
         expr_type = ttypes.ParsedExprType(in_expr=in_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
@@ -194,13 +194,13 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         raw_in = cons.this
         left_operand = parse_expr(raw_in.args['this'])
         arguments = []
-        for arg in raw_in.args['expressions'] :
-            if arg :
+        for arg in raw_in.args['expressions']:
+            if arg:
                 arguments.append(parse_expr(arg))
         in_expr = ttypes.InExpr(
-            left_operand = left_operand,
-            arguments = arguments,
-            in_type = False
+            left_operand=left_operand,
+            arguments=arguments,
+            in_type=False
         )
         expr_type = ttypes.ParsedExprType(in_expr=in_expr)
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
@@ -353,7 +353,8 @@ def check_valid_name(name, name_type: str = "Table"):
     if name is None:
         raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name.isspace():
-        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"{name_type} name cannot be composed of whitespace characters only")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name cannot be composed of whitespace characters only")
     if name == '':
         raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name == ' ':
@@ -392,6 +393,7 @@ def select_res_to_polars(res) -> pl.DataFrame:
 
     return pl.from_pandas(pd.DataFrame(df_dict))
 
+
 def get_constant_expr(column_info):
     # process constant expression
     default = None
@@ -403,6 +405,7 @@ def get_constant_expr(column_info):
         return constant_exp
     else:
         return get_remote_constant_expr_from_python_value(default)
+
 
 def get_constraints(column_info: dict) -> list[ttypes.Constraint]:
     if column_info.get("constraints") is None:
@@ -462,6 +465,7 @@ def get_embedding_element_type(element_type):
         case _:
             raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
 
+
 def get_embedding_type(column_big_info: list[str]) -> ttypes.DataType:
     column_type = ttypes.DataType()
     match column_big_info[0]:
@@ -488,6 +492,7 @@ def get_embedding_type(column_big_info: list[str]) -> ttypes.DataType:
 
     column_type.physical_type = physical_type
     return column_type
+
 
 def get_sparse_type(column_big_info: list[str]) -> ttypes.DataType:
     column_type = ttypes.DataType()
@@ -517,6 +522,7 @@ def get_sparse_type(column_big_info: list[str]) -> ttypes.DataType:
 
     column_type.physical_type = physical_type
     return column_type
+
 
 def get_data_type(column_info: dict) -> ttypes.DataType:
     if "type" not in column_info:
@@ -572,6 +578,7 @@ def get_data_type(column_info: dict) -> ttypes.DataType:
                 case _:
                     raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
             return proto_column_type
+
 
 def get_ordinary_info(column_info_, column_defs, column_name, index):
     # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}

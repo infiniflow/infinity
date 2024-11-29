@@ -317,8 +317,6 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def filter(self, where: Optional[str]) -> InfinityThriftQueryBuilder:
-        if isinstance(where, str):
-            where = where.lower()
         where_expr = traverse_conditions(condition(where))
         self._filter = where_expr
         return self
