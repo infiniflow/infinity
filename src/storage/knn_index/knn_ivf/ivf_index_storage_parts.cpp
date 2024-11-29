@@ -130,7 +130,34 @@ public:
                            const u32 centroids_num,
                            const EmbeddingDataType embedding_data_type,
                            const IndexIVFStorageOption &ivf_storage_option)
-        : IVF_Parts_Storage(embedding_dimension, centroids_num) {}
+        : IVF_Parts_Storage(embedding_dimension, centroids_num) {
+        row_memory_cost_ = sizeof(SegmentOffset);
+        switch (ivf_storage_option.plain_storage_data_type_) {
+            case EmbeddingDataType::kElemInt8: {
+                row_memory_cost_ += sizeof(i8) * embedding_dimension;
+                break;
+            }
+            case EmbeddingDataType::kElemUInt8: {
+                row_memory_cost_ += sizeof(i8) * embedding_dimension;
+                break;
+            }
+            case EmbeddingDataType::kElemFloat: {
+                row_memory_cost_ += sizeof(f32) * embedding_dimension;
+                break;
+            }
+            case EmbeddingDataType::kElemFloat16: {
+                row_memory_cost_ += sizeof(Float16T) * embedding_dimension;
+                break;
+            }
+            case EmbeddingDataType::kElemBFloat16: {
+                row_memory_cost_ += sizeof(BFloat16T) * embedding_dimension;
+                break;
+            }
+            default:
+                UnrecoverableError("Invalid IVF plain_data_type");
+                break;
+        }
+    }
     ~IVF_Parts_Storage_Info() override = default;
     void Save(LocalFileHandle &file_handle) const override {}
     void Load(LocalFileHandle &file_handle) override {}
@@ -204,7 +231,22 @@ public:
                            const IndexIVFStorageOption &ivf_storage_option)
         : IVF_Parts_Storage(embedding_dimension, centroids_num), sq_bits_(ivf_storage_option.scalar_quantization_bits_),
           common_vec_a_(embedding_dimension), common_vec_b_(embedding_dimension) {
+        AddMemUsed(sizeof(f32) * 2 * embedding_dimension);
         assert(sq_bits_ == 4 || sq_bits_ == 8);
+        // see IVF_Part_Storage
+        row_memory_cost_ = sizeof(SegmentOffset) + sizeof(f32);
+        switch (sq_bits_) {
+            case 4: {
+                row_memory_cost_ += embedding_dimension / 2;
+                break;
+            }
+            case 8: {
+                row_memory_cost_ += embedding_dimension;
+                break;
+            }
+            default:
+                break;
+        }
     }
     ~IVF_Parts_Storage_Info() override = default;
 
@@ -294,6 +336,18 @@ public:
           subspace_centroid_bits_(ivf_storage_option.product_quantization_subspace_bits_) {
         assert(subspace_dimension_ * subspace_num_ == embedding_dimension());
         assert((embedding_dimension() << subspace_centroid_bits_) == subspace_dimension_ * expect_subspace_centroid_num_ * subspace_num_);
+        row_memory_cost_ = sizeof(SegmentOffset);
+        // subspace_centroid_bits_ in [4, 8) -> 0.5 byte per subspace
+        if (subspace_centroid_bits_ >= 4 && subspace_centroid_bits_ < 8) {
+            row_memory_cost_ += subspace_num_ / 2;
+        } else if (subspace_centroid_bits_ >= 8 && subspace_centroid_bits_ < 12) {
+            row_memory_cost_ += subspace_num_;
+        } else if (subspace_centroid_bits_ >= 12 && subspace_centroid_bits_ < 16) {
+            row_memory_cost_ += subspace_num_ * 3 / 2;
+        } else {
+            row_memory_cost_ += subspace_num_ * 2;
+        }
+        AddMemUsed(sizeof(f32) * (expect_subspace_centroid_num_ * embedding_dimension() + expect_subspace_centroid_num_ * subspace_num_));
     }
 
     ~IVF_Parts_Storage_Info() override = default;

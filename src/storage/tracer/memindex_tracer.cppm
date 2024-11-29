@@ -92,8 +92,10 @@ inline void MemIndexTracer::AddMemUsed(SizeT add) {
     SizeT old_index_memory = cur_index_memory_.fetch_add(add);
     if (SizeT new_index_memory = old_index_memory + add; new_index_memory > index_memory_limit_) {
         if (new_index_memory > index_memory_limit_ + acc_proposed_dump_.load()) {
+            LOG_TRACE(fmt::format("acc_proposed_dump_ = {}", acc_proposed_dump_.load()));
             auto dump_task = MakeDumpTask();
             if (dump_task.get() != nullptr) {
+                LOG_TRACE(fmt::format("Dump triggered!"));
                 TriggerDump(std::move(dump_task));
             }
         }

@@ -14,6 +14,8 @@
 
 module;
 
+#include <cassert>
+
 export module ivf_index_storage;
 
 import stl;
@@ -47,15 +49,22 @@ public:
     void Save(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
     Pair<u32, const f32 *> GetCentroidDataForMetric(const KnnDistanceBase1 *knn_distance) const;
+    inline SizeT MemoryUsed() const { return sizeof(u32) * 2 + sizeof(f32) * (centroids_data_.size() + normalized_centroids_data_cache_.size()); }
 };
 
 class IVF_Parts_Storage {
     const u32 embedding_dimension_ = 0;
     const u32 centroids_num_ = 0;
+    SizeT memory_used_ = 0;
 
 protected:
+    void AddMemUsed(SizeT mem_usage) { memory_used_ += mem_usage; }
+    void DecMemUsed(SizeT mem_decreased) { memory_used_ -= mem_decreased; }
+    SizeT row_memory_cost_ = 0;
     explicit IVF_Parts_Storage(const u32 embedding_dimension, const u32 centroids_num)
         : embedding_dimension_(embedding_dimension), centroids_num_(centroids_num) {}
+    virtual void
+    AppendOneEmbedding(u32 part_id, const void *embedding_ptr, SegmentOffset segment_offset, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
 
 public:
     virtual ~IVF_Parts_Storage() = default;
@@ -68,8 +77,13 @@ public:
     virtual void Load(LocalFileHandle &file_handle) = 0;
 
     virtual void Train(u32 training_embedding_num, const f32 *training_data, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
-    virtual void
-    AppendOneEmbedding(u32 part_id, const void *embedding_ptr, SegmentOffset segment_offset, const IVF_Centroids_Storage *ivf_centroids_storage) = 0;
+    void AppendOneEmbeddingWithStat(u32 part_id,
+                                    const void *embedding_ptr,
+                                    SegmentOffset segment_offset,
+                                    const IVF_Centroids_Storage *ivf_centroids_storage) {
+        AddMemUsed(row_memory_cost_);
+        AppendOneEmbedding(part_id, embedding_ptr, segment_offset, ivf_centroids_storage);
+    }
 
     virtual void SearchIndex(const Vector<u32> &part_ids,
                              const IVF_Index_Storage *ivf_index_storage,
@@ -78,6 +92,7 @@ public:
                              EmbeddingDataType query_element_type,
                              const std::function<bool(SegmentOffset)> &satisfy_filter_func,
                              const std::function<void(f32, SegmentOffset)> &add_result_func) const = 0;
+    SizeT MemoryUsed() const { return memory_used_; }
 };
 
 class IVF_Index_Storage {
@@ -118,6 +133,7 @@ public:
     void GetMemData(IVF_Index_Storage &&mem_data);
     void Save(LocalFileHandle &file_handle) const;
     void Load(LocalFileHandle &file_handle);
+    SizeT MemoryUsed() const;
 
 private:
     template <EmbeddingDataType embedding_data_type>
