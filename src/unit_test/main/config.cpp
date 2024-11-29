@@ -52,7 +52,7 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(config.ClientPort(), 23817u);
 
     EXPECT_EQ(config.PeerRetryDelay(), DEFAULT_PEER_RETRY_DELAY);
-    EXPECT_EQ(config.PeerRetryNum(), DEFAULT_PEER_RETRY_NUM);
+    EXPECT_EQ(config.PeerRetryCount(), DEFAULT_PEER_RETRY_COUNT);
     EXPECT_EQ(config.PeerConnectTimeout(), DEFAULT_PEER_CONNECT_TIMEOUT);
     EXPECT_EQ(config.PeerRecvTimeout(), DEFAULT_PEER_RECV_TIMEOUT);
     EXPECT_EQ(config.PeerSendTimeout(), DEFAULT_PEER_SEND_TIMEOUT);
@@ -100,7 +100,7 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.ClientPort(), 24817);
 
     EXPECT_EQ(config.PeerRetryDelay(), 1000);
-    EXPECT_EQ(config.PeerRetryNum(), 2);
+    EXPECT_EQ(config.PeerRetryCount(), 2);
     EXPECT_EQ(config.PeerConnectTimeout(), 2000);
     EXPECT_EQ(config.PeerRecvTimeout(), 2000);
     EXPECT_EQ(config.PeerSendTimeout(), 2000);
@@ -223,7 +223,7 @@ TEST_F(ConfigTest, TestValidValues) {
     EXPECT_EQ(config.ConnectionPoolSize(), 128);
 
     EXPECT_EQ(config.PeerRetryDelay(), 100);
-    EXPECT_EQ(config.PeerRetryNum(), 1);
+    EXPECT_EQ(config.PeerRetryCount(), 1);
     EXPECT_EQ(config.PeerConnectTimeout(), 200);
     EXPECT_EQ(config.PeerRecvTimeout(), 200);
     EXPECT_EQ(config.PeerSendTimeout(), 200);

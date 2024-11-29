@@ -11,7 +11,7 @@ client_port              = 23817
 connection_pool_size     = 128
 
 peer_retry_delay         = 100
-peer_retry_num           = 1
+peer_retry_count           = 1
 peer_connect_timeout     = 200
 peer_recv_timeout        = 200
 peer_send_timeout        = 200

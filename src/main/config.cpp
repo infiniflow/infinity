@@ -261,9 +261,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
 
         // Peer retry num
-        i64 peer_retry_num = DEFAULT_PEER_RETRY_NUM;
-        UniquePtr<IntegerOption> peer_retry_num_option = MakeUnique<IntegerOption>(PEER_RETRY_NUM_OPTION_NAME, peer_retry_num, 10, 0);
-        status = global_options_.AddOption(std::move(peer_retry_num_option));
+        i64 peer_retry_count = DEFAULT_PEER_RETRY_COUNT;
+        UniquePtr<IntegerOption> peer_retry_count_option = MakeUnique<IntegerOption>(PEER_RETRY_COUNT_OPTION_NAME, peer_retry_count, 10, 0);
+        status = global_options_.AddOption(std::move(peer_retry_count_option));
         if (!status.ok()) {
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
@@ -958,21 +958,21 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
-                        case GlobalOptionIndex::kPeerRetryNum: {
+                        case GlobalOptionIndex::kPeerRetryCount: {
                             // Peer retry num
-                            i64 peer_retry_num = DEFAULT_PEER_RETRY_NUM;
+                            i64 peer_retry_count = DEFAULT_PEER_RETRY_COUNT;
                             if (elem.second.is_integer()) {
-                                peer_retry_num = elem.second.value_or(peer_retry_num);
+                                peer_retry_count = elem.second.value_or(peer_retry_count);
                             } else {
-                                return Status::InvalidConfig("'peer_retry_num' field isn't integer.");
+                                return Status::InvalidConfig("'peer_retry_count' field isn't integer.");
                             }
 
-                            UniquePtr<IntegerOption> peer_retry_num_option =
-                                MakeUnique<IntegerOption>(PEER_RETRY_NUM_OPTION_NAME, peer_retry_num, 10, 0);
-                            if (!peer_retry_num_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid peer retry num: {}", peer_retry_num));
+                            UniquePtr<IntegerOption> peer_retry_count_option =
+                                MakeUnique<IntegerOption>(PEER_RETRY_COUNT_OPTION_NAME, peer_retry_count, 10, 0);
+                            if (!peer_retry_count_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid peer retry num: {}", peer_retry_count));
                             }
-                            Status status = global_options_.AddOption(std::move(peer_retry_num_option));
+                            Status status = global_options_.AddOption(std::move(peer_retry_count_option));
                             if (!status.ok()) {
                                 UnrecoverableError(status.message());
                             }
@@ -1158,12 +1158,12 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     }
                 }
 
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerRetryNum) == nullptr) {
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPeerRetryCount) == nullptr) {
                     // Peer retry num
-                    i64 peer_retry_num = DEFAULT_PEER_RETRY_NUM;
-                    UniquePtr<IntegerOption> peer_retry_num_option =
-                        MakeUnique<IntegerOption>(PEER_RETRY_NUM_OPTION_NAME, peer_retry_num, 10, 0);
-                    Status status = global_options_.AddOption(std::move(peer_retry_num_option));
+                    i64 peer_retry_count = DEFAULT_PEER_RETRY_COUNT;
+                    UniquePtr<IntegerOption> peer_retry_count_option =
+                        MakeUnique<IntegerOption>(PEER_RETRY_COUNT_OPTION_NAME, peer_retry_count, 10, 0);
+                    Status status = global_options_.AddOption(std::move(peer_retry_count_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2395,9 +2395,9 @@ i64 Config::PeerRetryDelay() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerRetryDelay);
 }
 
-i64 Config::PeerRetryNum() {
+i64 Config::PeerRetryCount() {
     std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerRetryNum);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPeerRetryCount);
 }
 
 i64 Config::PeerConnectTimeout() {

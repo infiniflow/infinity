@@ -3398,19 +3398,19 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
     {
         {
             // option name
-            Value value = Value::MakeVarchar(PEER_RETRY_NUM_OPTION_NAME);
+            Value value = Value::MakeVarchar(PEER_RETRY_COUNT_OPTION_NAME);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
         {
             // option name type
-            Value value = Value::MakeVarchar(std::to_string(global_config->PeerRetryNum()));
+            Value value = Value::MakeVarchar(std::to_string(global_config->PeerRetryCount()));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
         {
             // option name type
-            Value value = Value::MakeVarchar("Peer retry number");
+            Value value = Value::MakeVarchar("Peer retry count");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }

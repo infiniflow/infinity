@@ -218,7 +218,7 @@ export {
     constexpr SizeT DEFAULT_CLIENT_PORT = 23817;
 
     constexpr SizeT DEFAULT_PEER_RETRY_DELAY = 1000; // 1 second
-    constexpr SizeT DEFAULT_PEER_RETRY_NUM = 2;
+    constexpr SizeT DEFAULT_PEER_RETRY_COUNT = 2;
     constexpr SizeT DEFAULT_PEER_CONNECT_TIMEOUT = 2000; // 2 seconds
     constexpr SizeT DEFAULT_PEER_RECV_TIMEOUT = 0;    // not set
     constexpr SizeT DEFAULT_PEER_SEND_TIMEOUT = 0;    // not set
@@ -234,7 +234,7 @@ export {
     constexpr std::string_view PEER_SERVER_PORT_OPTION_NAME = "peer_port";
 
     constexpr std::string_view PEER_RETRY_DELAY_OPTION_NAME = "peer_retry_delay";
-    constexpr std::string_view PEER_RETRY_NUM_OPTION_NAME = "peer_retry_num";
+    constexpr std::string_view PEER_RETRY_COUNT_OPTION_NAME = "peer_retry_count";
     constexpr std::string_view PEER_CONNECT_TIMEOUT_OPTION_NAME = "peer_connect_timeout";
     constexpr std::string_view PEER_RECV_TIMEOUT_OPTION_NAME = "peer_recv_timeout";
     constexpr std::string_view PEER_SEND_TIMEOUT_OPTION_NAME = "peer_send_timeout";

@@ -161,7 +161,7 @@ export enum class GlobalOptionIndex : i8 {
     kObjectStorageSecretKey = 45,
     kObjectStorageHttps = 46,
     kPeerRetryDelay = 47,
-    kPeerRetryNum = 48,
+    kPeerRetryCount = 48,
     kPeerConnectTimeout = 49,
     kPeerRecvTimeout = 50,
     kPeerSendTimeout = 51,

@@ -13,7 +13,7 @@ peer_ip                  = "0.0.0.0"
 peer_port                = 23852
 
 peer_retry_delay         = 0
-peer_retry_num           = 0
+peer_retry_count           = 0
 peer_connect_timeout     = 2000
 peer_recv_timeout        = 0
 peer_send_timeout        = 0

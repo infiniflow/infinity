@@ -70,7 +70,7 @@ public:
     i64 PeerServerConnectionPoolSize();
 
     i64 PeerRetryDelay();
-    i64 PeerRetryNum();
+    i64 PeerRetryCount();
     i64 PeerConnectTimeout();
     i64 PeerRecvTimeout();
     i64 PeerSendTimeout();

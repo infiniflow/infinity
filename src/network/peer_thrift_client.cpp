@@ -188,7 +188,7 @@ void PeerClient::Process() {
 
 void PeerClient::Call(std::function<void()> call_func) {
     Config *config_ptr = InfinityContext::instance().config();
-    i64 retry_num = config_ptr->PeerRetryNum();
+    i64 retry_num = config_ptr->PeerRetryCount();
     i64 retry_delay = config_ptr->PeerRetryDelay();
     Optional<apache::thrift::transport::TTransportException> exception;
     for (i64 retry_count = 0; retry_count <= retry_num; ++retry_count) {
