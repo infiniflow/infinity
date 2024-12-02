@@ -138,6 +138,13 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
     for (auto *db_entry : db_entries) {
         Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
         for (auto *table_entry : table_entries) {
+            {
+                TableEntry::TableStatus table_status;
+                if (!table_entry->SetCompact(table_status)) {
+                    LOG_INFO(fmt::format("Cannot compact table {}, table_status: {}", table_entry->encode(), u8(table_status)));
+                    continue;
+                }
+            }
             while (true) {
                 Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Compact"));
                 TransactionID txn_id = txn->TxnID();

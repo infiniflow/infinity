@@ -678,6 +678,8 @@ void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts) {
     for (auto [table_entry, ptr_seq_n] : txn_tables_) {
         table_entry->Commit(commit_ts);
     }
+
+    this->RevertTableStatus();
 }
 
 void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
@@ -696,6 +698,8 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         db_entry->Cleanup();
         catalog_->RemoveDBEntry(db_entry, txn_id);
     }
+
+    this->RevertTableStatus();
 }
 
 bool TxnStore::ReadOnly() const {
@@ -719,6 +723,21 @@ bool TxnStore::ReadOnly() const {
     }
 
     return read_only;
+}
+
+void TxnStore::RevertTableStatus() {
+    WalEntry *wal_entry = txn_->GetWALEntry();
+    for (auto &cmd : wal_entry->cmds_) {
+        if (cmd->GetType() == WalCommandType::COMPACT) {
+            for (const auto &[table_name, table_store] : txn_tables_store_) {
+                table_store->GetTableEntry()->SetCompactDone();
+            }
+        } else if (cmd->GetType() == WalCommandType::CREATE_INDEX) {
+            for (const auto &[table_name, table_store] : txn_tables_store_) {
+                table_store->GetTableEntry()->SetCreateIndexDone();
+            }
+        }
+    }
 }
 
 } // namespace infinity

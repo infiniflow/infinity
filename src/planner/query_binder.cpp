@@ -1134,6 +1134,12 @@ UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement
     if (!status.ok()) {
         RecoverableError(status);
     }
+    {
+        TableEntry::TableStatus status;
+        if (!table_entry->SetCompact(status)) {
+            RecoverableError(Status::NotSupport(fmt::format("Cannot compact when table_status is {}", u8(status))));
+        }
+    }
     base_table_ref->index_index_ = table_entry->GetIndexIndex(txn);
 
     return MakeUnique<BoundCompactStatement>(bind_context_ptr_, base_table_ref, statement.compact_type_);

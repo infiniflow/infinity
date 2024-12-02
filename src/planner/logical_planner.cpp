@@ -105,6 +105,7 @@ import special_function;
 import utility;
 import wal_manager;
 import infinity_context;
+import table_entry;
 
 namespace infinity {
 
@@ -732,6 +733,12 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
+    {
+        TableEntry::TableStatus status;
+        if (!base_table_ref->table_entry_ptr_->SetCreatingIndex(status)) {
+            RecoverableError(Status::NotSupport(fmt::format("Cannot create index when table status is {}", u8(status))));
+        }
+    }
     auto status = base_table_ref->table_entry_ptr_->AddWriteTxnNum(txn);
     if (!status.ok()) {
         RecoverableError(status);

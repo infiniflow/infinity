@@ -228,6 +228,8 @@ public:
 
     std::mutex mtx_{};
 
+    void RevertTableStatus();
+
 private:
     // Txn store
     Txn *txn_{}; // TODO: remove this

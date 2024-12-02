@@ -43,6 +43,7 @@ import meta_info;
 import block_entry;
 import column_index_reader;
 import value;
+import infinity_exception;
 
 namespace infinity {
 
@@ -368,7 +369,51 @@ public:
 
     void SetUnlock();
 
+    enum struct TableStatus: u8 {
+        kNone = 0,
+        kCreatingIndex,
+        kCompacting,
+    };
+
+    bool SetCompact(TableStatus &status) {
+        std::unique_lock lock(rw_locker_);
+        if (table_status_ != TableStatus::kNone) {
+            status = table_status_;
+            return false;
+        }
+        table_status_ = TableStatus::kCompacting;
+        return true;
+    }
+
+    bool SetCreatingIndex(TableStatus &status) {
+        std::unique_lock lock(rw_locker_);
+        if (table_status_ == TableStatus::kCompacting) {
+            status = table_status_;
+            return false;
+        }
+        table_status_ = TableStatus::kCreatingIndex;
+        return true;
+    }
+
+    void SetCompactDone() {
+        std::unique_lock lock(rw_locker_);
+        if (table_status_ == TableStatus::kCreatingIndex) {
+            UnrecoverableError(fmt::format("Cannot set table {} to None, status: {}", encode(), u8(table_status_)));
+        }
+        table_status_ = TableStatus::kNone;
+    }
+
+    void SetCreateIndexDone() {
+        std::unique_lock lock(rw_locker_);
+        if (table_status_ == TableStatus::kCompacting) {
+            UnrecoverableError(fmt::format("Cannot set table {} to None, status: {}", encode(), u8(table_status_)));
+        }
+        table_status_ = TableStatus::kNone;
+    }
+
 private:
+    TableStatus table_status_;
+
     std::mutex mtx_; // when table is locked, write is not allowed.
     std::condition_variable cv_;
     bool locked_ = false;
