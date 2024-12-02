@@ -130,6 +130,107 @@ class TestMemIdx:
     # select count(*) from test_memidx1;
     # # result: 13
 
+    def test_mem_ivf(self, infinity_runner: InfinityRunner):
+        config1 = "test/data/config/restart_test/test_memidx/1.toml"
+        config2 = "test/data/config/restart_test/test_memidx/2.toml"
+        config3 = "test/data/config/restart_test/test_memidx/3.toml"
+        uri = common_values.TEST_LOCAL_HOST
+        infinity_runner.clear()
+
+        decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
+
+        @decorator1
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.create_table(
+                "test_mem_ivf",
+                {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}},
+            )
+            res = table_obj.create_index(
+                "idx1",
+                index.IndexInfo(
+                    "c2",
+                    index.IndexType.IVF,
+                    {
+                        "metric": "l2",
+                    },
+                ),
+            )
+            assert res.error_code == infinity.ErrorCode.OK
+
+            table_obj.insert([{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(51)])
+            # trigger the dump by 52th record
+            table_obj.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]}])
+            # table_obj.insert([{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(2)])
+            time.sleep(5)
+            table_obj.insert([{"c1": 4, "c2": [0.2, 0.1, 0.3, 0.4]} for i in range(4)])
+
+        part1()
+
+        # config1 can hold 51 rows of ivf mem index before dump
+        # 1. recover by dumpindex wal & memindex recovery
+        decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
+
+        @decorator2
+        def part2(infinity_obj):
+            time.sleep(5)
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_mem_ivf")
+            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            # print(data_dict)
+            assert data_dict["count(star)"] == [56]
+
+            data_dict, data_type_dict = (
+                table_obj.output(["c1"])
+                .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6, {"nprobe" : "100"})
+                .to_result()
+            )
+            # print(data_dict["c1"])
+            assert data_dict["c1"] == [4, 4, 4, 4, 4, 2]
+
+            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            # print(data_dict)
+            assert data_dict["count(star)"] == [56]
+
+            table_obj.insert([{"c1": 6, "c2": [0.3, 0.2, 0.1, 0.4]} for i in range(2)])
+            # wait for memindex dump & delta checkpoint to dump
+            time.sleep(5)
+            table_obj.insert([{"c1": 8, "c2": [0.4, 0.3, 0.2, 0.1]}])
+
+        part2()
+
+        # 2. recover by delta ckp & dumpindex wal & memindex recovery
+        decorator3 = infinity_runner_decorator_factory(config3, uri, infinity_runner)
+
+        @decorator3
+        def part3(infinity_obj):
+            time.sleep(5)
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_mem_ivf")
+
+            def check():
+                data_dict, data_type_dict = (
+                    table_obj.output(["c1"])
+                    .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6)
+                    .to_result()
+                )
+                assert data_dict["c1"] == [8, 6, 6, 4, 4, 4]
+
+                data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+                assert data_dict["count(star)"] == [59]
+
+            check()
+            infinity_obj.optimize("default_db", "test_mem_ivf", optimize_opt=None)
+            check()
+
+            db_obj.drop_table("test_memidx1")
+
+        part3()
+
+    def test_mem_ivf_recover(self, infinity_runner : InfinityRunner):
+        infinity_runner.clear()
+
+
     def test_optimize_from_different_database(self, infinity_runner: InfinityRunner):
         infinity_runner.clear()
 
