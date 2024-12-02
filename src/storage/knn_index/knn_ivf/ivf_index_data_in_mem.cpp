@@ -72,9 +72,7 @@ u32 IVFIndexInMem::GetInputRowCount() const {
 }
 
 template <LogicalType column_logical_type, EmbeddingDataType embedding_data_type>
-struct InMemStorage {
-    SizeT MemoryUsed() const { UnrecoverableError("only embedding and multi-vector is supported!"); }
-};
+struct InMemStorage;
 
 template <EmbeddingDataType embedding_data_type>
 struct InMemStorage<LogicalType::kEmbedding, embedding_data_type> {
