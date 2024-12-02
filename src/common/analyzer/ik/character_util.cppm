@@ -81,76 +81,13 @@ public:
     }
 
     static std::wstring UTF8ToUTF16(const std::string &utf8_str) {
-        std::wstring utf16_str;
-        std::string_view utf8_view(utf8_str);
-
-        while (!utf8_view.empty()) {
-            if ((utf8_view[0] & 0x80) == 0) { // 1-byte character
-                utf16_str.push_back(static_cast<wchar_t>(utf8_view[0]));
-                utf8_view.remove_prefix(1);
-            } else if ((utf8_view[0] & 0xE0) == 0xC0) { // 2-byte character
-                if (utf8_view.size() < 2)
-                    throw std::invalid_argument("Invalid UTF-8 sequence");
-                utf16_str.push_back(static_cast<wchar_t>(((utf8_view[0] & 0x1F) << 6) | (utf8_view[1] & 0x3F)));
-                utf8_view.remove_prefix(2);
-            } else if ((utf8_view[0] & 0xF0) == 0xE0) { // 3-byte character
-                if (utf8_view.size() < 3)
-                    throw std::invalid_argument("Invalid UTF-8 sequence");
-                utf16_str.push_back(static_cast<wchar_t>(((utf8_view[0] & 0x0F) << 12) | ((utf8_view[1] & 0x3F) << 6) | (utf8_view[2] & 0x3F)));
-                utf8_view.remove_prefix(3);
-            } else if ((utf8_view[0] & 0xF8) == 0xF0) { // 4-byte character
-                if (utf8_view.size() < 4)
-                    throw std::invalid_argument("Invalid UTF-8 sequence");
-                uint32_t code_point =
-                    ((utf8_view[0] & 0x07) << 18) | ((utf8_view[1] & 0x3F) << 12) | ((utf8_view[2] & 0x3F) << 6) | (utf8_view[3] & 0x3F);
-                if (code_point <= 0xFFFF) {
-                    utf16_str.push_back(static_cast<wchar_t>(code_point));
-                } else {
-                    code_point -= 0x10000;
-                    utf16_str.push_back(static_cast<wchar_t>((code_point >> 10) + 0xD800));
-                    utf16_str.push_back(static_cast<wchar_t>((code_point & 0x3FF) + 0xDC00));
-                }
-                utf8_view.remove_prefix(4);
-            } else {
-                throw std::invalid_argument("Invalid UTF-8 sequence");
-            }
-        }
-
-        return utf16_str;
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> converter;
+        return converter.from_bytes(utf8_str);
     }
 
     static std::string UTF16ToUTF8(const std::wstring &utf16_str) {
-        std::string utf8_str;
-        std::wstring_view utf16_view(utf16_str);
-
-        while (!utf16_view.empty()) {
-            if (utf16_view[0] < 0xD800 || utf16_view[0] > 0xDFFF) { // Basic Multilingual Plane
-                uint32_t code_point = utf16_view[0];
-                if (code_point <= 0x7F) {
-                    utf8_str.push_back(static_cast<char>(code_point));
-                } else if (code_point <= 0x7FF) {
-                    utf8_str.push_back(static_cast<char>(0xC0 | (code_point >> 6)));
-                    utf8_str.push_back(static_cast<char>(0x80 | (code_point & 0x3F)));
-                } else {
-                    utf8_str.push_back(static_cast<char>(0xE0 | (code_point >> 12)));
-                    utf8_str.push_back(static_cast<char>(0x80 | ((code_point >> 6) & 0x3F)));
-                    utf8_str.push_back(static_cast<char>(0x80 | (code_point & 0x3F)));
-                }
-                utf16_view.remove_prefix(1);
-            } else {
-                if (utf16_view.size() < 2 || utf16_view[0] < 0xD800 || utf16_view[0] > 0xDBFF || utf16_view[1] < 0xDC00 || utf16_view[1] > 0xDFFF) {
-                    throw std::invalid_argument("Invalid UTF-16 sequence");
-                }
-                uint32_t code_point = 0x10000 + ((utf16_view[0] - 0xD800) << 10) + (utf16_view[1] - 0xDC00);
-                utf8_str.push_back(static_cast<char>(0xF0 | (code_point >> 18)));
-                utf8_str.push_back(static_cast<char>(0x80 | ((code_point >> 12) & 0x3F)));
-                utf8_str.push_back(static_cast<char>(0x80 | ((code_point >> 6) & 0x3F)));
-                utf8_str.push_back(static_cast<char>(0x80 | (code_point & 0x3F)));
-                utf16_view.remove_prefix(2);
-            }
-        }
-
-        return utf8_str;
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> converter;
+        return converter.to_bytes(utf16_str);
     }
 };
 } // namespace infinity

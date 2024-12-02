@@ -2,6 +2,7 @@ module;
 
 import stl;
 import hit;
+import third_party;
 
 #include <algorithm>
 
@@ -9,7 +10,6 @@ module ik_dict_segment;
 
 namespace infinity {
 
-HashMap<wchar_t, wchar_t> DictSegment::char_map_;
 DictSegment::DictSegment(wchar_t node_char) : node_char_(node_char) {}
 
 Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length, Hit *search_hit) {
@@ -41,6 +41,7 @@ Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length
     }
 
     if (ds != nullptr) {
+        fmt::print("ds! begin {} length {}\n", begin, length);
         if (length > 1) {
             return ds->Match(char_array, begin + 1, length - 1, search_hit);
         } else if (length == 1) {
@@ -59,12 +60,14 @@ Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length
 
 void DictSegment::FillSegment(const Vector<wchar_t> &char_array, int begin, int length, int enabled) {
     wchar_t begin_char = char_array[begin];
-    wchar_t key_char = char_map_[begin_char];
-    if (key_char == L'\0') {
+    wchar_t key_char;
+    HashMap<wchar_t, wchar_t>::iterator it = char_map_.find(begin_char);
+    if (it == char_map_.end()) {
         char_map_[begin_char] = begin_char;
         key_char = begin_char;
+    } else {
+        key_char = it->second;
     }
-
     DictSegment *ds = LookforSegment(key_char, enabled);
     if (ds != nullptr) {
         if (length > 1) {

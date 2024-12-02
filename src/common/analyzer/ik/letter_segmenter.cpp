@@ -27,16 +27,9 @@ LetterSegmenter::LetterSegmenter() {
 }
 
 void LetterSegmenter::Analyze(AnalyzeContext *context) {
-    bool buffer_lock_flag = false;
-    buffer_lock_flag = ProcessEnglishLetter(context) || buffer_lock_flag;
-    buffer_lock_flag = ProcessArabicLetter(context) || buffer_lock_flag;
-    buffer_lock_flag = ProcessMixLetter(context) || buffer_lock_flag;
-
-    if (buffer_lock_flag) {
-        context->LockBuffer(SEGMENTER_NAME);
-    } else {
-        context->UnlockBuffer(SEGMENTER_NAME);
-    }
+    ProcessEnglishLetter(context);
+    ProcessArabicLetter(context);
+    ProcessMixLetter(context);
 }
 
 void LetterSegmenter::Reset() {

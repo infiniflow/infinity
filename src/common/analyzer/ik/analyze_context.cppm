@@ -59,15 +59,7 @@ public:
 
     bool MoveCursor();
 
-    void LockBuffer(const std::wstring &segmenter_name) { buff_locker_.insert(segmenter_name); }
-
-    void UnlockBuffer(const std::wstring &segmenter_name) { buff_locker_.erase(segmenter_name); }
-
-    bool IsBufferLocked() const { return !buff_locker_.empty(); }
-
     bool IsBufferConsumed() const { return cursor_ == available_ - 1; }
-
-    bool NeedRefillBuffer() const;
 
     void MarkBufferOffset() { buff_offset_ += cursor_; }
 

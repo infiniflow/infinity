@@ -8,7 +8,7 @@ namespace infinity {
 
 export class DictSegment {
 public:
-    static HashMap<wchar_t, wchar_t> char_map_;
+    HashMap<wchar_t, wchar_t> char_map_;
 
     static const int ARRAY_LENGTH_LIMIT = 3;
 

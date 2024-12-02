@@ -61,12 +61,6 @@ void CJKSegmenter::Analyze(AnalyzeContext *context) {
     if (context->IsBufferConsumed()) {
         tmp_hits_.clear();
     }
-
-    if (tmp_hits_.empty()) {
-        context->UnlockBuffer(SEGMENTER_NAME);
-    } else {
-        context->LockBuffer(SEGMENTER_NAME);
-    }
 }
 
 void CJKSegmenter::Reset() { tmp_hits_.clear(); }

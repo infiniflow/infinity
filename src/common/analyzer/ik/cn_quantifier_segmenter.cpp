@@ -33,12 +33,6 @@ CNQuantifierSegmenter::CNQuantifierSegmenter(Dictionary *dict) : dict_(dict) {
 void CNQuantifierSegmenter::Analyze(AnalyzeContext *context) {
     ProcessCNumber(context);
     ProcessCount(context);
-
-    if (nstart_ == -1 && nend_ == -1 && count_hits_.empty()) {
-        context->UnlockBuffer(SEGMENTER_NAME);
-    } else {
-        context->LockBuffer(SEGMENTER_NAME);
-    }
 }
 
 void CNQuantifierSegmenter::Reset() {

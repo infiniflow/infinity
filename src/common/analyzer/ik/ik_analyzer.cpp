@@ -72,9 +72,6 @@ int IKAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
         for (auto &segmenter : segmenters_) {
             segmenter->Analyze(context_.get());
         }
-        if (context_->NeedRefillBuffer()) {
-            break;
-        }
     } while (context_->MoveCursor());
     for (auto &segmenter : segmenters_) {
         segmenter->Reset();

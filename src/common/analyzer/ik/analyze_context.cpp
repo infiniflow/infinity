@@ -52,10 +52,6 @@ bool AnalyzeContext::MoveCursor() {
     }
 }
 
-bool AnalyzeContext::NeedRefillBuffer() const {
-    return available_ == BUFF_SIZE && cursor_ < available_ - 1 && cursor_ > available_ - BUFF_EXHAUST_CRITICAL && !IsBufferLocked();
-}
-
 void AnalyzeContext::AddLexeme(Lexeme *lexeme) { org_lexemes_.AddLexeme(lexeme); }
 
 void AnalyzeContext::AddLexemePath(LexemePath *path) {
