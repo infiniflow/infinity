@@ -35,6 +35,7 @@ import wal_manager;
 import global_resource_usage;
 import infinity_thrift_service;
 import defer_op;
+import virtual_store;
 
 namespace infinity {
 
@@ -153,6 +154,9 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     break;
                 }
                 case NodeRole::kLeader: {
+                    if(config_->StorageType() == StorageType::kLocal) {
+                        return Status::InvalidStorageType("shared storage", "local");
+                    }
                     // No need to un-init cluster manager, since current is admin
                     Status init_status = cluster_manager_->InitAsLeader(node_name);
                     if (!init_status.ok()) {
@@ -169,6 +173,10 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     break;
                 }
                 case NodeRole::kFollower: {
+                    if(config_->StorageType() == StorageType::kLocal) {
+                        return Status::InvalidStorageType("shared storage", "local");
+                    }
+
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kReadable);
                     if (!set_storage_status.ok()) {
                         return set_storage_status;
@@ -189,6 +197,10 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     break;
                 }
                 case NodeRole::kLearner: {
+                    if(config_->StorageType() == StorageType::kLocal) {
+                        return Status::InvalidStorageType("shared storage", "local");
+                    }
+
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kReadable);
                     if (!set_storage_status.ok()) {
                         return set_storage_status;

@@ -4111,6 +4111,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             }
         }
     } else {
+        NodeRole server_role = InfinityContext::instance().GetServerRole();
         {
             SizeT column_id = 0;
             {
@@ -4121,7 +4122,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
 
             ++column_id;
             {
-                Value value = Value::MakeVarchar(ToString(InfinityContext::instance().GetServerRole()));
+                Value value = Value::MakeVarchar(ToString(server_role));
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
@@ -4139,7 +4140,7 @@ QueryResult AdminExecutor::ShowCurrentNode(QueryContext *query_context, const Ad
             {
                 bool infinity_started = InfinityContext::instance().InfinityContextStarted();
                 String infinity_status("started");
-                if (!infinity_started) {
+                if (!infinity_started && server_role != NodeRole::kAdmin) {
                     infinity_status = "starting";
                 }
                 Value value = Value::MakeVarchar(infinity_status);
