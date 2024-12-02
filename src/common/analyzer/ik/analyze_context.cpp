@@ -52,7 +52,7 @@ bool AnalyzeContext::MoveCursor() {
     }
 }
 
-void AnalyzeContext::AddLexeme(Lexeme *lexeme) { org_lexemes_.AddLexeme(lexeme); }
+void AnalyzeContext::AddLexeme(Lexeme *lexeme) { org_lexemes_->AddLexeme(lexeme); }
 
 void AnalyzeContext::AddLexemePath(LexemePath *path) {
     if (path != nullptr) {
@@ -116,8 +116,7 @@ Lexeme *AnalyzeContext::GetNextLexeme() {
 }
 
 void AnalyzeContext::Reset() {
-    buff_locker_.clear();
-    org_lexemes_ = QuickSortSet();
+    org_lexemes_ = MakeUnique<QuickSortSet>();
     available_ = 0;
     buff_offset_ = 0;
     char_types_.clear();

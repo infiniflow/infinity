@@ -31,9 +31,7 @@ public:
 
     int last_useless_char_num_;
 
-    HashSet<std::wstring> buff_locker_;
-
-    QuickSortSet org_lexemes_;
+    UniquePtr<QuickSortSet> org_lexemes_;
 
     HashMap<int, UniquePtr<LexemePath>> path_map_;
 
@@ -67,7 +65,7 @@ public:
 
     void AddLexemePath(LexemePath *path);
 
-    QuickSortSet *GetOrgLexemes() { return &(org_lexemes_); }
+    QuickSortSet *GetOrgLexemes() { return org_lexemes_.get(); }
 
     void OutputToResult();
 

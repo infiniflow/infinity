@@ -2,6 +2,7 @@ module;
 
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
@@ -19,17 +20,21 @@ namespace fs = std::filesystem;
 
 namespace infinity {
 
-const String PATH_DIC_MAIN = "ik/main.dic";
-const String PATH_DIC_SURNAME = "ik/surname.dic";
-const String PATH_DIC_QUANTIFIER = "ik/quantifier.dic";
-const String PATH_DIC_SUFFIX = "ik/suffix.dic";
-const String PATH_DIC_PREP = "ik/preposition.dic";
-const String PATH_DIC_STOP = "ik/stopword.dic";
-const String FILE_NAME = "ik/IKAnalyzer.cfg.xml";
-const String EXT_DICT = "ik/ext_dict";
-const String EXT_STOP = "ik/ext_stopwords";
+const String PATH_DIC_MAIN = "main.dic";
+const String PATH_DIC_SURNAME = "surname.dic";
+const String PATH_DIC_QUANTIFIER = "quantifier.dic";
+const String PATH_DIC_SUFFIX = "suffix.dic";
+const String PATH_DIC_PREP = "preposition.dic";
+const String PATH_DIC_STOP = "stopword.dic";
+const String FILE_NAME = "IKAnalyzer.cfg.xml";
+const String EXT_DICT = "ext_dict";
+const String EXT_STOP = "ext_stopwords";
 
-Dictionary::Dictionary(const String &dir) : conf_dir_(dir) {}
+Dictionary::Dictionary(const String &dir) {
+    fs::path root(dir);
+    fs::path ik_root = root / "ik";
+    conf_dir_ = ik_root.string();
+}
 
 Status Dictionary::Load() {
     Status load_status;
@@ -94,6 +99,7 @@ Status Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool
     if (!is.is_open()) {
         return Status::InvalidAnalyzerFile(file_path);
     }
+    std::cout << "Load " << file_path << std::endl;
     std::string line;
     while (std::getline(is, line)) {
         std::wstring word = CharacterUtil::UTF8ToUTF16(line);
@@ -196,7 +202,6 @@ Status Dictionary::LoadExtDict() {
     Status load_status;
     if (!ext_dict_files.empty()) {
         for (const String &ext_dict_name : ext_dict_files) {
-            std::cout << "[Dict Loading] " << ext_dict_name << std::endl;
             String file = fs::path(conf_dir_) / fs::path(ext_dict_name).string();
             load_status = LoadDictFile(main_dict_.get(), file, false, "Extra Dict");
             if (!load_status.ok()) {
@@ -219,7 +224,6 @@ Status Dictionary::LoadStopWordDict() {
     Vector<String> ext_stopword_dict_files = GetExtStopWordDictionarys();
     if (!ext_stopword_dict_files.empty()) {
         for (const String &ext_stopword_dict_file : ext_stopword_dict_files) {
-            std::cout << "[Dict Loading] " << ext_stopword_dict_file << std::endl;
             String file = fs::path(conf_dir_) / fs::path(ext_stopword_dict_file).string();
             load_status = LoadDictFile(stop_words_.get(), file, false, "Extra Stopwords");
             if (!load_status.ok()) {
@@ -274,10 +278,11 @@ void Dictionary::ParseProperties(const String &content) {
     std::stringstream ss(content);
     String line;
     while (std::getline(ss, line)) {
-        size_t pos = line.find('=');
-        if (pos != String::npos) {
-            String key = line.substr(0, pos);
-            String value = line.substr(pos + 1);
+        std::regex attribute_regex(R"#(<entry key="([^"]+)">([^<]+)</entry>)#");
+        std::smatch match;
+        if (std::regex_search(line, match, attribute_regex)) {
+            std::string key = match[1].str();
+            std::string value = match[2].str();
             props_[key] = value;
         }
     }

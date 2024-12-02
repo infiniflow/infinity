@@ -66,6 +66,7 @@ int IKAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     unsigned level = 0;
     unsigned offset = 0;
     std::wstring line = CharacterUtil::UTF8ToUTF16(input.text_);
+    context_->Reset();
     context_->FillBuffer(line);
     context_->InitCursor();
     do {
