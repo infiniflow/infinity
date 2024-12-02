@@ -167,7 +167,7 @@ class TestMemIdx:
 
         part1()
 
-        # config1 can hold 6 rows of hnsw mem index before dump
+        # config1 can hold 51 rows of ivf mem index before dump
         # 1. recover by dumpindex wal & memindex recovery
         decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
 
