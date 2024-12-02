@@ -3781,7 +3781,7 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 **GET** `/admin/nodes`
 
-Lists all nodes in the cluster.
+Lists all nodes in the cluster
 
 #### Request
 
@@ -3809,19 +3809,38 @@ The response includes a JSON object like the following:
 
 ```shell
 {
-    "error_code":0,
-    "nodes":[
-        ["following","follower"],
-        ["boss","leader"],
-        ["learning","learner"]
-    ]
+  "error_code": 0,
+  "nodes": [
+    {
+      "address": "0.0.0.0:23852",
+      "heartbeat": "91",
+      "last_update": "Mon Dec  2 14:48:34 2024\n",
+      "name": "follower",
+      "role": "follower",
+      "status": "alive"
+    },
+    {
+      "address": "0.0.0.0:23851",
+      "heartbeat": "0",
+      "last_update": "Mon Dec  2 14:48:34 2024\n",
+      "name": "boss",
+      "role": "leader",
+      "status": "alive"
+    }
+  ]
 }
 ```
 
-- `"error_code"`: `integer`  
+- `"error_code"`: `integer`
   `0`: The operation succeeds.
-- `"nodes" : array` : 
-  Each element is in `[nodename, noderole]` format.
+- `"nodes" : array` :  
+  Each element is an object with following information:
+    - `"address"` : The IP address of the node.
+    - `"heartbeat"` : The number of heartbeat messages received from the leader. For non-leader roles only.
+    - `"name"` : The node's name.
+    - `"role"` : The node's role.
+    - `"status"` : The node's status, this is one of `"invalid"`, `"alive"`, `"lostconnection"`, `"removed"`, `"timeout"`.
+    - `"last_update"` : The last time that this node is updated.
 
 ---
 
