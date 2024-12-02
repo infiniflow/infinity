@@ -3836,7 +3836,7 @@ The response includes a JSON object like the following:
 - `"nodes" : array` :  
   Each element is an object with following information:
     - `"address"` : The IP address of the node.
-    - `"heartbeat"` : only valid for non-leader role, this is the number of heartbeat message received from the leader.
+    - `"heartbeat"` : The number of heartbeat messages received from the leader. For non-leader roles only.
     - `"name"` : the node's name.
     - `"role"` : the node's role.
     - `"status"` : the current status of the node.
