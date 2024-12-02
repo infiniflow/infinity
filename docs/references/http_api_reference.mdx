@@ -3839,7 +3839,8 @@ The response includes a JSON object like the following:
     - `"heartbeat"` : The number of heartbeat messages received from the leader. For non-leader roles only.
     - `"name"` : The node's name.
     - `"role"` : The node's role.
-    - `"status"` : The node's status.
+    - `"status"` : The node's status, this is one of `"invalid"`, `"alive"`, `"lostconnection"`, `"removed"`, `"timeout"`.
+    - `"last_update"` : The last time that this node is updated.
 
 ---
 
