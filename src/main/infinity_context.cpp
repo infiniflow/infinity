@@ -64,6 +64,7 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, bool admi
     config_ = MakeUnique<Config>();
     auto status = config_->Init(config_path, default_config);
     if (!status.ok()) {
+        fmt::print("Error: {}\n", status.message());
         std::exit(static_cast<int>(status.code()));
     }
     InfinityContext::instance().config()->PrintAll(); // Print all configs
