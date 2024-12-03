@@ -24,6 +24,7 @@ import internal_types;
 namespace infinity {
 
 export enum class EarlyTermAlgo {
+    kAuto,
     kNaive,
     kBatch,
     kBMW,

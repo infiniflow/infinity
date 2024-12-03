@@ -74,213 +74,191 @@ import score_threshold_iterator;
 
 namespace infinity {
 
-void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
-    float diff_percent = std::abs(a - b) / std::max(std::abs(a), std::abs(b));
-    if (diff_percent > bar) {
-        OStringStream oss;
-        oss << "result mismatch at " << i << " : a: " << a << ", b: " << b << ", diff_percent: " << diff_percent << std::endl;
-        Status status = Status::SyntaxError("Debug Info: " + std::move(oss).str());
-        RecoverableError(status);
-    }
-}
+struct QueryIterators {
+    UniquePtr<DocIterator> query_iter{};
+    // for comparison
+    UniquePtr<DocIterator> bmw_iter{};
+    UniquePtr<DocIterator> batch_iter{};
+    UniquePtr<DocIterator> naive_iter{};
+};
 
-void ExecuteFTSearch(UniquePtr<DocIterator> &et_iter, FullTextScoreResultHeap &result_heap, u32 &blockmax_loop_cnt) {
-    // et_iter is nullptr if fulltext index is present but there's no data
-    if (et_iter == nullptr) {
-        LOG_DEBUG(fmt::format("et_iter is nullptr"));
-        return;
-    }
-    while (true) {
-        ++blockmax_loop_cnt;
-        bool ok = et_iter->Next();
-        if (!ok) [[unlikely]] {
-            break;
+QueryIterators CreateQueryIterators(QueryBuilder &query_builder,
+                                    FullTextQueryContext &context,
+                                    const EarlyTermAlgo early_term_algo,
+                                    const float begin_threshold,
+                                    const float score_threshold) {
+    auto get_iter = [&query_builder, &context, begin_threshold, score_threshold, function_name = __func__](const EarlyTermAlgo algo) {
+        switch (algo) {
+            case EarlyTermAlgo::kAuto:
+            case EarlyTermAlgo::kNaive:
+            case EarlyTermAlgo::kBatch:
+            case EarlyTermAlgo::kBMW: {
+                // ok
+                break;
+            }
+            case EarlyTermAlgo::kCompare: {
+                UnrecoverableError(std::format("{}: Wrong parameter!", function_name));
+                break;
+            }
         }
-        RowID id = et_iter->DocID();
-        float et_score = et_iter->Score();
-        if (SHOULD_LOG_DEBUG()) {
-            OStringStream oss;
-            et_iter->PrintTree(oss, "", true);
-            String msg = fmt::format("Found candidate doc_id {} score {}\n", id.ToUint64(), et_score);
-            msg += oss.str();
-            LOG_DEBUG(msg);
+        context.early_term_algo_ = algo;
+        auto iter = query_builder.CreateSearch(context);
+        // iter is nullptr if fulltext index is present but there's no data
+        if (iter) {
+            iter->UpdateScoreThreshold(std::max(begin_threshold, score_threshold));
+            if (score_threshold > 0.0f) {
+                auto new_iter = MakeUnique<ScoreThresholdIterator>(std::move(iter), score_threshold);
+                iter = std::move(new_iter);
+            }
         }
-        if (result_heap.AddResult(et_score, id)) {
-            // update threshold
-            et_iter->UpdateScoreThreshold(result_heap.GetScoreThreshold());
-        }
-        if (blockmax_loop_cnt % 10 == 0) {
-            LOG_DEBUG(fmt::format("ExecuteFTSearch has evaluated {} candidates", blockmax_loop_cnt));
-        }
-    }
-}
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-variable"
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {
-    using TimeDurationType = std::chrono::duration<float, std::milli>;
-    auto execute_start_time = std::chrono::high_resolution_clock::now();
-    // 1. build QueryNode tree
-    // 1.1 populate column2analyzer
-    //    Txn *txn = query_context->GetTxn();
-    QueryBuilder query_builder(base_table_ref_.get());
-    query_builder.Init(index_reader_);
-    auto finish_init_query_builder_time = std::chrono::high_resolution_clock::now();
-    TimeDurationType query_builder_init_duration = finish_init_query_builder_time - execute_start_time;
-    LOG_DEBUG(fmt::format("PhysicalMatch 0: Init QueryBuilder time: {} ms", query_builder_init_duration.count()));
-
-    // 1.2 parse options into map, populate default_field
-    bool use_ordinary_iter = false;
-    bool use_block_max_iter = false;
-
-    switch (early_term_algo_) {
+        return iter;
+    };
+    QueryIterators query_iterators;
+    switch (early_term_algo) {
+        case EarlyTermAlgo::kAuto:
+        case EarlyTermAlgo::kNaive:
+        case EarlyTermAlgo::kBatch:
         case EarlyTermAlgo::kBMW: {
-            use_block_max_iter = true;
-            break;
-        }
-        case EarlyTermAlgo::kNaive: {
-            use_ordinary_iter = true;
+            query_iterators.query_iter = get_iter(early_term_algo);
             break;
         }
         case EarlyTermAlgo::kCompare: {
-            use_ordinary_iter = true;
-            use_block_max_iter = true;
-            break;
-        }
-        default: {
-            use_block_max_iter = true;
+            query_iterators.bmw_iter = get_iter(EarlyTermAlgo::kBMW);
+            query_iterators.batch_iter = get_iter(EarlyTermAlgo::kBatch);
+            query_iterators.naive_iter = get_iter(EarlyTermAlgo::kNaive);
             break;
         }
     }
+    return query_iterators;
+}
 
-    auto finish_parse_query_tree_time = std::chrono::high_resolution_clock::now();
-    TimeDurationType parse_query_tree_duration = finish_parse_query_tree_time - finish_init_query_builder_time;
-    LOG_DEBUG(fmt::format("PhysicalMatch 1: Parse QueryNode tree time: {} ms", parse_query_tree_duration.count()));
+void ASSERT_FLOAT_EQ(const float bar, const u32 i, const float a, const float b) {
+    const float diff_percent = std::abs(a - b) / std::max(std::abs(a), std::abs(b));
+    if (diff_percent > bar) {
+        OStringStream oss;
+        oss << "Debug Info: result mismatch at " << i << " : a: " << a << ", b: " << b << ", diff_percent: " << diff_percent << std::endl;
+        LOG_ERROR(std::move(oss).str());
+    }
+}
 
-    // 2 build query iterator
-    // result
-    FullTextQueryContext full_text_query_context(ft_similarity_, minimum_should_match_option_, match_expr_->index_names_);
-    u32 result_count = 0;
-    const float *score_result = nullptr;
-    const RowID *row_id_result = nullptr;
-    // for comparison
-    UniquePtr<DocIterator> et_iter;
-    UniquePtr<DocIterator> doc_iterator;
-    u32 ordinary_loop_cnt = 0;
-    u32 blockmax_loop_cnt = 0;
-    u32 ordinary_result_count = 0;
-    u32 blockmax_result_count = 0;
-    UniquePtr<float[]> ordinary_score_result;
-    UniquePtr<RowID[]> ordinary_row_id_result;
-    UniquePtr<float[]> blockmax_score_result;
-    UniquePtr<RowID[]> blockmax_row_id_result;
-    TimeDurationType ordinary_duration = {};
-    TimeDurationType blockmax_duration = {};
-    assert(common_query_filter_);
-    full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
+u32 ExecuteFTSearch(DocIterator *iter, FullTextScoreResultHeap &result_heap) {
+    u32 loop_cnt = 0;
+    // iter is nullptr if fulltext index is present but there's no data
+    if (!iter) {
+        LOG_DEBUG("iter is nullptr");
+        return loop_cnt;
+    }
+    while (true) {
+        ++loop_cnt;
+        if (!(iter->Next())) [[unlikely]] {
+            break;
+        }
+        if (result_heap.AddResult(iter->Score(), iter->DocID())) {
+            // update threshold
+            iter->UpdateScoreThreshold(result_heap.GetScoreThreshold());
+        }
+    }
+    return loop_cnt;
+}
 
-    if (use_block_max_iter) {
-        full_text_query_context.early_term_algo_ = EarlyTermAlgo::kBMW;
-        et_iter = query_builder.CreateSearch(full_text_query_context);
-        // et_iter is nullptr if fulltext index is present but there's no data
-        if (et_iter != nullptr) {
-            et_iter->UpdateScoreThreshold(std::max(begin_threshold_, score_threshold_));
-            if (score_threshold_ > 0.0f) {
-                auto new_et_iter = MakeUnique<ScoreThresholdIterator>(std::move(et_iter), score_threshold_);
-                et_iter = std::move(new_et_iter);
+auto ExecuteFTSearch(const QueryIterators &query_iterators, const u32 topn) {
+    struct FTSearchResultType {
+        u32 result_count{};
+        UniquePtr<float[]> score_result{};
+        UniquePtr<RowID[]> row_id_result{};
+    };
+    auto GetFTSearchResult = [topn](const UniquePtr<DocIterator> &iter) {
+        FTSearchResultType result;
+        result.score_result = MakeUniqueForOverwrite<float[]>(topn);
+        result.row_id_result = MakeUniqueForOverwrite<RowID[]>(topn);
+        FullTextScoreResultHeap result_heap(topn, result.score_result.get(), result.row_id_result.get());
+        [[maybe_unused]] const auto loop_cnt = ExecuteFTSearch(iter.get(), result_heap);
+        result_heap.Sort();
+        result.result_count = result_heap.GetResultSize();
+        return result;
+    };
+    if (query_iterators.query_iter) [[likely]] {
+        return GetFTSearchResult(query_iterators.query_iter);
+    }
+    // compare
+    auto bmw_result = GetFTSearchResult(query_iterators.bmw_iter);
+    FTSearchResultType naive_result;
+    {
+        naive_result.score_result = MakeUniqueForOverwrite<float[]>(topn);
+        naive_result.row_id_result = MakeUniqueForOverwrite<RowID[]>(topn);
+        FullTextScoreResultHeap result_heap(topn, naive_result.score_result.get(), naive_result.row_id_result.get());
+        if (query_iterators.batch_iter || query_iterators.naive_iter) {
+            if (!query_iterators.batch_iter || !query_iterators.naive_iter) {
+                UnrecoverableError("batch_iter and naive_iter should be both nullptr or both not nullptr");
+            }
+            while (true) {
+                const auto batch_next = query_iterators.batch_iter->Next();
+                const auto naive_next = query_iterators.naive_iter->Next();
+                if (!batch_next && !naive_next) {
+                    break;
+                }
+                if (!batch_next || !naive_next) {
+                    LOG_ERROR("Conflict: batch_next and naive_next should be both true or both false");
+                    break;
+                }
+                const auto batch_score = query_iterators.batch_iter->Score();
+                const auto naive_score = query_iterators.naive_iter->Score();
+                const auto batch_doc_id = query_iterators.batch_iter->DocID();
+                const auto naive_doc_id = query_iterators.naive_iter->DocID();
+                const auto batch_match_count = query_iterators.batch_iter->MatchCount();
+                const auto naive_match_count = query_iterators.naive_iter->MatchCount();
+                if (batch_doc_id != naive_doc_id) {
+                    LOG_ERROR(fmt::format("doc_id mismatch between batch and naive: {} vs {}", batch_doc_id.ToString(), naive_doc_id.ToString()));
+                }
+                if (batch_match_count != naive_match_count) {
+                    LOG_ERROR(fmt::format("match count mismatch between batch and naive: {} vs {}", batch_match_count, naive_match_count));
+                }
+                if (std::abs(batch_score - naive_score) / std::max(std::abs(batch_score), std::abs(naive_score)) > 1e-4) {
+                    LOG_ERROR(fmt::format("score mismatch between batch and naive: {} vs {}", batch_score, naive_score));
+                }
+                result_heap.AddResult(naive_score, naive_doc_id);
             }
         }
+        result_heap.Sort();
+        naive_result.result_count = result_heap.GetResultSize();
     }
-    if (use_ordinary_iter) {
-        full_text_query_context.early_term_algo_ = EarlyTermAlgo::kNaive;
-        doc_iterator = query_builder.CreateSearch(full_text_query_context);
-        if (doc_iterator && score_threshold_ > 0.0f) {
-            auto new_doc_iter = MakeUnique<ScoreThresholdIterator>(std::move(doc_iterator), score_threshold_);
-            doc_iterator = std::move(new_doc_iter);
-        }
+    if (bmw_result.result_count != naive_result.result_count) {
+        LOG_ERROR(fmt::format("result count mismatch between bmw and naive: {} vs {}", bmw_result.result_count, naive_result.result_count));
     }
+    for (u32 i = 0; i < std::min(bmw_result.result_count, naive_result.result_count); ++i) {
+        ASSERT_FLOAT_EQ(1e-4, i, bmw_result.score_result[i], naive_result.score_result[i]);
+    }
+    return bmw_result;
+}
+
+bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *operator_state) {
+    if (!common_query_filter_) {
+        UnrecoverableError(fmt::format("{}: common_query_filter_ is nullptr", __func__));
+    }
+    using TimeDurationType = std::chrono::duration<float, std::milli>;
+    const auto execute_start_time = std::chrono::high_resolution_clock::now();
+    // 1. build QueryNode tree
+    QueryBuilder query_builder(base_table_ref_.get());
+    query_builder.Init(index_reader_);
+    const auto finish_init_query_builder_time = std::chrono::high_resolution_clock::now();
+    LOG_DEBUG(fmt::format("PhysicalMatch 1: Init QueryBuilder time: {} ms",
+                          static_cast<TimeDurationType>(finish_init_query_builder_time - execute_start_time).count()));
+
+    // 2 build query iterator
+    FullTextQueryContext full_text_query_context(ft_similarity_, minimum_should_match_option_, match_expr_->index_names_);
+    full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
+    const auto query_iterators = CreateQueryIterators(query_builder, full_text_query_context, early_term_algo_, begin_threshold_, score_threshold_);
+    const auto finish_query_builder_time = std::chrono::high_resolution_clock::now();
+    LOG_DEBUG(fmt::format("PhysicalMatch Part 2: Build Query iterator time: {} ms",
+                          static_cast<TimeDurationType>(finish_query_builder_time - finish_init_query_builder_time).count()));
 
     // 3 full text search
-
-    auto finish_query_builder_time = std::chrono::high_resolution_clock::now();
-    TimeDurationType query_builder_duration = finish_query_builder_time - finish_parse_query_tree_time;
-    LOG_DEBUG(fmt::format("PhysicalMatch Part 2: Build Query iterator time: {} ms", query_builder_duration.count()));
-    if (use_block_max_iter) {
-        blockmax_score_result = MakeUniqueForOverwrite<float[]>(top_n_);
-        blockmax_row_id_result = MakeUniqueForOverwrite<RowID[]>(top_n_);
-        FullTextScoreResultHeap result_heap(top_n_, blockmax_score_result.get(), blockmax_row_id_result.get());
-#ifdef INFINITY_DEBUG
-        auto blockmax_begin_ts = std::chrono::high_resolution_clock::now();
-#endif
-        ExecuteFTSearch(et_iter, result_heap, blockmax_loop_cnt);
-        result_heap.Sort();
-        blockmax_result_count = result_heap.GetResultSize();
-#ifdef INFINITY_DEBUG
-        auto blockmax_end_ts = std::chrono::high_resolution_clock::now();
-        blockmax_duration = blockmax_end_ts - blockmax_begin_ts;
-#endif
-    }
-    if (use_ordinary_iter) {
-        ordinary_score_result = MakeUniqueForOverwrite<float[]>(top_n_);
-        ordinary_row_id_result = MakeUniqueForOverwrite<RowID[]>(top_n_);
-        FullTextScoreResultHeap result_heap(top_n_, ordinary_score_result.get(), ordinary_row_id_result.get());
-#ifdef INFINITY_DEBUG
-        auto ordinary_begin_ts = std::chrono::high_resolution_clock::now();
-#endif
-        ExecuteFTSearch(doc_iterator, result_heap, ordinary_loop_cnt);
-        result_heap.Sort();
-        ordinary_result_count = result_heap.GetResultSize();
-#ifdef INFINITY_DEBUG
-        auto ordinary_end_ts = std::chrono::high_resolution_clock::now();
-        ordinary_duration = ordinary_end_ts - ordinary_begin_ts;
-#endif
-    }
-    if (use_block_max_iter) {
-        result_count = blockmax_result_count;
-        score_result = blockmax_score_result.get();
-        row_id_result = blockmax_row_id_result.get();
-    } else {
-        result_count = ordinary_result_count;
-        score_result = ordinary_score_result.get();
-        row_id_result = ordinary_row_id_result.get();
-    }
+    const auto [result_count, score_result, row_id_result] = ExecuteFTSearch(query_iterators, top_n_);
     auto finish_query_time = std::chrono::high_resolution_clock::now();
-    TimeDurationType query_duration = finish_query_time - finish_query_builder_time;
-    LOG_DEBUG(fmt::format("PhysicalMatch Part 3: Full text search time: {} ms", query_duration.count()));
-#ifdef INFINITY_DEBUG
-    {
-        OStringStream stat_info;
-        stat_info << "Full text search stat:\n";
-        if (use_block_max_iter) {
-            stat_info << "blockmax_duration: " << blockmax_duration << std::endl;
-            stat_info << "blockmax_loop_cnt: " << blockmax_loop_cnt << std::endl;
-        }
-        if (use_ordinary_iter) {
-            stat_info << "ordinary_duration: " << ordinary_duration << std::endl;
-            stat_info << "ordinary_loop_cnt: " << ordinary_loop_cnt << std::endl;
-        }
-        LOG_DEBUG(std::move(stat_info).str());
-    }
-    if (use_ordinary_iter and use_block_max_iter) {
-        OStringStream compare_info;
-        compare_info << "Compare ordinary and blockmax:\n";
-        compare_info << "duration ratio: " << blockmax_duration.count() / ordinary_duration.count() << std::endl;
-        compare_info << "loop count ratio: " << (static_cast<float>(blockmax_loop_cnt) / ordinary_loop_cnt) << std::endl;
-        LOG_DEBUG(std::move(compare_info).str());
-        if (ordinary_result_count != blockmax_result_count) {
-            Status status = Status::SyntaxError("Debug Info: result count mismatch!");
-            RecoverableError(status);
-        }
-        for (u32 i = 0; i < result_count; ++i) {
-            ASSERT_FLOAT_EQ(1e-4, i, ordinary_score_result[i], blockmax_score_result[i]);
-        }
-    }
-#endif
+    LOG_DEBUG(fmt::format("PhysicalMatch Part 3: Full text search time: {} ms",
+                          static_cast<TimeDurationType>(finish_query_time - finish_query_builder_time).count()));
     LOG_DEBUG(fmt::format("Full text search result count: {}", result_count));
-    auto begin_output_time = std::chrono::high_resolution_clock::now();
-    TimeDurationType output_info_duration = begin_output_time - finish_query_time;
-    LOG_DEBUG(fmt::format("PhysicalMatch Part 4: Output stat info time: {} ms", output_info_duration.count()));
+
     // 4 populate result DataBlock
     // 4.1 prepare first output_data_block
     auto &output_data_blocks = operator_state->data_block_array_;
@@ -333,12 +311,10 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     if (cache_result_ && cache_mgr != nullptr) {
         AddCache(query_context, cache_mgr, output_data_blocks);
     }
-    auto finish_output_time = std::chrono::high_resolution_clock::now();
-    TimeDurationType output_duration = finish_output_time - begin_output_time;
-    LOG_DEBUG(fmt::format("PhysicalMatch Part 5: Output data time: {} ms", output_duration.count()));
+    LOG_DEBUG(fmt::format("PhysicalMatch Part 4: Output data time: {} ms",
+                          static_cast<TimeDurationType>(std::chrono::high_resolution_clock::now() - finish_query_time).count()));
     return true;
 }
-#pragma clang diagnostic pop
 
 PhysicalMatch::PhysicalMatch(const u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
@@ -379,7 +355,7 @@ bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator
             return true;
         }
     }
-    bool return_value = ExecuteInnerHomebrewed(query_context, operator_state);
+    bool return_value = ExecuteInner(query_context, operator_state);
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float, std::milli> duration = end_time - start_time;
     LOG_DEBUG(fmt::format("PhysicalMatch Execute time: {} ms", duration.count()));
