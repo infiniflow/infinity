@@ -726,19 +726,17 @@ bool TxnStore::ReadOnly() const {
 }
 
 void TxnStore::RevertTableStatus() {
-    WalEntry *wal_entry = txn_->GetWALEntry();
-    for (auto &cmd : wal_entry->cmds_) {
-        if (cmd->GetType() == WalCommandType::COMPACT) {
-            for (const auto &[table_name, table_store] : txn_tables_store_) {
-                LOG_INFO(fmt::format("Txn {}: Revert table {} status from compacting to done", txn_->TxnID(), table_name));
-                table_store->GetTableEntry()->SetCompactDone();
-            }
-        } else if (cmd->GetType() == WalCommandType::CREATE_INDEX) {
-            for (const auto &[table_name, table_store] : txn_tables_store_) {
-                LOG_INFO(fmt::format("Txn {}: Revert table {} status from creating index to done", txn_->TxnID(), table_name));
-                table_store->GetTableEntry()->SetCreateIndexDone();
-            }
+    if (table_status_ == TxnStoreStatus::kCompacting) {
+        for (const auto &[table_name, table_store] : txn_tables_store_) {
+            LOG_INFO(fmt::format("Txn {}: Revert table {} status from compacting to done", txn_->TxnID(), table_name));
+            table_store->GetTableEntry()->SetCompactDone();
         }
+    } else if (table_status_ == TxnStoreStatus::kCreatingIndex) {
+        for (const auto &[table_name, table_store] : txn_tables_store_) {
+            LOG_INFO(fmt::format("Txn {}: Revert table {} status from creating index to done", txn_->TxnID(), table_name));
+            table_store->GetTableEntry()->SetCreateIndexDone();
+        }
+        return;
     }
 }
 

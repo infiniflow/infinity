@@ -1557,6 +1557,49 @@ void TableEntry::SetUnlock() {
     locked_ = false;
 }
 
+bool TableEntry::SetCompact(TableStatus &status, Txn *txn) {
+    std::unique_lock lock(rw_locker_);
+    if (table_status_ != TableStatus::kNone) {
+        status = table_status_;
+        LOG_TRACE(fmt::format("SetCompact fail. Table {} is in status: {}", encode(), u8(table_status_)));
+        return false;
+    }
+    table_status_ = TableStatus::kCompacting;
+    txn->txn_store()->SetCompacting();
+    LOG_TRACE(fmt::format("SetCompact success. Table {} is in status: {}", encode(), u8(table_status_)));
+    return true;
+}
+
+bool TableEntry::SetCreatingIndex(TableStatus &status, Txn *txn) {
+    std::unique_lock lock(rw_locker_);
+    if (table_status_ == TableStatus::kCompacting) {
+        status = table_status_;
+        LOG_TRACE(fmt::format("SetCreatingIndex fail. Table {} is in status: {}", encode(), u8(table_status_)));
+        return false;
+    }
+    table_status_ = TableStatus::kCreatingIndex;
+    txn->txn_store()->SetCreatingIndex();
+    LOG_TRACE(fmt::format("SetCreatingIndex success. Table {} is in status: {}", encode(), u8(table_status_)));
+    return true;
+}
+
+void TableEntry::SetCompactDone() {
+    std::unique_lock lock(rw_locker_);
+    if (table_status_ == TableStatus::kCreatingIndex) {
+        UnrecoverableError(fmt::format("Cannot set table {} to None, status: {}", encode(), u8(table_status_)));
+    }
+    table_status_ = TableStatus::kNone;
+}
+
+void TableEntry::SetCreateIndexDone() {
+    std::unique_lock lock(rw_locker_);
+    if (table_status_ == TableStatus::kCompacting) {
+        UnrecoverableError(fmt::format("Cannot set table {} to None, status: {}", encode(), u8(table_status_)));
+    }
+    table_status_ = TableStatus::kNone;
+}
+
+
 void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs, TxnTableStore *txn_table_store) {
     ExpressionBinder tmp_binder(nullptr);
     Vector<Value> default_values;

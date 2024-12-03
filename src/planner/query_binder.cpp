@@ -1136,7 +1136,7 @@ UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement
     }
     {
         TableEntry::TableStatus status;
-        if (!table_entry->SetCompact(status)) {
+        if (!table_entry->SetCompact(status, txn)) {
             RecoverableError(Status::NotSupport(fmt::format("Cannot compact when table_status is {}", u8(status))));
         }
     }

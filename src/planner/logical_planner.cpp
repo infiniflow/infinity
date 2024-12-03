@@ -736,7 +736,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     TableEntry *table_entry = base_table_ref->table_entry_ptr_;
     {
         TableEntry::TableStatus status;
-        if (!table_entry->SetCreatingIndex(status)) {
+        if (!table_entry->SetCreatingIndex(status, txn)) {
             RecoverableError(Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(status))));
         }
     }

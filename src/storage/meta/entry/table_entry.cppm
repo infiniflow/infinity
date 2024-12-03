@@ -375,44 +375,16 @@ public:
         kCompacting,
     };
 
-    bool SetCompact(TableStatus &status) {
-        std::unique_lock lock(rw_locker_);
-        if (table_status_ != TableStatus::kNone) {
-            status = table_status_;
-            return false;
-        }
-        table_status_ = TableStatus::kCompacting;
-        return true;
-    }
+    bool SetCompact(TableStatus &status, Txn *txn);
 
-    bool SetCreatingIndex(TableStatus &status) {
-        std::unique_lock lock(rw_locker_);
-        if (table_status_ == TableStatus::kCompacting) {
-            status = table_status_;
-            return false;
-        }
-        table_status_ = TableStatus::kCreatingIndex;
-        return true;
-    }
+    bool SetCreatingIndex(TableStatus &status, Txn *txn);
 
-    void SetCompactDone() {
-        std::unique_lock lock(rw_locker_);
-        if (table_status_ == TableStatus::kCreatingIndex) {
-            UnrecoverableError(fmt::format("Cannot set table {} to None, status: {}", encode(), u8(table_status_)));
-        }
-        table_status_ = TableStatus::kNone;
-    }
+    void SetCompactDone();
 
-    void SetCreateIndexDone() {
-        std::unique_lock lock(rw_locker_);
-        if (table_status_ == TableStatus::kCompacting) {
-            UnrecoverableError(fmt::format("Cannot set table {} to None, status: {}", encode(), u8(table_status_)));
-        }
-        table_status_ = TableStatus::kNone;
-    }
+    void SetCreateIndexDone();
 
 private:
-    TableStatus table_status_;
+    TableStatus table_status_ = TableStatus::kNone;
 
     std::mutex mtx_; // when table is locked, write is not allowed.
     std::condition_variable cv_;
