@@ -3485,6 +3485,73 @@ A `500` HTTP status code indicates an error condition. The response includes a J
 
 ---
 
+
+### Admin remove node
+
+**POST** `/admin/node/{node_name}`
+
+Only leader node can run this command, it will remove a node from the cluster.
+
+#### Request
+
+- Method: DELETE
+- URL: `/admin/node/node_name`
+- Headers:
+  - `accept: application/json`
+  - `content-type: application/json`
+
+##### Request example
+
+```shell
+curl --request DELETE \
+    --url http://localhost:23822/admin/node/follower1 \
+    --header 'accept: application/json' \
+    --header 'content-type: application/json'
+```
+
+#### Response
+
+<Tabs
+  defaultValue="s200"
+  values={[
+    {label: 'Status code 200', value: 's200'},
+    {label: 'Status code 500', value: 's500'},
+  ]}>
+  <TabItem value="s200">
+
+The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code": 0
+}
+```
+
+- `"error_code"`: `integer`
+  `0`: The operation succeeds.
+
+</TabItem>
+  <TabItem value="s500">
+
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
+
+```shell
+{
+    "error_code":7020
+    "error_message" : "Duplicate node: following"
+}
+```
+
+- `"error_code"`: `integer`
+  A non-zero value indicates a specific error condition.
+- `"error_message"`: `string`
+  When `error_code` is non-zero, `"error_message"` provides additional details about the error.
+
+</TabItem>
+</Tabs>
+
+---
+
 ### Admin show node variables
 
 **GET** `/admin/variables`
@@ -3673,7 +3740,7 @@ Gets information about the currently connected node.
 #### Request
 
 - Method: GET
-- URL: `/admin/node/{node_name}`
+- URL: `/admin/node/current`
 - Headers: `accept: application/json`
 
 ##### Request example
