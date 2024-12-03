@@ -656,7 +656,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
 
                             ToLower(server_mode);
-                            if (server_mode == "standalone" or server_mode == "cluster") {
+                            if (server_mode == "standalone" or server_mode == "admin") {
                                 UniquePtr<StringOption> server_mode_option = MakeUnique<StringOption>(SERVER_MODE_OPTION_NAME, server_mode);
                                 Status status = global_options_.AddOption(std::move(server_mode_option));
                                 if (!status.ok()) {
