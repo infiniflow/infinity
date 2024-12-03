@@ -528,94 +528,80 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
         }
     }
     if (sub_doc_iters.size() < 2) {
+        // 0 or 1
         // no need for WAND
         all_are_term = false;
         all_are_term_or_phrase = false;
     }
     const u32 msm_bar = keyword_iters.empty() ? 1u : 0u;
+    auto GetIterResultT = [&]<typename T>() -> std::unique_ptr<DocIterator> {
+        if (params.minimum_should_match > sub_doc_iters.size()) {
+            return nullptr;
+        } else if (params.minimum_should_match <= msm_bar) {
+            if constexpr (std::is_same_v<T, OrIterator>) {
+                sub_doc_iters.insert(sub_doc_iters.end(),
+                                     std::make_move_iterator(keyword_iters.begin()),
+                                     std::make_move_iterator(keyword_iters.end()));
+                return MakeUnique<OrIterator>(std::move(sub_doc_iters));
+            }
+            auto msm_iter = MakeUnique<T>(std::move(sub_doc_iters));
+            if (keyword_iters.empty()) {
+                return msm_iter;
+            } else {
+                keyword_iters.emplace_back(std::move(msm_iter));
+                return MakeUnique<OrIterator>(std::move(keyword_iters));
+            }
+        } else {
+            // must use minimum_should_match
+            UniquePtr<DocIterator> msm_iter;
+            if (params.minimum_should_match <= 1) {
+                msm_iter = MakeUnique<T>(std::move(sub_doc_iters));
+            } else if (params.minimum_should_match < sub_doc_iters.size()) {
+                using MSM_T = std::conditional_t<std::is_same_v<T, OrIterator>, MinimumShouldMatchIterator, MinimumShouldMatchWrapper<T>>;
+                msm_iter = MakeUnique<MSM_T>(std::move(sub_doc_iters), params.minimum_should_match);
+            } else {
+                msm_iter = MakeUnique<AndIterator>(std::move(sub_doc_iters));
+            }
+            if (keyword_iters.empty()) {
+                return msm_iter;
+            } else {
+                keyword_iters.insert(keyword_iters.begin(), std::move(msm_iter));
+                return MakeUnique<MustFirstIterator>(std::move(keyword_iters));
+            }
+        }
+    };
     if (sub_doc_iters.empty() && keyword_iters.empty()) {
         return nullptr;
     } else if (sub_doc_iters.size() + keyword_iters.size() == 1) {
         return only_child->CreateSearch(params, is_top_level);
-    } else if (is_top_level && all_are_term && params.ft_similarity == FulltextSimilarity::kBM25 && params.early_term_algo == EarlyTermAlgo::kBMW) {
-        if (params.minimum_should_match > sub_doc_iters.size()) {
-            return nullptr;
-        } else if (params.minimum_should_match <= msm_bar) {
-            auto msm_iter = MakeUnique<BlockMaxWandIterator>(std::move(sub_doc_iters));
-            if (keyword_iters.empty()) {
-                return msm_iter;
-            } else {
-                keyword_iters.emplace_back(std::move(msm_iter));
-                return MakeUnique<OrIterator>(std::move(keyword_iters));
+    } else if (is_top_level && all_are_term && params.ft_similarity == FulltextSimilarity::kBM25) {
+        EarlyTermAlgo choose_algo = EarlyTermAlgo::kNaive;
+        switch (params.early_term_algo) {
+            case EarlyTermAlgo::kAuto: {
+                break;
             }
-        } else {
-            // must use minimum_should_match
-            UniquePtr<DocIterator> msm_iter;
-            if (params.minimum_should_match <= 1) {
-                msm_iter = MakeUnique<BlockMaxWandIterator>(std::move(sub_doc_iters));
-            } else if (params.minimum_should_match < sub_doc_iters.size()) {
-                msm_iter = MakeUnique<MinimumShouldMatchWrapper<BlockMaxWandIterator>>(std::move(sub_doc_iters), params.minimum_should_match);
-            } else {
-                msm_iter = MakeUnique<AndIterator>(std::move(sub_doc_iters));
+            case EarlyTermAlgo::kBMW:
+            case EarlyTermAlgo::kBatch:
+            case EarlyTermAlgo::kNaive: {
+                choose_algo = params.early_term_algo;
+                break;
             }
-            if (keyword_iters.empty()) {
-                return msm_iter;
-            } else {
-                keyword_iters.insert(keyword_iters.begin(), std::move(msm_iter));
-                return MakeUnique<MustFirstIterator>(std::move(keyword_iters));
+            case EarlyTermAlgo::kCompare: {
+                UnrecoverableError("OrQueryNode: EarlyTermAlgo::kCompare is not allowed here");
+                break;
             }
         }
-    } else if (is_top_level && all_are_term && params.ft_similarity == FulltextSimilarity::kBM25 && params.early_term_algo == EarlyTermAlgo::kBatch) {
-        if (params.minimum_should_match > sub_doc_iters.size()) {
-            return nullptr;
-        } else if (params.minimum_should_match <= msm_bar) {
-            auto msm_iter = MakeUnique<BatchOrIterator>(std::move(sub_doc_iters));
-            if (keyword_iters.empty()) {
-                return msm_iter;
-            } else {
-                keyword_iters.emplace_back(std::move(msm_iter));
-                return MakeUnique<OrIterator>(std::move(keyword_iters));
-            }
-        } else {
-            // must use minimum_should_match
-            UniquePtr<DocIterator> msm_iter;
-            if (params.minimum_should_match <= 1) {
-                msm_iter = MakeUnique<BatchOrIterator>(std::move(sub_doc_iters));
-            } else if (params.minimum_should_match < sub_doc_iters.size()) {
-                msm_iter = MakeUnique<MinimumShouldMatchWrapper<BatchOrIterator>>(std::move(sub_doc_iters), params.minimum_should_match);
-            } else {
-                msm_iter = MakeUnique<AndIterator>(std::move(sub_doc_iters));
-            }
-            if (keyword_iters.empty()) {
-                return msm_iter;
-            } else {
-                keyword_iters.insert(keyword_iters.begin(), std::move(msm_iter));
-                return MakeUnique<MustFirstIterator>(std::move(keyword_iters));
-            }
+        if (choose_algo == EarlyTermAlgo::kBMW) {
+            return GetIterResultT.template operator()<BlockMaxWandIterator>();
+        } else if (choose_algo == EarlyTermAlgo::kBatch) {
+            return GetIterResultT.template operator()<BatchOrIterator>();
+        } else if (choose_algo == EarlyTermAlgo::kNaive) {
+            return GetIterResultT.template operator()<OrIterator>();
         }
+        UnrecoverableError("Unreachable code");
+        return nullptr;
     } else if (all_are_term_or_phrase) {
-        if (params.minimum_should_match > sub_doc_iters.size()) {
-            return nullptr;
-        } else if (params.minimum_should_match <= msm_bar) {
-            sub_doc_iters.insert(sub_doc_iters.end(), std::make_move_iterator(keyword_iters.begin()), std::make_move_iterator(keyword_iters.end()));
-            return MakeUnique<OrIterator>(std::move(sub_doc_iters));
-        } else {
-            // must use minimum_should_match
-            UniquePtr<DocIterator> msm_iter;
-            if (params.minimum_should_match <= 1) {
-                msm_iter = MakeUnique<OrIterator>(std::move(sub_doc_iters));
-            } else if (params.minimum_should_match < sub_doc_iters.size()) {
-                msm_iter = MakeUnique<MinimumShouldMatchIterator>(std::move(sub_doc_iters), params.minimum_should_match);
-            } else {
-                msm_iter = MakeUnique<AndIterator>(std::move(sub_doc_iters));
-            }
-            if (keyword_iters.empty()) {
-                return msm_iter;
-            } else {
-                keyword_iters.insert(keyword_iters.begin(), std::move(msm_iter));
-                return MakeUnique<MustFirstIterator>(std::move(keyword_iters));
-            }
-        }
+        return GetIterResultT.template operator()<OrIterator>();
     } else {
         sub_doc_iters.insert(sub_doc_iters.end(), std::make_move_iterator(keyword_iters.begin()), std::make_move_iterator(keyword_iters.end()));
         if (params.minimum_should_match <= msm_bar) {
