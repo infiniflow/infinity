@@ -820,6 +820,9 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
         if (!status.ok())
             continue;
         for (const auto &[segment_id, segment_entry] : segment_map_) {
+            if (segment_entry->CheckDeprecate(ts)) {
+                continue;
+            }
             auto iter = table_index_entry->index_by_segment().find(segment_id);
             SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
             if (iter == table_index_entry->index_by_segment().end()) {
