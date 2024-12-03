@@ -13,7 +13,7 @@ def test_admin(cluster: InfinityCluster):
         res = infinity1.show_current_node()
         logger.info(f'{res.node_role}, {res.node_status}')
         assert (res.node_role == "admin")
-        assert (res.node_status == "starting")
+        assert (res.node_status == "started")
 
         res = infinity1.show_admin_variables()
         logger.info(res.data)
