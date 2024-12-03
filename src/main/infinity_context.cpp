@@ -94,7 +94,7 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, bool admi
 
 void InfinityContext::InitPhase2() {
 
-    if (config_->ServerMode() == "cluster") {
+    if (config_->ServerMode() == "admin") {
         // Admin mode or cluster start phase
         infinity_context_inited_ = true;
 //        fmt::print("Infinity is started as a cluster node.\n");
