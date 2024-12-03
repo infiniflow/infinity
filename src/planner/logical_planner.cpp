@@ -733,13 +733,14 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
+    TableEntry *table_entry = base_table_ref->table_entry_ptr_;
     {
         TableEntry::TableStatus status;
-        if (!base_table_ref->table_entry_ptr_->SetCreatingIndex(status)) {
-            RecoverableError(Status::NotSupport(fmt::format("Cannot create index when table status is {}", u8(status))));
+        if (!table_entry->SetCreatingIndex(status)) {
+            RecoverableError(Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(status))));
         }
     }
-    auto status = base_table_ref->table_entry_ptr_->AddWriteTxnNum(txn);
+    auto status = table_entry->AddWriteTxnNum(txn);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -956,7 +957,7 @@ Status LogicalPlanner::BuildCopy(CopyStatement *statement, SharedPtr<BindContext
     BindSchemaName(statement->schema_name_);
     if (statement->copy_from_) {
         StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-            if (storage_mode == StorageMode::kUnInitialized) {
+        if (storage_mode == StorageMode::kUnInitialized) {
             UnrecoverableError("Uninitialized storage mode");
         }
 

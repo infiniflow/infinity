@@ -730,10 +730,12 @@ void TxnStore::RevertTableStatus() {
     for (auto &cmd : wal_entry->cmds_) {
         if (cmd->GetType() == WalCommandType::COMPACT) {
             for (const auto &[table_name, table_store] : txn_tables_store_) {
+                LOG_INFO(fmt::format("Txn {}: Revert table {} status from compacting to done", txn_->TxnID(), table_name));
                 table_store->GetTableEntry()->SetCompactDone();
             }
         } else if (cmd->GetType() == WalCommandType::CREATE_INDEX) {
             for (const auto &[table_name, table_store] : txn_tables_store_) {
+                LOG_INFO(fmt::format("Txn {}: Revert table {} status from creating index to done", txn_->TxnID(), table_name));
                 table_store->GetTableEntry()->SetCreateIndexDone();
             }
         }
