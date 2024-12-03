@@ -216,7 +216,7 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
     // TODO: Add projection before sort, limit?
     //    // Push order by expression to projection
-    //    if (statement.order_by_list != nullptr) {
+    //    if (statement.order_by_list_ != nullptr) {
     //        PushOrderByToProject(query_context_ptr_, statement);
     //    }
 
@@ -238,7 +238,7 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     }
 
     // 13. ORDER BY
-    if (statement.order_by_list != nullptr) {
+    if (statement.order_by_list_ != nullptr) {
         BuildOrderBy(query_context_ptr_, statement, bound_select_statement);
     }
 
@@ -866,7 +866,7 @@ void QueryBinder::BuildHaving(QueryContext *query_context,
 }
 
 void QueryBinder::PushOrderByToProject(QueryContext *, const SelectStatement &statement) {
-    for (const OrderByExpr *order_by_expr : *statement.order_by_list) {
+    for (const OrderByExpr *order_by_expr : *statement.order_by_list_) {
         if (order_by_expr->expr_->type_ == ParsedExprType::kKnn) {
             continue;
         } else {
@@ -919,10 +919,10 @@ void QueryBinder::BuildOrderBy(QueryContext *query_context,
                                const SelectStatement &statement,
                                UniquePtr<BoundSelectStatement> &bound_statement) const {
     auto order_binder = MakeShared<OrderBinder>(query_context);
-    SizeT order_by_count = statement.order_by_list->size();
+    SizeT order_by_count = statement.order_by_list_->size();
     bound_statement->order_by_expressions_.reserve(order_by_count);
     bound_statement->order_by_types_.reserve(order_by_count);
-    for (const OrderByExpr *order_expr : *statement.order_by_list) {
+    for (const OrderByExpr *order_expr : *statement.order_by_list_) {
         auto bound_order_expr = order_binder->Bind(*order_expr->expr_, this->bind_context_ptr_.get(), 0, true);
         bound_statement->order_by_types_.emplace_back(order_expr->type_);
         bound_statement->order_by_expressions_.emplace_back(bound_order_expr);

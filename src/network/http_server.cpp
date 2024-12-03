@@ -871,10 +871,11 @@ public:
                 json_response["error_message"] = fmt::format("Invalid json format: {}", data_body);
             }
             auto *insert_rows = new Vector<InsertRowExpr *>();
-            DeferFn del_insert_rows([&]() {
+            DeferFn free_insert_rows([&]() {
                 if (insert_rows != nullptr) {
                     for (auto *insert_row : *insert_rows) {
                         delete insert_row;
+                        insert_row = nullptr;
                     }
                     delete insert_rows;
                     insert_rows = nullptr;
