@@ -3511,7 +3511,7 @@ public:
         if (!http_body_json.contains("role") or !http_body_json["role"].is_string()) {
             http_status = HTTPStatus::CODE_500;
             json_response["error_code"] = ErrorCode::kInvalidCommand;
-            json_response["error_message"] = "field 'role' is required to be set to string!";
+            json_response["error_message"] = "Field 'role' is required";
             return ResponseFactory::createResponse(http_status, json_response.dump());
         }
 
@@ -3531,7 +3531,7 @@ public:
         } else {
             http_status = HTTPStatus::CODE_500;
             json_response["error_code"] = ErrorCode::kInvalidNodeRole;
-            json_response["error_code"] = "invalid node role";
+            json_response["error_message"] = fmt::format("Invalid node role {}", role);
             return ResponseFactory::createResponse(http_status, json_response.dump());
         }
 
@@ -3541,7 +3541,7 @@ public:
         } else {
             http_status = HTTPStatus::CODE_500;
             json_response["error_code"] = result.ErrorCode();
-            json_response["error_code"] = result.ErrorMsg();
+            json_response["error_message"] = result.ErrorMsg();
         }
 
         return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -3662,10 +3662,11 @@ public:
         auto result = infinity->AdminShowCatalogs();
         if (result.IsOk()) {
             json_response["error_code"] = 0;
-            if(result.result_table_->data_blocks_.empty()) {
+            if (result.result_table_->data_blocks_.empty()) {
                 ;
             } else {
-                DataBlock *data_block = result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
+                DataBlock *data_block =
+                    result.result_table_->GetDataBlockById(0).get(); // Assume the config output data only included in one data block
                 auto row_count = data_block->row_count();
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json node_json;
