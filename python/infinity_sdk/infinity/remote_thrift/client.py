@@ -384,3 +384,7 @@ class ThriftInfinityClient:
     def flush(self, flush_request: ttypes.FlushRequest):
         flush_request.session_id = self.session_id
         return self.client.Flush(flush_request)
+    
+    @retry_wrapper
+    def compact(self, db_name: str, table_name: str):
+        return self.client.Compact(CompactRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))

@@ -247,6 +247,18 @@ QueryResult Infinity::Flush(const String &flush_type) {
     return result;
 }
 
+QueryResult Infinity::Compact(const String &db_name, const String &table_name) {
+    UniquePtr<QueryContext> query_context_ptr;
+    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
+    auto compact_statement = MakeUnique<ManualCompactStatement>(db_name, table_name);
+
+    ToLower(compact_statement->schema_name_);
+    ToLower(compact_statement->table_name_);
+
+    QueryResult result = query_context_ptr->QueryStatement(compact_statement.get());
+    return result;
+}
+
 QueryResult Infinity::SetVariableOrConfig(const String &name, bool value, SetScope scope) {
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
