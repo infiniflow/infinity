@@ -172,7 +172,6 @@ void FileWorker::MoveFile() {
         handler.HandleWriteResult(persist_result);
 
         obj_addr_ = persist_result.obj_addr_;
-        VirtualStore::DeleteFile(src_path);
     }
 }
 
