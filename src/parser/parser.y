@@ -1593,7 +1593,7 @@ select_clause_with_modifier: select_clause_without_modifier order_by_clause limi
         yyerror(&yyloc, scanner, result, "Result modifier(ORDER BY) is conflict with SEARCH expression.");
         YYERROR;
     }
-    $1->order_by_list = $2;
+    $1->order_by_list_ = $2;
     $1->limit_expr_ = $3;
     $1->offset_expr_ = $4;
     $$ = $1;

@@ -363,11 +363,11 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         result->emplace_back(MakeShared<String>(having_str));
     }
 
-    if (select_statement->order_by_list != nullptr) {
+    if (select_statement->order_by_list_ != nullptr) {
         String order_str = String(intent_size, ' ') + "groupby: ";
-        SizeT order_count = select_statement->order_by_list->size();
+        SizeT order_count = select_statement->order_by_list_->size();
         for (SizeT idx = 0; idx < order_count - 1; ++idx) {
-            OrderByExpr *order_expr = select_statement->order_by_list->at(idx);
+            OrderByExpr *order_expr = select_statement->order_by_list_->at(idx);
             order_str += order_expr->expr_->ToString();
             if (order_expr->type_ == OrderType::kAsc) {
                 order_str += " Ascending, ";
@@ -375,7 +375,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
                 order_str += " Descending, ";
             }
         }
-        OrderByExpr *order_expr = select_statement->order_by_list->back();
+        OrderByExpr *order_expr = select_statement->order_by_list_->back();
         order_str += order_expr->expr_->ToString();
         if (order_expr->type_ == OrderType::kAsc) {
             order_str += " Ascending";

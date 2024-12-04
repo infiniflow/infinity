@@ -60,7 +60,7 @@ public:
     ParsedExpr *where_expr_{nullptr};
     std::vector<ParsedExpr *> *group_by_list_{nullptr};
     ParsedExpr *having_expr_{nullptr};
-    std::vector<OrderByExpr *> *order_by_list{nullptr};
+    std::vector<OrderByExpr *> *order_by_list_{nullptr};
     ParsedExpr *limit_expr_{nullptr};
     ParsedExpr *offset_expr_{nullptr};
     std::vector<WithExpr *> *with_exprs_{nullptr};

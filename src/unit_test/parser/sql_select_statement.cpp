@@ -486,18 +486,18 @@ TEST_F(SelectStatementParsingTest, good_test2) {
                 EXPECT_EQ(col_expr->names_[0], "b");
             }
 
-            EXPECT_NE(select_statement->order_by_list, nullptr);
-            EXPECT_EQ(select_statement->order_by_list->size(), 2u);
+            EXPECT_NE(select_statement->order_by_list_, nullptr);
+            EXPECT_EQ(select_statement->order_by_list_->size(), 2u);
             {
-                EXPECT_EQ((*select_statement->order_by_list)[0]->type_, OrderType::kAsc);
-                EXPECT_EQ((*select_statement->order_by_list)[0]->expr_->type_, ParsedExprType::kColumn);
-                auto *col_expr = (ColumnExpr *)((*select_statement->order_by_list)[0]->expr_);
+                EXPECT_EQ((*select_statement->order_by_list_)[0]->type_, OrderType::kAsc);
+                EXPECT_EQ((*select_statement->order_by_list_)[0]->expr_->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *)((*select_statement->order_by_list_)[0]->expr_);
                 EXPECT_EQ(col_expr->names_[0], "a");
             }
             {
-                EXPECT_EQ((*select_statement->order_by_list)[1]->type_, OrderType::kDesc);
-                EXPECT_EQ((*select_statement->order_by_list)[1]->expr_->type_, ParsedExprType::kColumn);
-                auto *col_expr = (ColumnExpr *)((*select_statement->order_by_list)[1]->expr_);
+                EXPECT_EQ((*select_statement->order_by_list_)[1]->type_, OrderType::kDesc);
+                EXPECT_EQ((*select_statement->order_by_list_)[1]->expr_->type_, ParsedExprType::kColumn);
+                auto *col_expr = (ColumnExpr *)((*select_statement->order_by_list_)[1]->expr_);
                 EXPECT_EQ(col_expr->names_[0], "b");
             }
         }
