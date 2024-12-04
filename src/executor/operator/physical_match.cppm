@@ -106,7 +106,7 @@ private:
     IndexReader index_reader_;
     UniquePtr<QueryNode> query_tree_;
     float begin_threshold_;
-    EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kBMW};
+    EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kAuto};
     u32 top_n_{1};
 
     // for filter
@@ -117,7 +117,6 @@ private:
     FulltextSimilarity ft_similarity_{FulltextSimilarity::kBM25};
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
-    bool ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state);
 };
 
 } // namespace infinity

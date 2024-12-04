@@ -42,6 +42,8 @@ public:
 
     inline u32 GetDocFreq() const { return doc_freq_; }
 
+    inline auto GetTotalDF() const { return total_df_; }
+
     u64 GetTermFreq() const { return term_freq_; }
 
     void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader);
@@ -96,6 +98,7 @@ public:
 private:
 
     u32 doc_freq_ = 0;
+    u64 total_df_ = 0;
 
     u64 column_id_;
     UniquePtr<PostingIterator> iter_;

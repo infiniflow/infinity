@@ -456,7 +456,7 @@ private:
             case Enum::kFilterFulltextExpr: {
                 auto *filter_fulltext_expr = static_cast<const FilterFulltextExpression *>(index_filter_tree_node.src_ptr->get());
                 auto index_reader = table_entry_ptr_->GetFullTextIndexReader(query_context_->GetTxn());
-                EarlyTermAlgo early_term_algo = EarlyTermAlgo::kNaive;
+                EarlyTermAlgo early_term_algo = EarlyTermAlgo::kAuto;
                 UniquePtr<QueryNode> query_tree;
                 MinimumShouldMatchOption minimum_should_match_option;
                 f32 score_threshold = {};
@@ -474,16 +474,18 @@ private:
 
                     // option: block max
                     iter = search_ops.options_.find("block_max");
-                    if (iter == search_ops.options_.end() || iter->second == "false") {
+                    if (iter == search_ops.options_.end() || iter->second == "auto") {
+                        early_term_algo = EarlyTermAlgo::kAuto;
+                    } else if (iter->second == "batch") {
+                        early_term_algo = EarlyTermAlgo::kBatch;
+                    } else if (iter->second == "false") {
                         early_term_algo = EarlyTermAlgo::kNaive;
                     } else if (iter->second == "true" || iter->second == "bmw") {
                         early_term_algo = EarlyTermAlgo::kBMW;
-                    } else if (iter->second == "batch") {
-                        early_term_algo = EarlyTermAlgo::kBatch;
                     } else if (iter->second == "compare") {
                         early_term_algo = EarlyTermAlgo::kCompare;
                     } else {
-                        RecoverableError(Status::SyntaxError("block_max option must be empty, true, false or compare"));
+                        RecoverableError(Status::SyntaxError("block_max option must be empty, auto, batch, false, true, bmw, or compare"));
                     }
 
                     // option: top n
