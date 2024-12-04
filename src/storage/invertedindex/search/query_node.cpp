@@ -600,7 +600,7 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
                         df_sum += static_cast<const TermDocIterator *>(iter.get())->GetDocFreq();
                     }
                     if (df_sum * 5ull < total_df) {
-                        choose_algo = EarlyTermAlgo::kNaive;
+                        choose_algo = EarlyTermAlgo::kBMW;
                     } else {
                         choose_algo = EarlyTermAlgo::kBatch;
                     }
