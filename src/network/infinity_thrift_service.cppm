@@ -158,6 +158,8 @@ public:
 
     void Flush(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::FlushRequest &request) final;
 
+    void Compact(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CompactRequest &request) final;
+
 private:
     Tuple<Infinity *, Status> GetInfinityBySessionID(i64 session_id);
 

@@ -59,6 +59,7 @@ class InfinityServiceIf {
   virtual void Cleanup(CommonResponse& _return, const CommonRequest& request) = 0;
   virtual void Command(CommonResponse& _return, const CommandRequest& request) = 0;
   virtual void Flush(CommonResponse& _return, const FlushRequest& request) = 0;
+  virtual void Compact(CommonResponse& _return, const CompactRequest& request) = 0;
 };
 
 class InfinityServiceIfFactory {
@@ -197,6 +198,9 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void Flush(CommonResponse& /* _return */, const FlushRequest& /* request */) override {
+    return;
+  }
+  void Compact(CommonResponse& /* _return */, const CompactRequest& /* request */) override {
     return;
   }
 };
@@ -4049,6 +4053,110 @@ class InfinityService_Flush_presult {
 
 };
 
+typedef struct _InfinityService_Compact_args__isset {
+  _InfinityService_Compact_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_Compact_args__isset;
+
+class InfinityService_Compact_args {
+ public:
+
+  InfinityService_Compact_args(const InfinityService_Compact_args&);
+  InfinityService_Compact_args& operator=(const InfinityService_Compact_args&);
+  InfinityService_Compact_args() noexcept {
+  }
+
+  virtual ~InfinityService_Compact_args() noexcept;
+  CompactRequest request;
+
+  _InfinityService_Compact_args__isset __isset;
+
+  void __set_request(const CompactRequest& val);
+
+  bool operator == (const InfinityService_Compact_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Compact_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Compact_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_Compact_pargs {
+ public:
+
+
+  virtual ~InfinityService_Compact_pargs() noexcept;
+  const CompactRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Compact_result__isset {
+  _InfinityService_Compact_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Compact_result__isset;
+
+class InfinityService_Compact_result {
+ public:
+
+  InfinityService_Compact_result(const InfinityService_Compact_result&);
+  InfinityService_Compact_result& operator=(const InfinityService_Compact_result&);
+  InfinityService_Compact_result() noexcept {
+  }
+
+  virtual ~InfinityService_Compact_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_Compact_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_Compact_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Compact_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Compact_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Compact_presult__isset {
+  _InfinityService_Compact_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Compact_presult__isset;
+
+class InfinityService_Compact_presult {
+ public:
+
+
+  virtual ~InfinityService_Compact_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_Compact_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
 class InfinityServiceClient : virtual public InfinityServiceIf {
  public:
   InfinityServiceClient(std::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) {
@@ -4185,6 +4293,9 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void Flush(CommonResponse& _return, const FlushRequest& request) override;
   void send_Flush(const FlushRequest& request);
   void recv_Flush(CommonResponse& _return);
+  void Compact(CommonResponse& _return, const CompactRequest& request) override;
+  void send_Compact(const CompactRequest& request);
+  void recv_Compact(CommonResponse& _return);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
@@ -4237,6 +4348,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_Cleanup(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Command(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Flush(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Compact(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   InfinityServiceProcessor(::std::shared_ptr<InfinityServiceIf> iface) :
     iface_(iface) {
@@ -4277,6 +4389,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["Cleanup"] = &InfinityServiceProcessor::process_Cleanup;
     processMap_["Command"] = &InfinityServiceProcessor::process_Command;
     processMap_["Flush"] = &InfinityServiceProcessor::process_Flush;
+    processMap_["Compact"] = &InfinityServiceProcessor::process_Compact;
   }
 
   virtual ~InfinityServiceProcessor() {}
@@ -4675,6 +4788,16 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
     return;
   }
 
+  void Compact(CommonResponse& _return, const CompactRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->Compact(_return, request);
+    }
+    ifaces_[i]->Compact(_return, request);
+    return;
+  }
+
 };
 
 // The 'concurrent' client is a thread safe client that correctly handles
@@ -4818,6 +4941,9 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void Flush(CommonResponse& _return, const FlushRequest& request) override;
   int32_t send_Flush(const FlushRequest& request);
   void recv_Flush(CommonResponse& _return, const int32_t seqid);
+  void Compact(CommonResponse& _return, const CompactRequest& request) override;
+  int32_t send_Compact(const CompactRequest& request);
+  void recv_Compact(CommonResponse& _return, const int32_t seqid);
  protected:
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;

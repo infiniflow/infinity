@@ -81,7 +81,7 @@ def test_standalone2admin2leader2admin(cluster: InfinityCluster):
     test: (standalone, operations)->admin->(leader, operations)->admin
     '''
     with cluster:
-        cluster.add_node("test", "conf/infinity_conf.toml")
+        cluster.add_node("test", "conf/infinity_minio_conf.toml")
         test_client = cluster.client("test")
         state = instance_state(test_client)
         assert test_client.show_current_node().node_role == "standalone"

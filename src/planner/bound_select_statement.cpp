@@ -218,7 +218,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
                     // option: block max
                     iter = search_ops.options_.find("block_max");
-                    if (iter == search_ops.options_.end() or iter->second == "true" or iter->second == "bmw") {
+                    if (iter == search_ops.options_.end() || iter->second == "auto") {
+                        match_node->early_term_algo_ = EarlyTermAlgo::kAuto;
+                    } else if (iter->second == "true" || iter->second == "bmw") {
                         match_node->early_term_algo_ = EarlyTermAlgo::kBMW;
                     } else if (iter->second == "batch") {
                         match_node->early_term_algo_ = EarlyTermAlgo::kBatch;
@@ -227,8 +229,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     } else if (iter->second == "compare") {
                         match_node->early_term_algo_ = EarlyTermAlgo::kCompare;
                     } else {
-                        Status status = Status::SyntaxError("block_max option must be empty, true, false or compare");
-                        RecoverableError(status);
+                        RecoverableError(Status::SyntaxError("block_max option must be empty, auto, bmw, true, batch, false, or compare"));
                     }
 
                     // option: top n

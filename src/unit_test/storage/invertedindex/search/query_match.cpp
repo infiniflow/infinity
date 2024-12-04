@@ -338,7 +338,7 @@ void QueryMatchTest::QueryMatch(const String &db_name,
         Status status = Status::ParseMatchExprFailed(match_expr->fields_, match_expr->matching_text_);
         RecoverableError(status);
     }
-    FullTextQueryContext full_text_query_context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{}, index_hints);
+    FullTextQueryContext full_text_query_context(FulltextSimilarity::kBM25, MinimumShouldMatchOption{}, 10, index_hints);
     full_text_query_context.early_term_algo_ = EarlyTermAlgo::kNaive;
     full_text_query_context.query_tree_ = std::move(query_tree);
     UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);

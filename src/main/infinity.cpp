@@ -60,9 +60,9 @@ import extra_ddl_info;
 import drop_index_info;
 import drop_table_info;
 import third_party;
+import defer_op;
 
 import infinity_exception;
-import third_party;
 
 namespace infinity {
 
@@ -93,10 +93,10 @@ std::variant<UniquePtr<QueryContext>, QueryResult> Infinity::GetQueryContext(boo
     return query_context_ptr;
 }
 
-#define GET_QUERY_CONTEXT(result, query_context_ptr) \
-    if (std::holds_alternative<QueryResult>(result)) { \
-        return std::get<QueryResult>(result); \
-    } \
+#define GET_QUERY_CONTEXT(result, query_context_ptr)                                                                                                 \
+    if (std::holds_alternative<QueryResult>(result)) {                                                                                               \
+        return std::get<QueryResult>(result);                                                                                                        \
+    }                                                                                                                                                \
     query_context_ptr = std::move(std::get<UniquePtr<QueryContext>>(result));
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
@@ -244,6 +244,18 @@ QueryResult Infinity::Flush(const String &flush_type) {
     }
 
     QueryResult result = query_context_ptr->QueryStatement(flush_statement.get());
+    return result;
+}
+
+QueryResult Infinity::Compact(const String &db_name, const String &table_name) {
+    UniquePtr<QueryContext> query_context_ptr;
+    GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
+    auto compact_statement = MakeUnique<ManualCompactStatement>(db_name, table_name);
+
+    ToLower(compact_statement->schema_name_);
+    ToLower(compact_statement->table_name_);
+
+    QueryResult result = query_context_ptr->QueryStatement(compact_statement.get());
     return result;
 }
 
@@ -871,6 +883,16 @@ QueryResult Infinity::ShowFunction(const String &function_name) {
 }
 
 QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<InsertRowExpr *> *insert_rows) {
+    DeferFn free_insert_rows([&]() {
+        if (insert_rows != nullptr) {
+            for (auto *insert_row : *insert_rows) {
+                delete insert_row;
+                insert_row = nullptr;
+            }
+            delete insert_rows;
+            insert_rows = nullptr;
+        }
+    });
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     UniquePtr<InsertStatement> insert_statement = MakeUnique<InsertStatement>();
@@ -886,8 +908,6 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
         insert_statement->insert_rows_.emplace_back(insert_row_expr_ptr);
         insert_row_expr_ptr = nullptr;
     }
-    delete insert_rows;
-    insert_rows = nullptr;
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
     return result;
 }
@@ -917,6 +937,17 @@ QueryResult Infinity::Import(const String &db_name, const String &table_name, co
 
 QueryResult
 Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedExpr *> *columns, const String &path, ExportOptions export_options) {
+    DeferFn free_column_expressions([&]() {
+        if (columns != nullptr) {
+            for (auto &column_expr : *columns) {
+                delete column_expr;
+                column_expr = nullptr;
+            }
+            delete columns;
+            columns = nullptr;
+        }
+    });
+
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     UniquePtr<CopyStatement> export_statement = MakeUnique<CopyStatement>();
@@ -940,6 +971,7 @@ Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedE
     export_statement->row_limit_ = export_options.row_limit_;
 
     QueryResult result = query_context_ptr->QueryStatement(export_statement.get());
+    columns = nullptr;
     return result;
 }
 
@@ -961,6 +993,17 @@ QueryResult Infinity::Delete(const String &db_name, const String &table_name, Pa
 }
 
 QueryResult Infinity::Update(const String &db_name, const String &table_name, ParsedExpr *filter, Vector<UpdateExpr *> *update_list) {
+    DeferFn free_update_list([&]() {
+        if (update_list != nullptr) {
+            for (auto &update_expr : *update_list) {
+                delete update_expr;
+                update_expr = nullptr;
+            }
+            delete update_list;
+            update_list = nullptr;
+        }
+    });
+
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     UniquePtr<UpdateStatement> update_statement = MakeUnique<UpdateStatement>();
@@ -975,6 +1018,7 @@ QueryResult Infinity::Update(const String &db_name, const String &table_name, Pa
         ToLower(update_expr_ptr->column_name);
     }
     QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
+    update_list = nullptr;
     return result;
 }
 
@@ -989,6 +1033,46 @@ QueryResult Infinity::Explain(const String &db_name,
                               Vector<ParsedExpr *> *highlight_columns,
                               Vector<OrderByExpr *> *order_by_list,
                               Vector<ParsedExpr *> *group_by_list) {
+    DeferFn free_output_columns([&]() {
+        if (output_columns != nullptr) {
+            for (auto &output_column : *output_columns) {
+                delete output_column;
+                output_column = nullptr;
+            }
+            delete output_columns;
+            output_columns = nullptr;
+        }
+    });
+    DeferFn free_highlight_columns([&]() {
+        if (output_columns != nullptr) {
+            for (auto &highlight_column : *highlight_columns) {
+                delete highlight_column;
+                highlight_column = nullptr;
+            }
+            delete highlight_columns;
+            highlight_columns = nullptr;
+        }
+    });
+    DeferFn free_order_by_list([&]() {
+        if (output_columns != nullptr) {
+            for (auto &order_by : *order_by_list) {
+                delete order_by;
+                order_by = nullptr;
+            }
+            delete order_by_list;
+            order_by_list = nullptr;
+        }
+    });
+    DeferFn free_group_by_list([&]() {
+        if (output_columns != nullptr) {
+            for (auto &group_by : *group_by_list) {
+                delete group_by;
+                group_by = nullptr;
+            }
+            delete group_by_list;
+            group_by_list = nullptr;
+        }
+    });
 
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
@@ -1014,11 +1098,16 @@ QueryResult Infinity::Explain(const String &db_name,
     select_statement->search_expr_ = search_expr;
     select_statement->limit_expr_ = limit;
     select_statement->offset_expr_ = offset;
-    select_statement->order_by_list = order_by_list;
+    select_statement->order_by_list_ = order_by_list;
+    select_statement->group_by_list_ = group_by_list;
 
     explain_statment->statement_ = select_statement;
 
     QueryResult result = query_context_ptr->QueryStatement(explain_statment.get());
+    output_columns = nullptr;
+    highlight_columns = nullptr;
+    order_by_list = nullptr;
+    group_by_list = nullptr;
     return result;
 }
 
@@ -1032,6 +1121,46 @@ QueryResult Infinity::Search(const String &db_name,
                              Vector<ParsedExpr *> *highlight_columns,
                              Vector<OrderByExpr *> *order_by_list,
                              Vector<ParsedExpr *> *group_by_list) {
+    DeferFn free_output_columns([&]() {
+        if (output_columns != nullptr) {
+            for (auto &output_column : *output_columns) {
+                delete output_column;
+                output_column = nullptr;
+            }
+            delete output_columns;
+            output_columns = nullptr;
+        }
+    });
+    DeferFn free_highlight_columns([&]() {
+        if (output_columns != nullptr) {
+            for (auto &highlight_column : *highlight_columns) {
+                delete highlight_column;
+                highlight_column = nullptr;
+            }
+            delete highlight_columns;
+            highlight_columns = nullptr;
+        }
+    });
+    DeferFn free_order_by_list([&]() {
+        if (output_columns != nullptr) {
+            for (auto &order_by : *order_by_list) {
+                delete order_by;
+                order_by = nullptr;
+            }
+            delete order_by_list;
+            order_by_list = nullptr;
+        }
+    });
+    DeferFn free_group_by_list([&]() {
+        if (output_columns != nullptr) {
+            for (auto &group_by : *group_by_list) {
+                delete group_by;
+                group_by = nullptr;
+            }
+            delete group_by_list;
+            group_by_list = nullptr;
+        }
+    });
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     UniquePtr<SelectStatement> select_statement = MakeUnique<SelectStatement>();
@@ -1053,9 +1182,14 @@ QueryResult Infinity::Search(const String &db_name,
     select_statement->search_expr_ = search_expr;
     select_statement->limit_expr_ = limit;
     select_statement->offset_expr_ = offset;
-    select_statement->order_by_list = order_by_list;
+    select_statement->order_by_list_ = order_by_list;
+    select_statement->group_by_list_ = group_by_list;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
+    output_columns = nullptr;
+    highlight_columns = nullptr;
+    order_by_list = nullptr;
+    group_by_list = nullptr;
     return result;
 }
 

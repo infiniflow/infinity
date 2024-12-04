@@ -35,6 +35,7 @@ import wal_manager;
 import global_resource_usage;
 import infinity_thrift_service;
 import defer_op;
+import virtual_store;
 
 namespace infinity {
 
@@ -63,6 +64,7 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, bool admi
     config_ = MakeUnique<Config>();
     auto status = config_->Init(config_path, default_config);
     if (!status.ok()) {
+        fmt::print("Error: {}\n", status.message());
         std::exit(static_cast<int>(status.code()));
     }
     InfinityContext::instance().config()->PrintAll(); // Print all configs
@@ -92,7 +94,7 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, bool admi
 
 void InfinityContext::InitPhase2() {
 
-    if (config_->ServerMode() == "cluster") {
+    if (config_->ServerMode() == "admin") {
         // Admin mode or cluster start phase
         infinity_context_inited_ = true;
 //        fmt::print("Infinity is started as a cluster node.\n");
@@ -153,6 +155,9 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     break;
                 }
                 case NodeRole::kLeader: {
+                    if(config_->StorageType() == StorageType::kLocal) {
+                        return Status::InvalidStorageType("shared storage", "local");
+                    }
                     // No need to un-init cluster manager, since current is admin
                     Status init_status = cluster_manager_->InitAsLeader(node_name);
                     if (!init_status.ok()) {
@@ -169,6 +174,10 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     break;
                 }
                 case NodeRole::kFollower: {
+                    if(config_->StorageType() == StorageType::kLocal) {
+                        return Status::InvalidStorageType("shared storage", "local");
+                    }
+
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kReadable);
                     if (!set_storage_status.ok()) {
                         return set_storage_status;
@@ -189,6 +198,10 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     break;
                 }
                 case NodeRole::kLearner: {
+                    if(config_->StorageType() == StorageType::kLocal) {
+                        return Status::InvalidStorageType("shared storage", "local");
+                    }
+
                     Status set_storage_status = storage_->SetStorageMode(StorageMode::kReadable);
                     if (!set_storage_status.ok()) {
                         return set_storage_status;

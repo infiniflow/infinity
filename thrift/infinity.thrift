@@ -745,6 +745,12 @@ struct FlushRequest {
 2: string flush_type,
 }
 
+struct CompactRequest {
+1: i64 session_id
+2: string db_name,
+3: string table_name,
+}
+
 // Service
 service InfinityService {
 CommonResponse Connect(1:ConnectRequest request),
@@ -797,5 +803,7 @@ CommonResponse Cleanup(1:CommonRequest request),
 CommonResponse Command(1: CommandRequest request),
 
 CommonResponse Flush(1: FlushRequest request),
+
+CommonResponse Compact(1: CompactRequest request),
 
 }
