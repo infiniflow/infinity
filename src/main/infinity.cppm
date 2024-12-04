@@ -74,6 +74,8 @@ public:
 
     QueryResult Flush(const String &flush_type = "");
 
+    QueryResult Compact(const String &db_name, const String &table_name);
+
     QueryResult SetVariableOrConfig(const String &name, bool value, SetScope scope);
 
     QueryResult SetVariableOrConfig(const String &name, i64 value, SetScope scope);

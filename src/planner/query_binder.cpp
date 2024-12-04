@@ -79,6 +79,7 @@ import txn;
 import logger;
 import defer_op;
 import highlighter;
+import txn_store;
 
 namespace infinity {
 
@@ -1129,10 +1130,21 @@ UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement
         }
         base_table_ref = MakeShared<BaseTableRef>(compact_statement.table_entry_, std::move(block_index));
     }
-    TableEntry *table_entry = base_table_ref->table_entry_ptr_;\
+    TableEntry *table_entry = base_table_ref->table_entry_ptr_;
+    {
+        TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
+        txn_table_store->SetCompactType(statement.compact_type_);
+    }
+
     auto status = table_entry->AddWriteTxnNum(txn);
     if (!status.ok()) {
         RecoverableError(status);
+    }
+    {
+        TableEntry::TableStatus status;
+        if (!table_entry->SetCompact(status, txn)) {
+            RecoverableError(Status::NotSupport(fmt::format("Cannot compact when table_status is {}", u8(status))));
+        }
     }
     base_table_ref->index_index_ = table_entry->GetIndexIndex(txn);
 

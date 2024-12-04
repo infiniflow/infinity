@@ -182,7 +182,7 @@ ColumnVector BlockEntry::GetConstColumnVector(BufferManager *buffer_mgr, ColumnI
         std::shared_lock lock(rw_locker_);
         row_count = block_row_count_;
     }
-    return block_column_entry->GetColumnVector(buffer_mgr, row_count);
+    return block_column_entry->GetConstColumnVector(buffer_mgr, row_count);
 }
 
 SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {

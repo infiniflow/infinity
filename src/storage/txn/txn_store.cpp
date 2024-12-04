@@ -271,13 +271,14 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
     return {nullptr, Status::OK()};
 }
 
+void TxnTableStore::SetCompactType(CompactStatementType type) { compact_state_.type_ = type; }
+
 Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
                                                         CompactStatementType type) {
-    if (compact_state_.type_ != CompactStatementType::kInvalid) {
-        String error_message = "Attempt to compact table store twice";
+    if (compact_state_.type_ != type) {
+        String error_message = fmt::format("Compact type mismatch: {} vs {}", static_cast<int>(compact_state_.type_), static_cast<int>(type));
         UnrecoverableError(error_message);
     }
-    compact_state_ = TxnCompactStore(type);
     for (auto &[new_segment, old_segments] : segment_data) {
         auto txn_segment_store = TxnSegmentStore::AddSegmentStore(new_segment.get());
         compact_state_.compact_data_.emplace_back(std::move(txn_segment_store), old_segments);
@@ -678,6 +679,8 @@ void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts) {
     for (auto [table_entry, ptr_seq_n] : txn_tables_) {
         table_entry->Commit(commit_ts);
     }
+
+    this->RevertTableStatus();
 }
 
 void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
@@ -696,6 +699,8 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         db_entry->Cleanup();
         catalog_->RemoveDBEntry(db_entry, txn_id);
     }
+
+    this->RevertTableStatus();
 }
 
 bool TxnStore::ReadOnly() const {
@@ -719,6 +724,21 @@ bool TxnStore::ReadOnly() const {
     }
 
     return read_only;
+}
+
+void TxnStore::RevertTableStatus() {
+    if (table_status_ == TxnStoreStatus::kCompacting) {
+        for (const auto &[table_name, table_store] : txn_tables_store_) {
+            LOG_INFO(fmt::format("Txn {}: Revert table {} status from compacting to done", txn_->TxnID(), table_name));
+            table_store->GetTableEntry()->SetCompactDone();
+        }
+    } else if (table_status_ == TxnStoreStatus::kCreatingIndex) {
+        for (const auto &[table_name, table_store] : txn_tables_store_) {
+            LOG_INFO(fmt::format("Txn {}: Revert table {} status from creating index to done", txn_->TxnID(), table_name));
+            table_store->GetTableEntry()->SetCreateIndexDone();
+        }
+        return;
+    }
 }
 
 } // namespace infinity
