@@ -144,6 +144,8 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         }
         inverting_thread_pool_.push(std::move(func));
     } else {
+        // mem trace : the column_lengths_;
+        AddMemUsed(sizeof(u32) * row_count_);
         PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
         auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
@@ -382,6 +384,7 @@ SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
     PostingPtr posting;
     bool found = posting_store.GetOrAdd(term, posting, prepared_posting_);
     if (!found) {
+        // mem trace : add term's size
         AddMemUsed(term.size());
         prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
     }
@@ -393,6 +396,7 @@ void MemoryIndexer::Reset() {
         posting_table_->store_.Clear();
     }
     column_lengths_.Clear();
+    DecMemUsed(mem_used_);
 }
 
 MemIndexTracerInfo MemoryIndexer::GetInfo() const {
@@ -407,8 +411,14 @@ MemIndexTracerInfo MemoryIndexer::GetInfo() const {
 
 TableIndexEntry *MemoryIndexer::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
-SizeT MemoryIndexer::MemUsed() const {
-    return mem_used_;
+SizeT MemoryIndexer::MemUsed() const { return mem_used_; }
+
+void MemoryIndexer::ApplyMemUseChange(MemUsageChange mem_change) {
+    if (mem_change.is_add_) {
+        AddMemUsed(mem_change.mem_);
+    } else {
+        DecMemUsed(mem_change.mem_);
+    }
 }
 
 void MemoryIndexer::AddMemUsed(SizeT mem) {

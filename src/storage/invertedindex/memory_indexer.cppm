@@ -38,11 +38,14 @@ import base_memindex;
 import memindex_tracer;
 import segment_index_entry;
 import table_index_entry;
+import mem_usage_change;
 
 namespace infinity {
 
 export class MemoryIndexer final : public BaseMemIndex {
 public:
+    void ApplyMemUseChange(MemUsageChange mem_change);
+
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
     };

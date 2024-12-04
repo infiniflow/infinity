@@ -52,7 +52,7 @@ ColumnInverter::ColumnInverter(PostingWriterProvider posting_writer_provider, Ve
 
 void ColumnInverter::InitAnalyzer(const String &analyzer_name) {
     auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
-    if(!status.ok()) {
+    if (!status.ok()) {
         Status status = Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name));
         RecoverableError(status);
     }
@@ -258,7 +258,7 @@ void ColumnInverter::SortForOfflineDump() {
 //                   ----------------------------------------------------------------------------------------------------------------------------+
 //                                                            Data within each group
 
-void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter>& buf_writer) {
+void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter> &buf_writer) {
     // spill sort results for external merge sort
     // if (positions_.empty()) {
     //    return;
@@ -267,19 +267,19 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
     // size of this Run in bytes
     u32 data_size = 0;
     u64 data_size_pos = spill_file_tell;
-    buf_writer->Write((const char*)&data_size, sizeof(u32));
+    buf_writer->Write((const char *)&data_size, sizeof(u32));
     spill_file_tell += sizeof(u32);
 
     // number of tuples
     u32 num_of_tuples = positions_.size();
     tuple_count += num_of_tuples;
-    buf_writer->Write((const char*)&num_of_tuples, sizeof(u32));
+    buf_writer->Write((const char *)&num_of_tuples, sizeof(u32));
     spill_file_tell += sizeof(u32);
 
     // start offset for next spill
     u64 next_start_offset = 0;
     u64 next_start_offset_pos = spill_file_tell;
-    buf_writer->Write((const char*)&next_start_offset, sizeof(u64));
+    buf_writer->Write((const char *)&next_start_offset, sizeof(u64));
     spill_file_tell += sizeof(u64);
 
     u64 data_start_offset = spill_file_tell;
@@ -295,11 +295,11 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
         }
         record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
 
-        buf_writer->Write((const char*)&record_length, sizeof(u32));
+        buf_writer->Write((const char *)&record_length, sizeof(u32));
         buf_writer->Write(term.data(), term.size());
-        buf_writer->Write((const char*)&str_null, sizeof(char));
-        buf_writer->Write((const char*)&(i.doc_id_), sizeof(docid_t));
-        buf_writer->Write((const char*)&(i.term_pos_), sizeof(u32));
+        buf_writer->Write((const char *)&str_null, sizeof(char));
+        buf_writer->Write((const char *)&(i.doc_id_), sizeof(docid_t));
+        buf_writer->Write((const char *)&(i.term_pos_), sizeof(u32));
     }
     buf_writer->Flush();
     // update data size

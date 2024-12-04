@@ -74,7 +74,7 @@ public:
         }
     };
 
-    void SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter>& buf_writer);
+    void SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter> &buf_writer);
 
 private:
     using TermBuffer = Vector<char>;
