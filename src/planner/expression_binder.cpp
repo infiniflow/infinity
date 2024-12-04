@@ -981,23 +981,26 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
     auto [special_function_ptr, status] = Catalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
     if (status.ok()) {
         switch (special_function_ptr->special_type()) {
+            case SpecialType::kDistanceFactors:
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
                     RecoverableError(
-                        Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2"));
+                        Status::SyntaxError("DISTANCE() / DISTANCE_FACTORS() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2"));
                 }
                 break;
             }
+            case SpecialType::kSimilarityFactors:
             case SpecialType::kSimilarity: {
                 if (!bind_context_ptr->allow_similarity) {
                     RecoverableError(Status::SyntaxError(
-                        "SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product"));
+                        "SIMILARITY() / SIMILARITY_FACTORS() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product"));
                 }
                 break;
             }
+            case SpecialType::kScoreFactors:
             case SpecialType::kScore: {
                 if (!bind_context_ptr->allow_score) {
-                    RecoverableError(Status::SyntaxError("SCORE() requires Fusion or MATCH TEXT or MATCH TENSOR"));
+                    RecoverableError(Status::SyntaxError("SCORE() / SCORE_FACTORS() requires Fusion or MATCH TEXT or MATCH TENSOR"));
                 }
                 break;
             }
