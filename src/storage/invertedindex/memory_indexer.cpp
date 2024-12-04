@@ -145,7 +145,7 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         inverting_thread_pool_.push(std::move(func));
     } else {
         // mem trace : the column_lengths_;
-        AddMemUsed(sizeof(u32) * row_count_);
+        AddMemUsed(sizeof(u32) * row_count);
         PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
         auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
