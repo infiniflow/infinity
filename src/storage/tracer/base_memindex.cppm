@@ -35,6 +35,11 @@ protected:
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
         memindex_tracer->AddMemUsed(mem);
     }
+
+    void DecMemUsed(SizeT mem) {
+        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+        memindex_tracer->DecreaseMemUsed(mem);
+    }
 };
 
 } // namespace infinity

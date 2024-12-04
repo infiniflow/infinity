@@ -76,10 +76,16 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 
 MemoryIndexer::PostingTable::PostingTable() {}
 
-MemoryIndexer::MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer)
+MemoryIndexer::MemoryIndexer(const String &index_dir,
+                             const String &base_name,
+                             RowID base_row_id,
+                             optionflag_t flag,
+                             const String &analyzer,
+                             SegmentIndexEntry *segment_index_entry)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
       analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
-      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL) {
+      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL),
+      segment_index_entry_(segment_index_entry) {
     assert(std::filesystem::path(index_dir).is_absolute());
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
@@ -376,6 +382,7 @@ SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
     PostingPtr posting;
     bool found = posting_store.GetOrAdd(term, posting, prepared_posting_);
     if (!found) {
+        AddMemUsed(term.size());
         prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
     }
     return posting;
@@ -386,6 +393,33 @@ void MemoryIndexer::Reset() {
         posting_table_->store_.Clear();
     }
     column_lengths_.Clear();
+}
+
+MemIndexTracerInfo MemoryIndexer::GetInfo() const {
+    auto *table_index_entry = segment_index_entry_->table_index_entry();
+    SharedPtr<String> index_name = table_index_entry->GetIndexName();
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    SharedPtr<String> table_name = table_entry->GetTableName();
+    SharedPtr<String> db_name = table_entry->GetDBName();
+
+    return MemIndexTracerInfo(index_name, table_name, db_name, MemUsed(), doc_count_);
+}
+
+TableIndexEntry *MemoryIndexer::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
+
+SizeT MemoryIndexer::MemUsed() const {
+    return mem_used_;
+}
+
+void MemoryIndexer::AddMemUsed(SizeT mem) {
+    mem_used_ += mem;
+    BaseMemIndex::AddMemUsed(mem);
+}
+
+void MemoryIndexer::DecMemUsed(SizeT mem) {
+    assert(mem_used_ >= mem);
+    mem_used_ -= mem;
+    BaseMemIndex::DecMemUsed(mem);
 }
 
 void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>> &merger) {
