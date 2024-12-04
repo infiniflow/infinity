@@ -52,7 +52,7 @@ bool AnalyzeContext::MoveCursor() {
     }
 }
 
-void AnalyzeContext::AddLexeme(Lexeme *lexeme) { org_lexemes_->AddLexeme(lexeme); }
+bool AnalyzeContext::AddLexeme(Lexeme *lexeme) { return org_lexemes_->AddLexeme(lexeme); }
 
 void AnalyzeContext::AddLexemePath(LexemePath *path) {
     if (path != nullptr) {

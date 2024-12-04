@@ -28,7 +28,8 @@ void CJKSegmenter::Analyze(AnalyzeContext *context) {
                 if (hit->IsMatch()) {
                     Lexeme *new_lexeme =
                         new Lexeme(context->GetBufferOffset(), hit->GetBegin(), context->GetCursor() - hit->GetBegin() + 1, Lexeme::TYPE_CNWORD);
-                    context->AddLexeme(new_lexeme);
+                    if (!context->AddLexeme(new_lexeme))
+                        delete new_lexeme;
 
                     if (!hit->IsPrefix()) {
                         it = tmp_hits_.erase(it);
@@ -47,7 +48,8 @@ void CJKSegmenter::Analyze(AnalyzeContext *context) {
         Hit *single_char_hit = dict_->MatchInMainDict(context->GetSegmentBuff(), context->GetCursor(), 1);
         if (single_char_hit->IsMatch()) {
             Lexeme *new_lexeme = new Lexeme(context->GetBufferOffset(), context->GetCursor(), 1, Lexeme::TYPE_CNWORD);
-            context->AddLexeme(new_lexeme);
+            if (!context->AddLexeme(new_lexeme))
+                delete new_lexeme;
 
             if (single_char_hit->IsPrefix()) {
                 tmp_hits_.push_back(UniquePtr<Hit>(single_char_hit));

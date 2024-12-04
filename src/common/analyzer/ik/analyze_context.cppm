@@ -61,7 +61,7 @@ public:
 
     void MarkBufferOffset() { buff_offset_ += cursor_; }
 
-    void AddLexeme(Lexeme *lexeme);
+    bool AddLexeme(Lexeme *lexeme);
 
     void AddLexemePath(LexemePath *path);
 

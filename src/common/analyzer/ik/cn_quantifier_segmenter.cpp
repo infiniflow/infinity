@@ -76,7 +76,8 @@ void CNQuantifierSegmenter::ProcessCount(AnalyzeContext *context) {
                 if (hit->IsMatch()) {
                     Lexeme *new_lexeme =
                         new Lexeme(context->GetBufferOffset(), hit->GetBegin(), context->GetCursor() - hit->GetBegin() + 1, Lexeme::TYPE_COUNT);
-                    context->AddLexeme(new_lexeme);
+                    if (!context->AddLexeme(new_lexeme))
+                        delete new_lexeme;
 
                     if (!hit->IsPrefix()) {
                         it = count_hits_.erase(it);
@@ -95,7 +96,8 @@ void CNQuantifierSegmenter::ProcessCount(AnalyzeContext *context) {
         Hit *single_char_hit = dict_->MatchInQuantifierDict(context->GetSegmentBuff(), context->GetCursor(), 1);
         if (single_char_hit->IsMatch()) {
             Lexeme *new_lexeme = new Lexeme(context->GetBufferOffset(), context->GetCursor(), 1, Lexeme::TYPE_COUNT);
-            context->AddLexeme(new_lexeme);
+            if (!context->AddLexeme(new_lexeme))
+                delete new_lexeme;
 
             if (single_char_hit->IsPrefix()) {
                 count_hits_.push_back(UniquePtr<Hit>(single_char_hit));
@@ -131,7 +133,8 @@ bool CNQuantifierSegmenter::NeedCountScan(AnalyzeContext *context) {
 void CNQuantifierSegmenter::OutputNumLexeme(AnalyzeContext *context) {
     if (nstart_ > -1 && nend_ > -1) {
         Lexeme *new_lexeme = new Lexeme(context->GetBufferOffset(), nstart_, nend_ - nstart_ + 1, Lexeme::TYPE_CNUM);
-        context->AddLexeme(new_lexeme);
+        if (!context->AddLexeme(new_lexeme))
+            delete new_lexeme;
     }
 }
 
