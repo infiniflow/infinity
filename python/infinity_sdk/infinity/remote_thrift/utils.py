@@ -89,6 +89,21 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
                 expr_type = ttypes.ParsedExprType(function_expr=func_expr)
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
+            case "_score_factors":
+                func_expr = ttypes.FunctionExpr(function_name="score_factors", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_similarity_factors":
+                func_expr = ttypes.FunctionExpr(function_name="similarity_factors", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_distance_factors":
+                func_expr = ttypes.FunctionExpr(function_name="distance_factors", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
             case _:
                 parsed_expr = ttypes.ParsedExpr()
                 column_expr = ttypes.ColumnExpr()

@@ -165,6 +165,18 @@ void BuiltinFunctions::RegisterSpecialFunction() {
     SharedPtr<SpecialFunction> score_function = MakeShared<SpecialFunction>("SCORE", DataType(LogicalType::kFloat), 4, SpecialType::kScore);
     Catalog::AddSpecialFunction(catalog_ptr_.get(), score_function);
 
+    SharedPtr<SpecialFunction> distance_factors_function =
+        MakeShared<SpecialFunction>("DISTANCE_FACTORS", DataType(LogicalType::kVarchar), 5, SpecialType::kDistanceFactors);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), distance_factors_function);
+
+    SharedPtr<SpecialFunction> similarity_factors_function =
+        MakeShared<SpecialFunction>("SIMILARITY_FACTORS", DataType(LogicalType::kVarchar), 6, SpecialType::kSimilarityFactors);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), similarity_factors_function);
+
+    SharedPtr<SpecialFunction> score_factors_function =
+        MakeShared<SpecialFunction>("SCORE_FACTORS", DataType(LogicalType::kVarchar), 7, SpecialType::kScoreFactors);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), score_factors_function);
+
     auto createts_function =
         MakeShared<SpecialFunction>("CREATE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_CREATE, SpecialType::kCreateTs);
     Catalog::AddSpecialFunction(catalog_ptr_.get(), createts_function);

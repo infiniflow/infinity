@@ -104,6 +104,15 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  expression->alias_,
                                                  column_cnt_ - 2);
             }
+            case SpecialType::kScoreFactors:
+            case SpecialType::kSimilarityFactors:
+            case SpecialType::kDistanceFactors: {
+                return ReferenceExpression::Make(expression->Type(),
+                                                 expression->table_name(),
+                                                 expression->column_name(),
+                                                 expression->alias_,
+                                                 column_cnt_ - 3);
+            }
             case SpecialType::kCreateTs: 
             case SpecialType::kDeleteTs: {
                 break;

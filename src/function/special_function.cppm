@@ -26,8 +26,11 @@ namespace infinity {
 export enum class SpecialType {
     kRowID,
     kDistance,
+    kDistanceFactors,
     kSimilarity,
+    kSimilarityFactors,
     kScore,
+    kScoreFactors,
     kCreateTs,
     kDeleteTs,
     kFilterFullText,

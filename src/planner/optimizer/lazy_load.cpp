@@ -95,7 +95,10 @@ SharedPtr<BaseExpression> RefencecColumnCollection::VisitReplace(const SharedPtr
             case SpecialType::kRowID:
             case SpecialType::kDistance:
             case SpecialType::kSimilarity:
-            case SpecialType::kScore: {
+            case SpecialType::kScore:
+            case SpecialType::kDistanceFactors:
+            case SpecialType::kSimilarityFactors:
+            case SpecialType::kScoreFactors: {
                 return expression;
             }
             default: {
