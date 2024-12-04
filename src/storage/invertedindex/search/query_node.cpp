@@ -628,7 +628,7 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
         UnrecoverableError("Unreachable code");
         return nullptr;
     }
-    if (params.early_term_algo == EarlyTermAlgo::kAuto) {
+    if (params.early_term_algo == EarlyTermAlgo::kAuto && params.ft_similarity == FulltextSimilarity::kBM25) {
         // try to apply batch when possible
         // collect all term children info
         u64 total_df = 0u;
