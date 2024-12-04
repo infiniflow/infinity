@@ -601,8 +601,6 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
             break;
         }
         default: {
-            String error_message = "Invalid compact task type";
-            UnrecoverableError(error_message);
         }
     }
     return Status::OK();
@@ -651,8 +649,6 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
                 break;
             }
             default: {
-                String error_message = "Invalid compact task type";
-                UnrecoverableError(error_message);
             }
         }
     }

@@ -215,10 +215,6 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
 // Must be called when all segments are not compacting
 void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     std::unique_lock lock(mtx_);
-    if (status_ != CompactionStatus::kDisable) {
-        String error_message = fmt::format("Enable compaction when compaction not disable, {}", (u8)status_);
-        UnrecoverableError(error_message);
-    }
     for (auto *segment_entry : segment_entries) {
         this->AddSegmentInner(segment_entry);
     }
