@@ -30,6 +30,25 @@ const String FILE_NAME = "IKAnalyzer.cfg.xml";
 const String EXT_DICT = "ext_dict";
 const String EXT_STOP = "ext_stopwords";
 
+bool IsSpaceOrNewline(char c) { return std::isspace(static_cast<unsigned char>(c)) || c == '\n' || c == '\r'; }
+
+String Trim(const String &str) {
+    if (str.empty()) {
+        return str;
+    }
+
+    std::size_t start = 0;
+    while (start < str.size() && IsSpaceOrNewline(str[start])) {
+        ++start;
+    }
+
+    std::size_t end = str.size() - 1;
+    while (end > start && IsSpaceOrNewline(str[end])) {
+        --end;
+    }
+    return str.substr(start, end - start + 1);
+}
+
 Dictionary::Dictionary(const String &dir) {
     fs::path root(dir);
     fs::path ik_root = root / "ik";
@@ -99,9 +118,9 @@ Status Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool
     if (!is.is_open()) {
         return Status::InvalidAnalyzerFile(file_path);
     }
-    std::cout << "Load " << file_path << std::endl;
-    std::string line;
+    String line;
     while (std::getline(is, line)) {
+        line = Trim(line);
         std::wstring word = CharacterUtil::UTF8ToUTF16(line);
         if (!word.empty() && word[0] == L'\uFEFF') {
             word = word.substr(1);
