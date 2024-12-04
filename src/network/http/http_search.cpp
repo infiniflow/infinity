@@ -484,10 +484,11 @@ UniquePtr<ParsedExpr> HTTPSearch::ParseFilter(const nlohmann::json &json_object,
 Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list, HTTPStatus &http_status, nlohmann::json &response) {
 
     Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
-    DeferFn defer_fn([&]() {
+    DeferFn free_output_columns([&]() {
         if (output_columns != nullptr) {
             for (auto &expr : *output_columns) {
                 delete expr;
+                expr = nullptr;
             }
             delete output_columns;
             output_columns = nullptr;
