@@ -495,8 +495,11 @@ void Catalog::AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFuncti
     switch (special_function->special_type()) {
         case SpecialType::kRowID:
         case SpecialType::kDistance:
+        case SpecialType::kDistanceFactors:
         case SpecialType::kSimilarity:
+        case SpecialType::kSimilarityFactors:
         case SpecialType::kScore:
+        case SpecialType::kScoreFactors:
         case SpecialType::kFilterFullText: {
             return;
         }

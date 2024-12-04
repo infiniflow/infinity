@@ -368,6 +368,21 @@ class InfinityThriftQueryBuilder(ABC):
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
                     select_list.append(parsed_expr)
+                case "_score_factors":
+                    func_expr = FunctionExpr(function_name="score_factors", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case "_similarity_factors":
+                    func_expr = FunctionExpr(function_name="similarity_factors", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case "_distance_factors":
+                    func_expr = FunctionExpr(function_name="distance_factors", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
                 case _:
                     select_list.append(parse_expr(maybe_parse(column)))
 
@@ -423,6 +438,27 @@ class InfinityThriftQueryBuilder(ABC):
                     sort_list.append(order_by_expr)
                 case "_distance":
                     func_expr = FunctionExpr(function_name="distance", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
+                    sort_list.append(order_by_expr)
+                case "_score_factors":
+                    func_expr = FunctionExpr(function_name="score_factors", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
+                    sort_list.append(order_by_expr)
+                case "_similarity_factors":
+                    func_expr = FunctionExpr(function_name="similarity_factors", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
+                    sort_list.append(order_by_expr)
+                case "_distance_factors":
+                    func_expr = FunctionExpr(function_name="distance_factors", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
                     order_by_flag: bool = order_by_expr[1] == SortType.Asc
