@@ -44,8 +44,12 @@ void IKArbitrator::Process(AnalyzeContext *context, bool use_smart) {
     }
 }
 
+struct CompareLexemePath {
+    bool operator()(const UniquePtr<LexemePath> &lhs, const UniquePtr<LexemePath> &rhs) const { return lhs->CompareTo(*rhs); }
+};
+
 LexemePath *IKArbitrator::Judge(QuickSortSet::Cell *lexeme_cell, int fulltext_length) {
-    Set<UniquePtr<LexemePath>> path_options;
+    std::set<UniquePtr<LexemePath>, CompareLexemePath> path_options;
     UniquePtr<LexemePath> option = MakeUnique<LexemePath>();
 
     std::stack<QuickSortSet::Cell *> lexeme_stack = ForwardPath(lexeme_cell, option.get());

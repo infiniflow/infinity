@@ -23,11 +23,9 @@ void CJKSegmenter::Analyze(AnalyzeContext *context) {
         if (!tmp_hits_.empty()) {
             for (auto it = tmp_hits_.begin(); it != tmp_hits_.end();) {
                 Hit *hit = (*it).get();
-                fmt::print("CJK MatchWithHit tmp_hits size: {} cursor: {} \n", tmp_hits_.size(), context->GetCursor());
                 hit = dict_->MatchWithHit(context->GetSegmentBuff(), context->GetCursor(), hit);
 
                 if (hit->IsMatch()) {
-                    fmt::print("CJK Match length{} \n", context->GetCursor() - hit->GetBegin() + 1);
                     Lexeme *newLexeme =
                         new Lexeme(context->GetBufferOffset(), hit->GetBegin(), context->GetCursor() - hit->GetBegin() + 1, Lexeme::TYPE_CNWORD);
                     context->AddLexeme(newLexeme);

@@ -40,13 +40,10 @@ Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length
         ds = children_map_[key_char].get();
     }
 
-    std::wstring word(1, key_char);
-    std::string utfstr = CharacterUtil::UTF16ToUTF8(word);
     if (ds != nullptr) {
         if (length > 1) {
             return ds->Match(char_array, begin + 1, length - 1, search_hit);
         } else if (length == 1) {
-            fmt::print("Match word {} begin {} length {} node_state {} \n", utfstr, begin, length, ds->node_state_);
             if (ds->node_state_ == 1) {
                 search_hit->SetMatch();
             }
@@ -57,8 +54,6 @@ Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length
             return search_hit;
         }
     }
-    fmt::print("Match null {} begin {} length {}\n", utfstr, begin, length);
-
     return search_hit;
 }
 

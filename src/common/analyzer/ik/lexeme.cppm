@@ -32,6 +32,8 @@ public:
 
     Lexeme(int offset, int begin, int length, int lexeme_type);
 
+    Lexeme *Copy();
+
     bool Equals(const Lexeme &other) const { return offset_ == other.offset_ && begin_ == other.begin_ && length_ == other.length_; }
 
     int Hash() const {
