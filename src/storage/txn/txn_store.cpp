@@ -271,13 +271,14 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
     return {nullptr, Status::OK()};
 }
 
+void TxnTableStore::SetCompactType(CompactStatementType type) { compact_state_.type_ = type; }
+
 Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data,
                                                         CompactStatementType type) {
-    if (compact_state_.type_ != CompactStatementType::kInvalid) {
-        String error_message = "Attempt to compact table store twice";
+    if (compact_state_.type_ != type) {
+        String error_message = fmt::format("Compact type mismatch: {} vs {}", static_cast<int>(compact_state_.type_), static_cast<int>(type));
         UnrecoverableError(error_message);
     }
-    compact_state_ = TxnCompactStore(type);
     for (auto &[new_segment, old_segments] : segment_data) {
         auto txn_segment_store = TxnSegmentStore::AddSegmentStore(new_segment.get());
         compact_state_.compact_data_.emplace_back(std::move(txn_segment_store), old_segments);

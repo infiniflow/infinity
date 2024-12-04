@@ -609,9 +609,6 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
 }
 
 Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts, const TxnCompactStore &compact_store) {
-    if (compact_store.compact_data_.empty()) {
-        return Status::OK();
-    }
     {
         for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
             SharedPtr<SegmentEntry> segment;
@@ -1559,7 +1556,7 @@ void TableEntry::SetUnlock() {
 
 bool TableEntry::SetCompact(TableStatus &status, Txn *txn) {
     std::unique_lock lock(rw_locker_);
-    if (table_status_ != TableStatus::kNone) {
+    if (table_status_ == TableStatus::kCreatingIndex) {
         status = table_status_;
         LOG_TRACE(fmt::format("SetCompact fail. Table {} is in status: {}", encode(), u8(table_status_)));
         return false;

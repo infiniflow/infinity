@@ -109,6 +109,8 @@ public:
 
     Tuple<UniquePtr<String>, Status> Delete(const Vector<RowID> &row_ids);
 
+    void SetCompactType(CompactStatementType type);
+
     Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
     void AddSegmentStore(SegmentEntry *segment_entry);
