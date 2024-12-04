@@ -16,31 +16,29 @@ void IKArbitrator::Process(AnalyzeContext *context, bool use_smart) {
     QuickSortSet *org_lexemes = context->GetOrgLexemes();
     Lexeme *org_lexeme = org_lexemes->PollFirst();
 
-    LexemePath *cross_path = new LexemePath();
+    UniquePtr<LexemePath> cross_path = MakeUnique<LexemePath>();
     while (org_lexeme != nullptr) {
         if (!cross_path->AddCrossLexeme(org_lexeme)) {
             if (cross_path->Size() == 1 || !use_smart) {
-                context->AddLexemePath(cross_path);
+                context->AddLexemePath(cross_path.release());
             } else {
                 QuickSortSet::Cell *head_cell = cross_path->GetHead();
                 LexemePath *judge_result = Judge(head_cell, cross_path->GetPathLength());
                 context->AddLexemePath(judge_result);
-                delete cross_path;
             }
 
-            cross_path = new LexemePath();
+            cross_path = MakeUnique<LexemePath>();
             cross_path->AddCrossLexeme(org_lexeme);
         }
         org_lexeme = org_lexemes->PollFirst();
     }
 
     if (cross_path->Size() == 1 || !use_smart) {
-        context->AddLexemePath(cross_path);
+        context->AddLexemePath(cross_path.release());
     } else {
         QuickSortSet::Cell *head_cell = cross_path->GetHead();
         LexemePath *judge_result = Judge(head_cell, cross_path->GetPathLength());
         context->AddLexemePath(judge_result);
-        delete cross_path;
     }
 }
 

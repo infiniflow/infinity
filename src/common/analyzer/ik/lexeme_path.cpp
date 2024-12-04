@@ -105,7 +105,7 @@ LexemePath *LexemePath::Copy() const {
     Cell *c = GetHead();
     while (c != nullptr && c->GetLexeme() != nullptr) {
         Lexeme *lexeme = c->GetLexeme()->Copy();
-        if (!the_copy->AddLexeme(lexeme))
+        if (!(the_copy->AddLexeme(lexeme)))
             delete lexeme;
         c = c->GetNext();
     }
