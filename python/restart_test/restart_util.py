@@ -191,6 +191,8 @@ class LChYDataGenerato:
     def import_file() -> str:
         base_filepath = "test/data/jsonl/test_table.jsonl"
         filepath = "test/data/jsonl/test_table_gen.jsonl"
+        if os.path.exists(filepath):
+            return filepath
         if not os.path.exists("test/data/jsonl"):
             os.makedirs("test/data/jsonl")
         with open(base_filepath, "r") as base_file:

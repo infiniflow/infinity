@@ -43,6 +43,7 @@ import meta_info;
 import block_entry;
 import column_index_reader;
 import value;
+import infinity_exception;
 
 namespace infinity {
 
@@ -368,7 +369,23 @@ public:
 
     void SetUnlock();
 
+    enum struct TableStatus: u8 {
+        kNone = 0,
+        kCreatingIndex,
+        kCompacting,
+    };
+
+    bool SetCompact(TableStatus &status, Txn *txn);
+
+    bool SetCreatingIndex(TableStatus &status, Txn *txn);
+
+    void SetCompactDone();
+
+    void SetCreateIndexDone();
+
 private:
+    TableStatus table_status_ = TableStatus::kNone;
+
     std::mutex mtx_; // when table is locked, write is not allowed.
     std::condition_variable cv_;
     bool locked_ = false;

@@ -1760,6 +1760,18 @@ void InfinityThriftService::Flush(infinity_thrift_rpc::CommonResponse &response,
     ProcessQueryResult(response, result);
 }
 
+void InfinityThriftService::Compact(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CompactRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+    LOG_TRACE(fmt::format("THRIFT: Compact Table: {}", request.table_name));
+
+    QueryResult result = infinity->Compact(request.db_name, request.table_name);
+    ProcessQueryResult(response, result);
+}
+
 Tuple<Infinity *, Status> InfinityThriftService::GetInfinityBySessionID(i64 session_id) {
     std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
     auto iter = infinity_session_map_.find(session_id);
