@@ -61,7 +61,7 @@ public:
     IndexReader index_reader_;
     UniquePtr<QueryNode> query_tree_;
     float begin_threshold_;
-    EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kBMW};
+    EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kAuto};
     u32 top_n_{1};
 
     SharedPtr<CommonQueryFilter> common_query_filter_{};
