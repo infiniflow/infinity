@@ -142,7 +142,7 @@ curl --request POST \
 
 :::tip NOTE
 
-Only a node in `ADMIN` mode with `storage_type = "minio"` can be promoted to learner node.
+A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a follower node) can be promoted to learner node.
 
 :::
 
