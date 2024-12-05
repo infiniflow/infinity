@@ -56,8 +56,6 @@ private:
     }
 
     void Migrate(Vector<UniquePtr<DictSegment>> &segment_array, HashMap<wchar_t, UniquePtr<DictSegment>> &segment_map);
-
-    int CompareTo(const DictSegment &o) const { return node_char_ - o.node_char_; }
 };
 
 } // namespace infinity

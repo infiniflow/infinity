@@ -1,11 +1,7 @@
 module;
 
-#include <codecvt>
 #include <fstream>
-#include <iostream>
-#include <locale>
 #include <sstream>
-#include <stdexcept>
 
 import stl;
 import quick_sort_set;
@@ -52,11 +48,7 @@ bool AnalyzeContext::MoveCursor() {
     }
 }
 
-bool AnalyzeContext::NeedRefillBuffer() const {
-    return available_ == BUFF_SIZE && cursor_ < available_ - 1 && cursor_ > available_ - BUFF_EXHAUST_CRITICAL && !IsBufferLocked();
-}
-
-void AnalyzeContext::AddLexeme(Lexeme *lexeme) { org_lexemes_.AddLexeme(lexeme); }
+bool AnalyzeContext::AddLexeme(Lexeme *lexeme) { return org_lexemes_->AddLexeme(lexeme); }
 
 void AnalyzeContext::AddLexemePath(LexemePath *path) {
     if (path != nullptr) {
@@ -114,14 +106,15 @@ Lexeme *AnalyzeContext::GetNextLexeme() {
             result->SetLexemeText(
                 std::wstring(segment_buff_.begin() + result->GetBegin(), segment_buff_.begin() + result->GetBegin() + result->GetLength()));
             break;
+        } else {
+            delete result;
         }
     }
     return result;
 }
 
 void AnalyzeContext::Reset() {
-    buff_locker_.clear();
-    org_lexemes_ = QuickSortSet();
+    org_lexemes_ = MakeUnique<QuickSortSet>();
     available_ = 0;
     buff_offset_ = 0;
     char_types_.clear();

@@ -2,6 +2,7 @@ module;
 
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
@@ -13,22 +14,46 @@ import hit;
 import stl;
 import status;
 import character_util;
+import third_party;
 
 namespace fs = std::filesystem;
 
 namespace infinity {
 
-const String PATH_DIC_MAIN = "ik/main.dic";
-const String PATH_DIC_SURNAME = "ik/surname.dic";
-const String PATH_DIC_QUANTIFIER = "ik/quantifier.dic";
-const String PATH_DIC_SUFFIX = "ik/suffix.dic";
-const String PATH_DIC_PREP = "ik/preposition.dic";
-const String PATH_DIC_STOP = "ik/stopword.dic";
-const String FILE_NAME = "ik/IKAnalyzer.cfg.xml";
-const String EXT_DICT = "ik/ext_dict";
-const String EXT_STOP = "ik/ext_stopwords";
+const String PATH_DIC_MAIN = "main.dic";
+const String PATH_DIC_SURNAME = "surname.dic";
+const String PATH_DIC_QUANTIFIER = "quantifier.dic";
+const String PATH_DIC_SUFFIX = "suffix.dic";
+const String PATH_DIC_PREP = "preposition.dic";
+const String PATH_DIC_STOP = "stopword.dic";
+const String FILE_NAME = "IKAnalyzer.cfg.xml";
+const String EXT_DICT = "ext_dict";
+const String EXT_STOP = "ext_stopwords";
 
-Dictionary::Dictionary(const String &dir) : conf_dir_(dir) {}
+bool IsSpaceOrNewline(char c) { return std::isspace(static_cast<unsigned char>(c)) || c == '\n' || c == '\r'; }
+
+String Trim(const String &str) {
+    if (str.empty()) {
+        return str;
+    }
+
+    std::size_t start = 0;
+    while (start < str.size() && IsSpaceOrNewline(str[start])) {
+        ++start;
+    }
+
+    std::size_t end = str.size() - 1;
+    while (end > start && IsSpaceOrNewline(str[end])) {
+        --end;
+    }
+    return str.substr(start, end - start + 1);
+}
+
+Dictionary::Dictionary(const String &dir) {
+    fs::path root(dir);
+    fs::path ik_root = root / "ik";
+    conf_dir_ = ik_root.string();
+}
 
 Status Dictionary::Load() {
     Status load_status;
@@ -93,8 +118,9 @@ Status Dictionary::LoadDictFile(DictSegment *dict, const String &file_path, bool
     if (!is.is_open()) {
         return Status::InvalidAnalyzerFile(file_path);
     }
-    std::string line;
+    String line;
     while (std::getline(is, line)) {
+        line = Trim(line);
         std::wstring word = CharacterUtil::UTF8ToUTF16(line);
         if (!word.empty() && word[0] == L'\uFEFF') {
             word = word.substr(1);
@@ -167,12 +193,13 @@ Hit *Dictionary::MatchInQuantifierDict(const Vector<wchar_t> &char_array, int be
 }
 
 Hit *Dictionary::MatchWithHit(const Vector<wchar_t> &char_array, int current_index, Hit *matched_hit) {
-    DictSegment *ds = matched_hit->getMatchedDictSegment();
+    DictSegment *ds = matched_hit->GetMatchedDictSegment();
     return ds->Match(char_array, current_index, 1, matched_hit);
 }
 
 bool Dictionary::IsStopWord(const Vector<wchar_t> &char_array, int begin, int length) {
-    return stop_words_->Match(char_array, begin, length)->IsMatch();
+    UniquePtr<Hit> hit(stop_words_->Match(char_array, begin, length));
+    return hit->IsMatch();
 }
 
 Status Dictionary::LoadMainDict() {
@@ -194,7 +221,6 @@ Status Dictionary::LoadExtDict() {
     Status load_status;
     if (!ext_dict_files.empty()) {
         for (const String &ext_dict_name : ext_dict_files) {
-            std::cout << "[Dict Loading] " << ext_dict_name << std::endl;
             String file = fs::path(conf_dir_) / fs::path(ext_dict_name).string();
             load_status = LoadDictFile(main_dict_.get(), file, false, "Extra Dict");
             if (!load_status.ok()) {
@@ -217,7 +243,6 @@ Status Dictionary::LoadStopWordDict() {
     Vector<String> ext_stopword_dict_files = GetExtStopWordDictionarys();
     if (!ext_stopword_dict_files.empty()) {
         for (const String &ext_stopword_dict_file : ext_stopword_dict_files) {
-            std::cout << "[Dict Loading] " << ext_stopword_dict_file << std::endl;
             String file = fs::path(conf_dir_) / fs::path(ext_stopword_dict_file).string();
             load_status = LoadDictFile(stop_words_.get(), file, false, "Extra Stopwords");
             if (!load_status.ok()) {
@@ -272,10 +297,11 @@ void Dictionary::ParseProperties(const String &content) {
     std::stringstream ss(content);
     String line;
     while (std::getline(ss, line)) {
-        size_t pos = line.find('=');
-        if (pos != String::npos) {
-            String key = line.substr(0, pos);
-            String value = line.substr(pos + 1);
+        std::regex attribute_regex(R"#(<entry key="([^"]+)">([^<]+)</entry>)#");
+        std::smatch match;
+        if (std::regex_search(line, match, attribute_regex)) {
+            std::string key = match[1].str();
+            std::string value = match[2].str();
             props_[key] = value;
         }
     }
