@@ -54,12 +54,16 @@ When a transaction occurs, the leader node sends its log to both follower and le
 For *each* cluster node, you are required to prepare a customized configuration file to start it. Ensure that you properly set `server_mode`, `peer_ip`, `peer_port`, `storage_type`, and other related parameters. 
 
 1. Set `server_mode` to `"admin"`.
-2. Set `storage_type` to `"minio"`.
-3. Set `peer_ip` and `peer_port`.
-4. Update object storage-specific settings.
-5. Start up Infinity using the customized configuration file.
 
-*When a cluster node starts, it automatically operates in `ADMIN` mode.*
+2. Set `storage_type` to `"minio"`.
+
+3. Set `peer_ip` and `peer_port`.
+
+4. Update object storage-specific settings.
+
+5. Save your changes and start up Infinity using the customized configuration file.  
+
+   *When a cluster node starts, it automatically operates in `ADMIN` mode.*
 
 For further instructions on specifying a configuration file or setting parameters, see the [Configurations](https://infiniflow.org/docs/dev/configurations).
 
