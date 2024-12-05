@@ -53,8 +53,8 @@ All nodes in an Infinity cluster require a customized configuration file to star
 
   - `"standalone"`: Start Infinity as a standalone server.
   - `"admin"`:
-    - Start Infinity either as a standalone server in `ADMIN` state (when `storage_type` is set to `"local"`)
-    - Start Infinity as a cluster node in `ADMIN` state (when `storage_type` is set to `"minio"`)
+    - Start Infinity either as a standalone server in `ADMIN` mode (when `storage_type` is set to `"local"`)
+    - Start Infinity as a cluster node in `ADMIN` mode (when `storage_type` is set to `"minio"`)
 
 - `peer_ip`: The IP address on which the current node listens. Used for registration and inter-node communication.
 
@@ -65,7 +65,7 @@ All nodes in an Infinity cluster require a customized configuration file to star
   Available options:  
 
   - `"local"`: Use the local disk storage (default).
-  - `"minio"`: Use MinIO for shared storage. If you set `server_mode` to `"admin"` and `storage_type` to `"minio"`, the node will start as a cluster node in `ADMIN` state.
+  - `"minio"`: Use MinIO for shared storage. If you set `server_mode` to `"admin"` and `storage_type` to `"minio"`, the node will start as a cluster node in `ADMIN` mode.
 
 ### Mode and role transition
 
