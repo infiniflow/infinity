@@ -72,7 +72,14 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             // chinese-{coarse|fine}
             Analyzer *prototype = cache_[CHINESE].get();
             if (prototype == nullptr) {
-                String path = InfinityContext::instance().config()->ResourcePath();
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->ResourcePath();
+                }
                 UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
@@ -97,7 +104,14 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             // chinese-{coarse|fine}
             Analyzer *prototype = cache_[TRADITIONALCHINESE].get();
             if (prototype == nullptr) {
-                String path = InfinityContext::instance().config()->ResourcePath();
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->ResourcePath();
+                }
                 UniquePtr<TraditionalChineseAnalyzer> analyzer = MakeUnique<TraditionalChineseAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
@@ -123,7 +137,14 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             // rag-{coarse|fine}
             Analyzer *prototype = cache_[RAG].get();
             if (prototype == nullptr) {
-                String path = InfinityContext::instance().config()->ResourcePath();
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->ResourcePath();
+                }
                 UniquePtr<RAGAnalyzer> analyzer = MakeUnique<RAGAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
@@ -148,7 +169,14 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             //
             Analyzer *prototype = cache_[IK].get();
             if (prototype == nullptr) {
-                String path = InfinityContext::instance().config()->ResourcePath();
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->ResourcePath();
+                }
                 UniquePtr<IKAnalyzer> analyzer = MakeUnique<IKAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
@@ -172,7 +200,14 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
         case Str2Int(JAPANESE.data()): {
             Analyzer *prototype = cache_[JAPANESE].get();
             if (prototype == nullptr) {
-                String path = InfinityContext::instance().config()->ResourcePath();
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->ResourcePath();
+                }
                 UniquePtr<JapaneseAnalyzer> analyzer = MakeUnique<JapaneseAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
@@ -186,7 +221,14 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
         case Str2Int(KOREAN.data()): {
             Analyzer *prototype = cache_[KOREAN].get();
             if (prototype == nullptr) {
-                String path = InfinityContext::instance().config()->ResourcePath();
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->ResourcePath();
+                }
                 UniquePtr<KoreanAnalyzer> analyzer = MakeUnique<KoreanAnalyzer>(std::move(path));
                 Status load_status = analyzer->Load();
                 if (!load_status.ok()) {
