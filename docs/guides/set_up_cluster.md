@@ -91,7 +91,7 @@ curl --request POST \
     --header 'content-type: application/json' \
     --data ' {
         "role" : "leader",
-        "name" : "HarryPotter",
+        "name" : "Harry",
     } '
 ```
 ````
