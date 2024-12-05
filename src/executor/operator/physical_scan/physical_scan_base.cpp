@@ -85,6 +85,19 @@ SizeT PhysicalScanBase::TaskletCount() { return base_table_ref_->block_index_->B
 
 BlockIndex *PhysicalScanBase::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
 
+struct UpdateJobInfoB {
+    // src data info
+    SegmentID segment_id_{};
+    BlockID block_id_{};
+    ColumnID column_id_{};
+    BlockOffset block_offset_{};
+    // target position
+    u32 dba_id_{};
+    u32 dba_column_id_{};
+    u32 dba_row_id_{};
+    friend auto operator<=>(const UpdateJobInfoB &, const UpdateJobInfoB &) = default;
+};
+
 void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
                                  const Vector<RowID *> &row_ids_list,
                                  SizeT result_size,
@@ -93,6 +106,9 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
                                  OperatorState *operator_state) {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     SizeT query_n = raw_result_dists_list.size();
+    if (query_n != 1u) {
+        UnrecoverableError(fmt::format("{}: Unexpected: more than 1 query?", __func__));
+    }
 
     {
         SizeT total_data_row_count = query_n * result_n;
@@ -104,8 +120,8 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
             row_idx += DEFAULT_BLOCK_CAPACITY;
         } while (row_idx < total_data_row_count);
     }
-    auto *buffer_mgr = query_context->storage()->buffer_manager();
 
+    Vector<UpdateJobInfoB> update_job_infos;
     SizeT output_block_row_id = 0;
     SizeT output_block_idx = 0;
     DataBlock *output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
@@ -113,18 +129,11 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
         char *raw_result_dists = raw_result_dists_list[query_idx];
         RowID *row_ids = row_ids_list[query_idx];
         for (i64 top_idx = 0; top_idx < result_n; ++top_idx) {
-            SizeT id = query_n * query_idx + top_idx;
 
             SegmentID segment_id = row_ids[top_idx].segment_id_;
             SegmentOffset segment_offset = row_ids[top_idx].segment_offset_;
             BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
             BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-
-            BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-            if (block_entry == nullptr) {
-                String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
-                UnrecoverableError(error_message);
-            }
 
             if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
                 output_block_ptr->Finalize();
@@ -136,17 +145,39 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
             SizeT column_n = base_table_ref_->column_ids_.size();
             for (SizeT i = 0; i < column_n; ++i) {
                 SizeT column_id = base_table_ref_->column_ids_[i];
-                ColumnVector &&column_vector = block_entry->GetConstColumnVector(buffer_mgr, column_id);
-
-                output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
+                update_job_infos.emplace_back(segment_id, block_id, column_id, block_offset, output_block_idx, i, output_block_row_id);
+                output_block_ptr->column_vectors[i]->Finalize(output_block_ptr->column_vectors[i]->Size() + 1);
             }
-            output_block_ptr->AppendValueByPtr(column_n, raw_result_dists + id * result_size);
-            output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[id]);
+            output_block_ptr->AppendValueByPtr(column_n, raw_result_dists + top_idx * result_size);
+            output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[top_idx]);
 
             ++output_block_row_id;
         }
     }
     output_block_ptr->Finalize();
+    {
+        std::sort(update_job_infos.begin(), update_job_infos.end());
+        auto *buffer_mgr = query_context->storage()->buffer_manager();
+        auto cache_segment_id = std::numeric_limits<SegmentID>::max();
+        auto cache_block_id = std::numeric_limits<BlockID>::max();
+        BlockEntry *cache_block_entry = nullptr;
+        auto cache_column_id = std::numeric_limits<ColumnID>::max();
+        ColumnVector cache_column_vector;
+        for (const auto [segment_id, block_id, column_id, block_offset, dba_id, dba_column_id, dba_row_id] : update_job_infos) {
+            if (segment_id != cache_segment_id || block_id != cache_block_id) {
+                cache_segment_id = segment_id;
+                cache_block_id = block_id;
+                cache_block_entry = block_index->GetBlockEntry(segment_id, block_id);
+                cache_column_id = std::numeric_limits<ColumnID>::max();
+            }
+            if (column_id != cache_column_id) {
+                cache_column_vector = cache_block_entry->GetConstColumnVector(buffer_mgr, column_id);
+            }
+            auto val_for_update = cache_column_vector.GetValue(block_offset);
+            auto *target_column_vec = operator_state->data_block_array_[dba_id]->column_vectors[dba_column_id].get();
+            target_column_vec->SetValue(dba_row_id, val_for_update);
+        }
+    }
 
     ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
     if (cache_result_ && cache_mgr != nullptr) {
