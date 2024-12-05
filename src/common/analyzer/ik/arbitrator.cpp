@@ -17,7 +17,6 @@ void IKArbitrator::Process(AnalyzeContext *context, bool use_smart) {
     QuickSortSet *org_lexemes = context->GetOrgLexemes();
     Lexeme *org_lexeme = org_lexemes->PollFirst();
 
-    fmt::print("Construct LexemePath1\n");
     UniquePtr<LexemePath> cross_path = MakeUnique<LexemePath>();
     while (org_lexeme != nullptr) {
         if (!cross_path->AddCrossLexeme(org_lexeme)) {
@@ -28,8 +27,6 @@ void IKArbitrator::Process(AnalyzeContext *context, bool use_smart) {
                 LexemePath *judge_result = Judge(head_cell, cross_path->GetPathLength());
                 context->AddLexemePath(judge_result);
             }
-
-            fmt::print("Construct LexemePath2\n");
             cross_path = MakeUnique<LexemePath>();
             cross_path->AddCrossLexeme(org_lexeme);
         }
@@ -73,7 +70,9 @@ std::stack<QuickSortSet::Cell *> IKArbitrator::ForwardPath(QuickSortSet::Cell *l
     std::stack<QuickSortSet::Cell *> conflict_stack;
     QuickSortSet::Cell *c = lexeme_cell;
     while (c != nullptr && c->GetLexeme() != nullptr) {
-        if (!option->AddNotCrossLexeme(c->GetLexeme())) {
+        Lexeme *lexeme = c->GetLexeme()->Copy();
+        if (!option->AddNotCrossLexeme(lexeme)) {
+            delete lexeme;
             conflict_stack.push(c);
         }
         c = c->GetNext();
@@ -83,7 +82,8 @@ std::stack<QuickSortSet::Cell *> IKArbitrator::ForwardPath(QuickSortSet::Cell *l
 
 void IKArbitrator::BackPath(Lexeme *l, LexemePath *option) {
     while (option->CheckCross(l)) {
-        option->RemoveTail();
+        Lexeme *lexeme = option->RemoveTail();
+        delete lexeme;
     }
 }
 
