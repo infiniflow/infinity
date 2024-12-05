@@ -68,6 +68,7 @@ void BufferObj::UpdateFileWorkerInfo(UniquePtr<FileWorker> new_file_worker) {
 }
 
 BufferHandle BufferObj::Load() {
+    buffer_mgr_->AddRequestCount();
     std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
         case BufferStatus::kLoaded: {
@@ -81,6 +82,7 @@ BufferHandle BufferObj::Load() {
             break;
         }
         case BufferStatus::kFreed: {
+            buffer_mgr_->AddCacheMissCount();
             bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
             if (!free_success) {
                 String error_message = "Out of memory.";
@@ -95,6 +97,7 @@ BufferHandle BufferObj::Load() {
             break;
         }
         case BufferStatus::kNew: {
+            buffer_mgr_->AddCacheMissCount();
             LOG_TRACE(fmt::format("Request memory {}", GetBufferSize()));
             bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
             if (!free_success) {

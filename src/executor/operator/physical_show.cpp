@@ -3985,6 +3985,48 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
+        case GlobalVariable::kMemoryCacheMiss: {
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                varchar_type,
+            };
+
+            BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+            u64 total_request_count = buffer_manager->TotalRequestCount();
+            u64 cache_miss_count = buffer_manager->CacheMissCount();
+
+            output_block_ptr->Init(output_column_types);
+            Value value = Value::MakeVarchar(fmt::format("{}/{}", cache_miss_count, total_request_count));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case GlobalVariable::kDiskCacheMiss: {
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, varchar_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                varchar_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+            Value value = Value::MakeVarchar(fmt::format("{}/{}", 0, 0));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
         case GlobalVariable::kQueryCount: {
             Vector<SharedPtr<ColumnDef>> output_column_defs = {
                 MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
@@ -4559,6 +4601,51 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option description
                     Value value = Value::MakeVarchar("Result cache num");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kMemoryCacheMiss: {
+                BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+                u64 total_request_count = buffer_manager->TotalRequestCount();
+                u64 cache_miss_count = buffer_manager->CacheMissCount();
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    Value value = Value::MakeVarchar(fmt::format("{}/{}", cache_miss_count, total_request_count));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("Memory cache miss");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kDiskCacheMiss: {
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    Value value = Value::MakeVarchar("0/0");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("Disk cache miss");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }
