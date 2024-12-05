@@ -178,7 +178,7 @@ curl --request DELETE \
     --header 'content-type: application/json'
 ```
 
-*When the method call succeeds, the node operates in `ADMIN` mode and not registered.*
+*When the method call succeeds, the node operates in `ADMIN` mode and is unregistered.*
 
 ## Distributed APIs
 
