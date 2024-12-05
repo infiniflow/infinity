@@ -43,39 +43,23 @@ Once successfully registered with the leader node, a follower or learner starts 
 
 When a transaction occurs, the leader node sends its log to both follower and learner nodes. The leader confirms the transaction's completion only after receiving confirmation that all its follower nodes have successfully persisted the log. While the leader also sends logs to learner nodes, it does not require confirmation from them.
 
-### Configurations
-
-All nodes in an Infinity cluster require a customized configuration file to start up. Below, we only list the key parameters. For further configurations, such as object storage settings, see the [Configurations](https://infiniflow.org/docs/dev/configurations).
-
-- `server_mode`: The mode in which the server starts.  
-
-  Available options:  
-
-  - `"standalone"`: Start Infinity as a standalone server.
-  - `"admin"`:
-    - Start Infinity either as a standalone server in `ADMIN` mode (when `storage_type` is set to `"local"`)
-    - Start Infinity as a cluster node in `ADMIN` mode (when `storage_type` is set to `"minio"`)
-
-- `peer_ip`: The IP address on which the current node listens. Used for registration and inter-node communication.
-
-- `peer_port`: The port number on which the current node listens. Used for registration and inter-node communication.
-
-- `storage_type`: The type of storage to use.  
-
-  Available options:  
-
-  - `"local"`: Use the local disk storage (default).
-  - `"minio"`: Use MinIO for shared storage. If you set `server_mode` to `"admin"` and `storage_type` to `"minio"`, the node will start as a cluster node in `ADMIN` mode.
-
 ### Mode and role transition
 
 ![uml](https://github.com/user-attachments/assets/276700ab-ee60-4a9c-a449-7e1d8ad5a92b)
 
 ## Set up an Infinity cluster
 
-### Customize your configuration file
+### Customize configuration files for cluster
 
-For *each* cluster node, you are required to prepare a customized configuration file to start it. Ensure that you properly set `server_mode`, `peer_ip`, `peer_port`, `storage_type`, and other related parameters. When a cluster node starts, it automatically operates in `ADMIN` mode.
+For *each* cluster node, you are required to prepare a customized configuration file to start it. Ensure that you properly set `server_mode`, `peer_ip`, `peer_port`, `storage_type`, and other related parameters. 
+
+1. Set `server_mode` to `"admin"`.
+2. Set `storage_type` to `"minio"`.
+3. Set `peer_ip` and `peer_port`.
+4. Update object storage-specific settings.
+5. Start up Infinity using the customized configuration file.
+
+*When a cluster node starts, it automatically operates in `ADMIN` mode.*
 
 For further instructions on specifying a configuration file or setting parameters, see the [Configurations](https://infiniflow.org/docs/dev/configurations).
 
