@@ -94,11 +94,7 @@ A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a 
 
 ### Set a follower node
 
-1. Use a different configuration file to start another cluster node.  
-
-   *When the node starts, it operates in `ADMIN` mode and is not yet registered with a leader node.*
-
-2. If the number of follower nodes in your cluster is less than four, call `ADMIN SET NODE ROLE` to promote this new node to follower node:
+If the current node operates in `ADMIN` mode and the number of follower nodes in your cluster is less than four, call `ADMIN SET NODE ROLE` to promote this node to follower node:
 
 ```shell
 curl --request POST \
@@ -112,7 +108,7 @@ curl --request POST \
     } '
 ```
 
-​        *When the method call succeeds, the node is promoted to follower and registered with the leader node, which listens on `0.0.0.0:23851`.*
+*When the method call succeeds, the node is promoted to follower and registered with the leader node, which listens on `0.0.0.0:23851`.*
 
 :::tip NOTE
 
@@ -122,25 +118,21 @@ A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a 
 
 ### Set a learner node
 
-1. Use a third configuration file to start another cluster node.  
+If the current node operates in `ADMIN` mode, call `ADMIN SET NODE ROLE` to promote this new node to learner node.
 
-   *When the node starts, it operates in `ADMIN` mode and is not yet registered with a leader node.*
+```shell
+curl --request POST \
+    --url http://localhost:23823/admin/node/current \
+    --header 'accept: application/json' \
+    --header 'content-type: application/json' \
+    --data ' {
+        "role" : "learner",
+        "name" : "Ron",
+        "address" : "0.0.0.0:23851"
+    } '
+```
 
-2. Call `ADMIN SET NODE ROLE` to promote this new node to learner node.
-
-   ```shell
-   curl --request POST \
-       --url http://localhost:23823/admin/node/current \
-       --header 'accept: application/json' \
-       --header 'content-type: application/json' \
-       --data ' {
-           "role" : "learner",
-           "name" : "Ron",
-           "address" : "0.0.0.0:23851"
-       } '
-   ```
-
-   *When the method call succeeds, the node is promoted to learner and registered with the leader node, which listens on `0.0.0.0:23851`.*
+*When the method call succeeds, the node is promoted to learner and registered with the leader node, which listens on `0.0.0.0:23851`.*
 
 ### Check cluster health status
 
