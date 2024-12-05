@@ -90,7 +90,7 @@ A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a 
 
 :::
 
-You can also call `ADMIN SHOW CURRENT NODE` to double check the node's role and connection status:
+You can also use `ADMIN SHOW CURRENT NODE` to verify the node's role and connection status:
 
 ```shell
 curl --request GET \
