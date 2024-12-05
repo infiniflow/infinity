@@ -51,7 +51,7 @@ public:
     explicit BufferManager(u64 memory_limit,
                            SharedPtr<String> data_dir,
                            SharedPtr<String> temp_dir,
-                           PersistenceManager* persistence_manager,
+                           PersistenceManager *persistence_manager,
                            SizeT lru_count = DEFAULT_BUFFER_MANAGER_LRU_COUNT);
 
     ~BufferManager();
@@ -85,9 +85,13 @@ public:
 
     Vector<BufferObjectInfo> GetBufferObjectsInfo();
 
-    inline PersistenceManager* persistence_manager() const {
-        return persistence_manager_;
-    }
+    inline PersistenceManager *persistence_manager() const { return persistence_manager_; }
+
+    inline void AddRequestCount() { ++total_request_count_; }
+    inline void AddCacheMissCount() { ++cache_miss_count_; }
+    inline u64 TotalRequestCount() { return total_request_count_; }
+    inline u64 CacheMissCount() { return cache_miss_count_; }
+
 private:
     friend class BufferObj;
 
@@ -116,7 +120,7 @@ private:
     SharedPtr<String> data_dir_;
     SharedPtr<String> temp_dir_;
     const u64 memory_limit_{};
-    PersistenceManager* persistence_manager_;
+    PersistenceManager *persistence_manager_;
     Atomic<u64> current_memory_size_{};
 
     std::mutex w_locker_{};
@@ -133,6 +137,9 @@ private:
     std::mutex temp_locker_{};
     HashSet<BufferObj *> temp_set_;
     HashSet<BufferObj *> clean_temp_set_;
+
+    Atomic<u64> total_request_count_{0};
+    Atomic<u64> cache_miss_count_{0};
 };
 
 } // namespace infinity

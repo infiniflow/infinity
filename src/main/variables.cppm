@@ -49,6 +49,8 @@ export enum class GlobalVariable {
     kResultCache,               // global
     kCacheResultCapacity,       // global
     kCacheResultNum,            // global
+    kMemoryCacheMiss,           // global
+    kDiskCacheMiss,             // global
     kInvalid,
 };
 
