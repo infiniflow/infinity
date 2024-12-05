@@ -24,8 +24,8 @@ As of v0.5.0, the supported shared storage is MinIO.
 Infinity employs a distributed architecture comprising one leader node and *N* follower nodes, where 0 &le; *N* &le; 4. As illustrated in the diagram above, all nodes in the cluster use MinIO for persistent storage.
 
 - **Leader node**: The node responsible for processing transactions and managing connection status of other nodes in the cluster. When a transaction occurs, the leader node transmits the logs to both follower and learner nodes. The leader node confirms the completion of the transaction only upon receiving messages confirming completion of log persistence from *all* follower nodes.
-- **Follower node**: Receives log/WAL from the leader synchronously. It acts as a backup for the leader node, maintaining strong consistency with its state. 
-- **Learner node**: Receives log/WAL from the leader *asynchronously*. A learner also serves as a backup for the leader node. However, Its state may be behind that of the leader, as it is not required to maintain strong consistency with the leader, and the leader does not need to confirm whether all learner nodes have completed log persistence.
+- **Follower node**: Receives log/WAL from the leader synchronously. It acts as a backup for the leader node, maintaining strong consistency with the leader's state. 
+- **Learner node**: Receives log/WAL from the leader *asynchronously*. A learner also serves as a backup for the leader node. However, its state may be behind that of the leader, because it is not required to maintain strong consistency with the leader, and neither does the leader need to confirm whether all learner nodes have completed log persistence.
 
 From the user's perspective, the leader is the only write node, and all write operations must go through the leader node; all nodes in the cluster serve as read nodes, allowing you to send read operations to any of the leader, follower, or learner nodes, thereby alleviating the write burden on the leader.
 
@@ -67,32 +67,21 @@ All nodes in an Infinity cluster require a customized configuration file to star
   - `"local"`: Use the local disk storage (default).
   - `"minio"`: Use MinIO for shared storage. If you set `server_mode` to `"admin"` and `storage_type` to `"minio"`, the node will start as a cluster node in `ADMIN` state.
 
-### State/Role transition
+### Mode and role transition
 
 ![uml](https://github.com/user-attachments/assets/276700ab-ee60-4a9c-a449-7e1d8ad5a92b)
 
-### Distributed APIs
-
-- [ADMIN SET NODE ROLE](https://infiniflow.org/docs/dev/http_api_reference#admin-set-node-role)
-- [ADMIN SHOW NODE VARIABLES](https://infiniflow.org/docs/dev/http_api_reference#admin-show-node-variables)
-- [ADMIN SHOW NODE CONFIGS](https://infiniflow.org/docs/dev/http_api_reference#admin-show-node-configs)
-- [ADMIN SHOW NODE VARIABLE](https://infiniflow.org/docs/dev/http_api_reference#admin-show-node-variable)
-- [ADMIN SHOW CURRENT NODE](https://infiniflow.org/docs/dev/http_api_reference#admin-show-current-node)
-- [ADMIN SHOW NODE](https://infiniflow.org/docs/dev/http_api_reference#admin-show-node)
-- [ADMIN LIST NODES](https://infiniflow.org/docs/dev/http_api_reference#admin-list-nodes)
-- [ADMIN REMOVE NODE](https://infiniflow.org/docs/dev/http_api_reference#admin-remove-node)
-
 ## Set up an Infinity cluster
 
-### 1. Customize your configuration file
+### Customize your configuration file
 
-You are required to customize a configuration file to start Infinity as a cluster node. Ensure that you properly set `server_mode`, `peer_ip`, `peer_port`, `storage_type`, and other parameters. When a cluster node starts, it automatically operates in `ADMIN` state.
+For *each* cluster node, you are required to prepare a customized configuration file to start it. Ensure that you properly set `server_mode`, `peer_ip`, `peer_port`, `storage_type`, and other related parameters. When a cluster node starts, it automatically operates in `ADMIN` mode.
 
 For further instructions on specifying a configuration file or setting parameters, see the [Configurations](https://infiniflow.org/docs/dev/configurations).
 
-### 2. Set the leader node
+### Set the leader node
 
- A cluster can have at most one leader node. If the cluster you start does not have a leader node, call `ADMIN SET NODE ROLE` to promote the node you just started, which is in `ADMIN` state, to leader. Below is an example code:
+ A cluster can have only one leader node. If the cluster you start does not have a leader node, call `ADMIN SET NODE ROLE` to promote the node you just started, which currently operates in `ADMIN` mode, to leader. Below is an example code:
 
 ````shell
 ```shell
@@ -102,26 +91,26 @@ curl --request POST \
     --header 'content-type: application/json' \
     --data ' {
         "role" : "leader",
-        "name" : "Trump",
+        "name" : "HarryPotter",
     } '
 ```
 ````
 
-*When the method call succeeds, the node's state changes to `LEADER`.*
+*When the method call succeeds, the node switches to leader and operates in `CLUSTER` mode.*
 
 :::tip NOTE
 
-A node in `ADMIN`, `FOLLOWER`, or `LEARNER` state can be promoted to leader node. In other words, you cannot promote a standalone node directly to leader.
+A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a follower or learner node) can be promoted to leader. In other words, a standalone node cannot be promoted directly to leader.
 
 :::
 
-### 3. Set a follower node
+### Set a follower node
 
-3.1. Use a different configuration file to start another cluster node.  
+1. Use a different configuration file to start another cluster node.  
 
-​       *When the node starts, it is in `ADMIN` state.*
+   *When the node starts, it operates in `ADMIN` mode and is not yet registered with a leader node.*
 
-3.2. If the number of follower nodes in your cluster is less than four, call `ADMIN SET NODE ROLE` to promote the new node to follower node.
+2. If the number of follower nodes in your cluster is less than four, call `ADMIN SET NODE ROLE` to promote this new node to follower node:
 
 ```shell
 curl --request POST \
@@ -130,32 +119,86 @@ curl --request POST \
     --header 'content-type: application/json' \
     --data ' {
         "role" : "follower",
-        "name" : "Tom",
+        "name" : "Hermione",
         "address" : "0.0.0.0:23851"
     } '
 ```
 
-​       *When the method call succeeds, the node is registered with the leader node, which listens on 0.0.0.0:23851, and its state changes to `FOLLOWER`.*
+​        *When the method call succeeds, the node is promoted to follower and registered with the leader node, which listens on `0.0.0.0:23851`.*
 
 :::tip NOTE
 
-A node in `ADMIN`, `LEADER`, or `LEARNER` state can be switched to follower node. In other words, you cannot promote a standalone node directly to follower.
+A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a learner node) can be promoted to follower node. In other words, a standalone or leader node cannot be switched directly to follower.
 
 :::
 
-### 4. Set a learner node
+### Set a learner node
 
-4.1. Use a third configuration file to start another cluster node.  
+1. Use a third configuration file to start another cluster node.  
 
-​       *When the node starts, it is in `ADMIN` state.*
+   *When the node starts, it operates in `ADMIN` mode and is not yet registered with a leader node.*
 
-Register with the leader.
+2. Call `ADMIN SET NODE ROLE` to promote this new node to learner node.
 
-### 5. Promote a follower/learner to leader
+   ```shell
+   curl --request POST \
+       --url http://localhost:23823/admin/node/current \
+       --header 'accept: application/json' \
+       --header 'content-type: application/json' \
+       --data ' {
+           "role" : "learner",
+           "name" : "Ron",
+           "address" : "0.0.0.0:23851"
+       } '
+   ```
 
-1. If the leader node fails, call `ADMIN SET NODE ROLE` to promote a follower node in the cluster to leader.
-2. Call `SET NODE ROLE` to set each follower and learner to subscribe to the new leader node.
+   *When the method call succeeds, the node is promoted to learner and registered with the leader node, which listens on `0.0.0.0:23851`.*
 
-### ### 6. Remove a node from the cluster
+### Check cluster health status
 
-You cannot directly demote a leader node to a STANDALONE state. It must go through an `ADMIN` state, as illustrated in the state/role transition diagram.
+You can send an HTTP request `ADMIN LIST NODES` to any node in the cluster to display the health status of all nodes. In the following code example, a follower node is called:
+
+```shell
+curl --request GET \
+    --url http://localhost:23822/admin/nodes \
+    --header 'accept: application/json'
+```
+
+*When the method call succeeds, you get the following information of each node:*
+
+- *The HTTP address of the node.*
+- *The number of heartbeats received from the leader node.*
+- *The name of the node.*
+- *The role of the node: leader, follower, or learner.*
+- *The connection status of the node.*
+- *The last time that the node was updated.*
+
+:::tip NOTE
+
+See `ADMIN LIST NODES` for further details.
+
+:::
+
+### Remove a node from the cluster
+
+Call `ADMIN REMOVE NODE` to remove a node from the cluster. Note that you must send your HTTP request to the leader node for this action. In the following code example, learner Ron will be removed:
+
+```shell
+curl --request DELETE \
+    --url http://localhost:23821/admin/node/ron \
+    --header 'accept: application/json' \
+    --header 'content-type: application/json'
+```
+
+*When the method call succeeds, the node operates in `ADMIN` mode and not registered.*
+
+## Distributed APIs
+
+- [ADMIN SET NODE ROLE](https://infiniflow.org/docs/dev/http_api_reference#admin-set-node-role)
+- [ADMIN SHOW NODE VARIABLES](https://infiniflow.org/docs/dev/http_api_reference#admin-show-node-variables)
+- [ADMIN SHOW NODE CONFIGS](https://infiniflow.org/docs/dev/http_api_reference#admin-show-node-configs)
+- [ADMIN SHOW NODE VARIABLE](https://infiniflow.org/docs/dev/http_api_reference#admin-show-node-variable)
+- [ADMIN SHOW CURRENT NODE](https://infiniflow.org/docs/dev/http_api_reference#admin-show-current-node)
+- [ADMIN SHOW NODE](https://infiniflow.org/docs/dev/http_api_reference#admin-show-node)
+- [ADMIN LIST NODES](https://infiniflow.org/docs/dev/http_api_reference#admin-list-nodes)
+- [ADMIN REMOVE NODE](https://infiniflow.org/docs/dev/http_api_reference#admin-remove-node)
