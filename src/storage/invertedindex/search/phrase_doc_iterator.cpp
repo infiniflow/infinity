@@ -140,6 +140,7 @@ bool PhraseDocIterator::GetExactPhraseMatchData() {
             begin_positions.push_back(now_position0);
         }
     }
+#ifdef INFINITY_DEBUG
     if (SHOULD_LOG_DEBUG()) {
         std::ostringstream oss;
         oss << "Phrase \"" << terms_ptr_->at(0);
@@ -152,6 +153,7 @@ bool PhraseDocIterator::GetExactPhraseMatchData() {
         }
         LOG_DEBUG(oss.str());
     }
+#endif
     if (begin_positions.empty()) {
         return false;
     }
@@ -265,6 +267,7 @@ bool PhraseDocIterator::GetSloppyPhraseMatchData() {
     for (auto &solution : solutions) {
         tf_ += 1.0F / (1.0F + solution.matchLength);
     }
+#ifdef INFINITY_DEBUG
     if (SHOULD_LOG_DEBUG()) {
         std::ostringstream oss;
         oss << "Phrase \"" << terms_ptr_->at(0);
@@ -283,6 +286,7 @@ bool PhraseDocIterator::GetSloppyPhraseMatchData() {
         }
         LOG_DEBUG(oss.str());
     }
+#endif
     if (!solutions.empty()) {
         doc_freq_++;
         all_tf_.push_back(tf_);
