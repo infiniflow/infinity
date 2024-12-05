@@ -26,6 +26,8 @@ public:
 
     Status Load();
 
+    void SetFineGrained(bool fine_grained) { fine_grained_ = fine_grained; };
+
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;
 
@@ -42,6 +44,8 @@ private:
     String dict_path_;
 
     bool own_dict_{};
+
+    bool fine_grained_{false};
 
     Dictionary *dict_{nullptr};
 

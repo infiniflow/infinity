@@ -32,6 +32,7 @@ import standard_analyzer;
 import ngram_analyzer;
 import rag_analyzer;
 import keyword_analyzer;
+import ik_analyzer;
 import logger;
 
 namespace infinity {
@@ -161,6 +162,38 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 fine_grained = true;
             }
             UniquePtr<RAGAnalyzer> analyzer = MakeUnique<RAGAnalyzer>(*reinterpret_cast<RAGAnalyzer *>(prototype));
+            analyzer->SetFineGrained(fine_grained);
+            return {std::move(analyzer), Status::OK()};
+        }
+        case Str2Int(IK.data()): {
+            //
+            Analyzer *prototype = cache_[IK].get();
+            if (prototype == nullptr) {
+                String path;
+                Config *config = InfinityContext::instance().config();
+                if (config == nullptr) {
+                    // InfinityContext has not been initialized.
+                    path = "/var/infinity/resource";
+                } else {
+                    path = config->ResourcePath();
+                }
+                UniquePtr<IKAnalyzer> analyzer = MakeUnique<IKAnalyzer>(std::move(path));
+                Status load_status = analyzer->Load();
+                if (!load_status.ok()) {
+                    return {nullptr, load_status};
+                }
+                prototype = analyzer.get();
+                cache_[IK] = std::move(analyzer);
+            }
+            bool fine_grained = false;
+            const char *str = name.data();
+            while (*str != '\0' && *str != '-') {
+                str++;
+            }
+            if (strcmp(str, "-fine") == 0) {
+                fine_grained = true;
+            }
+            UniquePtr<IKAnalyzer> analyzer = MakeUnique<IKAnalyzer>(*reinterpret_cast<IKAnalyzer *>(prototype));
             analyzer->SetFineGrained(fine_grained);
             return {std::move(analyzer), Status::OK()};
         }

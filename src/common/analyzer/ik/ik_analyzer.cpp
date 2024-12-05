@@ -21,7 +21,7 @@ namespace infinity {
 
 IKAnalyzer::IKAnalyzer(const String &path) : dict_path_(path) {}
 
-IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), dict_(other.dict_) { Init(); }
+IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), fine_grained_(other.fine_grained_), dict_(other.dict_) { Init(); }
 
 IKAnalyzer::~IKAnalyzer() {
     if (own_dict_) {
