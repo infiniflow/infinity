@@ -88,7 +88,7 @@ curl --request POST \
 
 :::tip NOTE
 
-A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a follower or learner node) can be promoted to leader. In other words, a standalone node cannot be promoted directly to leader.
+A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a follower or learner node) can be promoted to leader.
 
 :::
 
@@ -116,7 +116,7 @@ curl --request POST \
 
 :::tip NOTE
 
-A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a learner node) can be promoted to follower node. In other words, a standalone or leader node cannot be switched directly to follower.
+A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a learner node) can be promoted to follower node.
 
 :::
 
