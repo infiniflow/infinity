@@ -37,7 +37,7 @@ Once you set a node to follower or learner using `ADMIN SET NODE ROLE`, it regis
 
 ### Keep-alive mechanism
 
-Once successfully registered with the leader node, a follower or learner starts sending periodic heartbeats to it. The leader node relies on these heartbeats to manage the connection status of each node. For example, if it does not receive heartbeats from a particular node for a specified time period, it sets that node's online status to `timeout`.
+Once successfully registered with the leader node, a follower or learner starts sending periodic heartbeats to it. The leader node relies on these heartbeats to manage the connection status of each node. For example, if it does not receive heartbeats from a particular node for a specified time period, it sets that node's connection status to `timeout`.
 
 ### Log synchronization
 
