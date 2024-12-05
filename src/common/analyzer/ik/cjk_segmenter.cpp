@@ -45,19 +45,18 @@ void CJKSegmenter::Analyze(AnalyzeContext *context) {
             }
         }
 
-        Hit *single_char_hit = dict_->MatchInMainDict(context->GetSegmentBuff(), context->GetCursor(), 1);
+        UniquePtr<Hit> single_char_hit(dict_->MatchInMainDict(context->GetSegmentBuff(), context->GetCursor(), 1));
         if (single_char_hit->IsMatch()) {
             Lexeme *new_lexeme = new Lexeme(context->GetBufferOffset(), context->GetCursor(), 1, Lexeme::TYPE_CNWORD);
             if (!context->AddLexeme(new_lexeme))
                 delete new_lexeme;
 
             if (single_char_hit->IsPrefix()) {
-                tmp_hits_.push_back(UniquePtr<Hit>(single_char_hit));
+                tmp_hits_.push_back(std::move(single_char_hit));
             }
         } else if (single_char_hit->IsPrefix()) {
-            tmp_hits_.push_back(UniquePtr<Hit>(single_char_hit));
+            tmp_hits_.push_back(std::move(single_char_hit));
         }
-
     } else {
         tmp_hits_.clear();
     }

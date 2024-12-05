@@ -110,6 +110,8 @@ Lexeme *AnalyzeContext::GetNextLexeme() {
             result->SetLexemeText(
                 std::wstring(segment_buff_.begin() + result->GetBegin(), segment_buff_.begin() + result->GetBegin() + result->GetLength()));
             break;
+        } else {
+            delete result;
         }
     }
     return result;
