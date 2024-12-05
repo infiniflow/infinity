@@ -24,16 +24,16 @@ As of v0.5.0, the supported shared storage is MinIO.
 Infinity employs a distributed architecture comprising one leader node and *N* follower nodes, where 0 &le; *N* &le; 4. As illustrated in the diagram above, all nodes in the cluster use MinIO for persistent storage.
 
 - **Leader node**: The node responsible for processing transactions and managing connection status of other nodes in the cluster. When a transaction occurs, the leader node transmits the logs to both follower and learner nodes. The leader node confirms the completion of the transaction only upon receiving messages confirming completion of log persistence from *all* follower nodes.
-- **Follower node**: Receives log/WAL from the leader synchronously. It acts as a backup for the leader node, maintaining strong consistency with the leader's state. 
+- **Follower node**: Receives log/WAL from the leader synchronously. It acts as a backup for the leader node, maintaining strong consistency with the leader's data state. 
 - **Learner node**: Receives log/WAL from the leader *asynchronously*. A learner also serves as a backup for the leader node. However, its state may be behind that of the leader, because it is not required to maintain strong consistency with the leader, and neither does the leader need to confirm whether all learner nodes have completed log persistence.
 
 From the user's perspective, the leader is the only write node, and all write operations must go through the leader node; all nodes in the cluster serve as read nodes, allowing you to send read operations to any of the leader, follower, or learner nodes, thereby alleviating the write burden on the leader.
 
 ### Startup and communication processes
 
-When started up in cluster mode, a node enters `ADMIN` state, but is not automatically assigned a role like leader, follower, or learner. You must call `ADMIN SET NODE ROLE` to assign it a role. Once a leader node starts, it reads logs from the local disk to determine the metadata and data to read from shared storage.
+When started up in cluster mode, a node enters `ADMIN` mode, but is not automatically assigned a role like leader, follower, or learner. You must call `ADMIN SET NODE ROLE` to assign it a role. Once a leader node starts, it reads logs from the local disk to determine the metadata and data to read from shared storage.
 
-Once you set a node to follower or learner using `ADMIN SET NODE ROLE`, it registers with the leader node. Upon receiving the registration request, the leader node sends back its current log for the followers and learners to construct their database state from shared storage.
+Once you set a node to follower or learner using `ADMIN SET NODE ROLE`, it registers with the leader node. Upon receiving the registration request, the leader node sends back its current log for the followers and learners to construct their data state from shared storage.
 
 ### Keep-alive mechanism
 
