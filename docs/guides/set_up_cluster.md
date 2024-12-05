@@ -45,7 +45,7 @@ When a transaction occurs, the leader node sends its log to both follower and le
 
 ### Mode and role transition
 
-![uml](https://github.com/user-attachments/assets/276700ab-ee60-4a9c-a449-7e1d8ad5a92b)
+![mode_transition](https://github.com/user-attachments/assets/5a6132e7-63bc-46a2-9a10-00d6c2d48553)
 
 ## Set up an Infinity cluster
 
