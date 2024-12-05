@@ -103,8 +103,8 @@ private:
     static String bucket_;
     static UniquePtr<S3Client> s3_client_;
 
-    static Atomic<u64> total_request_count_{0};
-    static Atomic<u64> cache_miss_count_{0};
+    static Atomic<u64> total_request_count_;
+    static Atomic<u64> cache_miss_count_;
 
     friend class ObjectStorageProcess;
 };
