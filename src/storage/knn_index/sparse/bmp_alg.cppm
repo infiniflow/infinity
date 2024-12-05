@@ -262,7 +262,7 @@ Pair<Vector<BMPDocID>, Vector<DataType>> BMPAlg<DataType, IdxType, CompressType>
             DataType score = scores[block_off];
             add_result(score, doc_id);
         }
-        if (ub_score * options.alpha_ < result_handler.GetDistance0(0 /*query_id*/)) {
+        if (result_handler.GetSize(0) == u32(topk) && ub_score * options.alpha_ < result_handler.GetDistance0(0 /*query_id*/)) {
             break;
         }
     }
