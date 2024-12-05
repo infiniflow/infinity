@@ -426,6 +426,26 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr.function_expr = func_expr
 
                     select_list.append(parsed_expr)
+                case "_create_timestamp":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "create_timestamp"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    select_list.append(parsed_expr)
+                case "_delete_timestamp":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "delete_timestamp"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    select_list.append(parsed_expr)
                 case "_score":
                     func_expr = WrapFunctionExpr()
                     func_expr.func_name = "score"
@@ -529,6 +549,28 @@ class InfinityLocalQueryBuilder(ABC):
                 case "_row_id":
                     func_expr = WrapFunctionExpr()
                     func_expr.func_name = "row_id"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    sort_list.append(order_by_expr)
+                case "_create_timestamp":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "create_timestamp"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    order_by_expr = WrapOrderByExpr(parsed_expr, order_by_expr[1] == SortType.Asc)
+                    sort_list.append(order_by_expr)
+                case "_delete_timestamp":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "delete_timestamp"
                     func_expr.arguments = []
 
                     expr_type = ParsedExprType(ParsedExprType.kFunction)
