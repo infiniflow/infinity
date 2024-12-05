@@ -391,6 +391,17 @@ QueryResult Infinity::CreateTable(const String &db_name,
                                   Vector<ColumnDef *> column_defs,
                                   Vector<TableConstraint *> constraints,
                                   CreateTableOptions create_table_options) {
+    DeferFn free_create_table([&]() {
+        for (auto &column_def : column_defs) {
+            delete column_def;
+            column_def = nullptr;
+        }
+        for (auto &constraint : constraints) {
+            delete constraint;
+            constraint = nullptr;
+        }
+    });
+
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
