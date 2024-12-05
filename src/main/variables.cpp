@@ -44,10 +44,12 @@ void VarUtil::InitVariablesMap() {
     global_name_map_[CPU_USAGE_VAR_NAME.data()] = GlobalVariable::kCPUUsage;
     global_name_map_["jeprof"] = GlobalVariable::kJeProf;
     global_name_map_["cleanup_trace"] = GlobalVariable::kCleanupTrace;
-    global_name_map_[FOLLOWER_NUMBER.data()] = GlobalVariable::kFollowerNum;
+    global_name_map_[FOLLOWER_NUMBER_VAR_NAME.data()] = GlobalVariable::kFollowerNum;
     global_name_map_[RESULT_CACHE_OPTION_NAME.data()] = GlobalVariable::kResultCache;
     global_name_map_[CACHE_RESULT_CAPACITY_OPTION_NAME.data()] = GlobalVariable::kCacheResultCapacity;
     global_name_map_[CACHE_RESULT_NUM_VAR_NAME.data()] = GlobalVariable::kCacheResultNum;
+    global_name_map_[MEMORY_CACHE_MISS_VAR_NAME.data()] = GlobalVariable::kMemoryCacheMiss;
+    global_name_map_[DISK_CACHE_MISS_VAR_NAME.data()] = GlobalVariable::kDiskCacheMiss;
 
     session_name_map_[QUERY_COUNT_VAR_NAME.data()] = SessionVariable::kQueryCount;
     session_name_map_[TOTAL_COMMIT_COUNT_VAR_NAME.data()] = SessionVariable::kTotalCommitCount;
