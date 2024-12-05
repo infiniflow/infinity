@@ -10,10 +10,12 @@ Infinity offers powerful search capabilities. This page covers the search usage.
 
 ## Full-text search
 
-Full text search will work if full text index is created. There are two kinds of work modes for full text indexing:
+### Work modes for full-text index
 
-- Real-time mode - If the full text index is created immediately after the table is created, then the full-text index will work in real time mode if data is ingested at this time. Real time index will accumulate posting data within memory and flush to disk if it reaches up the quota.
-- Offline mode - If the full-text index is created after the data is inserted, then it will work in offline mode, where the full-text index is constructed through external sorting.
+A full-text search will work if full text index is created. There are two kinds of work modes for full-text indexing:
+
+- **Real-time mode** - If the full text index is created immediately after the table is created, then the full-text index will work in real-time mode if data is ingested at this time. Real-time index will accumulate posting data within memory and flush to disk if it reaches up the quota.
+- **Offline mode** - If the full-text index is created after the data is inserted, then it will work in offline mode, where the full-text index is constructed through external sorting.
 
 ### Tokenizer
 
