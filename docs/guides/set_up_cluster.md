@@ -72,7 +72,6 @@ For further instructions on specifying a configuration file or setting parameter
  A cluster can have only one leader node. If the cluster you start does not have a leader node, call `ADMIN SET NODE ROLE` to promote the node you just started, which currently operates in `ADMIN` mode, to leader. Below is an example code:
 
 ````shell
-```shell
 curl --request POST \
     --url http://localhost:23821/admin/node/current \
     --header 'accept: application/json' \
@@ -81,7 +80,6 @@ curl --request POST \
         "role" : "leader",
         "name" : "Harry",
     } '
-```
 ````
 
 *When the method call succeeds, the node switches to leader and operates in `CLUSTER` mode.*
@@ -91,6 +89,16 @@ curl --request POST \
 A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a follower or learner node) can be promoted to leader.
 
 :::
+
+You can also call `ADMIN SHOW CURRENT NODE` to double check the node's role and connection status:
+
+```shell
+curl --request GET \
+    --url http://localhost:23821/admin/node/current \
+    --header 'accept: application/json'
+```
+
+
 
 ### Set a follower node
 
@@ -133,6 +141,12 @@ curl --request POST \
 ```
 
 *When the method call succeeds, the node is promoted to learner and registered with the leader node, which listens on `0.0.0.0:23851`.*
+
+:::tip NOTE
+
+Only a node in `ADMIN` mode with `storage_type = "minio"` can be promoted to learner node.
+
+:::
 
 ### Check cluster health status
 
