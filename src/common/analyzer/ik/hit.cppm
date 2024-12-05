@@ -33,7 +33,7 @@ public:
 
     void SetUnmatch() { hit_state_ = UNMATCH; }
 
-    DictSegment *getMatchedDictSegment() const { return matched_dict_segment_; }
+    DictSegment *GetMatchedDictSegment() const { return matched_dict_segment_; }
 
     void SetMatchedDictSegment(DictSegment *matched_dict_segment_);
 

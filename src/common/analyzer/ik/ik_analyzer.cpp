@@ -13,6 +13,7 @@ import arbitrator;
 import term;
 import status;
 import character_util;
+import third_party;
 
 module ik_analyzer;
 
@@ -20,7 +21,7 @@ namespace infinity {
 
 IKAnalyzer::IKAnalyzer(const String &path) : dict_path_(path) {}
 
-IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), dict_(other.dict_) { Init(); }
+IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), fine_grained_(other.fine_grained_), dict_(other.dict_) { Init(); }
 
 IKAnalyzer::~IKAnalyzer() {
     if (own_dict_) {
@@ -52,13 +53,6 @@ void IKAnalyzer::LoadSegmenters() {
     segmenters_.push_back(MakeUnique<CJKSegmenter>(dict_));
 }
 
-Lexeme *IKAnalyzer::Next() {
-    Lexeme *l = context_->GetNextLexeme();
-    while (l == nullptr) {
-    }
-    return l;
-}
-
 void IKAnalyzer::Reset() {
     context_->Reset();
     for (auto &segmenter : segmenters_) {
@@ -72,14 +66,12 @@ int IKAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     unsigned level = 0;
     unsigned offset = 0;
     std::wstring line = CharacterUtil::UTF8ToUTF16(input.text_);
+    context_->Reset();
     context_->FillBuffer(line);
     context_->InitCursor();
     do {
         for (auto &segmenter : segmenters_) {
             segmenter->Analyze(context_.get());
-        }
-        if (context_->NeedRefillBuffer()) {
-            break;
         }
     } while (context_->MoveCursor());
     for (auto &segmenter : segmenters_) {

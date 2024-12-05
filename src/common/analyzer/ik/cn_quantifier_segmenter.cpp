@@ -27,23 +27,12 @@ void CNQuantifierSegmenter::InitChnNumber() {
 CNQuantifierSegmenter::CNQuantifierSegmenter(Dictionary *dict) : dict_(dict) {
     nstart_ = -1;
     nend_ = -1;
-    count_hits_ = List<Hit *>();
     InitChnNumber();
 }
 
 void CNQuantifierSegmenter::Analyze(AnalyzeContext *context) {
-    // 处理中文数词
     ProcessCNumber(context);
-    // 处理中文量词
     ProcessCount(context);
-
-    // 判断是否锁定缓冲区
-    if (nstart_ == -1 && nend_ == -1 && count_hits_.empty()) {
-        // 对缓冲区解锁
-        context->UnlockBuffer(SEGMENTER_NAME);
-    } else {
-        context->LockBuffer(SEGMENTER_NAME);
-    }
 }
 
 void CNQuantifierSegmenter::Reset() {
@@ -81,34 +70,40 @@ void CNQuantifierSegmenter::ProcessCount(AnalyzeContext *context) {
 
     if (CharacterUtil::CHAR_CHINESE == context->GetCurrentCharType()) {
         if (!count_hits_.empty()) {
-            std::vector<Hit *> tmp_array(count_hits_.begin(), count_hits_.end());
-            for (Hit *hit : tmp_array) {
+            for (auto it = count_hits_.begin(); it != count_hits_.end();) {
+                Hit *hit = (*it).get();
                 hit = dict_->MatchWithHit(context->GetSegmentBuff(), context->GetCursor(), hit);
                 if (hit->IsMatch()) {
                     Lexeme *new_lexeme =
                         new Lexeme(context->GetBufferOffset(), hit->GetBegin(), context->GetCursor() - hit->GetBegin() + 1, Lexeme::TYPE_COUNT);
-                    context->AddLexeme(new_lexeme);
+                    if (!context->AddLexeme(new_lexeme))
+                        delete new_lexeme;
 
                     if (!hit->IsPrefix()) {
-                        count_hits_.remove(hit);
+                        it = count_hits_.erase(it);
+                    } else {
+                        ++it;
                     }
 
                 } else if (hit->IsUnmatch()) {
-                    count_hits_.remove(hit);
+                    it = count_hits_.erase(it);
+                } else {
+                    ++it;
                 }
             }
         }
 
-        Hit *single_char_hit = dict_->MatchInQuantifierDict(context->GetSegmentBuff(), context->GetCursor(), 1);
+        UniquePtr<Hit> single_char_hit(dict_->MatchInQuantifierDict(context->GetSegmentBuff(), context->GetCursor(), 1));
         if (single_char_hit->IsMatch()) {
             Lexeme *new_lexeme = new Lexeme(context->GetBufferOffset(), context->GetCursor(), 1, Lexeme::TYPE_COUNT);
-            context->AddLexeme(new_lexeme);
+            if (!context->AddLexeme(new_lexeme))
+                delete new_lexeme;
 
             if (single_char_hit->IsPrefix()) {
-                count_hits_.push_back(single_char_hit);
+                count_hits_.push_back(std::move(single_char_hit));
             }
         } else if (single_char_hit->IsPrefix()) {
-            count_hits_.push_back(single_char_hit);
+            count_hits_.push_back(std::move(single_char_hit));
         }
 
     } else {
@@ -138,7 +133,8 @@ bool CNQuantifierSegmenter::NeedCountScan(AnalyzeContext *context) {
 void CNQuantifierSegmenter::OutputNumLexeme(AnalyzeContext *context) {
     if (nstart_ > -1 && nend_ > -1) {
         Lexeme *new_lexeme = new Lexeme(context->GetBufferOffset(), nstart_, nend_ - nstart_ + 1, Lexeme::TYPE_CNUM);
-        context->AddLexeme(new_lexeme);
+        if (!context->AddLexeme(new_lexeme))
+            delete new_lexeme;
     }
 }
 
