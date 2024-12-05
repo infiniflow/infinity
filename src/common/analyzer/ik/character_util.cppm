@@ -1,7 +1,7 @@
 module;
 
-#include <codecvt>
-#include <locale>
+// #include <codecvt>
+// #include <locale>
 #include <string>
 
 export module character_util;
@@ -81,9 +81,10 @@ public:
     }
 
     static std::wstring UTF8ToUTF16(const std::string &utf8_str) {
+        // std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> converter;
+        // return converter.from_bytes(utf8_str);
         std::wstring utf16_str;
         std::string_view utf8_view(utf8_str);
-
         while (!utf8_view.empty()) {
             if ((utf8_view[0] & 0x80) == 0) { // 1-byte character
                 utf16_str.push_back(static_cast<wchar_t>(utf8_view[0]));
@@ -120,9 +121,10 @@ public:
     }
 
     static std::string UTF16ToUTF8(const std::wstring &utf16_str) {
+        // std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> converter;
+        // return converter.to_bytes(utf16_str);
         std::string utf8_str;
         std::wstring_view utf16_view(utf16_str);
-
         while (!utf16_view.empty()) {
             if (utf16_view[0] < 0xD800 || utf16_view[0] > 0xDFFF) { // Basic Multilingual Plane
                 uint32_t code_point = utf16_view[0];

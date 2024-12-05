@@ -15,6 +15,12 @@ Lexeme::Lexeme(int offset, int begin, int length, int lexeme_type) {
     lexeme_type_ = lexeme_type;
 }
 
+Lexeme *Lexeme::Copy() {
+    Lexeme *copy = new Lexeme(offset_, begin_, length_, lexeme_type_);
+    copy->lexeme_text_ = lexeme_text_;
+    return copy;
+}
+
 bool Lexeme::Append(const Lexeme &l, int lexeme_type) {
     if (!l.lexeme_text_.empty() && GetEndPosition() == l.GetBeginPosition()) {
         length_ += l.length_;

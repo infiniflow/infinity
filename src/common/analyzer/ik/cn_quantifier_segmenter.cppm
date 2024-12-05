@@ -23,7 +23,7 @@ public:
     int nstart_;
     int nend_;
 
-    List<Hit *> count_hits_;
+    List<UniquePtr<Hit>> count_hits_;
 
     Dictionary *dict_{nullptr};
 
