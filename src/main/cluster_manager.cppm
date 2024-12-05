@@ -88,7 +88,7 @@ public:
     Status SyncLogs();
     // Used by leader to control the number of follower
     Status SetFollowerNumber(SizeT new_follower_number);
-    SizeT GetFollowerNumber() const;
+    SizeT GetFollowerLimit() const;
 
 private:
     void CheckHeartBeatThread();
@@ -104,8 +104,10 @@ private:
     // Leader clients to followers and learners
     Map<String, SharedPtr<PeerClient>> reader_client_map_{}; // Used by leader;
     Vector<SharedPtr<String>> logs_to_sync_{};
-    Atomic<SizeT> follower_count_{1};
+    Atomic<u8> follower_limit_{4};
     Vector<SharedPtr<PeerClient>> clients_for_cleanup_;
+    Atomic<u8> follower_count_{};
+    Atomic<u8> learner_count_{};
 
     // Follower and Learner
 public:

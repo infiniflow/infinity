@@ -4485,7 +4485,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
                 output_block_ptr->Init(output_column_types);
 
-                i64 follower_number = InfinityContext::instance().cluster_manager()->GetFollowerNumber();
+                i64 follower_number = InfinityContext::instance().cluster_manager()->GetFollowerLimit();
                 Value value = Value::MakeBigInt(follower_number);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -5137,7 +5137,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                         }
                         {
                             // option value
-                            SizeT follower_count = InfinityContext::instance().cluster_manager()->GetFollowerNumber();
+                            SizeT follower_count = InfinityContext::instance().cluster_manager()->GetFollowerLimit();
                             Value value = Value::MakeVarchar(std::to_string(follower_count));
                             ValueExpression value_expr(value);
                             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);

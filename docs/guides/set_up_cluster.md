@@ -45,7 +45,7 @@ When a transaction occurs, the leader node sends its log to both follower and le
 
 ### Mode and role transition
 
-![mode_transition](https://github.com/user-attachments/assets/5a6132e7-63bc-46a2-9a10-00d6c2d48553)
+![mode_transition](https://github.com/user-attachments/assets/276700ab-ee60-4a9c-a449-7e1d8ad5a92b)
 
 ## Set up an Infinity cluster
 
@@ -118,7 +118,7 @@ curl --request POST \
 
 :::tip NOTE
 
-A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a learner node) can be promoted to follower node.
+A node in `ADMIN` mode with `storage_type = "minio"` can be promoted to follower node.
 
 :::
 
@@ -142,7 +142,7 @@ curl --request POST \
 
 :::tip NOTE
 
-A node in `ADMIN` mode with `storage_type = "minio"` or in `CLUSTER` mode (as a follower node) can be promoted to learner node.
+A node in `ADMIN` mode with `storage_type = "minio"` can be promoted to learner node.
 
 :::
 

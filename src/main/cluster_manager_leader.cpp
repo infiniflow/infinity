@@ -26,6 +26,7 @@ import storage;
 import logger;
 import infinity_exception;
 import wal_manager;
+import admin_statement;
 
 namespace infinity {
 
@@ -109,6 +110,10 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
             UnrecoverableError(error_message);
         }
 
+        if (other_node_name == this_node_->node_name()) {
+            return Status::DuplicateNode(other_node_name);
+        }
+
         // Add by register
         auto iter = other_node_map_.find(other_node_name);
         if (iter != other_node_map_.end()) {
@@ -116,12 +121,50 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
             // TODO: Update node info and not throw error.
             return Status::DuplicateNode(other_node_name);
         }
+
+        // Add learner and follower limit
+        switch (other_node->node_role()) {
+            case NodeRole::kFollower: {
+                if (follower_count_ + 1 == follower_limit_) {
+                    return Status::TooManyFollower(follower_limit_);
+                }
+                ++follower_count_;
+                break;
+            }
+            case NodeRole::kLearner: {
+                if (learner_count_ + 1 == std::numeric_limits<u8>::max()) {
+                    return Status::TooManyLearner();
+                }
+                ++learner_count_;
+                break;
+            }
+            default: {
+                return Status::InvalidNodeRole(fmt::format("Invalid node role: {}", ToString(other_node->node_role())));
+            }
+        }
     }
+
+    auto decrease_node_count = [&] {
+        switch (other_node->node_role()) {
+            case NodeRole::kFollower: {
+                --follower_count_;
+                break;
+            }
+            case NodeRole::kLearner: {
+                --learner_count_;
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    };
 
     // Connect to follower/learner server.
     auto [client_to_follower, client_status] =
         ClusterManager::ConnectToServerNoLock(this_node_->node_name(), other_node->node_ip(), other_node->node_port());
     if (!client_status.ok()) {
+        decrease_node_count();
         return client_status;
     }
 
@@ -141,6 +184,7 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
         } else {
             // Duplicated node
             // TODO: If the exist node lost connection, or other malfunction, use new other_node to replace it.
+            decrease_node_count();
             return Status::DuplicateNode(other_node_name);
         }
 
@@ -434,11 +478,11 @@ Status ClusterManager::SetFollowerNumber(SizeT new_follower_number) {
     }
 
     // Check current follower count, if new count is less, leader will downgrade some followers to learner
-    follower_count_ = new_follower_number;
+    follower_limit_ = new_follower_number;
     return Status::OK();
 }
 
-SizeT ClusterManager::GetFollowerNumber() const { return follower_count_; }
+SizeT ClusterManager::GetFollowerLimit() const { return follower_limit_; }
 
 Status ClusterManager::SendLogs(const String &node_name,
                                 const SharedPtr<PeerClient> &peer_client,
