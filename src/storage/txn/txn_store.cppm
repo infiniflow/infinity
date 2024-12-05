@@ -109,6 +109,8 @@ public:
 
     Tuple<UniquePtr<String>, Status> Delete(const Vector<RowID> &row_ids);
 
+    void SetCompactType(CompactStatementType type);
+
     Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
     void AddSegmentStore(SegmentEntry *segment_entry);
@@ -228,7 +230,20 @@ public:
 
     std::mutex mtx_{};
 
+    void RevertTableStatus();
+
+    void SetCompacting() { table_status_ = TxnStoreStatus::kCompacting; }
+
+    void SetCreatingIndex() { table_status_ = TxnStoreStatus::kCreatingIndex; }
+
 private:
+    enum struct TxnStoreStatus {
+        kNone = 0,
+        kCreatingIndex,
+        kCompacting,
+    };
+    TxnStoreStatus table_status_{TxnStoreStatus::kNone};
+
     // Txn store
     Txn *txn_{}; // TODO: remove this
     Catalog *catalog_{};

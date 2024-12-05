@@ -15141,4 +15141,136 @@ void FlushRequest::printTo(std::ostream& out) const {
   out << ")";
 }
 
+
+CompactRequest::~CompactRequest() noexcept {
+}
+
+
+void CompactRequest::__set_session_id(const int64_t val) {
+  this->session_id = val;
+}
+
+void CompactRequest::__set_db_name(const std::string& val) {
+  this->db_name = val;
+}
+
+void CompactRequest::__set_table_name(const std::string& val) {
+  this->table_name = val;
+}
+std::ostream& operator<<(std::ostream& out, const CompactRequest& obj)
+{
+  obj.printTo(out);
+  return out;
+}
+
+
+uint32_t CompactRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_I64) {
+          xfer += iprot->readI64(this->session_id);
+          this->__isset.session_id = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 2:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->db_name);
+          this->__isset.db_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      case 3:
+        if (ftype == ::apache::thrift::protocol::T_STRING) {
+          xfer += iprot->readString(this->table_name);
+          this->__isset.table_name = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t CompactRequest::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("CompactRequest");
+
+  xfer += oprot->writeFieldBegin("session_id", ::apache::thrift::protocol::T_I64, 1);
+  xfer += oprot->writeI64(this->session_id);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("db_name", ::apache::thrift::protocol::T_STRING, 2);
+  xfer += oprot->writeString(this->db_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldBegin("table_name", ::apache::thrift::protocol::T_STRING, 3);
+  xfer += oprot->writeString(this->table_name);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+void swap(CompactRequest &a, CompactRequest &b) {
+  using ::std::swap;
+  swap(a.session_id, b.session_id);
+  swap(a.db_name, b.db_name);
+  swap(a.table_name, b.table_name);
+  swap(a.__isset, b.__isset);
+}
+
+CompactRequest::CompactRequest(const CompactRequest& other544) {
+  session_id = other544.session_id;
+  db_name = other544.db_name;
+  table_name = other544.table_name;
+  __isset = other544.__isset;
+}
+CompactRequest& CompactRequest::operator=(const CompactRequest& other545) {
+  session_id = other545.session_id;
+  db_name = other545.db_name;
+  table_name = other545.table_name;
+  __isset = other545.__isset;
+  return *this;
+}
+void CompactRequest::printTo(std::ostream& out) const {
+  using ::apache::thrift::to_string;
+  out << "CompactRequest(";
+  out << "session_id=" << to_string(session_id);
+  out << ", " << "db_name=" << to_string(db_name);
+  out << ", " << "table_name=" << to_string(table_name);
+  out << ")";
+}
+
 } // namespace

@@ -60,8 +60,9 @@ struct CreateSearchParams {
     EarlyTermAlgo early_term_algo;
     FulltextSimilarity ft_similarity;
     uint32_t minimum_should_match;
+    uint32_t topn;
     const std::vector<std::string> &index_names_;
-    [[nodiscard]] CreateSearchParams RemoveMSM() const { return {table_entry, index_reader, early_term_algo, ft_similarity, 0, index_names_}; }
+    [[nodiscard]] CreateSearchParams RemoveMSM() const { return {table_entry, index_reader, early_term_algo, ft_similarity, 0, topn, index_names_}; }
 };
 
 // step 1. get the query tree from parser

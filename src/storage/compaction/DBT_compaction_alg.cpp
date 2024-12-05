@@ -133,6 +133,7 @@ Vector<SegmentEntry *> DBTCompactionAlg::CheckCompaction(TransactionID txn_id) {
             if (++running_task_n_ == 1) {
                 status_ = CompactionStatus::kRunning;
             }
+            LOG_TRACE(fmt::format("CheckCompaction add running_task_n to {}, txn_id: ", running_task_n_, txn_id));
 
             txn_2_layer_.emplace(txn_id, layer);
             return compact_segments;
@@ -185,8 +186,9 @@ void DBTCompactionAlg::CommitCompact(TransactionID commit_txn_id) {
 
     if (--running_task_n_ == 0) {
         status_ = CompactionStatus::kEnable;
-        cv_.notify_one();
+        cv_.notify_all();
     }
+    LOG_TRACE(fmt::format("CommitCompact substract running_task_n to {}, txn_id: ", running_task_n_, commit_txn_id));
 }
 
 void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
@@ -205,16 +207,14 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     }
     if (--running_task_n_ == 0) {
         status_ = CompactionStatus::kEnable;
+        cv_.notify_all();
     }
+    LOG_TRACE(fmt::format("RollbackCompact substract running_task_n to {}, txn_id: ", running_task_n_, rollback_txn_id));
 }
 
 // Must be called when all segments are not compacting
 void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     std::unique_lock lock(mtx_);
-    if (status_ != CompactionStatus::kDisable) {
-        String error_message = fmt::format("Enable compaction when compaction not disable, {}", (u8)status_);
-        UnrecoverableError(error_message);
-    }
     for (auto *segment_entry : segment_entries) {
         this->AddSegmentInner(segment_entry);
     }
@@ -225,7 +225,7 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
         UnrecoverableError(error_message);
     }
     status_ = CompactionStatus::kEnable;
-    cv_.notify_one();
+    cv_.notify_all();
 }
 
 void DBTCompactionAlg::Disable() {

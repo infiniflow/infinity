@@ -36,12 +36,14 @@ export struct FullTextQueryContext {
     const FulltextSimilarity ft_similarity_{};
     const MinimumShouldMatchOption minimum_should_match_option_{};
     u32 minimum_should_match_ = 0;
+    u32 topn_ = 0;
     EarlyTermAlgo early_term_algo_ = EarlyTermAlgo::kNaive;
     const Vector<String> &index_names_;
     FullTextQueryContext(const FulltextSimilarity ft_similarity,
                          const MinimumShouldMatchOption &minimum_should_match_option,
+                         const u32 topn,
                          const Vector<String> &index_names)
-        : ft_similarity_(ft_similarity), minimum_should_match_option_(minimum_should_match_option), index_names_(index_names) {}
+        : ft_similarity_(ft_similarity), minimum_should_match_option_(minimum_should_match_option), topn_(topn), index_names_(index_names) {}
 };
 
 export class QueryBuilder {

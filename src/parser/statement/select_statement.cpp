@@ -62,12 +62,12 @@ SelectStatement::~SelectStatement() {
         having_expr_ = nullptr;
     }
 
-    if (order_by_list != nullptr) {
-        for (auto &expr_ptr : *order_by_list) {
+    if (order_by_list_ != nullptr) {
+        for (auto &expr_ptr : *order_by_list_) {
             delete expr_ptr;
         }
-        delete order_by_list;
-        order_by_list = nullptr;
+        delete order_by_list_;
+        order_by_list_ = nullptr;
     }
 
     if (limit_expr_ != nullptr) {

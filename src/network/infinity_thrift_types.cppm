@@ -59,6 +59,7 @@ export using infinity_thrift_rpc::DropColumnsRequest;
 export using infinity_thrift_rpc::ShowCurrentNodeRequest;
 export using infinity_thrift_rpc::CommandRequest;
 export using infinity_thrift_rpc::FlushRequest;
+export using infinity_thrift_rpc::CompactRequest;
 export using infinity_thrift_rpc::CommonResponse;
 export using infinity_thrift_rpc::DeleteResponse;
 export using infinity_thrift_rpc::SelectResponse;

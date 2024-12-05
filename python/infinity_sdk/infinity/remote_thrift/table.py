@@ -438,6 +438,9 @@ class RemoteTable():
 
         return self._conn.drop_columns(db_name=self._db_name, table_name=self._table_name, column_names=column_names)
 
+    def compact(self):
+        return self._conn.compact(db_name=self._db_name, table_name=self._table_name)
+
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
 
         # execute the query

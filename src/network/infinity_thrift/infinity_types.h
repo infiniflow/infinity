@@ -416,6 +416,8 @@ class CommandRequest;
 
 class FlushRequest;
 
+class CompactRequest;
+
 typedef struct _Property__isset {
   _Property__isset() : key(false), value(false) {}
   bool key :1;
@@ -6003,6 +6005,63 @@ class FlushRequest : public virtual ::apache::thrift::TBase {
 void swap(FlushRequest &a, FlushRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const FlushRequest& obj);
+
+typedef struct _CompactRequest__isset {
+  _CompactRequest__isset() : session_id(false), db_name(false), table_name(false) {}
+  bool session_id :1;
+  bool db_name :1;
+  bool table_name :1;
+} _CompactRequest__isset;
+
+class CompactRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  CompactRequest(const CompactRequest&);
+  CompactRequest& operator=(const CompactRequest&);
+  CompactRequest() noexcept
+                 : session_id(0),
+                   db_name(),
+                   table_name() {
+  }
+
+  virtual ~CompactRequest() noexcept;
+  int64_t session_id;
+  std::string db_name;
+  std::string table_name;
+
+  _CompactRequest__isset __isset;
+
+  void __set_session_id(const int64_t val);
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  bool operator == (const CompactRequest & rhs) const
+  {
+    if (!(session_id == rhs.session_id))
+      return false;
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    return true;
+  }
+  bool operator != (const CompactRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const CompactRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(CompactRequest &a, CompactRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const CompactRequest& obj);
 
 } // namespace
 
