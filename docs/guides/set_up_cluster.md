@@ -10,7 +10,7 @@ Architecture overview and user guide for Infinity cluster.
 
 An Infinity cluster consists of one leader node, up to four follower nodes, and a number of learner nodes:
 
-- **Leader node**: The read node and only write node.
+- **Leader node**: The read node and the only write node.
 - **Follower node**: Read node.
 - **Learner node**: Read node.
 
