@@ -90,6 +90,11 @@ public:
     //
     static Status BucketExists();
 
+    static void AddRequestCount() { ++total_request_count_; }
+    static void AddCacheMissCount() { ++cache_miss_count_; }
+    static u64 TotalRequestCount() { return total_request_count_; }
+    static u64 CacheMissCount() { return cache_miss_count_; }
+
 private:
     static std::mutex mtx_;
     static HashMap<String, MmapInfo> mapped_files_;
@@ -97,6 +102,9 @@ private:
     static StorageType storage_type_;
     static String bucket_;
     static UniquePtr<S3Client> s3_client_;
+
+    static Atomic<u64> total_request_count_{0};
+    static Atomic<u64> cache_miss_count_{0};
 
     friend class ObjectStorageProcess;
 };
