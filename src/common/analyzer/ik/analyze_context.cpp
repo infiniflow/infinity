@@ -1,11 +1,7 @@
 module;
 
-#include <codecvt>
 #include <fstream>
-#include <iostream>
-#include <locale>
 #include <sstream>
-#include <stdexcept>
 
 import stl;
 import quick_sort_set;
