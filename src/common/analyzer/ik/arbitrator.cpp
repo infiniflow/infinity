@@ -7,6 +7,7 @@ import analyze_context;
 import lexeme;
 import lexeme_path;
 import quick_sort_set;
+import third_party;
 
 module arbitrator;
 
@@ -16,6 +17,7 @@ void IKArbitrator::Process(AnalyzeContext *context, bool use_smart) {
     QuickSortSet *org_lexemes = context->GetOrgLexemes();
     Lexeme *org_lexeme = org_lexemes->PollFirst();
 
+    fmt::print("Construct LexemePath1\n");
     UniquePtr<LexemePath> cross_path = MakeUnique<LexemePath>();
     while (org_lexeme != nullptr) {
         if (!cross_path->AddCrossLexeme(org_lexeme)) {
@@ -27,6 +29,7 @@ void IKArbitrator::Process(AnalyzeContext *context, bool use_smart) {
                 context->AddLexemePath(judge_result);
             }
 
+            fmt::print("Construct LexemePath2\n");
             cross_path = MakeUnique<LexemePath>();
             cross_path->AddCrossLexeme(org_lexeme);
         }
