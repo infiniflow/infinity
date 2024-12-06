@@ -39,7 +39,9 @@ public:
 
     Dictionary *dict_{nullptr};
 
-    AnalyzeContext(Dictionary *dict);
+    bool ik_smart_{true};
+
+    AnalyzeContext(Dictionary *dict, bool is_smart = true);
 
     int GetCursor() const { return cursor_; }
 
