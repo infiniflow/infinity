@@ -30,7 +30,7 @@ From the user's perspective, the leader is the only write node, and all write op
 
 ### Startup and communication processes
 
-When started up in cluster mode, a node enters `ADMIN` mode, but is not automatically assigned a role like leader, follower, or learner. You must call `ADMIN SET NODE ROLE` to assign it a role. Once a leader node starts, it reads logs from the local disk to determine the metadata and data to read from shared storage.
+When started up as a cluster node (see [Customize configuration files for cluster](#customize-configuration-files-for-cluster)), a node enters `ADMIN` mode, but is not automatically assigned a role like leader, follower, or learner. You must call `ADMIN SET NODE ROLE` to assign it a role. Once a leader node starts, it reads logs from the local disk to determine the metadata and data to read from shared storage.
 
 Once you set a node to follower or learner using `ADMIN SET NODE ROLE`, it registers with the leader node. Upon receiving the registration request, the leader node sends back its current log for the followers and learners to construct their data state from shared storage.
 
