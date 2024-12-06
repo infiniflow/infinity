@@ -579,10 +579,12 @@ void Catalog::AttachDeltaCheckpoint(const String &file_name) {
 
 // called by Replay
 UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_path) {
+    VirtualStore::AddRequestCount();
     if (!VirtualStore::Exists(catalog_path)) {
         std::filesystem::path filePath = catalog_path;
         String dst_file_name = filePath.filename();
         VirtualStore::DownloadObject(catalog_path, dst_file_name);
+        VirtualStore::AddCacheMissCount();
     }
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);
@@ -1000,8 +1002,10 @@ UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
         VirtualStore::MakeDirectory(dst_dir);
     }
 
+    VirtualStore::AddRequestCount();
     if (!VirtualStore::Exists(catalog_path)) {
         VirtualStore::DownloadObject(catalog_path, dst_file_name);
+        VirtualStore::AddCacheMissCount();
     }
 
     auto [catalog_file_handle, status] = VirtualStore::Open(catalog_path, FileAccessMode::kRead);

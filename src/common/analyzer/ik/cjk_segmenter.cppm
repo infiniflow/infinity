@@ -16,7 +16,7 @@ export class CJKSegmenter : public Segmenter {
 public:
     static const std::wstring SEGMENTER_NAME;
 
-    List<Hit *> tmp_hits_;
+    List<UniquePtr<Hit>> tmp_hits_;
 
     Dictionary *dict_{nullptr};
 

@@ -31,9 +31,7 @@ public:
 
     int last_useless_char_num_;
 
-    HashSet<std::wstring> buff_locker_;
-
-    QuickSortSet org_lexemes_;
+    UniquePtr<QuickSortSet> org_lexemes_;
 
     HashMap<int, UniquePtr<LexemePath>> path_map_;
 
@@ -59,23 +57,15 @@ public:
 
     bool MoveCursor();
 
-    void LockBuffer(const std::wstring &segmenter_name) { buff_locker_.insert(segmenter_name); }
-
-    void UnlockBuffer(const std::wstring &segmenter_name) { buff_locker_.erase(segmenter_name); }
-
-    bool IsBufferLocked() const { return !buff_locker_.empty(); }
-
     bool IsBufferConsumed() const { return cursor_ == available_ - 1; }
-
-    bool NeedRefillBuffer() const;
 
     void MarkBufferOffset() { buff_offset_ += cursor_; }
 
-    void AddLexeme(Lexeme *lexeme);
+    bool AddLexeme(Lexeme *lexeme);
 
     void AddLexemePath(LexemePath *path);
 
-    QuickSortSet *GetOrgLexemes() { return &(org_lexemes_); }
+    QuickSortSet *GetOrgLexemes() { return org_lexemes_.get(); }
 
     void OutputToResult();
 
