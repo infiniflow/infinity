@@ -1,13 +1,13 @@
-<div align="center">
-  <img width="187" src="https://github.com/infiniflow/infinity/assets/7248/015e1f02-1f7f-4b09-a0c2-9d261cd4858b"/>
+<div style="text-align:center">
+  <img width="187" src="https://github.com/infiniflow/infinity/assets/7248/015e1f02-1f7f-4b09-a0c2-9d261cd4858b" alt="Infinity logo"/>
 </div>
 
 
-<p align="center">
+<p style="text-align:center">
     <b>The AI-native database built for LLM applications, providing incredibly fast hybrid search of dense embedding, sparse embedding, tensor and full-text</b>
 </p>
 
-<h4 align="center">
+<h4 style="text-align:center">
   <a href="https://infiniflow.org/docs/dev/category/get-started">Document</a> |
   <a href="https://infiniflow.org/docs/dev/benchmark">Benchmark</a> |
   <a href="https://twitter.com/infiniflowai">Twitter</a> |
@@ -25,8 +25,8 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 
 ## ⚡️ Performance
 
-<div class="column" align="middle">
-  <img src="https://github.com/user-attachments/assets/c4c98e23-62ac-4d1a-82e5-614bca96fe0a"/>
+<div class="column" style="text-align:center">
+  <img src="https://github.com/user-attachments/assets/c4c98e23-62ac-4d1a-82e5-614bca96fe0a" alt="Infinity performance comparison"/>
 </div>
 
 ## 🌟 Key Features
@@ -62,7 +62,7 @@ Infinity supports two working modes, embedded mode and client-server mode. Infin
    ```bash
    pip install infinity-embedded-sdk==0.5.0.dev5
    ```
-1. Use Infinity to conduct a dense vector search:
+   Use Infinity to conduct a dense vector search:
    ```python
    import infinity_embedded
 
