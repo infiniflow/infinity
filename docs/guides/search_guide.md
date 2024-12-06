@@ -33,7 +33,7 @@ The following are Infinity's built-in analyzers/tokenizers.
 
 #### Standard analyzer
 
-The standard analyzer is the default tokenizer and works best with Latin characters. It uses stemmer before outputting tokens segmented by white space, where `English` is the default stemmer. To specify a stemmer for a different language, use `"standard-xxx"`, where `xxx` is the language to use.
+The standard analyzer is the default tokenizer and works best with Latin characters. It uses stemmer before outputting tokens segmented by white space, and `English` is the default stemmer. To specify a stemmer for a different language, use `"standard-xxx"`, where `xxx` is the language to use.
 
 Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, and `Turkish`.
 
