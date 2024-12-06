@@ -74,7 +74,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
         }
     } else {
         response.error_code = static_cast<i64>(ErrorCode::kInvalidNodeRole);
-        response.error_message = "Attempt to register a non-leader node";
+        response.error_message = "Attempt to register with a non-leader node";
     }
 
     return;

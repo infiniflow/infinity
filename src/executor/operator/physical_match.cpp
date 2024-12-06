@@ -272,6 +272,8 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
     append_data_block();
     // 4.2 output
     {
+        OutputToDataBlockHelper output_to_data_block_helper;
+        u32 output_block_idx = output_data_blocks.size() - 1;
         Vector<SizeT> &column_ids = base_table_ref_->column_ids_;
         SizeT column_n = column_ids.size();
         u32 block_capacity = DEFAULT_BLOCK_CAPACITY;
@@ -283,6 +285,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
                 output_block_ptr->Finalize();
                 append_data_block();
                 output_block_ptr = output_data_blocks.back().get();
+                ++output_block_idx;
                 output_block_row_id = 0;
             }
             const RowID &row_id = row_id_result[output_id];
@@ -290,13 +293,11 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
             u32 segment_offset = row_id.segment_offset_;
             u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
             u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-            BlockEntry *block_entry = base_table_ref_->block_index_->GetBlockEntry(segment_id, block_id);
-            assert(block_entry != nullptr);
             SizeT column_id = 0;
-
             for (; column_id < column_n; ++column_id) {
-                ColumnVector column_vector = block_entry->GetConstColumnVector(query_context->storage()->buffer_manager(), column_ids[column_id]);
-                output_block_ptr->column_vectors[column_id]->AppendWith(column_vector, block_offset, 1);
+                output_to_data_block_helper
+                    .AddOutputJobInfo(segment_id, block_id, column_ids[column_id], block_offset, output_block_idx, column_id, output_block_row_id);
+                output_block_ptr->column_vectors[column_id]->Finalize(output_block_ptr->column_vectors[column_id]->Size() + 1);
             }
             Value v = Value::MakeFloat(score_result[output_id]);
             output_block_ptr->column_vectors[column_id++]->AppendValue(v);
@@ -304,8 +305,10 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
             ++output_block_row_id;
         }
         output_block_ptr->Finalize();
+        output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
+                                                      base_table_ref_->block_index_.get(),
+                                                      output_data_blocks);
     }
-
     operator_state->SetComplete();
     ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
     if (cache_result_ && cache_mgr != nullptr) {

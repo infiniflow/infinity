@@ -431,55 +431,14 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
     } else {
         // all task Complete
         const u32 result_n = function_data.End();
-        const auto output_type_ptr = GetOutputTypes();
-        {
-            // prepare output data block
-            const u32 total_data_row_count = result_n;
-            u32 row_idx = 0;
-            do {
-                auto data_block = DataBlock::MakeUniquePtr();
-                data_block->Init(*output_type_ptr);
-                operator_state->data_block_array_.emplace_back(std::move(data_block));
-                row_idx += DEFAULT_BLOCK_CAPACITY;
-            } while (row_idx < total_data_row_count);
-        }
-        u32 output_block_row_id = 0;
-        u32 output_block_idx = 0;
-        DataBlock *output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
-        const float *result_scores = function_data.score_result_.get();
-        const RowID *result_row_ids = function_data.row_id_result_.get();
-        for (u32 top_idx = 0; top_idx < result_n; ++top_idx) {
-            const SegmentID segment_id = result_row_ids[top_idx].segment_id_;
-            const SegmentOffset segment_offset = result_row_ids[top_idx].segment_offset_;
-            const BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
-            const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-            BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-            if (block_entry == nullptr) {
-                String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
-                UnrecoverableError(error_message);
-            }
-            if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
-                output_block_ptr->Finalize();
-                ++output_block_idx;
-                output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
-                output_block_row_id = 0;
-            }
-            const SizeT column_n = base_table_ref_->column_ids_.size();
-            for (SizeT i = 0; i < column_n; ++i) {
-                const auto column_id = base_table_ref_->column_ids_[i];
-                auto column_vector = block_entry->GetConstColumnVector(buffer_mgr, column_id);
-                output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
-            }
-            output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_scores[top_idx]);
-            output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);
-            ++output_block_row_id;
-        }
-        output_block_ptr->Finalize();
-
-        ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
-        if (cache_result_ && cache_mgr != nullptr) {
-            AddCache(query_context, cache_mgr, operator_state->data_block_array_);
-        }
+        float *result_scores = function_data.score_result_.get();
+        RowID *result_row_ids = function_data.row_id_result_.get();
+        SetOutput(Vector<char *>{reinterpret_cast<char *>(result_scores)},
+                  Vector<RowID *>{result_row_ids},
+                  sizeof(std::remove_pointer_t<decltype(result_scores)>),
+                  result_n,
+                  query_context,
+                  operator_state);
         operator_state->SetComplete();
     }
 }

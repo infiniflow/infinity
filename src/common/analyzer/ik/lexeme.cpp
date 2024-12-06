@@ -17,7 +17,6 @@ Lexeme::Lexeme(int offset, int begin, int length, int lexeme_type) {
 
 Lexeme *Lexeme::Copy() {
     Lexeme *copy = new Lexeme(offset_, begin_, length_, lexeme_type_);
-    copy->lexeme_text_ = lexeme_text_;
     return copy;
 }
 

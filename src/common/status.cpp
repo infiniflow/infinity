@@ -599,6 +599,12 @@ Status Status::NotRegistered(const String &node_info) {
 
 Status Status::CantSwitchRole(const String &detailed_info) { return Status(ErrorCode::kCantSwitchRole, MakeUnique<String>(detailed_info)); }
 
+Status Status::TooManyFollower(infinity::u8 follower_limit) {
+    return Status(ErrorCode::kTooManyFollower, MakeUnique<String>(fmt::format("Too many followers, limit: {}", follower_limit)));
+}
+
+Status Status::TooManyLearner() { return Status(ErrorCode::kTooManyLearner, MakeUnique<String>("Too many learner, limit: 255")); }
+
 // meta
 Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUnique<String>("Invalid entry")); }
 

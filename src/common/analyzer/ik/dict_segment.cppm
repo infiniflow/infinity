@@ -54,8 +54,6 @@ private:
         }
         return children_map_;
     }
-
-    void Migrate(Vector<UniquePtr<DictSegment>> &segment_array, HashMap<wchar_t, UniquePtr<DictSegment>> &segment_map);
 };
 
 } // namespace infinity

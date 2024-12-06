@@ -26,6 +26,7 @@ import storage;
 import logger;
 import infinity_exception;
 import wal_manager;
+import admin_statement;
 
 namespace infinity {
 
@@ -109,12 +110,54 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
             UnrecoverableError(error_message);
         }
 
+        if (other_node_name == this_node_->node_name()) {
+            return Status::DuplicateNode(other_node_name);
+        }
+
         // Add by register
         auto iter = other_node_map_.find(other_node_name);
         if (iter != other_node_map_.end()) {
             // Duplicated node
             // TODO: Update node info and not throw error.
             return Status::DuplicateNode(other_node_name);
+        }
+
+        u32 follower_count = 0;
+        u32 learner_count = 0;
+        for (auto &other_node_pair : other_node_map_) {
+            switch (other_node_pair.second->node_role()) {
+                case NodeRole::kFollower: {
+                    follower_count += 1;
+                    break;
+                }
+                case NodeRole::kLearner: {
+                    learner_count += 1;
+                    break;
+                }
+                default: {
+                    String error_message = "Non-follower / learner role should be here.";
+                    UnrecoverableError(error_message);
+                }
+            }
+        }
+
+        // Add learner and follower limit
+        switch (other_node->node_role()) {
+            case NodeRole::kFollower: {
+                if (follower_count + 1 == follower_limit_) {
+                    return Status::TooManyFollower(follower_limit_);
+                }
+                break;
+            }
+            case NodeRole::kLearner: {
+                if (learner_count + 1 == std::numeric_limits<u8>::max()) {
+                    return Status::TooManyLearner();
+                }
+                break;
+            }
+            default: {
+                return Status::InvalidNodeRole(fmt::format("Invalid node role: {}", ToString(other_node->node_role())));
+            }
         }
     }
 
@@ -434,11 +477,11 @@ Status ClusterManager::SetFollowerNumber(SizeT new_follower_number) {
     }
 
     // Check current follower count, if new count is less, leader will downgrade some followers to learner
-    follower_count_ = new_follower_number;
+    follower_limit_ = new_follower_number;
     return Status::OK();
 }
 
-SizeT ClusterManager::GetFollowerNumber() const { return follower_count_; }
+SizeT ClusterManager::GetFollowerLimit() const { return follower_limit_; }
 
 Status ClusterManager::SendLogs(const String &node_name,
                                 const SharedPtr<PeerClient> &peer_client,

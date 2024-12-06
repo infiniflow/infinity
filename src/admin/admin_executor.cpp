@@ -4254,10 +4254,12 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
 
             status = InfinityContext::instance().ChangeServerRole(NodeRole::kFollower, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
-                LOG_INFO("Fail to change to FOLLOWER role");
-                Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
-                if (!restore_status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
+                if(status.code() != ErrorCode::kCantSwitchRole) {
+                    LOG_INFO("Fail to change to FOLLOWER role");
+                    Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
+                    if (!restore_status.ok()) {
+                        UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
+                    }
                 }
             } else {
                 LOG_INFO("Start in FOLLOWER role");
@@ -4297,10 +4299,12 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
 
             status = InfinityContext::instance().ChangeServerRole(NodeRole::kLearner, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
-                LOG_INFO("Fail to change to LEARNER role");
-                Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
-                if (!restore_status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
+                if(status.code() != ErrorCode::kCantSwitchRole) {
+                    LOG_INFO("Fail to change to LEARNER role");
+                    Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
+                    if (!restore_status.ok()) {
+                        UnrecoverableError(fmt::format("Fail to change node role to FOLLOWER, then fail to restore to ADMIN."));
+                    }
                 }
             } else {
                 LOG_INFO("Start in LEARNER role");
