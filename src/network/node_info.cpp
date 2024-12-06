@@ -60,6 +60,15 @@ String NodeInfo::node_ip() const {
     return ip_address_;
 }
 
+bool NodeInfo::IsSameNode(const NodeInfo& other) {
+    std::unique_lock locker(node_mutex_);
+    if(node_name_ == other.node_name_ && ip_address_ == other.ip_address_ && port_ == other.port_) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 String ToString(NodeStatus status) {
     switch (status) {
         case NodeStatus::kAlive:

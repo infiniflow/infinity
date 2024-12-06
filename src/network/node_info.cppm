@@ -62,6 +62,8 @@ public:
     void heartbeat_count_increase() { ++heartbeat_count_; }
     u64 heartbeat_count() const { return heartbeat_count_; }
 
+    bool IsSameNode(const NodeInfo& other);
+
 private:
     mutable std::mutex node_mutex_{};
     Atomic<NodeRole> node_role_{NodeRole::kUnInitialized};

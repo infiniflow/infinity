@@ -97,7 +97,7 @@ void InfinityContext::InitPhase2() {
     if (config_->ServerMode() == "admin") {
         // Admin mode or cluster start phase
         infinity_context_inited_ = true;
-//        fmt::print("Infinity is started as a cluster node.\n");
+        //        fmt::print("Infinity is started as a cluster node.\n");
         return;
     }
 
@@ -155,7 +155,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     break;
                 }
                 case NodeRole::kLeader: {
-                    if(config_->StorageType() == StorageType::kLocal) {
+                    if (config_->StorageType() == StorageType::kLocal) {
                         return Status::InvalidStorageType("shared storage", "local");
                     }
                     // No need to un-init cluster manager, since current is admin
@@ -174,7 +174,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     break;
                 }
                 case NodeRole::kFollower: {
-                    if(config_->StorageType() == StorageType::kLocal) {
+                    if (config_->StorageType() == StorageType::kLocal) {
                         return Status::InvalidStorageType("shared storage", "local");
                     }
 
@@ -198,7 +198,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
                     break;
                 }
                 case NodeRole::kLearner: {
-                    if(config_->StorageType() == StorageType::kLocal) {
+                    if (config_->StorageType() == StorageType::kLocal) {
                         return Status::InvalidStorageType("shared storage", "local");
                     }
 
@@ -368,9 +368,17 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
             }
             break;
         }
-        case NodeRole::kLearner:
+        case NodeRole::kLearner: {
+            if (target_role == NodeRole::kFollower) {
+                return Status::CantSwitchRole(fmt::format("Can't switch node role: from {} to {}", ToString(current_role), ToString(target_role)));
+            }
+        }
         case NodeRole::kFollower: {
             switch (target_role) {
+                case NodeRole::kLearner: {
+                    return Status::CantSwitchRole(
+                        fmt::format("Can't switch node role: from {} to {}", ToString(current_role), ToString(target_role)));
+                }
                 case NodeRole::kAdmin: {
                     if (cluster_manager_ == nullptr) {
                         UnrecoverableError("cluster manager wasn't valid.");
