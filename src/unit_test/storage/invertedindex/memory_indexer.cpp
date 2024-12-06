@@ -127,12 +127,12 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer1.Insert(column_, 0, 1);
     indexer1.Insert(column_, 1, 3);
     indexer1.Dump();
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk2", RowID(0U, 4U), flag_, "standard");
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk2", RowID(0U, 4U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer2->Insert(column_, 4, 1);
     while (indexer2->GetInflightTasks() > 0) {
         sleep(1);
@@ -149,7 +149,7 @@ TEST_P(MemoryIndexerTest, Insert) {
 
 TEST_P(MemoryIndexerTest, test2) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer1.Insert(column_, 0, 2, true);
     indexer1.Insert(column_, 2, 2, true);
     indexer1.Insert(column_, 4, 1, true);
@@ -165,7 +165,7 @@ TEST_P(MemoryIndexerTest, test2) {
 
 TEST_P(MemoryIndexerTest, test3) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer1.Insert(empty_column_, 0, 10, true);
     indexer1.Dump(true);
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 5U);
@@ -182,7 +182,7 @@ TEST_P(MemoryIndexerTest, test3) {
 
 TEST_P(MemoryIndexerTest, test4) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer1.Insert(empty_column_, 0, 5, true);
     indexer1.Insert(column_, 0, 5, true);
     indexer1.Dump(true);
@@ -201,7 +201,7 @@ TEST_P(MemoryIndexerTest, test4) {
 
 TEST_P(MemoryIndexerTest, SpillLoadTest) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    auto indexer1 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    auto indexer1 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer1->Insert(column_, 0, 2);
     indexer1->Insert(column_, 2, 2);
     indexer1->Insert(column_, 4, 1);
@@ -211,7 +211,8 @@ TEST_P(MemoryIndexerTest, SpillLoadTest) {
     }
 
     indexer1->Dump(false, true);
-    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    UniquePtr<MemoryIndexer> loaded_indexer =
+        MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
 
     loaded_indexer->Load();
     SegmentID segment_id = fake_segment_index_entry_1->segment_id();
@@ -251,7 +252,7 @@ TEST_P(MemoryIndexerTest, SeekPosition) {
     }
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
-    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard", fake_segment_index_entry_1.get());
     indexer1.Insert(column, 0, 8192);
     while (indexer1.GetInflightTasks() > 0) {
         sleep(1);
