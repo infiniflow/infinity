@@ -108,6 +108,7 @@ Lexeme *AnalyzeContext::GetNextLexeme() {
             break;
         } else {
             delete result;
+            result = nullptr;
         }
     }
     return result;
@@ -135,7 +136,9 @@ void AnalyzeContext::Compound(Lexeme *result) {
                 append_ok = result->Append(*next_lexeme, Lexeme::TYPE_CQUAN);
             }
             if (append_ok) {
+                Lexeme *r = results_.front();
                 results_.pop_front();
+                delete r;
             }
         }
         if (Lexeme::TYPE_CNUM == result->GetLexemeType() && !results_.empty()) {
@@ -145,7 +148,9 @@ void AnalyzeContext::Compound(Lexeme *result) {
                 append_ok = result->Append(*next_lexeme, Lexeme::TYPE_CQUAN);
             }
             if (append_ok) {
+                Lexeme *r = results_.front();
                 results_.pop_front();
+                delete r;
             }
         }
     }
