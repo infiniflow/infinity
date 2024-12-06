@@ -37,23 +37,12 @@ import data_block;
 import txn;
 import table_entry;
 import cached_match;
+import buffer_manager;
+import block_index;
 
 namespace infinity {
 
 String PhysicalOperator::GetName() const { return PhysicalOperatorToString(operator_type_); }
-
-struct UpdateJobInfo {
-    // src data info
-    SegmentID segment_id_{};
-    BlockID block_id_{};
-    ColumnID column_id_{};
-    BlockOffset block_offset_{};
-    // target position
-    u32 op_state_block_id_{};
-    u32 op_state_column_id_{};
-    u32 op_state_row_id_{};
-    friend auto operator<=>(const UpdateJobInfo &, const UpdateJobInfo &) = default;
-};
 
 void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *operator_state, HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) {
     if (load_metas_.get() == nullptr || load_metas_->empty()) {
@@ -68,7 +57,7 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
         UnrecoverableError("TableRef not found");
     }
 
-    Vector<UpdateJobInfo> update_job_infos;
+    OutputToDataBlockHelper output_to_data_block_helper;
     for (SizeT i = 0; i < operator_state->prev_op_state_->data_block_array_.size(); ++i) {
         auto input_block = operator_state->prev_op_state_->data_block_array_[i].get();
         SizeT load_column_count = load_metas_->size();
@@ -96,32 +85,14 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
             u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
             u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
             for (SizeT k = 0; k < load_column_count; ++k) {
-                update_job_infos.emplace_back(segment_id, block_id, load_metas[k].binding_.column_idx, block_offset, i, load_metas[k].index_, j);
+                output_to_data_block_helper
+                    .AddOutputJobInfo(segment_id, block_id, load_metas[k].binding_.column_idx, block_offset, i, load_metas[k].index_, j);
             }
         }
     }
-    std::sort(update_job_infos.begin(), update_job_infos.end());
-    {
-        auto cache_segment_id = std::numeric_limits<SegmentID>::max();
-        auto cache_block_id = std::numeric_limits<BlockID>::max();
-        BlockEntry *cache_block_entry = nullptr;
-        auto cache_column_id = std::numeric_limits<ColumnID>::max();
-        ColumnVector cache_column_vector;
-        for (const auto [segment_id, block_id, column_id, block_offset, op_state_block_id, op_state_column_id, op_state_row_id] : update_job_infos) {
-            if (segment_id != cache_segment_id || block_id != cache_block_id) {
-                cache_segment_id = segment_id;
-                cache_block_id = block_id;
-                cache_block_entry = table_ref->block_index_->GetBlockEntry(segment_id, block_id);
-                cache_column_id = std::numeric_limits<ColumnID>::max();
-            }
-            if (column_id != cache_column_id) {
-                cache_column_vector = cache_block_entry->GetConstColumnVector(query_context->storage()->buffer_manager(), column_id);
-            }
-            auto val_for_update = cache_column_vector.GetValue(block_offset);
-            auto *target_column_vec = operator_state->prev_op_state_->data_block_array_[op_state_block_id]->column_vectors[op_state_column_id].get();
-            target_column_vec->SetValue(op_state_row_id, val_for_update);
-        }
-    }
+    output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
+                                                  table_ref->block_index_.get(),
+                                                  operator_state->prev_op_state_->data_block_array_);
 }
 
 SharedPtr<Vector<String>> PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(const PhysicalOperator &op) {
@@ -144,6 +115,31 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalCommonFunctionUsingLoadMeta::GetO
         }
     }
     return output_types;
+}
+
+void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
+                                                const BlockIndex *block_index,
+                                                const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
+    std::sort(output_job_infos.begin(), output_job_infos.end());
+    auto cache_segment_id = std::numeric_limits<SegmentID>::max();
+    auto cache_block_id = std::numeric_limits<BlockID>::max();
+    BlockEntry *cache_block_entry = nullptr;
+    auto cache_column_id = std::numeric_limits<ColumnID>::max();
+    ColumnVector cache_column_vector;
+    for (const auto [segment_id, block_id, column_id, block_offset, output_block_id, output_column_id, output_row_id] : output_job_infos) {
+        if (segment_id != cache_segment_id || block_id != cache_block_id) {
+            cache_segment_id = segment_id;
+            cache_block_id = block_id;
+            cache_block_entry = block_index->GetBlockEntry(segment_id, block_id);
+            cache_column_id = std::numeric_limits<ColumnID>::max();
+        }
+        if (column_id != cache_column_id) {
+            cache_column_vector = cache_block_entry->GetConstColumnVector(buffer_mgr, column_id);
+        }
+        auto val_for_update = cache_column_vector.GetValue(block_offset);
+        output_data_blocks[output_block_id]->column_vectors[output_column_id]->SetValue(output_row_id, val_for_update);
+    }
+    output_job_infos.clear();
 }
 
 } // namespace infinity

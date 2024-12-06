@@ -231,19 +231,6 @@ auto ExecuteFTSearch(const QueryIterators &query_iterators, const u32 topn) {
     return bmw_result;
 }
 
-struct UpdateJobInfoC {
-    // src data info
-    SegmentID segment_id_{};
-    BlockID block_id_{};
-    ColumnID column_id_{};
-    BlockOffset block_offset_{};
-    // target position
-    u32 odb_id_{};
-    u32 odb_column_id_{};
-    u32 odb_row_id_{};
-    friend auto operator<=>(const UpdateJobInfoC &, const UpdateJobInfoC &) = default;
-};
-
 bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *operator_state) {
     if (!common_query_filter_) {
         UnrecoverableError(fmt::format("{}: common_query_filter_ is nullptr", __func__));
@@ -284,8 +271,8 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
     };
     append_data_block();
     // 4.2 output
-    Vector<UpdateJobInfoC> update_job_infos;
     {
+        OutputToDataBlockHelper output_to_data_block_helper;
         u32 output_block_idx = output_data_blocks.size() - 1;
         Vector<SizeT> &column_ids = base_table_ref_->column_ids_;
         SizeT column_n = column_ids.size();
@@ -308,7 +295,8 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
             u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
             SizeT column_id = 0;
             for (; column_id < column_n; ++column_id) {
-                update_job_infos.emplace_back(segment_id, block_id, column_ids[column_id], block_offset, output_block_idx, column_id, output_block_row_id);
+                output_to_data_block_helper
+                    .AddOutputJobInfo(segment_id, block_id, column_ids[column_id], block_offset, output_block_idx, column_id, output_block_row_id);
                 output_block_ptr->column_vectors[column_id]->Finalize(output_block_ptr->column_vectors[column_id]->Size() + 1);
             }
             Value v = Value::MakeFloat(score_result[output_id]);
@@ -317,31 +305,10 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
             ++output_block_row_id;
         }
         output_block_ptr->Finalize();
+        output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
+                                                      base_table_ref_->block_index_.get(),
+                                                      output_data_blocks);
     }
-    {
-        std::sort(update_job_infos.begin(), update_job_infos.end());
-        auto *buffer_mgr = query_context->storage()->buffer_manager();
-        auto cache_segment_id = std::numeric_limits<SegmentID>::max();
-        auto cache_block_id = std::numeric_limits<BlockID>::max();
-        BlockEntry *cache_block_entry = nullptr;
-        auto cache_column_id = std::numeric_limits<ColumnID>::max();
-        ColumnVector cache_column_vector;
-        for (const auto [segment_id, block_id, column_id, block_offset, odb_id, odb_column_id, odb_row_id] : update_job_infos) {
-            if (segment_id != cache_segment_id || block_id != cache_block_id) {
-                cache_segment_id = segment_id;
-                cache_block_id = block_id;
-                cache_block_entry = base_table_ref_->block_index_->GetBlockEntry(segment_id, block_id);
-                cache_column_id = std::numeric_limits<ColumnID>::max();
-            }
-            if (column_id != cache_column_id) {
-                cache_column_vector = cache_block_entry->GetConstColumnVector(buffer_mgr, column_id);
-            }
-            auto val_for_update = cache_column_vector.GetValue(block_offset);
-            auto *target_column_vec = output_data_blocks[odb_id]->column_vectors[odb_column_id].get();
-            target_column_vec->SetValue(odb_row_id, val_for_update);
-        }
-    }
-
     operator_state->SetComplete();
     ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
     if (cache_result_ && cache_mgr != nullptr) {
