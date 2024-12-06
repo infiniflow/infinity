@@ -28,6 +28,7 @@ import internal_types;
 import posting_writer;
 import vector_with_lock;
 import buf_writer;
+import mem_usage_change;
 
 namespace infinity {
 
@@ -52,7 +53,7 @@ public:
 
     void Sort();
 
-    void GeneratePosting();
+    MemUsageChange GeneratePosting();
 
     u32 GetDocCount() { return doc_count_; }
 

@@ -66,6 +66,7 @@ import utility;
 import persist_result_handler;
 import virtual_store;
 import local_file_handle;
+import mem_usage_change;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -229,6 +230,7 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         return 0;
     }
 
+    MemUsageChange mem_usage_change = {true, 0};
     while (1) {
         this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
         // num_merged = inverters.size();
@@ -236,7 +238,7 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
             break;
         }
         for (auto &inverter : inverters) {
-            inverter->GeneratePosting();
+            mem_usage_change.Add(inverter->GeneratePosting());
             num_generated += inverter->GetMerged();
         }
     }
@@ -246,6 +248,11 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         if (inflight_tasks_ == 0) {
             cv_.notify_all();
         }
+    }
+    if (mem_usage_change.is_add_) {
+        AddMemUsed(mem_usage_change.mem_);
+    } else {
+        DecMemUsed(mem_usage_change.mem_);
     }
 
     // LOG_INFO(fmt::format("MemoryIndexer::CommitSync sorted {} inverters, generated posting for {} inverters(merged to {}), inflight_tasks_ is {}",

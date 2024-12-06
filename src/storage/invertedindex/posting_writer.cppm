@@ -13,6 +13,7 @@ import posting_list_format;
 import index_defines;
 import term_meta;
 import vector_with_lock;
+import mem_usage_change;
 
 namespace infinity {
 export class PostingWriter {
@@ -47,7 +48,11 @@ public:
 
     u32 GetDocColumnLength(docid_t doc_id) { return column_lengths_.Get(doc_id); }
 
+    MemUsageChange GetSizeChange();
+
 private:
+    // for memory tracing
+    SizeT last_size_{0};
     const PostingFormat &posting_format_;
     DocListEncoder *doc_list_encoder_{nullptr};
     PositionListEncoder *position_list_encoder_{nullptr};

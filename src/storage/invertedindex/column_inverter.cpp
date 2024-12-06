@@ -203,11 +203,13 @@ void ColumnInverter::Sort() {
                                                                                        16);
 }
 
-void ColumnInverter::GeneratePosting() {
+MemUsageChange ColumnInverter::GeneratePosting() {
     u32 last_term_num = std::numeric_limits<u32>::max();
     u32 last_doc_id = INVALID_DOCID;
     StringRef last_term, term;
     SharedPtr<PostingWriter> posting = nullptr;
+    MemUsageChange ret{true, 0};
+    Map<StringRef, PostingWriter *> modified_writers;
     // printf("GeneratePosting() begin begin_doc_id_ %u, doc_count_ %u, merged_ %u", begin_doc_id_, doc_count_, merged_);
     for (auto &i : positions_) {
         if (last_term_num != i.term_num_) {
@@ -218,6 +220,9 @@ void ColumnInverter::GeneratePosting() {
             }
             term = GetTermFromNum(i.term_num_);
             posting = posting_writer_provider_(String(term.data()));
+            if (modified_writers.find(term) == modified_writers.end()) {
+                modified_writers[term] = posting.get();
+            }
             // printf("\nswitched-term-%d-<%s>\n", i.term_num_, term.data());
             if (last_term_num != (u32)(-1)) {
                 assert(last_term_num < i.term_num_);
@@ -242,6 +247,12 @@ void ColumnInverter::GeneratePosting() {
         // printf(" EndDocument3-%u\n", last_doc_id);
     }
     // printf("GeneratePosting() end begin_doc_id_ %u, doc_count_ %u, merged_ %u", begin_doc_id_, doc_count_, merged_);
+    for (auto kv : modified_writers) {
+        PostingWriter *writer = kv.second;
+        ret.Add(writer->GetSizeChange());
+    }
+    LOG_TRACE(fmt::format("MemUsageChange : {}, {}", ret.is_add_, ret.mem_));
+    return ret;
 }
 
 void ColumnInverter::SortForOfflineDump() {

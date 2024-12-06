@@ -981,11 +981,12 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
 }
 
 BaseMemIndex *SegmentIndexEntry::GetMemIndex() const {
-    // only support hnsw and ivf index now.
     if (memory_hnsw_index_.get() != nullptr) {
         return static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
     } else if (memory_ivf_index_.get() != nullptr) {
         return static_cast<BaseMemIndex *>(memory_ivf_index_.get());
+    } else if (memory_indexer_.get() != nullptr) {
+        return static_cast<BaseMemIndex *>(memory_indexer_.get());
     }
     return nullptr;
 }
