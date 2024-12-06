@@ -69,6 +69,13 @@ Use `"rag"` to select the RAG analyzer or `"rag-fine"` for fine-grained mode, wh
 Both RAG tokenization and fine-grained RAG tokenization are used in RAGFlow to ensure high recall.
 :::
 
+#### IK analyzer
+
+The IK analyzer is a bilingual tokenizer that supports Chinese (simplified and traditional) and English. It is a C++ adaptation of [IK Analyzer](https://github.com/infinilabs/analysis-ik) which is a very popular tokenizer for Chinese elasticsearch users.
+
+Use `"ik"` to select the IK analyzer or `"ik-fine"` for fine-grained mode. `"ik"` works the same with `ik_smart` of `IK Analyzer` while `"ik-fine"` works the same with `ik_max_word` of `IK Analyzer`.
+
+
 #### Keyword analyzer
 
 The keyword analyzer is a "noop" analyzer used for columns containing keywords only, where traditional scoring methods like `BM25` do not apply. It scores `0` or `1`, depending on whether any keywords are matched.
