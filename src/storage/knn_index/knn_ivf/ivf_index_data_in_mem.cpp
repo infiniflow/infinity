@@ -110,7 +110,7 @@ public:
         }
     }
 
-    ~IVFIndexInMemT() { BaseMemIndex::DecMemUsed(MemoryUsed()); }
+    ~IVFIndexInMemT() { BaseMemIndex::DecreaseMemoryUsage(MemoryUsed()); }
 
     MemIndexTracerInfo GetInfo() const override {
         auto *table_index_entry = segment_index_entry_->table_index_entry();

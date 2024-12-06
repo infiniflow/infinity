@@ -126,10 +126,10 @@ public:
 
 private:
     // call with write lock
-    void AddMemUsed(SizeT mem);
+    void IncreaseMemoryUsage(SizeT mem);
 
     // call with write lock
-    void DecMemUsed(SizeT mem);
+    void DecreaseMemoryUsage(SizeT mem);
 
     // CommitOffline is for offline case. It spill a batch of ColumnInverter. Returns the size of the batch.
     SizeT CommitOffline(SizeT wait_if_empty_ms = 0);

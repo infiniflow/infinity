@@ -30,7 +30,6 @@ import index_base;
 import column_def;
 import cleanup_scanner;
 import chunk_index_entry;
-// import memory_indexer;
 import default_values;
 import statement_common;
 import txn;

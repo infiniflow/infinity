@@ -146,7 +146,7 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
         inverting_thread_pool_.push(std::move(func));
     } else {
         // mem trace : the column_lengths_;
-        AddMemUsed(sizeof(u32) * row_count);
+        IncreaseMemoryUsage(sizeof(u32) * row_count);
         PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
         auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
@@ -250,9 +250,9 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         }
     }
     if (mem_usage_change.is_add_) {
-        AddMemUsed(mem_usage_change.mem_);
+        IncreaseMemoryUsage(mem_usage_change.mem_);
     } else {
-        DecMemUsed(mem_usage_change.mem_);
+        DecreaseMemoryUsage(mem_usage_change.mem_);
     }
 
     // LOG_INFO(fmt::format("MemoryIndexer::CommitSync sorted {} inverters, generated posting for {} inverters(merged to {}), inflight_tasks_ is {}",
@@ -392,7 +392,7 @@ SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
     bool found = posting_store.GetOrAdd(term, posting, prepared_posting_);
     if (!found) {
         // mem trace : add term's size
-        AddMemUsed(term.size());
+        IncreaseMemoryUsage(term.size());
         prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
     }
     return posting;
@@ -403,7 +403,7 @@ void MemoryIndexer::Reset() {
         posting_table_->store_.Clear();
     }
     column_lengths_.Clear();
-    DecMemUsed(mem_used_);
+    DecreaseMemoryUsage(mem_used_);
 }
 
 MemIndexTracerInfo MemoryIndexer::GetInfo() const {
@@ -422,21 +422,21 @@ SizeT MemoryIndexer::MemUsed() const { return mem_used_; }
 
 void MemoryIndexer::ApplyMemUseChange(MemUsageChange mem_change) {
     if (mem_change.is_add_) {
-        AddMemUsed(mem_change.mem_);
+        IncreaseMemoryUsage(mem_change.mem_);
     } else {
-        DecMemUsed(mem_change.mem_);
+        DecreaseMemoryUsage(mem_change.mem_);
     }
 }
 
-void MemoryIndexer::AddMemUsed(SizeT mem) {
+void MemoryIndexer::IncreaseMemoryUsage(SizeT mem) {
     mem_used_ += mem;
     BaseMemIndex::AddMemUsed(mem);
 }
 
-void MemoryIndexer::DecMemUsed(SizeT mem) {
+void MemoryIndexer::DecreaseMemoryUsage(SizeT mem) {
     assert(mem_used_ >= mem);
     mem_used_ -= mem;
-    BaseMemIndex::DecMemUsed(mem);
+    BaseMemIndex::DecreaseMemoryUsage(mem);
 }
 
 void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>> &merger) {
