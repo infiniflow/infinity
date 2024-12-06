@@ -13,7 +13,7 @@ CREATE TABLE test_knn_hnsw_cos(c1 INT,  c2 EMBEDDING(FLOAT, 4));
 statement ok
 COPY test_knn_hnsw_cos FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
 
-# mertic cos will order ascendingly. The query will return row 4, 3, 2
+# metric cos will be in descending order. The query will return row 4, 3, 2
 query I
 SELECT c1 FROM test_knn_hnsw_cos SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3);
 ----
