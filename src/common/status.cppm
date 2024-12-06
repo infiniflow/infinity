@@ -183,6 +183,8 @@ export enum class ErrorCode : long {
     kInvalidStorageType = 7024,
     kNotRegistered = 7025,
     kCantSwitchRole = 7026,
+    kTooManyFollower = 7027,
+    kTooManyLearner = 7028,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -356,6 +358,8 @@ public:
     static Status InvalidStorageType(const String &expected, const String &actual);
     static Status NotRegistered(const String &node_info);
     static Status CantSwitchRole(const String &detailed_info);
+    static Status TooManyFollower(u8 follower_limit);
+    static Status TooManyLearner();
 
     // meta
     static Status InvalidEntry();
