@@ -90,9 +90,12 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
                                  SizeT result_size,
                                  i64 result_n,
                                  QueryContext *query_context,
-                                 OperatorState *operator_state) {
+                                 OperatorState *operator_state) const {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     SizeT query_n = raw_result_dists_list.size();
+    if (query_n != 1u) {
+        UnrecoverableError(fmt::format("{}: Unexpected: more than 1 query?", __func__));
+    }
 
     {
         SizeT total_data_row_count = query_n * result_n;
@@ -104,8 +107,8 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
             row_idx += DEFAULT_BLOCK_CAPACITY;
         } while (row_idx < total_data_row_count);
     }
-    auto *buffer_mgr = query_context->storage()->buffer_manager();
 
+    OutputToDataBlockHelper output_to_data_block_helper;
     SizeT output_block_row_id = 0;
     SizeT output_block_idx = 0;
     DataBlock *output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
@@ -113,18 +116,11 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
         char *raw_result_dists = raw_result_dists_list[query_idx];
         RowID *row_ids = row_ids_list[query_idx];
         for (i64 top_idx = 0; top_idx < result_n; ++top_idx) {
-            SizeT id = query_n * query_idx + top_idx;
 
             SegmentID segment_id = row_ids[top_idx].segment_id_;
             SegmentOffset segment_offset = row_ids[top_idx].segment_offset_;
             BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
             BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-
-            BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-            if (block_entry == nullptr) {
-                String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
-                UnrecoverableError(error_message);
-            }
 
             if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
                 output_block_ptr->Finalize();
@@ -136,18 +132,17 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
             SizeT column_n = base_table_ref_->column_ids_.size();
             for (SizeT i = 0; i < column_n; ++i) {
                 SizeT column_id = base_table_ref_->column_ids_[i];
-                ColumnVector &&column_vector = block_entry->GetConstColumnVector(buffer_mgr, column_id);
-
-                output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
+                output_to_data_block_helper.AddOutputJobInfo(segment_id, block_id, column_id, block_offset, output_block_idx, i, output_block_row_id);
+                output_block_ptr->column_vectors[i]->Finalize(output_block_ptr->column_vectors[i]->Size() + 1);
             }
-            output_block_ptr->AppendValueByPtr(column_n, raw_result_dists + id * result_size);
-            output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[id]);
+            output_block_ptr->AppendValueByPtr(column_n, raw_result_dists + top_idx * result_size);
+            output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[top_idx]);
 
             ++output_block_row_id;
         }
     }
     output_block_ptr->Finalize();
-
+    output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(), block_index, operator_state->data_block_array_);
     ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager();
     if (cache_result_ && cache_mgr != nullptr) {
         AddCache(query_context, cache_mgr, operator_state->data_block_array_);
