@@ -21,7 +21,7 @@ namespace infinity {
 
 IKAnalyzer::IKAnalyzer(const String &path) : dict_path_(path) {}
 
-IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), fine_grained_(other.fine_grained_), dict_(other.dict_) { Init(); }
+IKAnalyzer::IKAnalyzer(const IKAnalyzer &other) : own_dict_(false), ik_smart_(other.ik_smart_), dict_(other.dict_) { Init(); }
 
 IKAnalyzer::~IKAnalyzer() {
     if (own_dict_) {
@@ -77,7 +77,7 @@ int IKAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     for (auto &segmenter : segmenters_) {
         segmenter->Reset();
     }
-    arbitrator_->Process(context_.get(), true);
+    arbitrator_->Process(context_.get(), ik_smart_);
     context_->OutputToResult();
     context_->MarkBufferOffset();
     Lexeme *lexeme = nullptr;

@@ -13,7 +13,7 @@ import ik_dict;
 module analyze_context;
 
 namespace infinity {
-AnalyzeContext::AnalyzeContext(Dictionary *dict) : dict_(dict) {
+AnalyzeContext::AnalyzeContext(Dictionary *dict, bool ik_smart) : dict_(dict), ik_smart_(ik_smart) {
     buff_offset_ = 0;
     cursor_ = 0;
     last_useless_char_num_ = 0;
@@ -126,6 +126,8 @@ void AnalyzeContext::Reset() {
 }
 
 void AnalyzeContext::Compound(Lexeme *result) {
+    if (!ik_smart_)
+        return;
     if (!results_.empty()) {
         if (Lexeme::TYPE_ARABIC == result->GetLexemeType()) {
             Lexeme *next_lexeme = results_.front();
