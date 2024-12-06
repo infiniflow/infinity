@@ -21,7 +21,7 @@ A full-text index must be built to perform a full-text search, and this index op
 
 ### Tokenizer
 
-When creating a full-text index, you are required to specify a tokenizer/analyzer, which will be used for future full-text searches on the same column(s). Infinity has many built-in tokenizers. Except for the Ngram analyzer and the default standard analyzer, all other analyzers require a dedicated dictionary. Please download the appropriate dictionary for your chosen analyzer from [this link](https://github.com/infiniflow/resource) and save it to the directory specified by `resource_dir` in the configuration file.
+When creating a full-text index, you are required to specify a tokenizer/analyzer, which will be used for future full-text searches on the same column(s). Infinity has many built-in tokenizers. Except for the Ngram analyzer and the default standard analyzer, all other analyzers require dedicated resource files. Please download the appropriate files for your chosen analyzer from [this link](https://github.com/infiniflow/resource) and save it to the directory specified by `resource_dir` in the configuration file.
 
 ```yaml
 [resource]
@@ -71,7 +71,7 @@ Both RAG tokenization and fine-grained RAG tokenization are used in RAGFlow to e
 
 #### Keyword analyzer
 
-The keyword analyzer is a no-op analyzer used for columns containing keywords only, where traditional scoring methods like `BM25` do not apply. It scores `0` or `1`, depending on whether any keywords are matched.
+The keyword analyzer is a "noop" analyzer used for columns containing keywords only, where traditional scoring methods like `BM25` do not apply. It scores `0` or `1`, depending on whether any keywords are matched.
 
 ### Search and ranking
 
