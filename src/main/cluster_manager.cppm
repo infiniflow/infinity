@@ -106,8 +106,6 @@ private:
     Vector<SharedPtr<String>> logs_to_sync_{};
     Atomic<u8> follower_limit_{4};
     Vector<SharedPtr<PeerClient>> clients_for_cleanup_;
-    Atomic<u8> follower_count_{};
-    Atomic<u8> learner_count_{};
 
     // Follower and Learner
 public:

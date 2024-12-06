@@ -338,7 +338,7 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                 return;
             }
             default: {
-                String error_message = "Heartbeat: error in data transfer to leader";
+                String error_message = "Heartbeat: error happens when data transfer to leader";
                 UnrecoverableError(error_message);
             }
         }

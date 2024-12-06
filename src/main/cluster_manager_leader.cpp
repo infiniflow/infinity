@@ -122,20 +122,37 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
             return Status::DuplicateNode(other_node_name);
         }
 
+        u32 follower_count = 0;
+        u32 learner_count = 0;
+        for (auto &other_node_pair : other_node_map_) {
+            switch (other_node_pair.second->node_role()) {
+                case NodeRole::kFollower: {
+                    follower_count += 1;
+                    break;
+                }
+                case NodeRole::kLearner: {
+                    learner_count += 1;
+                    break;
+                }
+                default: {
+                    String error_message = "Non-follower / learner role should be here.";
+                    UnrecoverableError(error_message);
+                }
+            }
+        }
+
         // Add learner and follower limit
         switch (other_node->node_role()) {
             case NodeRole::kFollower: {
-                if (follower_count_ + 1 == follower_limit_) {
+                if (follower_count + 1 == follower_limit_) {
                     return Status::TooManyFollower(follower_limit_);
                 }
-                ++follower_count_;
                 break;
             }
             case NodeRole::kLearner: {
-                if (learner_count_ + 1 == std::numeric_limits<u8>::max()) {
+                if (learner_count + 1 == std::numeric_limits<u8>::max()) {
                     return Status::TooManyLearner();
                 }
-                ++learner_count_;
                 break;
             }
             default: {
@@ -144,27 +161,10 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
         }
     }
 
-    auto decrease_node_count = [&] {
-        switch (other_node->node_role()) {
-            case NodeRole::kFollower: {
-                --follower_count_;
-                break;
-            }
-            case NodeRole::kLearner: {
-                --learner_count_;
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    };
-
     // Connect to follower/learner server.
     auto [client_to_follower, client_status] =
         ClusterManager::ConnectToServerNoLock(this_node_->node_name(), other_node->node_ip(), other_node->node_port());
     if (!client_status.ok()) {
-        decrease_node_count();
         return client_status;
     }
 
@@ -184,7 +184,6 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
         } else {
             // Duplicated node
             // TODO: If the exist node lost connection, or other malfunction, use new other_node to replace it.
-            decrease_node_count();
             return Status::DuplicateNode(other_node_name);
         }
 
