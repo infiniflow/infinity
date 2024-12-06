@@ -26,7 +26,7 @@ public:
 
     Status Load();
 
-    void SetFineGrained(bool fine_grained) { ik_smart_ = !fine_grained; };
+    void SetFineGrained(bool fine_grained);
 
 protected:
     int AnalyzeImpl(const Term &input, void *data, HookType func) override;

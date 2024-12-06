@@ -30,9 +30,16 @@ IKAnalyzer::~IKAnalyzer() {
 }
 
 void IKAnalyzer::Init() {
-    context_ = MakeUnique<AnalyzeContext>(dict_);
+    context_ = MakeUnique<AnalyzeContext>(dict_, ik_smart_);
     LoadSegmenters();
     arbitrator_ = MakeUnique<IKArbitrator>();
+}
+
+void IKAnalyzer::SetFineGrained(bool fine_grained) {
+    ik_smart_ = !fine_grained;
+    if (context_.get()) {
+        context_->ik_smart_ = ik_smart_;
+    }
 }
 
 Status IKAnalyzer::Load() {
