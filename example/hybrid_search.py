@@ -92,7 +92,7 @@ try:
 
     result = (
         table_instance.output(
-            ["num", "body", "vec", "sparse", "year", "tensor", "_score"]
+            ["num", "body", "vec", "sparse", "year", "tensor", "score()"]
         )
         .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
         .match_sparse(

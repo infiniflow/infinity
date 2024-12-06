@@ -450,6 +450,8 @@ i32 VirtualStore::MunmapFile(const String &file_path) {
 StorageType VirtualStore::storage_type_ = StorageType::kInvalid;
 String VirtualStore::bucket_ = "infinity";
 UniquePtr<S3Client> VirtualStore::s3_client_ = nullptr;
+Atomic<u64> VirtualStore::total_request_count_ = 0;
+Atomic<u64> VirtualStore::cache_miss_count_ = 0;
 
 Status VirtualStore::InitRemoteStore(StorageType storage_type,
                                      const String &URL,
