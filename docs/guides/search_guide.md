@@ -47,7 +47,7 @@ Use `"chinese"` to select the simplified Chinese analyzer, which is a wrapper of
 
 #### Traditional Chinese analyzer
 
-Use `"traditional"` to select the analyzer for traditional Chinese, which essentially converts simplified Chinese into traditional Chinese based on the outputs of the [Jieba](https://github.com/yanyiwu/cppjieba) analyzer.
+Use `"traditional"` to select the traditional Chinese analyzer, which essentially converts simplified Chinese into traditional Chinese based on the outputs of the [Jieba](https://github.com/yanyiwu/cppjieba) analyzer.
 
 #### Japanese analyzer
 
@@ -59,7 +59,7 @@ Use `"korean"` to select the Korean tokenizer, which is a wrapper of [mecab](htt
 
 #### RAG analyzer
 
-The RAG analyzer is a bilingual tokenizer that supports Chinese (simplified and traditional) and English. It is a C++ adaptation of [RAGFlow's tokenizer](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py), and its tokenization of Latin characters is a C++ adaptation of [NLTK](https://www.nltk.org/api/nltk.tokenize.punkt.html).
+The RAG analyzer is a bilingual tokenizer that supports Chinese (simplified and traditional) and English. It is a C++ adaptation of [RAGFlow's tokenizer](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py), and its tokenization of Latin characters derives from [NLTK](https://www.nltk.org/api/nltk.tokenize.punkt.html).
 
 This analyzer offers better recall for Chinese than the [Jieba](https://github.com/yanyiwu/cppjieba) analyzer, but lower tokenization throughput due to higher computational costs. Its English language processing involves an additional lemmatization step before stemming, different from that of the standard analyzer.
 
