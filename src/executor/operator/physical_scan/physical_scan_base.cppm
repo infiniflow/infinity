@@ -68,7 +68,7 @@ protected:
                    SizeT result_size,
                    i64 result_n,
                    QueryContext *query_context,
-                   OperatorState *operator_state);
+                   OperatorState *operator_state) const;
 
     void AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) const;
 

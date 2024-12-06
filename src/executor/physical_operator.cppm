@@ -124,4 +124,34 @@ export struct PhysicalCommonFunctionUsingLoadMeta {
     static SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes(const PhysicalOperator &op);
 };
 
+struct OutputJobInfo {
+    // src data info
+    SegmentID segment_id_{};
+    BlockID block_id_{};
+    ColumnID column_id_{};
+    BlockOffset block_offset_{};
+    // target position
+    u32 output_block_id_{};
+    u32 output_column_id_{};
+    u32 output_row_id_{};
+    friend auto operator<=>(const OutputJobInfo &, const OutputJobInfo &) = default;
+};
+
+class BufferManager;
+struct BlockIndex;
+struct DataBlock;
+export struct OutputToDataBlockHelper {
+    Vector<OutputJobInfo> output_job_infos;
+    void AddOutputJobInfo(const SegmentID segment_id,
+                          const BlockID block_id,
+                          const ColumnID column_id,
+                          const BlockOffset block_offset,
+                          const u32 output_block_id,
+                          const u32 output_column_id,
+                          const u32 output_row_id) {
+        output_job_infos.emplace_back(segment_id, block_id, column_id, block_offset, output_block_id, output_column_id, output_row_id);
+    }
+    void OutputToDataBlock(BufferManager *buffer_mgr, const BlockIndex *block_index, const Vector<UniquePtr<DataBlock>> &output_data_blocks);
+};
+
 } // namespace infinity
