@@ -3,14 +3,14 @@ module;
 #include <fstream>
 #include <sstream>
 
+module analyze_context;
+
 import stl;
 import quick_sort_set;
 import character_util;
 import lexeme;
 import lexeme_path;
 import ik_dict;
-
-module analyze_context;
 
 namespace infinity {
 AnalyzeContext::AnalyzeContext(Dictionary *dict, bool ik_smart) : dict_(dict), ik_smart_(ik_smart) {

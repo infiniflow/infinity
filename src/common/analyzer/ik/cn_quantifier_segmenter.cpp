@@ -2,6 +2,8 @@ module;
 
 #include <string>
 
+module cn_quantifier_segmenter;
+
 import stl;
 import hit;
 import segmenter;
@@ -9,8 +11,6 @@ import analyze_context;
 import lexeme;
 import character_util;
 import ik_dict;
-
-module cn_quantifier_segmenter;
 
 namespace infinity {
 

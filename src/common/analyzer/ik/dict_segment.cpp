@@ -1,13 +1,13 @@
 module;
 
+#include <algorithm>
+
+module ik_dict_segment;
+
 import stl;
 import hit;
 import character_util;
 import third_party;
-
-#include <algorithm>
-
-module ik_dict_segment;
 
 namespace infinity {
 
