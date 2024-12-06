@@ -13,7 +13,7 @@ import ik_dict;
 module analyze_context;
 
 namespace infinity {
-AnalyzeContext::AnalyzeContext(Dictionary *dict) : dict_(dict) {
+AnalyzeContext::AnalyzeContext(Dictionary *dict, bool ik_smart) : dict_(dict), ik_smart_(ik_smart) {
     buff_offset_ = 0;
     cursor_ = 0;
     last_useless_char_num_ = 0;
@@ -108,6 +108,7 @@ Lexeme *AnalyzeContext::GetNextLexeme() {
             break;
         } else {
             delete result;
+            result = nullptr;
         }
     }
     return result;
@@ -125,6 +126,8 @@ void AnalyzeContext::Reset() {
 }
 
 void AnalyzeContext::Compound(Lexeme *result) {
+    if (!ik_smart_)
+        return;
     if (!results_.empty()) {
         if (Lexeme::TYPE_ARABIC == result->GetLexemeType()) {
             Lexeme *next_lexeme = results_.front();
@@ -135,7 +138,9 @@ void AnalyzeContext::Compound(Lexeme *result) {
                 append_ok = result->Append(*next_lexeme, Lexeme::TYPE_CQUAN);
             }
             if (append_ok) {
+                Lexeme *r = results_.front();
                 results_.pop_front();
+                delete r;
             }
         }
         if (Lexeme::TYPE_CNUM == result->GetLexemeType() && !results_.empty()) {
@@ -145,7 +150,9 @@ void AnalyzeContext::Compound(Lexeme *result) {
                 append_ok = result->Append(*next_lexeme, Lexeme::TYPE_CQUAN);
             }
             if (append_ok) {
+                Lexeme *r = results_.front();
                 results_.pop_front();
+                delete r;
             }
         }
     }

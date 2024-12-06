@@ -37,7 +37,9 @@ Hit *DictSegment::Match(const Vector<wchar_t> &char_array, int begin, int length
             ds = (*it).get();
         }
     } else if (!children_map_.empty()) {
-        ds = children_map_[key_char].get();
+        auto it = children_map_.find(key_char);
+        if (it != children_map_.end())
+            ds = it->second.get();
     }
 
     if (ds != nullptr) {
