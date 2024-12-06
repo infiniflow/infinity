@@ -90,7 +90,7 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
                                  SizeT result_size,
                                  i64 result_n,
                                  QueryContext *query_context,
-                                 OperatorState *operator_state) {
+                                 OperatorState *operator_state) const {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     SizeT query_n = raw_result_dists_list.size();
     if (query_n != 1u) {
