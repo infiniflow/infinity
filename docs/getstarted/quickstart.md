@@ -5,6 +5,8 @@ slug: /
 
 # Quickstart
 
+A quickstart guide.
+
 ## Prerequisites
 
 - CPU: x86_64 with AVX2 support.

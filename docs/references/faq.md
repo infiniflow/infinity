@@ -5,6 +5,8 @@ slug: /FAQ
 
 # Frequently asked questions
 
+FAQs to be developed.
+
 ## What is Retrieval-Augmented Generation?
 
 Retrieval Augmented Generation (RAG) is a technique used to improve the accuracy and reliability of responses from foundation models, specifically Large Language Models (LLMs). It works by supplementing the existing LLMs with external sources of knowledge.

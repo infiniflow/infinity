@@ -2,45 +2,80 @@
 sidebar_position: 1
 slug: /search_guide
 ---
-# Search usage guide
+# Conduct a search
+
+Full-text, vector, sparse vector, tensor, hybrid search.
 
 ## Overview
 
-Infinity offers powerful search capabilities. This page covers the search usage.
+This document offers guidance on conducting a search within Infinity.
 
 ## Full-text search
 
 ### Work modes for full-text index
 
-A full-text search will work if full text index is created. There are two kinds of work modes for full-text indexing:
+A full-text index must be built to perform a full-text search, and this index operates in two modes:
 
-- **Real-time mode** - If the full text index is created immediately after the table is created, then the full-text index will work in real-time mode if data is ingested at this time. Real-time index will accumulate posting data within memory and flush to disk if it reaches up the quota.
-- **Offline mode** - If the full-text index is created after the data is inserted, then it will work in offline mode, where the full-text index is constructed through external sorting.
+- **Real-time mode** - If created immediately after a table is created, a full-text index will be built on ingested data in real time, accumulating posting data within memory and flushing it to disk when a specified quota is reached.
+- **Offline mode** - For data inserted before the creation of a full-text index, index will be built in offline mode using external sorting.
 
 ### Tokenizer
 
-There are several built-in tokenizers within Infinity. With the exception of the default standard analyzer and ngram analyzer, everything else requires the resource file to be in the right place. Make sure to download [resource package](https://github.com/infiniflow/resource) and put it to correct directory according to `[resource]` configuration:
+When creating a full-text index, you are required to specify a tokenizer/analyzer, which will be used for future full-text searches on the same column(s). Infinity has many built-in tokenizers. Except for the Ngram analyzer and the default standard analyzer, all other analyzers require a dedicated dictionary. Please download the appropriate dictionary for your chosen analyzer from [this link](https://github.com/infiniflow/resource) and save it to the directory specified by `resource_dir` in the configuration file.
 
 ```yaml
 [resource]
-# Directory for Infinity's resource files, including the dictionary files used by the analyzer
+# Directory for Infinity's resource files, including dictionaries to be used by analyzers
 resource_dir                  = "/var/infinity/resource"
 ```
 
-You must specify a tokenizer when creating a full text index, but you don't need to specify one when querying, because the query will select the same tokenizer in the same columns.
+The following are Infinity's built-in analyzers/tokenizers.
 
-- Standard analyzer: It's the default tokenizer, and is suitable for latin characters. Standard analyzer will just output tokens segmented by white spaces. It will also use stemmer before outputing, and `English` is the default stemmer. If you want to specify stemmers for other languages, use `standard-xxx` and `xxx` is the language you want to use. Currently, supported language stemmer includes: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, `Turkish`.
-- Ngram analyzer: The definition of Ngram could be referred to through [wikipedia](https://en.wikipedia.org/wiki/N-gram).  You must specify the number of  `N` when creating full text index if you want to use Ngram analyzer through `ngram-x` where `x` equals to the definition of `N`. For example, for code search, a typical choice is  `ngram-3` .
-- Chinese analyzer: Use `chinese` to specify tokenizer for simplified Chinese. It's a wrapper of [Jieba](https://github.com/yanyiwu/cppjieba) analyzer. Use `chinese-fine` to output the fine-grained analyzer results.
-- Traditional Chinese analyzer: Use `traditional` to specify tokenizer for traditional Chinese, which is actually a conversion between simplified Chinese and traditional Chinese based on the outputs of  [Jieba](https://github.com/yanyiwu/cppjieba) analyzer.
-- Japanese analyzer: Use `japanese` to specify tokenizer for Japanese. It's a wrapper of [mecab](http://taku910.github.io/mecab/).
-- Korean analyzer: Use `korean` to specify tokenizer for Korean. It's also a wrapper of [mecab](http://taku910.github.io/mecab/) but has different Korean dictionary.
-- RAG analyzer: It's a C++ migration of tokenizer imported from [RAGFlow](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py). It's a multilingual tokenizer and currently, both Chinese and English are well supported. RAG analyzer has better recall compared to [Jieba](https://github.com/yanyiwu/cppjieba) analyzer, but lower tokenization throughput due to much more expensive computation.  The English processing within RAG analyzer is also different from Standard analyzer, because it has an extra step of lemmatization before stemming, additionally, the tokenization of latin characters is a c++ migration of [NLTK](https://www.nltk.org/api/nltk.tokenize.punkt.html). RAG analyzer also supports fined grained mode through `rag-fine`, which will output tokenization results with the second highest score. In RAGFlow, both RAG tokenization and fine-grained RAG tokenization are used to guarantee the recall.
-- Keyword analyzer: It's a noop analyzer. This is used if you have columns containing keywords only, and you don't want such traditional scoring approaches as `BM25`to take into effects, the score will return 0 or 1 according to whether any keywords are hit.
+#### Standard analyzer
+
+The standard analyzer is the default tokenizer and works best with Latin characters. It uses stemmer before outputting tokens segmented by white space, where `English` is the default stemmer. To specify a stemmer for a different language, use `"standard-xxx"`, where `xxx` is the language to use.
+
+Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, and `Turkish`.
+
+#### Ngram analyzer
+
+A definition of N-gram can be found on [wikipedia](https://en.wikipedia.org/wiki/N-gram). Use `"ngram-x"` to select the Ngram analyzer, where `x` represents the value of `N`. For example, a common choice for full-text searches in code is `"ngram-3"`.
+
+#### Simplified Chinese analyzer
+
+Use `"chinese"` to select the simplified Chinese analyzer, which is a wrapper of [Jieba](https://github.com/yanyiwu/cppjieba) analyzer. Use `"chinese-fine"` to output fine-grained analyzer results.
+
+#### Traditional Chinese analyzer
+
+Use `"traditional"` to select the analyzer for traditional Chinese, which essentially converts simplified Chinese into traditional Chinese based on the outputs of the [Jieba](https://github.com/yanyiwu/cppjieba) analyzer.
+
+#### Japanese analyzer
+
+Use `"japanese"` to select the Japanese analyzer, which is a wrapper of [mecab](http://taku910.github.io/mecab/).
+
+#### Korean analyzer
+
+Use `"korean"` to select the Korean tokenizer, which is a wrapper of [mecab](http://taku910.github.io/mecab/) but uses a different Korean dictionary.
+
+#### RAG analyzer
+
+The RAG analyzer is a bilingual tokenizer that supports Chinese (simplified and traditional) and English. It is a C++ adaptation of [RAGFlow's tokenizer](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py), and its tokenization of Latin characters is a C++ adaptation of [NLTK](https://www.nltk.org/api/nltk.tokenize.punkt.html).
+
+This analyzer offers better recall for Chinese than the [Jieba](https://github.com/yanyiwu/cppjieba) analyzer, but lower tokenization throughput due to higher computational costs. Its English language processing involves an additional lemmatization step before stemming, different from that of the standard analyzer.
+
+Use `"rag"` to select the RAG analyzer or `"rag-fine"` for fine-grained mode, which outputs tokenization results with the second highest score.
+
+:::note
+Both RAG tokenization and fine-grained RAG tokenization are used in RAGFlow to ensure high recall.
+:::
+
+#### Keyword analyzer
+
+The keyword analyzer is a no-op analyzer used for columns containing keywords only, where traditional scoring methods like `BM25` do not apply. It scores `0` or `1`, depending on whether any keywords are matched.
 
 ### Search and ranking
 
-Infinity offers following syntax for full text search:
+Infinity offers following syntax for full-text search:
 
 - Single term: `"blooms"`
 - AND multiple terms: `"space AND efficient"`, `"space && efficient"` or `"space + efficient"`
@@ -53,8 +88,8 @@ Infinity offers following syntax for full text search:
 
 `OR`  is the default semantic among multiple terms if user does not specify in search syntax. Infinity offers `BM25` scoring and block-max `WAND` for dynamic pruning to accelerate the multiple terms search processing. There are two approaches to bypass `BM25` scoring:
 
-* Using `keyword` analyzer when creating index, then `BM25` will not be used and it will return the score based on whether keywords are hit.
-* Specifying `similarity=boolean` during searching. Then the scoring is decided by the number of keywords hits.
+- Using `keyword` analyzer when creating index, then `BM25` will not be used and it will return the score based on whether keywords are hit.
+- Specifying `similarity=boolean` during searching. Then the scoring is decided by the number of keywords hits.
 
 ## Dense vector search
 
