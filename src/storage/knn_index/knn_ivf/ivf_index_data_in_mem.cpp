@@ -110,6 +110,8 @@ public:
         }
     }
 
+    ~IVFIndexInMemT() { BaseMemIndex::DecreaseMemoryUsage(MemoryUsed()); }
+
     MemIndexTracerInfo GetInfo() const override {
         auto *table_index_entry = segment_index_entry_->table_index_entry();
         SharedPtr<String> index_name = table_index_entry->GetIndexName();

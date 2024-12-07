@@ -94,7 +94,7 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
         column->AppendValue(v);
     }
     for (SizeT i = 0; i < chunk_names.size(); ++i) {
-        MemoryIndexer indexer(index_dir, chunk_names[i], base_row_ids[i], flag_, "standard");
+        MemoryIndexer indexer(index_dir, chunk_names[i], base_row_ids[i], flag_, "standard", nullptr);
         indexer.Insert(column, row_offsets[i], row_counts[i]);
         indexer.Dump();
     }

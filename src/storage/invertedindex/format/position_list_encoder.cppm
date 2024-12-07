@@ -18,8 +18,7 @@ namespace infinity {
 
 export class PositionListEncoder {
 public:
-    PositionListEncoder(const PostingFormatOption &format_option,
-                        const PositionListFormat *pos_list_format = nullptr);
+    PositionListEncoder(const PostingFormatOption &format_option, const PositionListFormat *pos_list_format = nullptr);
 
     ~PositionListEncoder();
 
@@ -38,6 +37,8 @@ public:
 
     const PositionListFormat *GetPositionListFormat() const { return pos_list_format_; }
 
+    inline SizeT GetSizeInBytes() const { return pos_list_buffer_.GetSizeInBytes() + pos_skiplist_writer_->GetSizeInBytes(); }
+
 private:
     void CreatePosSkipListWriter();
     void AddPosSkipListItem(u32 total_pos_count, u32 compressed_pos_size, bool need_flush);
@@ -45,10 +46,10 @@ private:
 
 private:
     PostingByteSlice pos_list_buffer_;
-    pos_t last_pos_in_cur_doc_;                       // 4byte
-    u32 total_pos_count_;                             // 4byte
+    pos_t last_pos_in_cur_doc_; // 4byte
+    u32 total_pos_count_;       // 4byte
     PostingFormatOption format_option_;
-    bool is_own_format_;                              // 1byte
+    bool is_own_format_; // 1byte
     UniquePtr<SkipListWriter> pos_skiplist_writer_;
     const PositionListFormat *pos_list_format_;
 };

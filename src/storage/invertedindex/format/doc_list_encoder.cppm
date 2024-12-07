@@ -51,6 +51,8 @@ public:
 
     PostingByteSlice *GetDocListBuffer() { return &doc_list_buffer_; }
 
+    inline SizeT GetSizeInBytes() const { return doc_list_buffer_.GetSizeInBytes() + doc_skiplist_writer_->GetSizeInBytes(); }
+
 private:
     void AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf, u32 doc_len);
 

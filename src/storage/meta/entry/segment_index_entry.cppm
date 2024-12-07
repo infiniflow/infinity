@@ -30,7 +30,6 @@ import index_base;
 import column_def;
 import cleanup_scanner;
 import chunk_index_entry;
-import memory_indexer;
 import default_values;
 import statement_common;
 import txn;
@@ -50,6 +49,7 @@ class SecondaryIndexInMem;
 class EMVBIndexInMem;
 class BMPIndexInMem;
 class BaseMemIndex;
+class MemoryIndexer;
 
 export struct PopulateEntireConfig {
     bool prepare_;
@@ -180,13 +180,8 @@ public:
         return {chunk_index_entries_, memory_emvb_index_};
     }
 
-    Pair<u64, u32> GetFulltextColumnLenInfo() {
-        std::shared_lock lock(rw_locker_);
-        if (ft_column_len_sum_ == 0 && memory_indexer_.get() != nullptr) {
-            return {memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount()};
-        }
-        return {ft_column_len_sum_, ft_column_len_cnt_};
-    }
+    Pair<u64, u32> GetFulltextColumnLenInfo();
+
     void UpdateFulltextColumnLenInfo(u64 column_len_sum, u32 column_len_cnt) {
         std::unique_lock lock(rw_locker_);
         ft_column_len_sum_ += column_len_sum;
@@ -230,7 +225,7 @@ public:
 
     // only for unittest
     MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
-    void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
+    void SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer);
     static SharedPtr<SegmentIndexEntry> CreateFakeEntry(const String &index_dir);
 
     ChunkID GetNextChunkID() { return next_chunk_id_++; }

@@ -37,6 +37,8 @@ public:
 
     u8 Size() const { return size_; }
 
+    inline SizeT GetSizeInBytes() const { return capacity_ * posting_fields_->GetTotalSize(); }
+
     u8 GetRowCount() const { return posting_fields_->GetSize(); }
 
     template <typename T>

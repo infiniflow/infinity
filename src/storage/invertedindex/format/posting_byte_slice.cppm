@@ -57,6 +57,8 @@ public:
 
     SizeT EstimateDumpSize() const { return posting_writer_.GetSize(); }
 
+    inline SizeT GetSizeInBytes() const { return buffer_.GetSizeInBytes() + posting_writer_.GetSize(); }
+
 protected:
     SizeT DoFlush();
 
