@@ -227,9 +227,117 @@ class TestMemIdx:
 
         part3()
 
-    def test_mem_ivf_recover(self, infinity_runner : InfinityRunner):
+    def test_mem_indexer(self, infinity_runner : InfinityRunner):
+        config1 = "test/data/config/restart_test/test_memidx/1.toml"
+        config2 = "test/data/config/restart_test/test_memidx/2.toml"
+        config3 = "test/data/config/restart_test/test_memidx/3.toml"
+        uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
 
+        decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
+
+        @decorator1
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.create_table(
+                "test_mem_indexer",
+                {"c1" : {"type" : "int"}, "c2": {"type": "varchar"}},
+            )
+            res = table_obj.create_index(
+                "idx1",
+                index.IndexInfo(
+                    "c2",
+                    index.IndexType.FullText,
+                ),
+            )
+            assert res.error_code == infinity.ErrorCode.OK
+
+            table_obj.insert([
+                {"c1" : 1, "c2" : "this is a test text"},
+                {"c1" : 2, "c2" : "this is not a test text"},
+            ])
+            # trigger the dump in 3rd record
+            table_obj.insert([
+                {"c1" : 3, "c2" : "this is indeed a test text"},
+            ])
+            table_obj.insert([
+                {"c1" : 4, "c2" : "this is definitely not a test text"},
+                {"c1" : 5, "c2" : "this is nothing but a test text"}, 
+            ])
+
+        part1()
+
+        # config1 can hold 2 rows of identical fulltext mem index before dump
+        # 1. recover by dumpindex wal & memindex recovery
+        decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
+
+        @decorator2
+        def part2(infinity_obj):
+            time.sleep(5)
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_mem_indexer")
+            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            # print(data_dict)
+            assert data_dict["count(star)"] == [5]
+
+            data_dict, data_type_dict = (
+                table_obj.output(["c1"])
+                .match_text('c2', 'test text', 3)
+                .to_result()
+            )
+            # print(data_dict["c1"])
+            assert data_dict["c1"] == [1, 2, 3]
+
+            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            # print(data_dict)
+            assert data_dict["count(star)"] == [5]
+
+            # the 2nd dump
+            table_obj.insert([
+                {"c1" : 6, "c2" : "this is the exact opposite of a test text"},
+            ])
+            time.sleep(5)
+            table_obj.insert([
+                {"c1" : 7, "c2" : "what is this?"},
+                {"c1" : 8, "c2" : "this is what?"},
+                {"c1" : 9, "c2" : "not a test text!"},
+                {"c1" : 10, "c2" : "what a this?"},
+                {"c1" : 11, "c2" : "this is you!"},
+            ])
+
+        part2()
+
+        # 2. recover by delta ckp & dumpindex wal & memindex recovery
+        decorator3 = infinity_runner_decorator_factory(config3, uri, infinity_runner)
+
+        @decorator3
+        def part3(infinity_obj):
+            time.sleep(5)
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_mem_indexer")
+
+            def check(rows):
+                data_dict, data_type_dict = (
+                    table_obj.output(["c1"])
+                    .match_text('c2', 'this what', 3)
+                    .to_result()
+                )
+                # print(data_dict["c1"])
+                assert data_dict["c1"] == [7, 8, 10]
+
+                data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+                assert data_dict["count(star)"] == [rows]
+
+            check(11)
+            table_obj.insert([
+                {"c1" : 12, "c2" : "this is a text!"},
+            ])
+            check(12)
+
+            # the 3rd dump
+            db_obj.drop_table("test_mem_indexer")
+
+        part3()
 
     def test_optimize_from_different_database(self, infinity_runner: InfinityRunner):
         infinity_runner.clear()

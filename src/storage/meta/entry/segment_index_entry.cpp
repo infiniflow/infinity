@@ -67,6 +67,7 @@ import hnsw_util;
 import wal_entry;
 import infinity_context;
 import defer_op;
+import memory_indexer;
 
 namespace infinity {
 
@@ -208,7 +209,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 {
                     std::unique_lock<std::shared_mutex> lck(rw_locker_);
                     String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
-                    memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, begin_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
+                    memory_indexer_ =
+                        MakeUnique<MemoryIndexer>(full_path, base_name, begin_row_id, index_fulltext->flag_, index_fulltext->analyzer_, this);
                 }
                 table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
             } else {
@@ -459,7 +461,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
             String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
             String full_path = Path(InfinityContext::instance().config()->DataDir()) / *table_index_entry_->index_dir();
-            memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
+            memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, this);
             u64 column_id = column_def->id();
             SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
             auto block_entry_iter = BlockEntryIter(segment_entry);
@@ -979,11 +981,12 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
 }
 
 BaseMemIndex *SegmentIndexEntry::GetMemIndex() const {
-    // only support hnsw and ivf index now.
     if (memory_hnsw_index_.get() != nullptr) {
         return static_cast<BaseMemIndex *>(memory_hnsw_index_.get());
     } else if (memory_ivf_index_.get() != nullptr) {
         return static_cast<BaseMemIndex *>(memory_ivf_index_.get());
+    } else if (memory_indexer_.get() != nullptr) {
+        return static_cast<BaseMemIndex *>(memory_indexer_.get());
     }
     return nullptr;
 }
@@ -1217,5 +1220,15 @@ void SegmentIndexEntry::ResetOptimizing() {
     bool expected = true;
     optimizing_.compare_exchange_strong(expected, false);
 }
+
+Pair<u64, u32> SegmentIndexEntry::GetFulltextColumnLenInfo() {
+    std::shared_lock lock(rw_locker_);
+    if (ft_column_len_sum_ == 0 && memory_indexer_.get() != nullptr) {
+        return {memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount()};
+    }
+    return {ft_column_len_sum_, ft_column_len_cnt_};
+}
+
+void SegmentIndexEntry::SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
 
 } // namespace infinity

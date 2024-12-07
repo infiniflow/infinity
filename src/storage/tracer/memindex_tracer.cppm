@@ -85,7 +85,7 @@ protected:
 };
 
 inline void MemIndexTracer::AddMemUsed(SizeT add) {
-    LOG_TRACE(fmt::format("Add mem used: {}, mem index limit: {}", add, index_memory_limit_));
+    // LOG_TRACE(fmt::format("Add mem used: {}, mem index limit: {}", add, index_memory_limit_));
     if (add == 0 || index_memory_limit_ == 0) {
         return;
     }

@@ -34,11 +34,18 @@ import buf_writer;
 import posting_list_format;
 import external_sort_merger;
 import persistence_manager;
+import base_memindex;
+import memindex_tracer;
+import segment_index_entry;
+import table_index_entry;
+import mem_usage_change;
 
 namespace infinity {
 
-export class MemoryIndexer {
+export class MemoryIndexer final : public BaseMemIndex {
 public:
+    void ApplyMemUseChange(MemUsageChange mem_change);
+
     struct KeyComp {
         bool operator()(const String &lhs, const String &rhs) const;
     };
@@ -52,7 +59,12 @@ public:
         PostingTableStore store_;
     };
 
-    MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer);
+    MemoryIndexer(const String &index_dir,
+                  const String &base_name,
+                  RowID base_row_id,
+                  optionflag_t flag,
+                  const String &analyzer,
+                  SegmentIndexEntry *segment_index_entry);
 
     ~MemoryIndexer();
 
@@ -106,7 +118,19 @@ public:
 
     void Reset();
 
+    MemIndexTracerInfo GetInfo() const override;
+
+    TableIndexEntry *table_index_entry() const override;
+
+    SizeT MemUsed() const;
+
 private:
+    // call with write lock
+    void IncreaseMemoryUsage(SizeT mem);
+
+    // call with write lock
+    void DecreaseMemoryUsage(SizeT mem);
+
     // CommitOffline is for offline case. It spill a batch of ColumnInverter. Returns the size of the batch.
     SizeT CommitOffline(SizeT wait_if_empty_ms = 0);
 
@@ -157,5 +181,8 @@ private:
     UniquePtr<char_t[]> spill_buffer_{};
     SizeT spill_buffer_size_{0};
     UniquePtr<BufWriter> buf_writer_;
+
+    SegmentIndexEntry *segment_index_entry_{nullptr};
+    SizeT mem_used_{0};
 };
 } // namespace infinity

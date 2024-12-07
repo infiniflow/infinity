@@ -22,7 +22,7 @@ import segment_posting;
 import index_segment_reader;
 import posting_iterator;
 import index_defines;
-import memory_indexer;
+// import memory_indexer;
 import internal_types;
 import segment_index_entry;
 import chunk_index_entry;
@@ -32,6 +32,7 @@ namespace infinity {
 struct TableEntry;
 class TermDocIterator;
 class Txn;
+class MemoryIndexer;
 
 export class ColumnIndexReader {
 public:
