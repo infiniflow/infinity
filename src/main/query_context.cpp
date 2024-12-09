@@ -408,12 +408,4 @@ void QueryContext::RollbackTxn() {
     storage_->txn_manager()->IncreaseRollbackedTxnCount();
 }
 
-void QueryContext::ProcessResult(QueryResult& query_result) {
-    if(query_result.result_table_->total_hits_count_flag_) {
-        nlohmann::json json_res;
-        json_res["total_hits_count"] = query_result.result_table_->row_count();
-        query_result.extra_json_result_ = json_res.dump();
-    }
-}
-
 } // namespace infinity

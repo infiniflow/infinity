@@ -11625,6 +11625,11 @@ void SelectRequest::__set_order_by_list(const std::vector<OrderByExpr> & val) {
   this->order_by_list = val;
 __isset.order_by_list = true;
 }
+
+void SelectRequest::__set_total_hits_count(const bool val) {
+  this->total_hits_count = val;
+__isset.total_hits_count = true;
+}
 std::ostream& operator<<(std::ostream& out, const SelectRequest& obj)
 {
   obj.printTo(out);
@@ -11797,6 +11802,14 @@ uint32_t SelectRequest::read(::apache::thrift::protocol::TProtocol* iprot) {
           xfer += iprot->skip(ftype);
         }
         break;
+      case 13:
+        if (ftype == ::apache::thrift::protocol::T_BOOL) {
+          xfer += iprot->readBool(this->total_hits_count);
+          this->__isset.total_hits_count = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
       default:
         xfer += iprot->skip(ftype);
         break;
@@ -11902,6 +11915,11 @@ uint32_t SelectRequest::write(::apache::thrift::protocol::TProtocol* oprot) cons
     }
     xfer += oprot->writeFieldEnd();
   }
+  if (this->__isset.total_hits_count) {
+    xfer += oprot->writeFieldBegin("total_hits_count", ::apache::thrift::protocol::T_BOOL, 13);
+    xfer += oprot->writeBool(this->total_hits_count);
+    xfer += oprot->writeFieldEnd();
+  }
   xfer += oprot->writeFieldStop();
   xfer += oprot->writeStructEnd();
   return xfer;
@@ -11921,6 +11939,7 @@ void swap(SelectRequest &a, SelectRequest &b) {
   swap(a.limit_expr, b.limit_expr);
   swap(a.offset_expr, b.offset_expr);
   swap(a.order_by_list, b.order_by_list);
+  swap(a.total_hits_count, b.total_hits_count);
   swap(a.__isset, b.__isset);
 }
 
@@ -11937,6 +11956,7 @@ SelectRequest::SelectRequest(const SelectRequest& other474) {
   limit_expr = other474.limit_expr;
   offset_expr = other474.offset_expr;
   order_by_list = other474.order_by_list;
+  total_hits_count = other474.total_hits_count;
   __isset = other474.__isset;
 }
 SelectRequest& SelectRequest::operator=(const SelectRequest& other475) {
@@ -11952,6 +11972,7 @@ SelectRequest& SelectRequest::operator=(const SelectRequest& other475) {
   limit_expr = other475.limit_expr;
   offset_expr = other475.offset_expr;
   order_by_list = other475.order_by_list;
+  total_hits_count = other475.total_hits_count;
   __isset = other475.__isset;
   return *this;
 }
@@ -11970,6 +11991,7 @@ void SelectRequest::printTo(std::ostream& out) const {
   out << ", " << "limit_expr="; (__isset.limit_expr ? (out << to_string(limit_expr)) : (out << "<null>"));
   out << ", " << "offset_expr="; (__isset.offset_expr ? (out << to_string(offset_expr)) : (out << "<null>"));
   out << ", " << "order_by_list="; (__isset.order_by_list ? (out << to_string(order_by_list)) : (out << "<null>"));
+  out << ", " << "total_hits_count="; (__isset.total_hits_count ? (out << to_string(total_hits_count)) : (out << "<null>"));
   out << ")";
 }
 

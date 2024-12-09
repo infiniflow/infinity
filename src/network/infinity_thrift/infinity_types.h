@@ -4599,7 +4599,7 @@ void swap(ExplainResponse &a, ExplainResponse &b);
 std::ostream& operator<<(std::ostream& out, const ExplainResponse& obj);
 
 typedef struct _SelectRequest__isset {
-  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true) {}
+  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), total_hits_count(false) {}
   bool session_id :1;
   bool db_name :1;
   bool table_name :1;
@@ -4612,6 +4612,7 @@ typedef struct _SelectRequest__isset {
   bool limit_expr :1;
   bool offset_expr :1;
   bool order_by_list :1;
+  bool total_hits_count :1;
 } _SelectRequest__isset;
 
 class SelectRequest : public virtual ::apache::thrift::TBase {
@@ -4622,7 +4623,8 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   SelectRequest() noexcept
                 : session_id(0),
                   db_name(),
-                  table_name() {
+                  table_name(),
+                  total_hits_count(0) {
 
 
 
@@ -4642,6 +4644,7 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   ParsedExpr limit_expr;
   ParsedExpr offset_expr;
   std::vector<OrderByExpr>  order_by_list;
+  bool total_hits_count;
 
   _SelectRequest__isset __isset;
 
@@ -4668,6 +4671,8 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   void __set_offset_expr(const ParsedExpr& val);
 
   void __set_order_by_list(const std::vector<OrderByExpr> & val);
+
+  void __set_total_hits_count(const bool val);
 
   bool operator == (const SelectRequest & rhs) const
   {
@@ -4710,6 +4715,10 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
     if (__isset.order_by_list != rhs.__isset.order_by_list)
       return false;
     else if (__isset.order_by_list && !(order_by_list == rhs.order_by_list))
+      return false;
+    if (__isset.total_hits_count != rhs.__isset.total_hits_count)
+      return false;
+    else if (__isset.total_hits_count && !(total_hits_count == rhs.total_hits_count))
       return false;
     return true;
   }

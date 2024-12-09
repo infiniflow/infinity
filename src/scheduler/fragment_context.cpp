@@ -1535,10 +1535,10 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
         }
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());
-        result_table->total_hits_count_flag_ = materialize_sink_state->total_hits_count_flag_;
         if (result_table.get() == nullptr) {
             result_table = DataTable::MakeResultTable(column_defs);
         }
+        result_table->total_hits_count_flag_ = materialize_sink_state->total_hits_count_flag_;
 
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
             result_table->Append(std::move(result_data_block));
@@ -1585,10 +1585,10 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
         }
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());
-        result_table->total_hits_count_flag_ = materialize_sink_state->total_hits_count_flag_;
         if (result_table.get() == nullptr) {
             result_table = DataTable::MakeResultTable(column_defs);
         }
+        result_table->total_hits_count_flag_ = materialize_sink_state->total_hits_count_flag_;
 
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
             result_table->Append(std::move(result_data_block));

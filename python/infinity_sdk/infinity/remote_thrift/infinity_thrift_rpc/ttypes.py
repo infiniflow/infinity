@@ -6747,6 +6747,7 @@ class SelectRequest(object):
      - limit_expr
      - offset_expr
      - order_by_list
+     - total_hits_count
 
     """
 
@@ -6755,7 +6756,7 @@ class SelectRequest(object):
     ], highlight_list=[
     ], search_expr=None, where_expr=None, group_by_list=[
     ], having_expr=None, limit_expr=None, offset_expr=None, order_by_list=[
-    ],):
+    ], total_hits_count=None,):
         self.session_id = session_id
         self.db_name = db_name
         self.table_name = table_name
@@ -6780,6 +6781,7 @@ class SelectRequest(object):
             order_by_list = [
             ]
         self.order_by_list = order_by_list
+        self.total_hits_count = total_hits_count
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -6879,6 +6881,11 @@ class SelectRequest(object):
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
+            elif fid == 13:
+                if ftype == TType.BOOL:
+                    self.total_hits_count = iprot.readBool()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -6948,6 +6955,10 @@ class SelectRequest(object):
             for iter384 in self.order_by_list:
                 iter384.write(oprot)
             oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        if self.total_hits_count is not None:
+            oprot.writeFieldBegin('total_hits_count', TType.BOOL, 13)
+            oprot.writeBool(self.total_hits_count)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -9482,6 +9493,7 @@ SelectRequest.thrift_spec = (
     (11, TType.STRUCT, 'offset_expr', [ParsedExpr, None], None, ),  # 11
     (12, TType.LIST, 'order_by_list', (TType.STRUCT, [OrderByExpr, None], False), [
     ], ),  # 12
+    (13, TType.BOOL, 'total_hits_count', None, None, ),  # 13
 )
 all_structs.append(SelectResponse)
 SelectResponse.thrift_spec = (

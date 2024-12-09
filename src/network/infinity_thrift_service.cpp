@@ -667,7 +667,8 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
                                                 output_columns,
                                                 highlight_columns,
                                                 order_by_list,
-                                                nullptr);
+                                                nullptr,
+                                                request.total_hits_count);
     output_columns = nullptr;
     highlight_columns = nullptr;
     filter = nullptr;
@@ -2742,9 +2743,13 @@ void InfinityThriftService::ProcessDataBlocks(const QueryResult &result,
             return;
         }
     }
-    if(!result.extra_json_result_.empty()) {
-        response.extra_result = result.extra_json_result_;
+
+    if(result.result_table_->total_hits_count_flag_) {
+        nlohmann::json json_response;
+        json_response["total_hits_count"] = result.result_table_->row_count();
+        response.extra_result = json_response.dump();
     }
+
     HandleColumnDef(response, result.result_table_->ColumnCount(), result.result_table_->definition_ptr_, columns);
 }
 

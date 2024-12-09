@@ -63,7 +63,6 @@ public:
 
 export struct QueryResult : public BaseResult {
     LogicalNodeType root_operator_type_{LogicalNodeType::kInvalid};
-    String extra_json_result_;
     String ToString() const;
 
     static QueryResult UnusedResult() { return {}; }

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import struct
+import json
 import numpy as np
 from infinity.common import VEC, SparseVector, InfinityException
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
@@ -374,7 +375,7 @@ def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> tty
     raise KeyError(f"column name {column_name} not found in column defs")
 
 
-def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, Any]], dict[str | Any, Any]]:
+def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, Any]], dict[str | Any, Any], {}]:
     data_dict = {}
     data_type_dict = {}
     column_counter = defaultdict(int)
@@ -394,7 +395,14 @@ def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, 
         data_dict[column_name] = data_list
         data_type_dict[column_name] = column_data_type
 
-    return data_dict, data_type_dict
+    extra_result = {}
+    if res.extra_result is not None:
+        try:
+            extra_result = json.loads(res.extra_result)
+        except json.JSONDecodeError:
+            pass
+
+    return data_dict, data_type_dict, extra_result
 
 
 def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embedding_data_type: str, method_type: str,
