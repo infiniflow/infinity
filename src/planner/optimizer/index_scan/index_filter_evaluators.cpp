@@ -607,7 +607,6 @@ struct TrunkReader {
 template <typename ColumnValueType>
 struct TrunkReaderT final : TrunkReader<ColumnValueType> {
     using KeyType = typename TrunkReader<ColumnValueType>::SecondaryIndexOrderedT;
-    static constexpr u32 data_pair_size = sizeof(KeyType) + sizeof(u32);
     const u32 segment_row_count_;
     SharedPtr<ChunkIndexEntry> chunk_index_entry_;
     u32 begin_pos_ = 0;
@@ -615,9 +614,9 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType> {
     TrunkReaderT(const u32 segment_row_count, const SharedPtr<ChunkIndexEntry> &chunk_index_entry)
         : segment_row_count_(segment_row_count), chunk_index_entry_(chunk_index_entry) {}
     u32 GetResultCnt(const Pair<KeyType, KeyType> interval_range) override {
-        BufferHandle index_handle_head = chunk_index_entry_->GetIndex();
-        auto index = static_cast<const SecondaryIndexData *>(index_handle_head.GetData());
-        u32 index_data_num = index->GetChunkRowCount();
+        const BufferHandle index_handle = chunk_index_entry_->GetIndex();
+        const auto index = static_cast<const SecondaryIndexData *>(index_handle.GetData());
+        const u32 index_data_num = index->GetChunkRowCount();
         const auto [begin_val, end_val] = interval_range;
         // 1. search PGM and get approximate search range
         // result:
@@ -626,117 +625,61 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType> {
         //    3. size_t upper_bound_; ///< The upper bound of the range.
         // NOTICE: PGM return a range [lower_bound_, upper_bound_) which must include **one** key when the key exists
         // NOTICE: but the range may not include the complete [start, end] range
-        auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
-        auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
+        const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
+        const auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
         u32 begin_pos = begin_lower;
         u32 end_pos = std::min<u32>(end_upper, index_data_num - 1);
         if (end_pos < begin_pos) {
             return 0;
         }
-        const auto column_data_type = chunk_index_entry_->segment_index_entry_->table_index_entry()->column_def()->type();
-        const auto index_part_num = chunk_index_entry_->GetPartNum();
+        const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
+        auto index_key_ptr = [key_ptr](const u32 i) -> KeyType {
+            KeyType key{};
+            std::memcpy(&key, static_cast<const char *>(key_ptr) + i * sizeof(KeyType), sizeof(KeyType));
+            return key;
+        };
         // 2. find the exact range
         // 2.1 find the exact begin_pos which is the first position that index_key >= begin_val
-        u32 begin_part_id = begin_pos / 8192;
-        u32 begin_part_offset = begin_pos % 8192;
-        auto index_handle_b = chunk_index_entry_->GetIndexPartAt(begin_part_id);
-        auto index_data_b = index_handle_b.GetData();
-        auto index_key_b_ptr = [&index_data_b](u32 i) -> KeyType {
-            KeyType key = {};
-            std::memcpy(&key, static_cast<const char *>(index_data_b) + i * data_pair_size, sizeof(KeyType));
-            return key;
-        };
-        auto begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
-        if (index_key_b_ptr(begin_part_offset) < begin_val) {
+        if (index_key_ptr(begin_pos) < begin_val) {
             // search forward
-            while (index_key_b_ptr(begin_part_offset) < begin_val) {
-                if (++begin_part_offset == begin_part_size) {
-                    if (++begin_part_id >= index_part_num) {
-                        // nothing found
-                        return 0;
-                    }
-                    index_handle_b = chunk_index_entry_->GetIndexPartAt(begin_part_id);
-                    index_data_b = index_handle_b.GetData();
-                    begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
-                    begin_part_offset = 0;
+            while (index_key_ptr(begin_pos) < begin_val) {
+                if (++begin_pos == index_data_num) {
+                    // nothing found
+                    return 0;
                 }
             }
         } else {
             // search backward
-            auto test_begin_part_id = begin_part_id;
-            auto test_begin_part_offset = begin_part_offset;
-            while (index_key_b_ptr(test_begin_part_offset) >= begin_val) {
+            auto test_begin_pos = begin_pos;
+            while (index_key_ptr(test_begin_pos) >= begin_val) {
                 // keep valid begin_pos
-                begin_part_id = test_begin_part_id;
-                begin_part_offset = test_begin_part_offset;
-                if (test_begin_part_offset-- == 0) {
-                    if (test_begin_part_id-- == 0) {
-                        // left bound is the leftmost
-                        break;
-                    }
-                    index_handle_b = chunk_index_entry_->GetIndexPartAt(test_begin_part_id);
-                    index_data_b = index_handle_b.GetData();
-                    begin_part_size = chunk_index_entry_->GetPartRowCount(test_begin_part_id);
-                    test_begin_part_offset = begin_part_size - 1;
+                begin_pos = test_begin_pos;
+                if (test_begin_pos-- == 0) {
+                    // left bound is the leftmost
+                    break;
                 }
             }
-            // recover valid pointers
-            index_handle_b = chunk_index_entry_->GetIndexPartAt(begin_part_id);
-            index_data_b = index_handle_b.GetData();
-            begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
         }
-        // update begin_pos
-        begin_pos = begin_part_id * 8192 + begin_part_offset;
         // 2.2 find the exact end_pos which is the first position that index_key > end_val (or the position past the end)
-        u32 end_part_id = end_pos / 8192;
-        u32 end_part_offset = end_pos % 8192;
-        auto index_handle_e = chunk_index_entry_->GetIndexPartAt(end_part_id);
-        auto index_data_e = index_handle_e.GetData();
-        auto index_key_e_ptr = [&index_data_e](u32 i) -> KeyType {
-            KeyType key = {};
-            std::memcpy(&key, static_cast<const char *>(index_data_e) + i * data_pair_size, sizeof(KeyType));
-            return key;
-        };
-        auto end_part_size = chunk_index_entry_->GetPartRowCount(end_part_id);
-        if (index_key_e_ptr(end_part_offset) <= end_val) {
+        if (index_key_ptr(end_pos) <= end_val) {
             // search forward
-            while (index_key_e_ptr(end_part_offset) <= end_val) {
-                if (++end_part_offset == end_part_size) {
-                    if (++end_part_id >= index_part_num) {
-                        // right bound is the rightmost
-                        // recover end_part_id and keep end_part_offset
-                        // they will be used to calculate end_pos
-                        --end_part_id;
-                        break;
-                    }
-                    index_handle_e = chunk_index_entry_->GetIndexPartAt(end_part_id);
-                    index_data_e = index_handle_e.GetData();
-                    end_part_size = chunk_index_entry_->GetPartRowCount(end_part_id);
-                    end_part_offset = 0;
+            while (index_key_ptr(end_pos) <= end_val) {
+                if (++end_pos == index_data_num) {
+                    // right bound is the rightmost
+                    break;
                 }
             }
         } else {
             // search backward
-            auto test_end_part_id = end_part_id;
-            auto test_end_part_offset = end_part_offset;
-            while (index_key_e_ptr(test_end_part_offset) > end_val) {
-                end_part_id = test_end_part_id;
-                end_part_offset = test_end_part_offset;
-                if (test_end_part_offset-- == 0) {
-                    if (test_end_part_id-- == 0) {
-                        // nothing found
-                        return 0;
-                    }
-                    index_handle_e = chunk_index_entry_->GetIndexPartAt(test_end_part_id);
-                    index_data_e = index_handle_e.GetData();
-                    // no need to update end_part_size
-                    test_end_part_offset = chunk_index_entry_->GetPartRowCount(test_end_part_id) - 1;
+            auto test_end_pos = end_pos;
+            while (index_key_ptr(test_end_pos) > end_val) {
+                end_pos = test_end_pos;
+                if (test_end_pos-- == 0) {
+                    // nothing found
+                    return 0;
                 }
             }
-            // does not need to recover valid values like index_handle_e, index_data_e, index_key_e_ptr, end_part_size
         }
-        // update end_pos
-        end_pos = end_part_id * 8192 + end_part_offset;
         // 3. now we know result size
         if (end_pos <= begin_pos) {
             // nothing found
@@ -751,27 +694,12 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType> {
     void OutPut(Bitmask &selected_rows) override {
         const u32 begin_pos = begin_pos_;
         const u32 end_pos = end_pos_;
-        const u32 result_size = end_pos - begin_pos;
-        u32 begin_part_id = begin_pos / 8192;
-        u32 begin_part_offset = begin_pos % 8192;
-        auto index_handle_b = chunk_index_entry_->GetIndexPartAt(begin_part_id);
-        auto index_data_b = index_handle_b.GetData();
-        auto index_offset_b_ptr = [&index_data_b](const u32 i) -> u32 {
-            u32 result = 0;
-            std::memcpy(&result, static_cast<const char *>(index_data_b) + i * data_pair_size + sizeof(KeyType), sizeof(u32));
-            return result;
-        };
-        auto begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
+        const auto index_handle = chunk_index_entry_->GetIndex();
+        const auto index = static_cast<const SecondaryIndexData *>(index_handle.GetData());
+        const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
         // output result
-        for (u32 i = 0; i < result_size; ++i) {
-            if (begin_part_offset == begin_part_size) {
-                index_handle_b = chunk_index_entry_->GetIndexPartAt(++begin_part_id);
-                index_data_b = index_handle_b.GetData();
-                begin_part_size = chunk_index_entry_->GetPartRowCount(begin_part_id);
-                begin_part_offset = 0;
-            }
-            selected_rows.SetTrue(index_offset_b_ptr(begin_part_offset));
-            ++begin_part_offset;
+        for (u32 i = begin_pos; i < end_pos; ++i) {
+            selected_rows.SetTrue(offset_ptr[i]);
         }
     }
 };

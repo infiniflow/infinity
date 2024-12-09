@@ -39,14 +39,12 @@ SecondaryIndexFileWorker::~SecondaryIndexFileWorker() {
 
 void SecondaryIndexFileWorker::AllocateInMemory() {
     if (data_) [[unlikely]] {
-        String error_message = "AllocateInMemory: Already allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("AllocateInMemory: Already allocated.");
     } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
         data_ = static_cast<void *>(GetSecondaryIndexData(data_type, row_count_, true));
         LOG_TRACE("Finished AllocateInMemory().");
     } else {
-        String error_message = fmt::format("Cannot build secondary index on data type: {}", data_type->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
     }
 }
 
@@ -57,8 +55,7 @@ void SecondaryIndexFileWorker::FreeInMemory() {
         data_ = nullptr;
         LOG_TRACE("Finished FreeInMemory(), deleted data_ ptr.");
     } else {
-        String error_message = "FreeInMemory: Data is not allocated.";
-        UnrecoverableError(error_message);
+        UnrecoverableError("FreeInMemory: Data is not allocated.");
     }
 }
 
@@ -69,8 +66,7 @@ bool SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
         prepare_success = true;
         LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
     } else {
-        String error_message = "WriteToFileImpl: data_ is nullptr";
-        UnrecoverableError(error_message);
+        UnrecoverableError("WriteToFileImpl: data_ is nullptr");
     }
     return true;
 }
@@ -82,91 +78,7 @@ void SecondaryIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
         data_ = static_cast<void *>(index);
         LOG_TRACE("Finished ReadFromFileImpl().");
     } else {
-        String error_message = "ReadFromFileImpl: data_ is not nullptr";
-        UnrecoverableError(error_message);
-    }
-}
-
-SecondaryIndexFileWorkerParts::SecondaryIndexFileWorkerParts(SharedPtr<String> data_dir,
-                                                             SharedPtr<String> temp_dir,
-                                                             SharedPtr<String> file_dir,
-                                                             SharedPtr<String> file_name,
-                                                             SharedPtr<IndexBase> index_base,
-                                                             SharedPtr<ColumnDef> column_def,
-                                                             u32 row_count,
-                                                             u32 part_id,
-                                                             PersistenceManager* persistence_manager)
-    : IndexFileWorker(std::move(data_dir),
-                      std::move(temp_dir),
-                      std::move(file_dir),
-                      std::move(file_name),
-                      std::move(index_base),
-                      column_def,
-                      persistence_manager),
-      row_count_(row_count), part_id_(part_id) {
-    data_pair_size_ = GetSecondaryIndexDataPairSize(column_def_->type());
-}
-
-SecondaryIndexFileWorkerParts::~SecondaryIndexFileWorkerParts() {
-    if (data_ != nullptr) {
-        FreeInMemory();
-        data_ = nullptr;
-    }
-}
-
-void SecondaryIndexFileWorkerParts::AllocateInMemory() {
-    if (row_count_ < part_id_ * 8192) {
-        String error_message = fmt::format("AllocateInMemory: row_count_: {} < part_id_ * 8192: {}", row_count_, part_id_ * 8192);
-        UnrecoverableError(error_message);
-    }
-    if (data_) [[unlikely]] {
-        String error_message = "AllocateInMemory: Already allocated.";
-        UnrecoverableError(error_message);
-    } else if (auto &data_type = column_def_->type(); data_type->CanBuildSecondaryIndex()) [[likely]] {
-        data_ = static_cast<void *>(new char[part_row_count_ * data_pair_size_]);
-        LOG_TRACE("Finished AllocateInMemory().");
-    } else {
-        String error_message = fmt::format("Cannot build secondary index on data type: {}", data_type->ToString());
-        UnrecoverableError(error_message);
-    }
-}
-
-void SecondaryIndexFileWorkerParts::FreeInMemory() {
-    if (data_) [[likely]] {
-        delete[] static_cast<char *>(data_);
-        data_ = nullptr;
-        LOG_TRACE("Finished FreeInMemory(), deleted data_ ptr.");
-    } else {
-        String error_message = "FreeInMemory: Data is not allocated.";
-        UnrecoverableError(error_message);
-    }
-}
-
-bool SecondaryIndexFileWorkerParts::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
-    if (data_) [[likely]] {
-        file_handle_->Append(data_, part_row_count_ * data_pair_size_);
-        prepare_success = true;
-        LOG_TRACE("Finished WriteToFileImpl(bool &prepare_success).");
-    } else {
-        String error_message = "WriteToFileImpl: data_ is nullptr";
-        UnrecoverableError(error_message);
-    }
-    return true;
-}
-
-void SecondaryIndexFileWorkerParts::ReadFromFileImpl(SizeT file_size) {
-    if (row_count_ < part_id_ * 8192) {
-        String error_message = fmt::format("ReadFromFileImpl: row_count_: {} < part_id_ * 8192: {}", row_count_, part_id_ * 8192);
-        UnrecoverableError(error_message);
-    }
-    if (!data_) [[likely]] {
-        const u32 read_bytes = part_row_count_ * data_pair_size_;
-        data_ = static_cast<void *>(new char[read_bytes]);
-        file_handle_->Read(data_, read_bytes);
-        LOG_TRACE("Finished ReadFromFileImpl().");
-    } else {
-        String error_message = "ReadFromFileImpl: data_ is not nullptr";
-        UnrecoverableError(error_message);
+        UnrecoverableError("ReadFromFileImpl: data_ is not nullptr");
     }
 }
 

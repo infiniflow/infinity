@@ -947,7 +947,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             merged_chunk_index_entry = CreateSecondaryIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
             BufferHandle handle = merged_chunk_index_entry->GetIndex();
             auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
-            data_ptr->InsertMergeData(old_chunks, merged_chunk_index_entry);
+            data_ptr->InsertMergeData(old_chunks);
             break;
         }
         case IndexType::kEMVB: {
