@@ -990,6 +990,8 @@ BaseMemIndex *SegmentIndexEntry::GetMemIndex() const {
         return static_cast<BaseMemIndex *>(memory_ivf_index_.get());
     } else if (memory_indexer_.get() != nullptr) {
         return static_cast<BaseMemIndex *>(memory_indexer_.get());
+    } else if (memory_bmp_index_.get() != nullptr) {
+        return static_cast<BaseMemIndex *>(memory_bmp_index_.get());
     }
     return nullptr;
 }
