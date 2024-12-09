@@ -135,7 +135,7 @@ Example: `"title:(quick OR brown) AND body:foobar"`
 
 #### Escape character
 
-Use `\` to escape reserved characters like `:` `~` `(` `)` `"` `+` `-` `=` `&` `|` `[` `]` `{` `}` `*` `?` `\` `/` `^`. For example: `"space\-efficient"`.
+Use `\` to escape reserved characters like `:` `~` `(` `)` `"` `+` `-` `=` `&` `|` `[` `]` `{` `}` `*` `?` `\` `/`. For example: `"space\-efficient"`.
 
 ### Scoring
 
@@ -143,7 +143,7 @@ Infinity offers `BM25` scoring and block-max `WAND` for dynamic pruning to accel
 
 - Set `"analyzer"` to `"keyword"` when creating index (to select the keyword analyzer).  
   *The returned score will then be based on whether keywords are matched.*
-- Set `"similarity"` to `boolean` during search.  
+- Add `{"similarity": "boolean"}` as a search option.  
   *The scoring will then depend on the number of matched keywords.*
 
 ## Dense vector search
