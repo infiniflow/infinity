@@ -25,6 +25,8 @@ import sparse_util;
 import segment_iter;
 import segment_entry;
 import infinity_exception;
+import third_party;
+import logger;
 
 namespace infinity {
 
@@ -90,14 +92,16 @@ BMPIndexInMem::~BMPIndexInMem() {
         return;
     }
     std::visit(
-        [](auto &&index) {
+        [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return;
             } else {
+                SizeT mem_used = index->MemoryUsage();
                 if (index != nullptr) {
                     delete index;
                 }
+                DecreaseMemoryUsage(mem_used);
             }
         },
         bmp_);
@@ -116,6 +120,7 @@ SizeT BMPIndexInMem::GetRowCount() const {
         bmp_);
 }
 
+// realtime insert, trace this
 void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count) {
     std::visit(
         [&](auto &&index) {
@@ -125,9 +130,12 @@ void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_e
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
-
+                SizeT mem_before = index->MemoryUsage();
                 MemIndexInserterIter<SparseRefT> iter(block_offset, block_column_entry, buffer_mgr, row_offset, row_count);
                 index->AddDocs(std::move(iter));
+                SizeT mem_after = index->MemoryUsage();
+                AddMemUsed(mem_after - mem_before);
+                LOG_INFO(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
             }
         },
         bmp_);
@@ -155,7 +163,7 @@ void BMPIndexInMem::AddDocs(const SegmentEntry *segment_entry, BufferManager *bu
         bmp_);
 }
 
-SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const {
+SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) {
     if (!own_memory_) {
         UnrecoverableError("BMPIndexInMem::Dump() called with own_memory_ = false.");
     }
@@ -169,6 +177,7 @@ SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_
             } else {
                 row_count = index->DocNum();
                 index_size = index->GetSizeInBytes();
+                DecreaseMemoryUsage(index->MemoryUsage());
             }
         },
         bmp_);

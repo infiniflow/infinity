@@ -34,15 +34,16 @@ void BlockData<DataType, BMPCompressType::kCompressed>::Calculate(Vector<DataTyp
 }
 
 template <typename DataType>
-void BlockData<DataType, BMPCompressType::kCompressed>::AddBlock(BMPBlockID block_id, DataType max_score) {
+void BlockData<DataType, BMPCompressType::kCompressed>::AddBlock(BMPBlockID block_id, DataType max_score, SizeT &mem_usage) {
     block_ids_.push_back(block_id);
     max_scores_.push_back(max_score);
+    mem_usage += (sizeof(BMPBlockID) + sizeof(DataType));
 }
 
 template <typename DataType>
 void BlockData<DataType, BMPCompressType::kCompressed>::Prefetch() const {
-    _mm_prefetch((const char*)block_ids_.data(), _MM_HINT_T0);
-    _mm_prefetch((const char*)max_scores_.data(), _MM_HINT_T0);
+    _mm_prefetch((const char *)block_ids_.data(), _MM_HINT_T0);
+    _mm_prefetch((const char *)max_scores_.data(), _MM_HINT_T0);
 }
 
 template struct BlockData<f32, BMPCompressType::kCompressed>;
@@ -58,8 +59,9 @@ void BlockData<DataType, BMPCompressType::kRaw>::Calculate(Vector<DataType> &upp
 }
 
 template <typename DataType>
-void BlockData<DataType, BMPCompressType::kRaw>::AddBlock(BMPBlockID block_id, DataType max_score) {
+void BlockData<DataType, BMPCompressType::kRaw>::AddBlock(BMPBlockID block_id, DataType max_score, SizeT &mem_usage) {
     if (block_id >= (BMPBlockID)max_scores_.size()) {
+        mem_usage += sizeof(BMPBlockID);
         max_scores_.resize(block_id + 1, 0.0);
     }
     max_scores_[block_id] = max_score;
@@ -67,7 +69,7 @@ void BlockData<DataType, BMPCompressType::kRaw>::AddBlock(BMPBlockID block_id, D
 
 template <typename DataType>
 void BlockData<DataType, BMPCompressType::kRaw>::Prefetch() const {
-    _mm_prefetch((const char*)max_scores_.data(), _MM_HINT_T0);
+    _mm_prefetch((const char *)max_scores_.data(), _MM_HINT_T0);
 }
 
 template struct BlockData<f32, BMPCompressType::kRaw>;
