@@ -2,14 +2,14 @@ module;
 
 #include <stack>
 
+module arbitrator;
+
 import stl;
 import analyze_context;
 import lexeme;
 import lexeme_path;
 import quick_sort_set;
 import third_party;
-
-module arbitrator;
 
 namespace infinity {
 
