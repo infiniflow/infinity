@@ -20,3 +20,4 @@ target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/src/storage/in
 target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/spdlog/include")
 target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/nlohmann")
 target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/parallel-hashmap")
+target_include_directories(sql_parser PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
