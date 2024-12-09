@@ -901,11 +901,13 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"ANALYZER"`: *Optional*
       - `"standard"`: (Default) The standard analyzer, segmented by token, lowercase processing, and provides stemming output. Use `-` to specify the languages stemmer. `English` is the default stemmer: `"standard-english"` and `"standard"` are the same stemmer setting. Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, and `Turkish`.
       - `"rag"`: Multilingual RAG analyzer imported from [RAGFlow](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py), supporting `Chinese` and `English`. Use `-fine` to output the fine-grained analyzer results.
+      - `"ik"`: Bilingual analyzer imported from [ik-analyzer](https://github.com/infinilabs/analysis-ik), supporting `Chinese` and `English`. Use `-fine` to output the fine-grained analyzer results.
       - `"chinese"`: Simplified Chinese. Use `-fine` to output the fine-grained analyzer results.
-      - `"traditional"`: Traditional Chinese
-      - `"japanese"`: Japanese
-      - `"korean"`: Korean
-      - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
+      - `"traditional"`: Traditional Chinese.
+      - `"japanese"`: Japanese.
+      - `"korean"`: Korean.
+      - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram).
+      - `"keyword"`: "noop" analyzer used for columns containing keywords only.
   - Parameter settings for a secondary index:  
     No parameters are required. For now, use an empty list `[]`.
   - Parameter settings for a BMP index:
