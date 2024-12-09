@@ -1,13 +1,13 @@
-<div style="text-align:center">
+<div align="center">
   <img width="187" src="https://github.com/infiniflow/infinity/assets/7248/015e1f02-1f7f-4b09-a0c2-9d261cd4858b" alt="Infinity logo"/>
 </div>
 
 
-<p style="text-align:center">
+<p align="center">
     <b>The AI-native database built for LLM applications, providing incredibly fast hybrid search of dense embedding, sparse embedding, tensor and full-text</b>
 </p>
 
-<h4 style="text-align:center">
+<h4 align="center">
   <a href="https://infiniflow.org/docs/dev/category/get-started">Document</a> |
   <a href="https://infiniflow.org/docs/dev/benchmark">Benchmark</a> |
   <a href="https://twitter.com/infiniflowai">Twitter</a> |
@@ -25,7 +25,7 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 
 ## ⚡️ Performance
 
-<div class="column" style="text-align:center">
+<div class="column" align="middle">
   <img src="https://github.com/user-attachments/assets/c4c98e23-62ac-4d1a-82e5-614bca96fe0a" alt="Infinity performance comparison"/>
 </div>
 
