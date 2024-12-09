@@ -1298,7 +1298,8 @@ Status CheckParquetColumns(TableEntry *table_entry, arrow::ParquetFileReader *ar
         const auto &column_def = column_defs[i];
 
         if (*column_def->type() != *field->type()) {
-            return Status::ImportFileFormatError(fmt::format("Column {} mismatch, {} != {}", i, column_def->type()->ToString(), field->type()->ToString()));
+            return Status::ImportFileFormatError(
+                fmt::format("Column {} mismatch, {} != {}", i, column_def->type()->ToString(), field->type()->ToString()));
         }
     }
 
@@ -1361,10 +1362,6 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
             auto batch = maybe_batch.MoveValueUnsafe();
             const auto batch_row_count = batch->num_rows();
             const auto batch_col_count = batch->num_columns();
-            if (static_cast<u64>(batch_col_count) != table_entry_->ColumnCount()) {
-                RecoverableError(
-                    Status::ColumnCountMismatch(fmt::format("Column count mismatch: {} != {}", batch_col_count, table_entry_->ColumnCount())));
-            }
             for (i64 batch_row_id = 0; batch_row_id < batch_row_count; ++batch_row_id) {
                 for (int column_idx = 0; column_idx < batch_col_count; ++column_idx) {
                     SharedPtr<arrow::Array> column = batch->column(column_idx);
@@ -1439,14 +1436,8 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
                                ColumnVector &column_vector,
                                i64 start_offset,
                                i64 end_offset) {
-    if (sparse_info->DataType() != EmbeddingDataType::kElemBit && data_array.get() == nullptr) {
-        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-    }
     switch (sparse_info->DataType()) {
         case EmbeddingDataType::kElemBit: {
-            if (data_array.get() != nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
             ParquetSparseValueHandler<IndexType, IndexArray, bool, arrow::BooleanArray>(sparse_info,
                                                                                         index_array,
                                                                                         nullptr,
@@ -1456,13 +1447,7 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
             break;
         }
         case EmbeddingDataType::kElemUInt8: {
-            if (data_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto uint8_value_array = std::dynamic_pointer_cast<arrow::UInt8Array>(data_array->values());
-            if (uint8_value_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto uint8_value_array = std::static_pointer_cast<arrow::UInt8Array>(data_array->values());
             ParquetSparseValueHandler<IndexType, IndexArray, u8, arrow::UInt8Array>(sparse_info,
                                                                                     index_array,
                                                                                     uint8_value_array,
@@ -1472,13 +1457,7 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
             break;
         }
         case EmbeddingDataType::kElemInt8: {
-            if (data_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto int8_value_array = std::dynamic_pointer_cast<arrow::Int8Array>(data_array->values());
-            if (int8_value_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto int8_value_array = std::static_pointer_cast<arrow::Int8Array>(data_array->values());
             ParquetSparseValueHandler<IndexType, IndexArray, i8, arrow::Int8Array>(sparse_info,
                                                                                    index_array,
                                                                                    int8_value_array,
@@ -1488,13 +1467,7 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
             break;
         }
         case EmbeddingDataType::kElemInt16: {
-            if (data_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto int16_value_array = std::dynamic_pointer_cast<arrow::Int16Array>(data_array->values());
-            if (int16_value_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto int16_value_array = std::static_pointer_cast<arrow::Int16Array>(data_array->values());
             ParquetSparseValueHandler<IndexType, IndexArray, i16, arrow::Int16Array>(sparse_info,
                                                                                      index_array,
                                                                                      int16_value_array,
@@ -1504,13 +1477,7 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
             break;
         }
         case EmbeddingDataType::kElemInt32: {
-            if (data_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto int32_value_array = std::dynamic_pointer_cast<arrow::Int32Array>(data_array->values());
-            if (int32_value_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto int32_value_array = std::static_pointer_cast<arrow::Int32Array>(data_array->values());
             ParquetSparseValueHandler<IndexType, IndexArray, i32, arrow::Int32Array>(sparse_info,
                                                                                      index_array,
                                                                                      int32_value_array,
@@ -1520,13 +1487,7 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
             break;
         }
         case EmbeddingDataType::kElemInt64: {
-            if (data_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto int64_value_array = std::dynamic_pointer_cast<arrow::Int64Array>(data_array->values());
-            if (int64_value_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto int64_value_array = std::static_pointer_cast<arrow::Int64Array>(data_array->values());
             ParquetSparseValueHandler<IndexType, IndexArray, i64, arrow::Int64Array>(sparse_info,
                                                                                      index_array,
                                                                                      int64_value_array,
@@ -1536,13 +1497,7 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
             break;
         }
         case EmbeddingDataType::kElemFloat16: {
-            if (data_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto float16_value_array = std::dynamic_pointer_cast<arrow::HalfFloatArray>(data_array->values());
-            if (float16_value_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto float16_value_array = std::static_pointer_cast<arrow::HalfFloatArray>(data_array->values());
             ParquetSparseValueHandler<IndexType, IndexArray, Float16T, arrow::HalfFloatArray>(sparse_info,
                                                                                               index_array,
                                                                                               float16_value_array,
@@ -1552,13 +1507,7 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
             break;
         }
         case EmbeddingDataType::kElemBFloat16: {
-            if (data_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto float_value_array = std::dynamic_pointer_cast<arrow::FloatArray>(data_array->values());
-            if (float_value_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto float_value_array = std::static_pointer_cast<arrow::FloatArray>(data_array->values());
             ParquetSparseValueHandler<IndexType, IndexArray, BFloat16T, arrow::FloatArray>(sparse_info,
                                                                                            index_array,
                                                                                            float_value_array,
@@ -1568,13 +1517,7 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
             break;
         }
         case EmbeddingDataType::kElemFloat: {
-            if (data_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto float_value_array = std::dynamic_pointer_cast<arrow::FloatArray>(data_array->values());
-            if (float_value_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto float_value_array = std::static_pointer_cast<arrow::FloatArray>(data_array->values());
             ParquetSparseValueHandler<IndexType, IndexArray, float, arrow::FloatArray>(sparse_info,
                                                                                        index_array,
                                                                                        float_value_array,
@@ -1584,13 +1527,7 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
             break;
         }
         case EmbeddingDataType::kElemDouble: {
-            if (data_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto double_value_array = std::dynamic_pointer_cast<arrow::DoubleArray>(data_array->values());
-            if (double_value_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto double_value_array = std::static_pointer_cast<arrow::DoubleArray>(data_array->values());
             ParquetSparseValueHandler<IndexType, IndexArray, double, arrow::DoubleArray>(sparse_info,
                                                                                          index_array,
                                                                                          double_value_array,
@@ -1626,10 +1563,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
             }
             const SizeT byte_size = dim / 8;
             auto embedding = MakeUnique<char[]>(byte_size);
-            auto bool_array = std::dynamic_pointer_cast<arrow::BooleanArray>(list_array->values());
-            if (bool_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto bool_array = std::static_pointer_cast<arrow::BooleanArray>(list_array->values());
             auto *raw_u8_ptr = reinterpret_cast<u8 *>(embedding.get());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 if (bool_array->Value(j)) {
@@ -1641,10 +1575,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
         }
         case EmbeddingDataType::kElemUInt8: {
             auto embedding = MakeUnique<char[]>(dim * sizeof(u8));
-            auto uint8_array = std::dynamic_pointer_cast<arrow::UInt8Array>(list_array->values());
-            if (uint8_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto uint8_array = std::static_pointer_cast<arrow::UInt8Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 const u8 value = uint8_array->Value(j);
                 reinterpret_cast<u8 *>(embedding.get())[j - start_offset] = value;
@@ -1653,10 +1584,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
         }
         case EmbeddingDataType::kElemInt8: {
             auto embedding = MakeUnique<char[]>(dim * sizeof(i8));
-            auto int8_array = std::dynamic_pointer_cast<arrow::Int8Array>(list_array->values());
-            if (int8_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto int8_array = std::static_pointer_cast<arrow::Int8Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 i8 value = int8_array->Value(j);
                 reinterpret_cast<i8 *>(embedding.get())[j - start_offset] = value;
@@ -1665,10 +1593,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
         }
         case EmbeddingDataType::kElemInt16: {
             auto embedding = MakeUnique<char[]>(dim * sizeof(i16));
-            auto int16_array = std::dynamic_pointer_cast<arrow::Int16Array>(list_array->values());
-            if (int16_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto int16_array = std::static_pointer_cast<arrow::Int16Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 i16 value = int16_array->Value(j);
                 reinterpret_cast<i16 *>(embedding.get())[j - start_offset] = value;
@@ -1677,10 +1602,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
         }
         case EmbeddingDataType::kElemInt32: {
             auto embedding = MakeUnique<char[]>(dim * sizeof(i32));
-            auto int32_array = std::dynamic_pointer_cast<arrow::Int32Array>(list_array->values());
-            if (int32_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto int32_array = std::static_pointer_cast<arrow::Int32Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 i32 value = int32_array->Value(j);
                 reinterpret_cast<i32 *>(embedding.get())[j - start_offset] = value;
@@ -1689,10 +1611,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
         }
         case EmbeddingDataType::kElemInt64: {
             auto embedding = MakeUnique<char[]>(dim * sizeof(i64));
-            auto int64_array = std::dynamic_pointer_cast<arrow::Int64Array>(list_array->values());
-            if (int64_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto int64_array = std::static_pointer_cast<arrow::Int64Array>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 i64 value = int64_array->Value(j);
                 reinterpret_cast<i64 *>(embedding.get())[j - start_offset] = value;
@@ -1701,10 +1620,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
         }
         case EmbeddingDataType::kElemFloat16: {
             auto embedding = MakeUnique<char[]>(dim * sizeof(Float16T));
-            auto float16_array = std::dynamic_pointer_cast<arrow::HalfFloatArray>(list_array->values());
-            if (float16_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto float16_array = std::static_pointer_cast<arrow::HalfFloatArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 const u16 value = float16_array->Value(j);
                 reinterpret_cast<Float16T *>(embedding.get())[j - start_offset] = value;
@@ -1713,10 +1629,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
         }
         case EmbeddingDataType::kElemBFloat16: {
             auto embedding = MakeUnique<char[]>(dim * sizeof(BFloat16T));
-            auto float_array = std::dynamic_pointer_cast<arrow::FloatArray>(list_array->values());
-            if (float_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto float_array = std::static_pointer_cast<arrow::FloatArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 const float value = float_array->Value(j);
                 reinterpret_cast<BFloat16T *>(embedding.get())[j - start_offset] = value;
@@ -1725,10 +1638,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
         }
         case EmbeddingDataType::kElemFloat: {
             auto embedding = MakeUnique<char[]>(dim * sizeof(float));
-            auto float_array = std::dynamic_pointer_cast<arrow::FloatArray>(list_array->values());
-            if (float_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto float_array = std::static_pointer_cast<arrow::FloatArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 float value = float_array->Value(j);
                 reinterpret_cast<float *>(embedding.get())[j - start_offset] = value;
@@ -1737,10 +1647,7 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
         }
         case EmbeddingDataType::kElemDouble: {
             auto embedding = MakeUnique<char[]>(dim * sizeof(double));
-            auto double_array = std::dynamic_pointer_cast<arrow::DoubleArray>(list_array->values());
-            if (double_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto double_array = std::static_pointer_cast<arrow::DoubleArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 double value = double_array->Value(j);
                 reinterpret_cast<double *>(embedding.get())[j - start_offset] = value;
@@ -1767,10 +1674,7 @@ ParquetTensorHandler(SharedPtr<arrow::ListArray> list_array, const EmbeddingInfo
             embedding_vec.push_back(std::move(data));
         }
     } else {
-        auto tensor_ele_array = std::dynamic_pointer_cast<arrow::ListArray>(list_array->values());
-        if (tensor_ele_array.get() == nullptr) {
-            RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-        }
+        auto tensor_ele_array = std::static_pointer_cast<arrow::ListArray>(list_array->values());
         for (i64 j = start_offset; j < end_offset; ++j) {
             auto data = ParquetEmbeddingHandler(tensor_ele_array, embedding_info, j);
             embedding_vec.push_back(std::move(data));
@@ -1784,78 +1688,78 @@ ParquetTensorHandler(SharedPtr<arrow::ListArray> list_array, const EmbeddingInfo
 void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
     switch (const auto column_data_logical_type = column_vector.data_type()->type(); column_data_logical_type) {
         case LogicalType::kBoolean: {
-            auto value = std::dynamic_pointer_cast<arrow::BooleanArray>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::BooleanArray>(array)->Value(value_idx);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
             break;
         }
         case LogicalType::kTinyInt: {
-            auto value = std::dynamic_pointer_cast<arrow::Int8Array>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::Int8Array>(array)->Value(value_idx);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
             break;
         }
         case LogicalType::kSmallInt: {
-            auto value = std::dynamic_pointer_cast<arrow::Int16Array>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::Int16Array>(array)->Value(value_idx);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
             break;
         }
         case LogicalType::kInteger: {
-            auto value = std::dynamic_pointer_cast<arrow::Int32Array>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::Int32Array>(array)->Value(value_idx);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
             break;
         }
         case LogicalType::kBigInt: {
-            auto value = std::dynamic_pointer_cast<arrow::Int64Array>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::Int64Array>(array)->Value(value_idx);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
             break;
         }
         case LogicalType::kFloat16: {
-            auto value = std::dynamic_pointer_cast<arrow::HalfFloatArray>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::HalfFloatArray>(array)->Value(value_idx);
             const Float16T float16_value(value);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&float16_value));
             break;
         }
         case LogicalType::kBFloat16: {
-            auto value = std::dynamic_pointer_cast<arrow::FloatArray>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::FloatArray>(array)->Value(value_idx);
             const BFloat16T bfloat16_value(value);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&bfloat16_value));
             break;
         }
         case LogicalType::kFloat: {
-            auto value = std::dynamic_pointer_cast<arrow::FloatArray>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::FloatArray>(array)->Value(value_idx);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
             break;
         }
         case LogicalType::kDouble: {
-            auto value = std::dynamic_pointer_cast<arrow::DoubleArray>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::DoubleArray>(array)->Value(value_idx);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
             break;
         }
         case LogicalType::kDate: {
-            auto value = std::dynamic_pointer_cast<arrow::Date32Array>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::Date32Array>(array)->Value(value_idx);
             const DateT date_value(value);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&date_value));
             break;
         }
         case LogicalType::kTime: {
-            auto value = std::dynamic_pointer_cast<arrow::Time32Array>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::Time32Array>(array)->Value(value_idx);
             const TimeT time_value(value);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&time_value));
             break;
         }
         case LogicalType::kDateTime: {
-            auto value = std::dynamic_pointer_cast<arrow::TimestampArray>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::TimestampArray>(array)->Value(value_idx);
             const DateTimeT datetime_value(value);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&datetime_value));
             break;
         }
         case LogicalType::kTimestamp: {
-            auto value = std::dynamic_pointer_cast<arrow::TimestampArray>(array)->Value(value_idx);
+            auto value = std::static_pointer_cast<arrow::TimestampArray>(array)->Value(value_idx);
             const TimestampT timestamp_value(value);
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&timestamp_value));
             break;
         }
         case LogicalType::kVarchar: {
-            String value_str = std::dynamic_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
+            String value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
             std::string_view value(value_str);
             column_vector.AppendByStringView(value);
             break;
@@ -1866,10 +1770,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                 auto [data, size] = ParquetEmbeddingHandler(fixed_list_array, embedding_info, value_idx);
                 column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(data.get()));
             } else {
-                auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
-                if (list_array.get() == nullptr) {
-                    RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-                }
+                auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
                 auto [data, size] = ParquetEmbeddingHandler(list_array, embedding_info, value_idx);
                 column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(data.get()));
             }
@@ -1878,26 +1779,17 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
         case LogicalType::kSparse: {
             const auto *sparse_info = static_cast<SparseInfo *>(column_vector.data_type()->type_info().get());
 
-            auto struct_array = std::dynamic_pointer_cast<arrow::StructArray>(array);
-            if (struct_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto struct_array = std::static_pointer_cast<arrow::StructArray>(array);
 
             auto index_raw_array = struct_array->GetFieldByName("index");
-            if (index_raw_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
-            auto index_array = std::dynamic_pointer_cast<arrow::ListArray>(index_raw_array);
-            if (index_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto index_array = std::static_pointer_cast<arrow::ListArray>(index_raw_array);
             i64 start_offset = index_array->value_offset(value_idx);
             i64 end_offset = index_array->value_offset(value_idx + 1);
 
             SharedPtr<arrow::ListArray> data_array;
             auto value_raw_array = struct_array->GetFieldByName("value");
             if (value_raw_array.get() != nullptr) {
-                data_array = std::dynamic_pointer_cast<arrow::ListArray>(value_raw_array);
+                data_array = std::static_pointer_cast<arrow::ListArray>(value_raw_array);
 
                 i64 start_offset1 = index_array->value_offset(value_idx);
                 i64 end_offset1 = index_array->value_offset(value_idx + 1);
@@ -1908,10 +1800,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
 
             switch (sparse_info->IndexType()) {
                 case EmbeddingDataType::kElemInt8: {
-                    auto int8_index_array = std::dynamic_pointer_cast<arrow::Int8Array>(index_array->values());
-                    if (int8_index_array.get() == nullptr) {
-                        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-                    }
+                    auto int8_index_array = std::static_pointer_cast<arrow::Int8Array>(index_array->values());
                     ParquetSparseValueHandler<i8, arrow::Int8Array>(sparse_info,
                                                                     int8_index_array,
                                                                     data_array,
@@ -1921,10 +1810,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                     break;
                 }
                 case EmbeddingDataType::kElemInt16: {
-                    auto int16_index_array = std::dynamic_pointer_cast<arrow::Int16Array>(index_array->values());
-                    if (int16_index_array.get() == nullptr) {
-                        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-                    }
+                    auto int16_index_array = std::static_pointer_cast<arrow::Int16Array>(index_array->values());
                     ParquetSparseValueHandler<i16, arrow::Int16Array>(sparse_info,
                                                                       int16_index_array,
                                                                       data_array,
@@ -1934,10 +1820,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                     break;
                 }
                 case EmbeddingDataType::kElemInt32: {
-                    auto int32_index_array = std::dynamic_pointer_cast<arrow::Int32Array>(index_array->values());
-                    if (int32_index_array.get() == nullptr) {
-                        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-                    }
+                    auto int32_index_array = std::static_pointer_cast<arrow::Int32Array>(index_array->values());
                     ParquetSparseValueHandler<i32, arrow::Int32Array>(sparse_info,
                                                                       int32_index_array,
                                                                       data_array,
@@ -1947,10 +1830,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                     break;
                 }
                 case EmbeddingDataType::kElemInt64: {
-                    auto int64_index_array = std::dynamic_pointer_cast<arrow::Int64Array>(index_array->values());
-                    if (int64_index_array.get() == nullptr) {
-                        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-                    }
+                    auto int64_index_array = std::static_pointer_cast<arrow::Int64Array>(index_array->values());
                     ParquetSparseValueHandler<i64, arrow::Int64Array>(sparse_info,
                                                                       int64_index_array,
                                                                       data_array,
@@ -1968,10 +1848,7 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
         case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
             auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(column_vector.data_type()->type_info());
-            auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
-            if (list_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
             Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(list_array, embedding_info.get(), value_idx);
             Vector<Pair<ptr_t, SizeT>> embedding_data;
             for (const auto &[data_ptr, data_bytes] : embedding_vec) {
@@ -1989,16 +1866,10 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
         case LogicalType::kTensorArray: {
             const auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(column_vector.data_type()->type_info());
             auto value = Value::MakeTensorArray(embedding_info);
-            auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
-            if (list_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
             i64 start_offset = list_array->value_offset(value_idx);
             i64 end_offset = list_array->value_offset(value_idx + 1);
-            auto tensor_array = std::dynamic_pointer_cast<arrow::ListArray>(list_array->values());
-            if (tensor_array.get() == nullptr) {
-                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-            }
+            auto tensor_array = std::static_pointer_cast<arrow::ListArray>(list_array->values());
             for (i64 j = start_offset; j < end_offset; ++j) {
                 Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(tensor_array, embedding_info.get(), j);
                 Vector<Pair<ptr_t, SizeT>> embedding_data;

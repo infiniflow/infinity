@@ -80,6 +80,9 @@ bool SparseInfo::operator==(const arrow::StructType &other) const {
     }
     std::shared_ptr<arrow::Field> value_field = other.GetFieldByName("value");
     if (!value_field) {
+        return data_type_ == EmbeddingDataType::kElemBit;
+    }
+    if (data_type_ == EmbeddingDataType::kElemBit) {
         return false;
     }
     auto value_type = std::dynamic_pointer_cast<arrow::ListType>(value_field->type());
