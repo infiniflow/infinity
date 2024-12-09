@@ -6,6 +6,8 @@ slug: /set_up_cluster
 
 Architecture overview and user guide for Infinity cluster.
 
+---
+
 ## Overview
 
 An Infinity cluster consists of one leader node, up to four follower nodes, and several learner nodes:

@@ -188,7 +188,7 @@ bool PhraseDocIterator::GetSloppyPhraseMatchData() {
     term_pos_i : term i's current position in document
     phrase_pos_i: term_pos_i - pos_i
 
-    For a solution (term_pos_0, term_pos_1, ..., term_pos_n), it's acceptable iff:
+    For a solution (term_pos_0, term_pos_1, ..., term_pos_n), it's acceptable if:
     for any i, j (0<=i<=n, 0<=j<=n), |phrase_pos_i - phrase_pos_j| <= slop
 
     For an acceptable solution, its matchLength is:
