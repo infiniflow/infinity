@@ -197,7 +197,7 @@ Infinity offers three types of rerankers for fusion:
 
 ## Conditional filters
 
-Conditional filters in Infinity must work through an index to facilitate search. The following two indexes in Infinity support conditional filters:
+Conditional filters in Infinity must work through an index to facilitate search. The following two types of indexes in Infinity support conditional filters:
 
 - **Secondary index**: Built on numeric or string columns. This index does not apply any tokenization to a string column when using conditional filters.
 - **Full-text index**: Built on full-text columns. This index applies tokenization to the full-text column but does not trigger any relevance scoring procedure.
