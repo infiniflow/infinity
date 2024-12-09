@@ -50,9 +50,9 @@ void PhysicalProject::Init() {
 
 bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
     auto *project_operator_state = static_cast<ProjectionOperatorState *>(operator_state);
-    if(project_operator_state->empty_source_) {
+    if (project_operator_state->empty_source_) {
         project_operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
-        DataBlock* output_data_block = project_operator_state->data_block_array_.back().get();
+        DataBlock *output_data_block = project_operator_state->data_block_array_.back().get();
         output_data_block->Init(*GetOutputTypes());
 
         ExpressionEvaluator evaluator;
@@ -77,14 +77,14 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
         output_data_block->Finalize();
         project_operator_state->SetComplete();
     } else {
-        OperatorState* prev_op_state = operator_state->prev_op_state_;
+        OperatorState *prev_op_state = operator_state->prev_op_state_;
 
         SizeT input_block_count = prev_op_state->data_block_array_.size();
-        for(SizeT block_idx = 0; block_idx < input_block_count; ++ block_idx) {
-            DataBlock* input_data_block = prev_op_state->data_block_array_[block_idx].get();
+        for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
+            DataBlock *input_data_block = prev_op_state->data_block_array_[block_idx].get();
 
             project_operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
-            DataBlock* output_data_block = project_operator_state->data_block_array_.back().get();
+            DataBlock *output_data_block = project_operator_state->data_block_array_.back().get();
             output_data_block->Init(*GetOutputTypes());
 
             ExpressionEvaluator evaluator;
@@ -139,7 +139,6 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
             output_data_block->Finalize();
         }
 
-
         //    if (prev_op_state->Complete() && !prev_op_state->data_block_->Finalized()) {
         //        project_operator_state->data_block_->Finalize();
         //        project_operator_state->SetComplete();
@@ -148,6 +147,7 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
 
         prev_op_state->data_block_array_.clear();
         if (prev_op_state->Complete()) {
+            project_operator_state->total_hits_count_flag_ = total_hits_count_flag_;
             project_operator_state->SetComplete();
         }
     }

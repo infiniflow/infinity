@@ -235,6 +235,7 @@ export struct TopOperatorState : public OperatorState {
 // Projection
 export struct ProjectionOperatorState : public OperatorState {
     inline explicit ProjectionOperatorState() : OperatorState(PhysicalOperatorType::kProjection) {}
+    bool total_hits_count_flag_{false};
 };
 
 // Sort
@@ -585,6 +586,7 @@ export struct MaterializeSinkState : public SinkState {
     Vector<UniquePtr<DataBlock>> data_block_array_{};
 
     bool empty_result_{false};
+    bool total_hits_count_flag_{false};
 };
 
 export struct ResultSinkState : public SinkState {

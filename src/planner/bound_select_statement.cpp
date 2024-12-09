@@ -150,7 +150,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
                                                   projection_expressions_,
                                                   projection_index_,
-                                                  Map<SizeT, SharedPtr<HighlightInfo>>());
+                                                  Map<SizeT, SharedPtr<HighlightInfo>>(),
+                                                  total_hits_count_flag_);
         project->set_left_node(root);
         root = project;
 
@@ -160,7 +161,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
                                                              pruned_expression_,
                                                              result_index_,
-                                                             Map<SizeT, SharedPtr<HighlightInfo>>());
+                                                             Map<SizeT, SharedPtr<HighlightInfo>>(),
+                                                             total_hits_count_flag_);
             pruned_project->set_left_node(root);
             root = pruned_project;
         }
@@ -406,7 +408,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(),
                                                   projection_expressions_,
                                                   projection_index_,
-                                                  std::move(highlight_columns_));
+                                                  std::move(highlight_columns_),
+                                                  total_hits_count_flag_);
         project->set_left_node(root);
         root = std::move(project);
 

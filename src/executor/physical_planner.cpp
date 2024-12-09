@@ -847,7 +847,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildProjection(const SharedPtr<Log
                                        std::move(input_physical_operator),
                                        logical_project->expressions_,
                                        logical_operator->load_metas(),
-                                       std::move(logical_project->highlight_columns_));
+                                       std::move(logical_project->highlight_columns_),
+                                       logical_project->total_hits_count_flag_);
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFilter(const SharedPtr<LogicalNode> &logical_operator) const {

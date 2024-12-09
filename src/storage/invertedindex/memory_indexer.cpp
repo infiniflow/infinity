@@ -430,7 +430,7 @@ void MemoryIndexer::ApplyMemUseChange(MemUsageChange mem_change) {
 
 void MemoryIndexer::IncreaseMemoryUsage(SizeT mem) {
     mem_used_ += mem;
-    BaseMemIndex::AddMemUsed(mem);
+    BaseMemIndex::IncreaseMemoryUsage(mem);
 }
 
 void MemoryIndexer::DecreaseMemoryUsage(SizeT mem) {

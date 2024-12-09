@@ -38,9 +38,10 @@ public:
                              UniquePtr<PhysicalOperator> left,
                              Vector<SharedPtr<BaseExpression>> expressions,
                              SharedPtr<Vector<LoadMeta>> load_metas,
-                             Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns)
+                             Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns,
+                             bool total_hits_count_flag)
         : PhysicalOperator(PhysicalOperatorType::kProjection, std::move(left), nullptr, id, load_metas), expressions_(std::move(expressions)),
-          projection_table_index_(table_index), highlight_columns_(std::move(highlight_columns)) {}
+          projection_table_index_(table_index), highlight_columns_(std::move(highlight_columns)), total_hits_count_flag_(total_hits_count_flag) {}
 
     ~PhysicalProject() override = default;
 
@@ -52,9 +53,7 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    SizeT TaskletCount() override {
-        return left_->TaskletCount();
-    }
+    SizeT TaskletCount() override { return left_->TaskletCount(); }
 
     Vector<SharedPtr<BaseExpression>> expressions_{};
 
@@ -64,6 +63,7 @@ private:
     //    ExpressionExecutor executor;
     u64 projection_table_index_{};
     Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns_{};
+    bool total_hits_count_flag_{false};
 };
 
 } // namespace infinity

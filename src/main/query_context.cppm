@@ -137,6 +137,7 @@ public:
 
 private:
     QueryResult HandleAdminStatement(const AdminStatement* admin_statement);
+    void ProcessResult(QueryResult& query_result);
 
 private:
     inline void CreateQueryProfiler() {

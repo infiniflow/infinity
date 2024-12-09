@@ -108,6 +108,7 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(MaterializeSinkState *mate
         }
         case PhysicalOperatorType::kProjection: {
             ProjectionOperatorState *projection_output_state = static_cast<ProjectionOperatorState *>(task_op_state);
+            materialize_sink_state->total_hits_count_flag_ = projection_output_state->total_hits_count_flag_;
             if (projection_output_state->data_block_array_.empty()) {
                 materialize_sink_state->empty_result_ = true;
             } else {
