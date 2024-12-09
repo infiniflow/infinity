@@ -2742,6 +2742,9 @@ void InfinityThriftService::ProcessDataBlocks(const QueryResult &result,
             return;
         }
     }
+    if(!result.extra_json_result_.empty()) {
+        response.extra_result = result.extra_json_result_;
+    }
     HandleColumnDef(response, result.result_table_->ColumnCount(), result.result_table_->definition_ptr_, columns);
 }
 

@@ -608,6 +608,7 @@ struct SelectResponse {
 2: string error_msg,
 3: list<ColumnDef> column_defs = [],
 4: list<ColumnField> column_fields = [];
+5: string extra_result;
 }
 
 struct DeleteRequest {

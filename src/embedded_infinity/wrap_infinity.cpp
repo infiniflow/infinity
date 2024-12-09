@@ -1358,6 +1358,9 @@ void ProcessDataBlocks(QueryResult &query_result, WrapQueryResult &wrap_query_re
         auto data_block = query_result.result_table_->GetDataBlockById(block_idx);
         ProcessColumns(data_block, query_result.result_table_->ColumnCount(), columns);
     }
+    if (!query_result.extra_json_result_.empty()) {
+        wrap_query_result.extra_result = query_result.extra_json_result_;
+    }
     HandleColumnDef(wrap_query_result, query_result.result_table_->ColumnCount(), query_result.result_table_->definition_ptr_, columns);
 }
 

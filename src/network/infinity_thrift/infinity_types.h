@@ -4730,11 +4730,12 @@ void swap(SelectRequest &a, SelectRequest &b);
 std::ostream& operator<<(std::ostream& out, const SelectRequest& obj);
 
 typedef struct _SelectResponse__isset {
-  _SelectResponse__isset() : error_code(false), error_msg(false), column_defs(true), column_fields(true) {}
+  _SelectResponse__isset() : error_code(false), error_msg(false), column_defs(true), column_fields(true), extra_result(false) {}
   bool error_code :1;
   bool error_msg :1;
   bool column_defs :1;
   bool column_fields :1;
+  bool extra_result :1;
 } _SelectResponse__isset;
 
 class SelectResponse : public virtual ::apache::thrift::TBase {
@@ -4744,7 +4745,8 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
   SelectResponse& operator=(const SelectResponse&);
   SelectResponse() noexcept
                  : error_code(0),
-                   error_msg() {
+                   error_msg(),
+                   extra_result() {
 
 
   }
@@ -4754,6 +4756,7 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
   std::string error_msg;
   std::vector<ColumnDef>  column_defs;
   std::vector<ColumnField>  column_fields;
+  std::string extra_result;
 
   _SelectResponse__isset __isset;
 
@@ -4765,6 +4768,8 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
 
   void __set_column_fields(const std::vector<ColumnField> & val);
 
+  void __set_extra_result(const std::string& val);
+
   bool operator == (const SelectResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
@@ -4774,6 +4779,8 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
     if (!(column_defs == rhs.column_defs))
       return false;
     if (!(column_fields == rhs.column_fields))
+      return false;
+    if (!(extra_result == rhs.extra_result))
       return false;
     return true;
   }

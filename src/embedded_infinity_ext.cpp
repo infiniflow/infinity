@@ -48,6 +48,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("names", &WrapQueryResult::names)
         .def_rw("column_defs", &WrapQueryResult::column_defs)
         .def_rw("column_fields", &WrapQueryResult::column_fields)
+        .def_rw("extra_result", &WrapQueryResult::extra_result)
         .def_rw("database_name", &WrapQueryResult::database_name)
         .def_rw("store_dir", &WrapQueryResult::store_dir)
         .def_rw("table_count", &WrapQueryResult::table_count)

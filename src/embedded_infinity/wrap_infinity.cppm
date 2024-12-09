@@ -125,6 +125,7 @@ export struct WrapQueryResult {
     Vector<String> names;
     Vector<WrapColumnDef> column_defs;
     Vector<ColumnField> column_fields;
+    String extra_result;
     // show database
     String database_name;
     String store_dir;
