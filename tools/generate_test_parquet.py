@@ -11,6 +11,7 @@ def generate(generate_if_exist: bool, copy_dir: str):
 
     table_name = "parquet_test_table"
     table_name1 = "parquet_test_table1"
+    table_name_err = "parquet_test_table_err"
     parquet_filename = "gen_test.parquet"
     parquet_filename1 = "gen_test1.parquet"
     parquet_path = parquet_dir + "/" + parquet_filename
@@ -128,6 +129,29 @@ def generate(generate_if_exist: bool, copy_dir: str):
 
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("\n")
+
+        # import with incompatible schema
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name_err))
+        slt_file.write("\n")
+
+        slt_file.write("statement ok\n")
+        slt_file.write(
+            f"CREATE TABLE {table_name_err} (col1 Boolean, col2 TINYINT, col3 BIGINT);\n"
+        )
+        slt_file.write("\n")
+
+        slt_file.write("statement error\n")
+        slt_file.write(
+            "COPY {} FROM '{}' WITH (FORMAT PARQUET);\n".format(
+                table_name_err, copy_path
+            )
+        )
+        slt_file.write("\n")
+
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name_err))
         slt_file.write("\n")
 
 

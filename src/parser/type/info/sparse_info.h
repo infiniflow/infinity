@@ -20,6 +20,10 @@
 #include "type/complex/sparse_type.h"
 #include "type/type_info.h"
 
+namespace arrow {
+class StructType;
+}
+
 namespace infinity {
 
 enum class SparseStoreType : int8_t {
@@ -45,6 +49,8 @@ public:
         : TypeInfo(TypeInfoType::kSparse), data_type_(data_type), index_type_(index_type), dimension_(dim), store_type_(store_type) {}
 
     bool operator==(const TypeInfo &other) const override;
+
+    bool operator==(const arrow::StructType &other) const;
 
     [[nodiscard]] inline size_t Size() const override { return sizeof(SparseType); }
 

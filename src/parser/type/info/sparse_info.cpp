@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "sparse_info.h"
+#include <arrow/type.h>
 #include <limits>
 
 namespace infinity {
@@ -63,6 +64,29 @@ bool SparseInfo::operator==(const TypeInfo &other) const {
     const auto *other_sparse_info = static_cast<const SparseInfo *>(&other);
     return data_type_ == other_sparse_info->data_type_ && index_type_ == other_sparse_info->index_type_ &&
            dimension_ == other_sparse_info->dimension_;
+}
+
+bool SparseInfo::operator==(const arrow::StructType &other) const {
+    std::shared_ptr<arrow::Field> index_field = other.GetFieldByName("index");
+    if (!index_field) {
+        return false;
+    }
+    auto index_type = std::dynamic_pointer_cast<arrow::ListType>(index_field->type());
+    if (!index_type) {
+        return false;
+    }
+    if (index_type_ != index_type->value_type()->id()) {
+        return false;
+    }
+    std::shared_ptr<arrow::Field> value_field = other.GetFieldByName("value");
+    if (!value_field) {
+        return false;
+    }
+    auto value_type = std::dynamic_pointer_cast<arrow::ListType>(value_field->type());
+    if (!value_type) {
+        return false;
+    }
+    return data_type_ == value_type->value_type()->id();
 }
 
 nlohmann::json SparseInfo::Serialize() const {

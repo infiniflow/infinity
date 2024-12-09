@@ -1280,6 +1280,33 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
     }
 }
 
+namespace {
+
+Status CheckParquetColumns(TableEntry *table_entry, arrow::ParquetFileReader *arrow_reader) {
+    SharedPtr<arrow::Schema> schema;
+    arrow::Status status = arrow_reader->GetSchema(&schema);
+    if (!status.ok()) {
+        return Status::ImportFileFormatError(status.ToString());
+    }
+    const arrow::FieldVector &fields = schema->fields();
+    const Vector<SharedPtr<ColumnDef>> &column_defs = table_entry->column_defs();
+    if (fields.size() != column_defs.size()) {
+        return Status::ColumnCountMismatch(fmt::format("Column count mismatch: {} != {}", fields.size(), column_defs.size()));
+    }
+    for (SizeT i = 0; i < fields.size(); ++i) {
+        const auto &field = fields[i];
+        const auto &column_def = column_defs[i];
+
+        if (*column_def->type() != *field->type()) {
+            return Status::ImportFileFormatError(fmt::format("Column {} mismatch, {} != {}", i, column_def->type()->ToString(), field->type()->ToString()));
+        }
+    }
+
+    return Status::OK();
+}
+
+} // namespace
+
 void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state) {
     arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
 
@@ -1303,6 +1330,10 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
         RecoverableError(Status::ImportFileFormatError(build_result.status().ToString()));
     }
     std::unique_ptr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
+
+    if (Status status = CheckParquetColumns(table_entry_, arrow_reader.get()); !status.ok()) {
+        RecoverableError(status);
+    }
 
     std::shared_ptr<arrow::RecordBatchReader> rb_reader;
     if (auto status = arrow_reader->GetRecordBatchReader(&rb_reader); !status.ok()) {
