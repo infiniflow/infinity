@@ -6,6 +6,8 @@ slug: /search_guide
 
 Full-text, vector, sparse vector, tensor, hybrid search.
 
+---
+
 ## Overview
 
 This document offers guidance on conducting a search within Infinity.
@@ -71,32 +73,78 @@ Both RAG tokenization and fine-grained RAG tokenization are used in RAGFlow to e
 
 #### IK analyzer
 
-The IK analyzer is a bilingual tokenizer that supports Chinese (simplified and traditional) and English. It is a C++ adaptation of the [IK Analyzer](https://github.com/infinilabs/analysis-ik), widely used as a tokenizer by Chinese Elasticsearch users.
+The IK analyzer is a bilingual tokenizer that supports Chinese (simplified and traditional) and English. It is a C++ adaptation of the [IK Analyzer](https://github.com/infinilabs/analysis-ik), which is widely used as a tokenizer by Chinese Elasticsearch users.
 
-Use `"ik"` to select this analyzer, which works the same as the `ik_smart` argument in the [IK Analyzer](https://github.com/infinilabs/analysis-ik), or `"ik-fine"` for fine-grained mode, which works the same as the `ik_max_word` argument in the [IK Analyzer](https://github.com/infinilabs/analysis-ik).
-
+Use `"ik"` to select this analyzer, which is equivalent to the `ik_smart` option in the [IK Analyzer](https://github.com/infinilabs/analysis-ik), or `"ik-fine"` for fine-grained mode, which is equivalent to the `ik_max_word` option in the [IK Analyzer](https://github.com/infinilabs/analysis-ik).
 
 #### Keyword analyzer
 
 The keyword analyzer is a "noop" analyzer used for columns containing keywords only, where traditional scoring methods like `BM25` do not apply. It scores `0` or `1`, depending on whether any keywords are matched.
 
-### Search and ranking
+Use `"keyword"` to select this analyzer.
 
-Infinity offers following syntax for full-text search:
+### Search and ranking syntax
 
-- Single term: `"blooms"`
-- AND multiple terms: `"space AND efficient"`, `"space && efficient"` or `"space + efficient"`
-- OR multiple terms: `"Bloom OR filter"`, `"Bloom || filter"` or just `"Bloom filter"` .
-- Phrase search: `"Bloom filter" or 'Bloom filter'`
-- CARAT operator: `^`: Used to boost the importance of a term, e.g., `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
-- Sloppy phrase search: `'"harmful chemical"~10'`
-- Field-specific search: `"title:(quick OR brown) AND body:foobar"`
-- Escaping reserved characters: `"space\-efficient"` . `:` `~` `()` `""` `+` `-` `=` `&` `|` `[]` `{}` `*` `?` `\` `/` are reserved characters for search syntax.
+Infinity supports the following syntax for full-text search expressions:
 
-`OR`  is the default semantic among multiple terms if user does not specify in search syntax. Infinity offers `BM25` scoring and block-max `WAND` for dynamic pruning to accelerate the multiple terms search processing. There are two approaches to bypass `BM25` scoring:
+- Single term
+- AND multiple terms
+- OR multiple terms
+- Phrase search
+- CARAT opertor
+- Sloppy phrase search
+- Field-specific search
+- Escape character
 
-- Using `keyword` analyzer when creating index, then `BM25` will not be used and it will return the score based on whether keywords are hit.
-- Specifying `similarity=boolean` during searching. Then the scoring is decided by the number of keywords hits.
+#### Single term
+
+Example: `"blooms"`
+
+#### AND multiple terms
+
+- `"space AND efficient"`
+- `"space && efficient"`
+- `"space + efficient"`
+
+#### OR multiple terms
+
+- `"Bloom OR filter"`
+- `"Bloom || filter"`
+- `"Bloom filter"`
+
+:::tip NOTE
+`OR` is the default semantic in a multi-term full-text search unless explicitly specified otherwise.
+:::
+
+#### Phrase search
+
+- `"Bloom filter"`
+- `'Bloom filter'`
+
+#### CARAT operator
+
+Use `^` to boost the importance of a specific term. For example: `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
+
+#### Sloppy phrase search
+
+Example: `'"harmful chemical"~10'`
+
+#### Field-specific search
+
+Example: `"title:(quick OR brown) AND body:foobar"`
+
+#### Escape character
+
+Use `\` to escape reserved characters like `:` `~` `()` `""` `+` `-` `=` `&` `|` `[]` `{}` `*` `?` `\` `/` `^`. For example: `"space\-efficient"`.
+
+### Scoring
+
+Infinity offers `BM25` scoring and block-max `WAND` for dynamic pruning to accelerate multi-term searches. To *not* use `BM25` scoring, do either of the following:
+
+- Set `"analyzer"` to `"keyword"` when creating index (to select the keyword analyzer).  
+  *The returned score will then be based on whether keywords are matched.*
+- Specify `similarity=boolean` during search.  
+  *The scoring will then depend on the number of matched keywords.*
 
 ## Dense vector search
 
@@ -149,7 +197,7 @@ Infinity offers three types of rerankers for fusion:
 
 ## Conditional filters
 
-Conditional filters in Infinity must work through an index to facilitate search. There are two types of indexes in Infinity that support conditional filters:
+Conditional filters in Infinity must work through an index to facilitate search. The following two indexes in Infinity support conditional filters:
 
 - **Secondary index**: Built on numeric or string columns. This index does not apply any tokenization to a string column when using conditional filters.
 - **Full-text index**: Built on full-text columns. This index applies tokenization to the full-text column but does not trigger any relevance scoring procedure.

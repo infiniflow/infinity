@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 2
 slug: /pysdk_api_reference
 ---
 # Python API Reference
@@ -1571,7 +1571,7 @@ table_object.delete("c1 >= 70 and c1 <= 90")
 
 ---
 
-### update data
+### update
 
 ```python
 table_object.update(cond, data)

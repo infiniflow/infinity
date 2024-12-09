@@ -1,8 +1,9 @@
 ---
-sidebar_position: 1
+sidebar_position: 3
 slug: /benchmark
 ---
 # Benchmark
+
 This document compares the following key specifications of Elasticsearch, Qdrant, Quickwit and Infinity:
 
 - Time to insert & build index
