@@ -30,6 +30,9 @@ import index_bmp;
 import sparse_info;
 import internal_types;
 import buffer_handle;
+import base_memindex;
+import memindex_tracer;
+import table_index_entry;
 
 namespace infinity {
 
@@ -52,11 +55,15 @@ export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompr
                                         BMPAlg<f64, i8, BMPCompressType::kRaw> *,
                                         std::nullptr_t>;
 
-export struct BMPIndexInMem {
+export struct BMPIndexInMem final : public BaseMemIndex {
 public:
     BMPIndexInMem() : bmp_(nullptr) {}
 
-    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def);
+    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry);
+
+    MemIndexTracerInfo GetInfo() const override;
+
+    TableIndexEntry *table_index_entry() const override;
 
 private:
     template <typename DataType, typename IndexType>
@@ -112,13 +119,14 @@ public:
 
     AbstractBMP &get_ref() { return bmp_; }
 
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const ;
+    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const;
 
 private:
     RowID begin_row_id_ = {};
     AbstractBMP bmp_ = nullptr;
     mutable bool own_memory_ = true;
     mutable BufferHandle chunk_handle_{};
+    SegmentIndexEntry *segment_index_entry_;
 };
 
 } // namespace infinity

@@ -28,8 +28,30 @@ import infinity_exception;
 
 namespace infinity {
 
-BMPIndexInMem::BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
-    : begin_row_id_(begin_row_id), bmp_(InitAbstractIndex(index_base, column_def)) {
+MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
+    auto *table_index_entry = segment_index_entry_->table_index_entry();
+    SharedPtr<String> index_name = table_index_entry->GetIndexName();
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    SharedPtr<String> table_name = table_entry->GetTableName();
+    SharedPtr<String> db_name = table_entry->GetDBName();
+
+    auto [mem_used, row_cnt] = std::visit(
+        [](auto &&index) -> Pair<SizeT, SizeT> {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return {};
+            } else {
+                return {index->GetSizeInBytes(), index->DocNum()};
+            }
+        },
+        bmp_);
+    return MemIndexTracerInfo(index_name, table_name, db_name, mem_used, row_cnt);
+}
+
+TableIndexEntry *BMPIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
+
+BMPIndexInMem::BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry)
+    : begin_row_id_(begin_row_id), bmp_(InitAbstractIndex(index_base, column_def)), segment_index_entry_(segment_index_entry) {
     const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
     const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
     SizeT term_num = sparse_info->Dimension();

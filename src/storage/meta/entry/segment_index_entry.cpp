@@ -266,7 +266,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
         case IndexType::kBMP: {
             if (memory_bmp_index_.get() == nullptr) {
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                memory_bmp_index_ = MakeShared<BMPIndexInMem>(begin_row_id, index_base.get(), column_def.get());
+                memory_bmp_index_ = MakeShared<BMPIndexInMem>(begin_row_id, index_base.get(), column_def.get(), this);
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
             memory_bmp_index_->AddDocs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
@@ -539,7 +539,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kBMP: {
-            memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base, column_def.get());
+            memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base, column_def.get(), this);
 
             memory_bmp_index_->AddDocs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_);
             dumped_memindex_entry = MemIndexDump();
@@ -923,7 +923,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             break;
         }
         case IndexType::kBMP: {
-            auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base, column_def.get());
+            auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base, column_def.get(), this);
             AbstractBMP abstract_bmp = memory_bmp_index->get();
 
             std::visit(
