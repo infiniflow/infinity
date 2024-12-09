@@ -1,8 +1,8 @@
 module;
 
-import ik_dict_segment;
-
 module hit;
+
+import ik_dict_segment;
 
 namespace infinity {
 
