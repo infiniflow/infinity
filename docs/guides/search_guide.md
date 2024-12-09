@@ -85,7 +85,7 @@ Use `"keyword"` to select this analyzer.
 
 ### Search and ranking syntax
 
-Infinity supports the following syntax for full-text search expressions:
+Infinity supports the following syntax or full-text search expressions:
 
 - Single term
 - AND multiple terms
@@ -135,7 +135,7 @@ Example: `"title:(quick OR brown) AND body:foobar"`
 
 #### Escape character
 
-Use `\` to escape reserved characters like `:` `~` `()` `""` `+` `-` `=` `&` `|` `[]` `{}` `*` `?` `\` `/` `^`. For example: `"space\-efficient"`.
+Use `\` to escape reserved characters like `:` `~` `(` `)` `"` `+` `-` `=` `&` `|` `[` `]` `{` `}` `*` `?` `\` `/` `^`. For example: `"space\-efficient"`.
 
 ### Scoring
 
@@ -143,7 +143,7 @@ Infinity offers `BM25` scoring and block-max `WAND` for dynamic pruning to accel
 
 - Set `"analyzer"` to `"keyword"` when creating index (to select the keyword analyzer).  
   *The returned score will then be based on whether keywords are matched.*
-- Specify `similarity=boolean` during search.  
+- Set `"similarity"` to `boolean` during search.  
   *The scoring will then depend on the number of matched keywords.*
 
 ## Dense vector search
