@@ -166,7 +166,7 @@ void HnswIndexInMem::InsertVecs(SizeT block_offset,
                         break;
                     }
                 }
-                this->IncreaseMemoryUsage(mem_usage);
+                this->IncreaseMemoryUsageBase(mem_usage);
             }
         },
         hnsw_);
@@ -214,7 +214,7 @@ void HnswIndexInMem::InsertVecs(const SegmentEntry *segment_entry,
                         break;
                     }
                 }
-                this->IncreaseMemoryUsage(mem_usage);
+                this->IncreaseMemoryUsageBase(mem_usage);
             }
         },
         hnsw_);

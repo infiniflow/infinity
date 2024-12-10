@@ -30,8 +30,8 @@ public:
     virtual TableIndexEntry *table_index_entry() const = 0;
 
 protected:
-    void IncreaseMemoryUsage(SizeT mem);
-    void DecreaseMemoryUsage(SizeT mem);
+    void IncreaseMemoryUsageBase(SizeT mem);
+    void DecreaseMemoryUsageBase(SizeT mem);
 };
 
 } // namespace infinity

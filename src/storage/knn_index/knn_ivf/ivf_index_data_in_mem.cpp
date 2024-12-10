@@ -110,7 +110,7 @@ public:
         }
     }
 
-    ~IVFIndexInMemT() { BaseMemIndex::DecreaseMemoryUsage(MemoryUsed()); }
+    ~IVFIndexInMemT() { BaseMemIndex::DecreaseMemoryUsageBase(MemoryUsed()); }
 
     MemIndexTracerInfo GetInfo() const override {
         auto *table_index_entry = segment_index_entry_->table_index_entry();
@@ -189,7 +189,7 @@ public:
         SizeT mem2 = MemoryUsed();
         LOG_TRACE(fmt::format("ivf mem usage = {}", mem2));
         LOG_TRACE(fmt::format("ivf mem added = {}", mem2 - mem1));
-        IncreaseMemoryUsage(mem2 > mem1 ? mem2 - mem1 : 0);
+        IncreaseMemoryUsageBase(mem2 > mem1 ? mem2 - mem1 : 0);
     }
 
     void BuildIndex() {
