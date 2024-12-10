@@ -20,6 +20,11 @@
 
 #include <memory>
 
+namespace arrow {
+class FixedSizeListType;
+class ListType;
+}
+
 namespace infinity {
 
 class EmbeddingInfo : public TypeInfo {
@@ -35,6 +40,10 @@ public:
     ~EmbeddingInfo() override = default;
 
     bool operator==(const TypeInfo &other) const override;
+
+    bool operator==(const arrow::FixedSizeListType &other) const;
+
+    bool operator==(const arrow::ListType &other) const;
 
     [[nodiscard]] inline size_t Size() const override { return EmbeddingType::EmbeddingSize(embedding_data_type_, dimension_); }
 

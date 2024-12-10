@@ -34,9 +34,10 @@ def is_port_in_use(port: int) -> bool:
 
 
 class MinioParams:
-    def __init__(self, minio_dir: str, minio_port: int):
+    def __init__(self, minio_dir: str, minio_port: int, minio_console_port: int):
         self.minio_dir = minio_dir
         self.minio_port = minio_port
+        self.minio_console_port = minio_console_port
 
 
 class BaseInfinityRunner:
@@ -244,7 +245,7 @@ class InfinityCluster:
     def add_minio(self, minio_params: MinioParams):
         minio_image_name = "quay.io/minio/minio"
 
-        minio_cmd = f'server /data --console-address ":{minio_params.minio_port}"'
+        minio_cmd = f'server /data --address ":{minio_params.minio_port}" --console-address ":{minio_params.minio_console_port}"'
         docker_client = docker.from_env()
         container_name = "minio_host"
 

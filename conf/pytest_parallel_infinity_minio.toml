@@ -18,7 +18,7 @@ persistence_dir          = "/var/infinity/persistence"
 storage_type             = "minio"
 
 [storage.object_storage]
-url                      = "127.0.0.1:9000"
+url                      = "127.0.0.1:9005"
 bucket_name              = "infinity"
 access_key               = "minioadmin"
 secret_key               = "minioadmin"
