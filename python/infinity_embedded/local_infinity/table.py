@@ -437,7 +437,7 @@ class LocalTable():
             group_by_list = query.group_by
 
         total_hits_count_flag = False
-        if query.total_hits_count_flag:
+        if query.total_hits_count:
             total_hits_count_flag = True
         res = self._conn.search(db_name=self._db_name,
                                 table_name=self._table_name,

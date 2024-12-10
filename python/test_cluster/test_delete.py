@@ -41,25 +41,25 @@ class TestDelete:
             res = table_obj.delete("c1 = 1")
             assert res.error_code == ErrorCode.OK
 
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)})
                                         .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
             time.sleep(1)
             db_obj_2 = infinity2.get_database("default_db")
             table_obj_2 = db_obj_2.get_table("test_delete")
-            res = table_obj_2.output(["*"]).to_df()
+            res, extra_result = table_obj_2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)})
                                         .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))            
 
             res = table_obj.delete()
             assert res.error_code == ErrorCode.OK
 
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c3': ()})
                                         .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
-            res = table_obj_2.output(["*"]).to_df()
+            res, extra_result = table_obj_2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c3': ()})
                                         .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
@@ -104,13 +104,13 @@ class TestDelete:
                 print(e)
                 assert(e.error_code == 8007)
 
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3, 4), 'c2': (10, 20, 30, 40), 'c3': (100, 200, 300, 400)})
                                         .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
-            res = table_obj_2.output(["*"]).to_df()
+            res, extra_result = table_obj_2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 2, 3, 4), 'c2': (10, 20, 30, 40), 'c3': (100, 200, 300, 400)})
                                         .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
-            res = db_obj.drop_table("test_delete")
+            res, extra_result = db_obj.drop_table("test_delete")
             assert res.error_code == ErrorCode.OK

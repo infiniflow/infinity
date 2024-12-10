@@ -111,7 +111,7 @@ class TestInsertImport:
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_insert")
 
-            data_dict, _ = table_obj.output(["count(*)"]).to_result()
+            data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
             assert count_star == cur_n
             logger.debug(f"cur_n: {cur_n}")

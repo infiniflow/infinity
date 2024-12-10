@@ -22,7 +22,7 @@ class LocalQueryResult:
     def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, index_names=None,
                  column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None,
                  comment=None,
-                 table_name=None, index_name=None, index_type=None, index_comment=None, deleted_rows=0):
+                 table_name=None, index_name=None, index_type=None, index_comment=None, deleted_rows=0, extra_result=None):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
@@ -40,6 +40,7 @@ class LocalQueryResult:
         self.index_type = index_type
         self.index_comment = index_comment
         self.deleted_rows = deleted_rows
+        self.extra_result = extra_result
 
 
 class LocalInfinityClient:
@@ -69,7 +70,7 @@ class LocalInfinityClient:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, table_names=res.names)
         if has_result_data:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, column_defs=res.column_defs,
-                                    column_fields=res.column_fields)
+                                    column_fields=res.column_fields, extra_result=res.extra_result)
         if has_db_name:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, database_name=res.database_name,
                                     store_dir=res.store_dir, table_count=res.table_count, comment=res.comment)

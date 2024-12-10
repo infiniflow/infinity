@@ -693,7 +693,7 @@ class InfinityLocalQueryBuilder(ABC):
 
     def to_arrow(self) -> (Table, Any):
         dataframe, extra_result = self.to_df()
-        return pa.Table.from_pandas(None, dataframe), extra_result
+        return pa.Table.from_pandas(dataframe), extra_result
 
     def explain(self, explain_type=ExplainType.kPhysical) -> Any:
         query = ExplainQuery(

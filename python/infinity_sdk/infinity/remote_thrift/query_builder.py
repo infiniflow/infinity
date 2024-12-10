@@ -74,7 +74,7 @@ class ExplainQuery(Query):
             sort: Optional[List[OrderByExpr]],
             explain_type: Optional[ExplainType],
     ):
-        super().__init__(columns, highlight, search, filter, groupby, limit, offset, sort)
+        super().__init__(columns, highlight, search, filter, groupby, limit, offset, sort, False)
         self.explain_type = explain_type
 
 
@@ -535,7 +535,7 @@ class InfinityThriftQueryBuilder(ABC):
 
     def to_arrow(self) -> (Table, Any):
         dataframe, extra_result = self.to_df()
-        return pa.Table.from_pandas(None, dataframe), extra_result
+        return pa.Table.from_pandas(dataframe), extra_result
 
     def explain(self, explain_type=ExplainType.Physical) -> Any:
         query = ExplainQuery(

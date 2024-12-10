@@ -145,8 +145,8 @@ class TestFullText:
                                 .to_result()
                             )
 
-                            data_dict, _ = res
-                            gt_data_dict, _ = gt_res
+                            data_dict, _, _ = res
+                            gt_data_dict, _, _ = gt_res
                             if data_dict != gt_data_dict:
                                 print(f"diff: {data_dict} {gt_data_dict}")
                             else:

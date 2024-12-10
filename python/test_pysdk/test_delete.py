@@ -100,7 +100,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         assert res.deleted_rows == 1
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2, 3, 4), 'c2': (20, 30, 40), 'c3': (200, 300, 400)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
@@ -108,7 +108,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         assert res.deleted_rows == 3
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c3': ()})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
@@ -192,7 +192,7 @@ class TestInfinity:
             except Exception as e:
                 print(e)
 
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             print("{}：{}".format(common_values.types_array[i], res))
             assert tb
 
@@ -207,7 +207,7 @@ class TestInfinity:
         # insert
         values = [{"c1": 1} for _ in range(8192)]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
@@ -215,7 +215,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         assert res.deleted_rows == 8192
 
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_delete_table_with_one_block"+suffix, ConflictType.Error)
 
@@ -230,13 +230,13 @@ class TestInfinity:
         for i in range(1024):
             values = [{"c1": i} for _ in range(10)]
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
         for i in range(1024):
             table_obj.delete("c1 = " + str(i))
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         db_obj.drop_table("test_delete_table_with_one_segment"+suffix, ConflictType.Error)
 
         print(delete_res)
@@ -250,7 +250,7 @@ class TestInfinity:
         for i in range(10):
             values = [{"c1": i} for _ in range(10)]
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
@@ -258,7 +258,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         assert res.deleted_rows == 10
 
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_select_before_after_delete"+suffix, ConflictType.Error)
 
@@ -277,7 +277,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         assert res.deleted_rows == 10
 
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_delete_insert_data"+suffix, ConflictType.Error)
 
@@ -301,7 +301,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         assert res.deleted_rows == 5
 
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_delete_inserted_long_before_data"+suffix, ConflictType.Error)
 
@@ -346,11 +346,11 @@ class TestInfinity:
         try:
             table_obj.insert(values)
 
-            insert_res = table_obj.output(["*"]).to_df()
+            insert_res, extra_result = table_obj.output(["*"]).to_df()
             print(insert_res)
 
             table_obj.delete("c1 = " + str(column_types_example))
-            delete_res = table_obj.output(["*"]).to_df()
+            delete_res, extra_result = table_obj.output(["*"]).to_df()
             print(delete_res)
         except Exception as e:
             print(e)
@@ -368,7 +368,7 @@ class TestInfinity:
         # insert
         values = [{"c1": 1} for _ in range(8192)]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
@@ -376,7 +376,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         assert res.deleted_rows == 8192
 
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
         res = db_obj.drop_table("test_delete_one_block_without_expression"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -392,7 +392,7 @@ class TestInfinity:
         for i in range(1024):
             values = [{"c1": i} for _ in range(10)]
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
@@ -400,7 +400,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         assert res.deleted_rows == 10240
 
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_delete_one_segment_without_expression"+suffix, ConflictType.Error)
 
@@ -424,14 +424,14 @@ class TestInfinity:
         for i in range(10):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
         res = table_obj.delete(filter_list)
         assert res.error_code == ErrorCode.OK
 
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Error)
 
@@ -455,13 +455,13 @@ class TestInfinity:
         for i in range(10):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
         # TODO: Detailed error information check
         with pytest.raises(Exception):
             table_obj.delete(filter_list)
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
         db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Error)
