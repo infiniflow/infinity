@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,19 +14,23 @@
 
 module;
 
-export module keyword_analyzer;
+#include <sstream>
+#include <string>
+module whitespace_analyzer;
 import stl;
 import term;
 import analyzer;
 
 namespace infinity {
-export class KeywordAnalyzer : public Analyzer {
-public:
-    KeywordAnalyzer() = default;
-    ~KeywordAnalyzer() override = default;
 
-protected:
-    int AnalyzeImpl(const Term &input, void *data, HookType func) override;
-};
+int WhitespaceAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
+    std::istringstream is(input.text_);
+    std::string t;
+    u32 offset = 0;
+    while (is >> t) {
+        func(data, t.data(), t.size(), offset++, 0, Term::AND, 0, false);
+    }
+    return 0;
+}
 
 } // namespace infinity
