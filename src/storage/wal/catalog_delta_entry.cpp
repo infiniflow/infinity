@@ -1303,6 +1303,38 @@ void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1) {
     auto iter = delta_ops_.lower_bound(encode1);
     while (iter != delta_ops_.end()) {
         const auto &[encode2, delta_op2] = *iter;
+#if 1
+        SizeT encode1_len = encode1.size();
+        SizeT encode2_len = encode2.size();
+        if(encode1_len > encode2_len) {
+            // encode1 isn't prefix of encode2
+            break;
+        }
+        // encode1_len <= encode2_len
+        SizeT idx = 0;
+        while(idx < encode1_len) {
+            if(encode1[idx] != encode2[idx]) {
+                break;
+            }
+            ++ idx;
+        }
+
+        if(idx != encode1_len) {
+            break;  // encode1 is not prefix of encode2
+        }
+
+        if(idx == encode2_len) {
+            ++iter;
+            continue; // encode1 == encode2;
+        }
+
+        if(encode2[idx] != '#') {
+            ++iter;
+            continue; // encode1 is not prefix of encode2
+        }
+
+        iter = delta_ops_.erase(iter); // encode1 is prefix of encode2
+#else
         auto [iter1, iter2] = std::mismatch(encode1.begin(), encode1.end(), encode2.begin());
         if (iter1 != encode1.end()) {
             break; // encode1 is not prefix of encode2
@@ -1316,9 +1348,11 @@ void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1) {
             continue; // not prefix
         }
         iter = delta_ops_.erase(iter); // is prefix
+#endif
     }
 }
-
+// #default_db#test_cleanup_index#idx1_todrop
+// #default_db#test_cleanup_index#idx2
 void GlobalCatalogDeltaEntry::RemoveDeltaOp(TxnTimeStamp max_commit_ts) {
     std::lock_guard<std::mutex> lock(catalog_delta_locker_);
     for (auto iter = delta_ops_.begin(); iter != delta_ops_.end();) {
