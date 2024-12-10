@@ -59,7 +59,7 @@ class TestInfinity:
             res,
             pd.DataFrame({"c1": [1], "c2": [2]}).astype(
                 {"c1": dtype("int32"), "c2": dtype("int32")}
-            ),
+            )
         )
 
         res = table_obj.add_columns({"c2": {"type": "varchar", "default": "default"}})
@@ -76,7 +76,7 @@ class TestInfinity:
             res,
             pd.DataFrame({"c1": [1], "c2": [2], "c3": ["default"]}).astype(
                 {"c1": dtype("int32"), "c2": dtype("int32"), "c3": dtype("object")}
-            ),
+            )
         )
 
         table_obj.insert([{"c1": 2, "c2": 3, "c3": "test"}])
