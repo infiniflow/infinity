@@ -5,6 +5,7 @@ import lexeme;
 module quick_sort_set;
 
 namespace infinity {
+
 QuickSortSet::QuickSortSet() {}
 
 QuickSortSet::~QuickSortSet() {

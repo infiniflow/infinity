@@ -13,6 +13,7 @@ import posting_list_format;
 import index_defines;
 import term_meta;
 import vector_with_lock;
+import mem_usage_change;
 
 module posting_writer;
 
@@ -106,4 +107,16 @@ InMemPostingDecoder *PostingWriter::CreateInMemPostingDecoder() const {
 
     return posting_decoder;
 }
+
+MemUsageChange PostingWriter::GetSizeChange() {
+    SizeT size = doc_list_encoder_->GetSizeInBytes() + position_list_encoder_->GetSizeInBytes();
+    SizeT last_size = last_size_;
+    last_size_ = size;
+    if (size >= last_size) {
+        return MemUsageChange{true, size - last_size};
+    } else {
+        return MemUsageChange{false, last_size - size};
+    }
+}
+
 } // namespace infinity

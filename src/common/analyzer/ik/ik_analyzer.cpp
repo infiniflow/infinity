@@ -2,6 +2,8 @@ module;
 
 #include <vector>
 
+module ik_analyzer;
+
 import stl;
 import segmenter;
 import cjk_segmenter;
@@ -14,8 +16,6 @@ import term;
 import status;
 import character_util;
 import third_party;
-
-module ik_analyzer;
 
 namespace infinity {
 

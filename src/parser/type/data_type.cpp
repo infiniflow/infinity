@@ -26,6 +26,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h> 
+#include <arrow/type.h>
 
 namespace infinity {
 
@@ -114,7 +115,100 @@ bool DataType::operator==(const DataType &other) const {
     }
 }
 
+bool DataType::operator==(const arrow::DataType &other) const {
+    switch (type_) {
+        case LogicalType::kBoolean:
+            return other.id() == arrow::Type::BOOL;
+        case LogicalType::kTinyInt:
+            return other.id() == arrow::Type::INT8;
+        case LogicalType::kSmallInt:
+            return other.id() == arrow::Type::INT16;
+        case LogicalType::kInteger:
+            return other.id() == arrow::Type::INT32;
+        case LogicalType::kBigInt:
+            return other.id() == arrow::Type::INT64;
+        case LogicalType::kFloat16:
+            return other.id() == arrow::Type::HALF_FLOAT;
+        case LogicalType::kBFloat16:
+            return other.id() == arrow::Type::FLOAT;
+        case LogicalType::kFloat:
+            return other.id() == arrow::Type::FLOAT;
+        case LogicalType::kDouble:
+            return other.id() == arrow::Type::DOUBLE;
+        case LogicalType::kDate:
+            return other.id() == arrow::Type::DATE32;
+        case LogicalType::kTime:
+            return other.id() == arrow::Type::TIME32;
+        case LogicalType::kDateTime:
+            return other.id() == arrow::Type::TIMESTAMP;
+        case LogicalType::kTimestamp:
+            return other.id() == arrow::Type::TIMESTAMP;
+        case LogicalType::kVarchar:
+            return other.id() == arrow::Type::STRING;
+        case LogicalType::kEmbedding: {
+            auto *embedding_info = static_cast<EmbeddingInfo *>(type_info_.get());
+            if (other.id() == arrow::Type::FIXED_SIZE_LIST) {
+                const auto &list_type = static_cast<const arrow::FixedSizeListType &>(other);
+                return *embedding_info == list_type;
+            } else if (other.id() == arrow::Type::LIST) {
+                const auto &list_type = static_cast<const arrow::ListType &>(other);
+                return *embedding_info == list_type;
+            } else {
+                return false;
+            }
+        }
+        case LogicalType::kSparse: {
+            const auto *sparse_info = static_cast<SparseInfo *>(type_info_.get());
+            if (other.id() != arrow::Type::STRUCT) {
+                return false;
+            }
+            const auto &struct_type = static_cast<const arrow::StructType &>(other);
+            return *sparse_info == struct_type;
+        }
+        case LogicalType::kMultiVector:
+        case LogicalType::kTensor: {
+            auto *embedding_info = static_cast<EmbeddingInfo *>(type_info_.get());
+            if (other.id() != arrow::Type::LIST) {
+                return false;
+            }
+            const auto &tensor_type = static_cast<const arrow::ListType &>(other);
+            if (tensor_type.value_type()->id() == arrow::Type::FIXED_SIZE_LIST) {
+                const auto &inner_type = static_cast<const arrow::FixedSizeListType &>(*tensor_type.value_field()->type());
+                return *embedding_info == inner_type;
+            } else if (tensor_type.value_type()->id() == arrow::Type::LIST) {
+                const auto &inner_type = static_cast<const arrow::ListType &>(*tensor_type.value_field()->type());
+                return *embedding_info == inner_type;
+            }
+            return false;
+        }
+        case LogicalType::kTensorArray: {
+            auto *embedding_info = static_cast<EmbeddingInfo *>(type_info_.get());
+            if (other.id() != arrow::Type::LIST) {
+                return false;
+            }
+            const auto &tensor_array_type = static_cast<const arrow::ListType &>(other);
+            if (tensor_array_type.value_type()->id() != arrow::Type::LIST) {
+                return false;
+            }
+            const auto &tensor_type = static_cast<const arrow::ListType &>(*tensor_array_type.value_field()->type());
+            if (tensor_type.value_type()->id() == arrow::Type::FIXED_SIZE_LIST) {
+                const auto &inner_type = static_cast<const arrow::FixedSizeListType &>(*tensor_type.value_field()->type());
+                return *embedding_info == inner_type;
+            } else if (tensor_type.value_type()->id() == arrow::Type::LIST) {
+                const auto &inner_type = static_cast<const arrow::ListType &>(*tensor_type.value_field()->type());
+                return *embedding_info == inner_type;
+            }
+            return false;
+        }
+        default: {
+            return false;
+        }
+    }
+}
+
 bool DataType::operator!=(const DataType &other) const { return !operator==(other); }
+
+bool DataType::operator!=(const arrow::DataType &other) const { return !operator==(other); }
 
 size_t DataType::Size() const {
     switch (type_) {

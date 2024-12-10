@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <concepts>
 #include <vector>
 
@@ -36,33 +37,26 @@ namespace infinity {
 template <typename RawValueType>
 struct SecondaryIndexChunkDataReader {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    static constexpr u32 PairSize = sizeof(OrderedKeyType) + sizeof(SegmentOffset);
     ChunkIndexEntry *chunk_index_;
-    BufferHandle current_handle_;
-    u32 part_count_ = 0;
-    u32 current_offset_ = 0;
-    u32 current_part_id_ = 0;
-    u32 current_part_size_ = 0;
+    BufferHandle handle_;
+    u32 row_count_ = 0;
+    u32 next_offset_ = 0;
+    const void *key_ptr_ = nullptr;
+    const SegmentOffset *offset_ptr_ = nullptr;
     SecondaryIndexChunkDataReader(ChunkIndexEntry *chunk_index) : chunk_index_(chunk_index) {
-        part_count_ = chunk_index_->GetPartNum();
-        current_part_size_ = chunk_index_->GetPartRowCount(current_part_id_);
+        handle_ = chunk_index_->GetIndex();
+        row_count_ = chunk_index_->GetRowCount();
+        auto *index = static_cast<const SecondaryIndexData *>(handle_.GetData());
+        std::tie(key_ptr_, offset_ptr_) = index->GetKeyOffsetPointer();
+        assert(index->GetChunkRowCount() == row_count_);
     }
     bool GetNextDataPair(OrderedKeyType &key, u32 &offset) {
-        if (current_offset_ == 0) {
-            if (current_part_id_ >= part_count_) {
-                return false;
-            }
-            current_handle_ = chunk_index_->GetIndexPartAt(current_part_id_);
+        if (next_offset_ >= row_count_) {
+            return false;
         }
-        const auto *data_ptr = static_cast<const char *>(current_handle_.GetData());
-        std::memcpy(&key, data_ptr + current_offset_ * PairSize, sizeof(OrderedKeyType));
-        std::memcpy(&offset, data_ptr + current_offset_ * PairSize + sizeof(OrderedKeyType), sizeof(SegmentOffset));
-        if (++current_offset_ == current_part_size_) {
-            current_offset_ = 0;
-            if (++current_part_id_ < part_count_) {
-                current_part_size_ = chunk_index_->GetPartRowCount(current_part_id_);
-            }
-        }
+        std::memcpy(&key, static_cast<const char *>(key_ptr_) + next_offset_ * sizeof(OrderedKeyType), sizeof(key));
+        std::memcpy(&offset, offset_ptr_ + next_offset_, sizeof(offset));
+        ++next_offset_;
         return true;
     }
 };
@@ -105,49 +99,37 @@ struct SecondaryIndexChunkMerger {
 template <typename RawValueType>
 class SecondaryIndexDataT final : public SecondaryIndexData {
     using OrderedKeyType = ConvertToOrderedType<RawValueType>;
-    // sorted values in chunk
-    // only for build and save
-    // should not be loaded from file
-    bool need_save_ = false;
     UniquePtr<OrderedKeyType[]> key_;
     UniquePtr<SegmentOffset[]> offset_;
 
 public:
-    static constexpr u32 PairSize = sizeof(OrderedKeyType) + sizeof(SegmentOffset);
-
     SecondaryIndexDataT(const u32 chunk_row_count, const bool allocate) : SecondaryIndexData(chunk_row_count) {
         pgm_index_ = GenerateSecondaryPGMIndex<OrderedKeyType>();
-        if (allocate) {
-            need_save_ = true;
-            LOG_TRACE(fmt::format("SecondaryIndexDataT(): Allocate space for chunk_row_count_: {}", chunk_row_count_));
-            key_ = MakeUnique<OrderedKeyType[]>(chunk_row_count_);
-            offset_ = MakeUnique<SegmentOffset[]>(chunk_row_count_);
-        }
+        key_ = MakeUnique<OrderedKeyType[]>(chunk_row_count_);
+        offset_ = MakeUnique<SegmentOffset[]>(chunk_row_count_);
+        key_ptr_ = key_.get();
+        offset_ptr_ = offset_.get();
     }
 
     void SaveIndexInner(LocalFileHandle &file_handle) const override {
-        if (!need_save_) {
-            String error_message = "SaveIndexInner(): error: SecondaryIndexDataT is not allocated.";
-            UnrecoverableError(error_message);
-        }
+        file_handle.Append(key_ptr_, chunk_row_count_ * sizeof(OrderedKeyType));
+        file_handle.Append(offset_ptr_, chunk_row_count_ * sizeof(SegmentOffset));
         pgm_index_->SaveIndex(file_handle);
     }
 
-    void ReadIndexInner(LocalFileHandle &file_handle) override { pgm_index_->LoadIndex(file_handle); }
+    void ReadIndexInner(LocalFileHandle &file_handle) override {
+        file_handle.Read(key_ptr_, chunk_row_count_ * sizeof(OrderedKeyType));
+        file_handle.Read(offset_ptr_, chunk_row_count_ * sizeof(SegmentOffset));
+        pgm_index_->LoadIndex(file_handle);
+    }
 
-    void InsertData(const void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) override {
-        if (!need_save_) {
-            String error_message = "InsertData(): error: SecondaryIndexDataT is not allocated.";
-            UnrecoverableError(error_message);
-        }
+    void InsertData(const void *ptr) override {
         auto map_ptr = static_cast<const MultiMap<OrderedKeyType, u32> *>(ptr);
         if (!map_ptr) {
-            String error_message = "InsertData(): error: map_ptr type error.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("InsertData(): error: map_ptr type error.");
         }
         if (map_ptr->size() != chunk_row_count_) {
-            String error_message = fmt::format("InsertData(): error: map size: {} != chunk_row_count_: {}", map_ptr->size(), chunk_row_count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("InsertData(): error: map size: {} != chunk_row_count_: {}", map_ptr->size(), chunk_row_count_));
         }
         u32 i = 0;
         for (const auto &[key, offset] : *map_ptr) {
@@ -156,17 +138,12 @@ public:
             ++i;
         }
         if (i != chunk_row_count_) {
-            String error_message = fmt::format("InsertData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_);
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("InsertData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_));
         }
-        OutputAndBuild(chunk_index);
+        pgm_index_->BuildIndex(chunk_row_count_, key_.get());
     }
 
-    void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks, SharedPtr<ChunkIndexEntry> &merged_chunk_index_entry) override {
-        if (!need_save_) {
-            String error_message = "InsertMergeData(): error: SecondaryIndexDataT is not allocated.";
-            UnrecoverableError(error_message);
-        }
+    void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks) override {
         SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
         OrderedKeyType key = {};
         u32 offset = 0;
@@ -177,24 +154,7 @@ public:
             ++i;
         }
         if (i != chunk_row_count_) {
-            String error_message = fmt::format("InsertMergeData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_);
-            UnrecoverableError(error_message);
-        }
-        OutputAndBuild(merged_chunk_index_entry);
-    }
-
-    void OutputAndBuild(SharedPtr<ChunkIndexEntry> &chunk_index) {
-        const u32 part_num = chunk_index->GetPartNum();
-        for (u32 part_id = 0; part_id < part_num; ++part_id) {
-            const u32 part_row_count = chunk_index->GetPartRowCount(part_id);
-            const u32 part_offset = part_id * 8192;
-            BufferHandle handle = chunk_index->GetIndexPartAt(part_id);
-            auto data_ptr = static_cast<char *>(handle.GetDataMut());
-            for (u32 j = 0; j < part_row_count; ++j) {
-                const u32 index = part_offset + j;
-                std::memcpy(data_ptr + j * PairSize, key_.get() + index, sizeof(OrderedKeyType));
-                std::memcpy(data_ptr + j * PairSize + sizeof(OrderedKeyType), offset_.get() + index, sizeof(SegmentOffset));
-            }
+            UnrecoverableError(fmt::format("InsertMergeData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_));
         }
         pgm_index_->BuildIndex(chunk_row_count_, key_.get());
     }
@@ -202,8 +162,7 @@ public:
 
 SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
     if (!(data_type->CanBuildSecondaryIndex())) {
-        String error_message = fmt::format("Cannot build secondary index on data type: {}", data_type->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Cannot build secondary index on data type: {}", data_type->ToString()));
         return nullptr;
     }
     switch (data_type->type()) {
@@ -241,57 +200,8 @@ SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, 
             return new SecondaryIndexDataT<VarcharT>(chunk_row_count, allocate);
         }
         default: {
-            String error_message = fmt::format("Need to add secondary index support for data type: {}", data_type->ToString());
-            UnrecoverableError(error_message);
+            UnrecoverableError(fmt::format("Need to add secondary index support for data type: {}", data_type->ToString()));
             return nullptr;
-        }
-    }
-}
-
-u32 GetSecondaryIndexDataPairSize(const SharedPtr<DataType> &data_type) {
-    if (!(data_type->CanBuildSecondaryIndex())) {
-        String error_message = fmt::format("Cannot build secondary index on data type: {}", data_type->ToString());
-        UnrecoverableError(error_message);
-        return 0;
-    }
-    switch (data_type->type()) {
-        case LogicalType::kTinyInt: {
-            return SecondaryIndexDataT<TinyIntT>::PairSize;
-        }
-        case LogicalType::kSmallInt: {
-            return SecondaryIndexDataT<SmallIntT>::PairSize;
-        }
-        case LogicalType::kInteger: {
-            return SecondaryIndexDataT<IntegerT>::PairSize;
-        }
-        case LogicalType::kBigInt: {
-            return SecondaryIndexDataT<BigIntT>::PairSize;
-        }
-        case LogicalType::kFloat: {
-            return SecondaryIndexDataT<FloatT>::PairSize;
-        }
-        case LogicalType::kDouble: {
-            return SecondaryIndexDataT<DoubleT>::PairSize;
-        }
-        case LogicalType::kDate: {
-            return SecondaryIndexDataT<DateT>::PairSize;
-        }
-        case LogicalType::kTime: {
-            return SecondaryIndexDataT<TimeT>::PairSize;
-        }
-        case LogicalType::kDateTime: {
-            return SecondaryIndexDataT<DateTimeT>::PairSize;
-        }
-        case LogicalType::kTimestamp: {
-            return SecondaryIndexDataT<TimestampT>::PairSize;
-        }
-        case LogicalType::kVarchar: {
-            return SecondaryIndexDataT<VarcharT>::PairSize;
-        }
-        default: {
-            String error_message = fmt::format("Need to add secondary index support for data type: {}", data_type->ToString());
-            UnrecoverableError(error_message);
-            return 0;
         }
     }
 }

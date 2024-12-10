@@ -40,7 +40,7 @@ mem_index_capacity       = 1048576
 storage_type             = "minio"
 
 [storage.object_storage]
-url                      = "127.0.0.1:9000"
+url                      = "127.0.0.1:9005"
 bucket_name              = "infinity"
 access_key               = "minioadmin"
 secret_key               = "minioadmin"

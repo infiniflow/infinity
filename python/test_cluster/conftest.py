@@ -18,6 +18,11 @@ def pytest_addoption(parser):
     parser.addoption(
         "--minio_port",
         action="store",
+        default=9000,
+    )
+    parser.addoption(
+        "--minio_console_port",
+        action="store",
         default=9001,
     )
     parser.addoption(
@@ -55,7 +60,8 @@ def pytest_generate_tests(metafunc):
     infinity_path = metafunc.config.getoption("infinity_path")
     minio_dir = metafunc.config.getoption("minio_dir")
     minio_port = metafunc.config.getoption("minio_port")
-    minio_params = MinioParams(minio_dir, minio_port)
+    minio_console_port = metafunc.config.getoption("minio_console_port")
+    minio_params = MinioParams(minio_dir, minio_port, minio_console_port)
 
     infinity_dir = metafunc.config.getoption("infinity_dir")
     use_sudo = metafunc.config.getoption("use_sudo")
