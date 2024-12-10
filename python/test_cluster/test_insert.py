@@ -42,7 +42,7 @@ class TestInsert:
                 }
             ).astype({"c1": dtype("int32"), "c2": dtype("object")})
 
-            res, extra_result = table1.output(["*"]).to_df()
+            res = table1.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, res_gt)
 
             time.sleep(1)
@@ -51,7 +51,7 @@ class TestInsert:
             infinity2 = cluster.client("node2")
             db2 = infinity2.get_database("default_db")
             table2 = db2.get_table(table_name)
-            res, extra_result = table2.output(["*"]).to_df()
+            res = table2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, res_gt)
 
             res = db1.drop_table(table_name)
@@ -104,7 +104,7 @@ class TestInsert:
             infinity2 = docker_cluster.client("node2")
             db2 = infinity2.get_database("default_db")
             table2 = db2.get_table(table_name)
-            res, extra_result = table2.output(["*"]).to_df()
+            res = table2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, res_gt)
 
             docker_cluster.disconnect("node2")
@@ -121,7 +121,7 @@ class TestInsert:
             docker_cluster.reconnect("node2")
 
             docker_cluster.disconnect("node1")
-            res, extra_result = table2.output(["*"]).to_df()
+            res = table2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, res_gt)
             docker_cluster.reconnect("node1")
 
@@ -169,7 +169,7 @@ class TestInsert:
             infinity2 = docker_cluster.client("node2")
             db2 = infinity2.get_database("default_db")
             table2 = db2.get_table(table_name)
-            res, extra_result = table2.output(["*"]).to_df()
+            res = table2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, res_gt)
 
             # reconnect leader
@@ -189,7 +189,7 @@ class TestInsert:
                     ),
                 }
             ).astype({"c1": dtype("int32"), "c2": dtype("object")})
-            res, extra_result = table2.output(["*"]).to_df()
+            res = table2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, res_gt)
 
             db1.drop_table(table_name)

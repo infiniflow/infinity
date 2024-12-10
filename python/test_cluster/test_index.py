@@ -61,12 +61,12 @@ class TestIndex:
                     "c2": ("text1", "text2"),
                 }
             ).astype({"c1": dtype("int32"), "c2": dtype("object")})
-            res1, extra_result = table_obj1.output(["*"]).filter("c1 < 3").to_df()
+            res1 = table_obj1.output(["*"]).filter("c1 < 3").to_df()
             pd.testing.assert_frame_equal(res1, res_gt)
 
             print("select in node2")
             time.sleep(1)
-            res2, extra_result = table_obj2.output(["*"]).filter("c1 < 3").to_df()
+            res2 = table_obj2.output(["*"]).filter("c1 < 3").to_df()
             # print(res2)
             pd.testing.assert_frame_equal(res2, res_gt)
 

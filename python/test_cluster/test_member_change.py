@@ -148,7 +148,7 @@ def test_cluster_shutdown_and_recover(cluster: InfinityCluster, kill: bool, lead
                 nonlocal insert_line
                 infinity: infinity_http = cluster.client(node_name)
                 table = infinity.get_database("default_db").get_table(table_name)
-                res, extra_result = table.output(["*"]).to_df()
+                res = table.output(["*"]).to_df()
                 if res.shape[0] == insert_line + 1:
                     insert_line += 1
                 logger.debug(f"test_i: {i}, verify data, node_name: {node_name}")

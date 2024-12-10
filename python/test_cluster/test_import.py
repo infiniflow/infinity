@@ -45,7 +45,7 @@ class TestImport:
                 }
             ).astype({"c1": dtype("int32"), "c2": dtype("object")})
 
-            res, extra_result = table_obj1.output(["*"]).to_df()
+            res = table_obj1.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, res_gt)
 
             time.sleep(1)
@@ -54,7 +54,7 @@ class TestImport:
             infinity2 = cluster.client("node2")
             db_obj2 = infinity2.get_database("default_db")
             table_obj2 = db_obj2.get_table(table_name)
-            res, extra_result = table_obj2.output(["*"]).to_df()
+            res = table_obj2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, res_gt)
 
             db_obj1.drop_table(table_name)

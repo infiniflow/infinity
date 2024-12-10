@@ -40,7 +40,7 @@ class TestUpdate:
             res = table_obj.update("c1 = 1", {"c2": 90, "c3": 900})
             assert res.error_code == ErrorCode.OK
 
-            res, extra_result = table_obj.output(["*"]).to_df()
+            res = table_obj.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, pd.DataFrame(
                 {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
                                         .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
@@ -48,7 +48,7 @@ class TestUpdate:
             time.sleep(1)
             db_obj_2 = infinity2.get_database("default_db")
             table_obj_2 = db_obj_2.get_table("test_update")
-            res, extra_result = table_obj_2.output(["*"]).to_df()
+            res = table_obj_2.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, pd.DataFrame(
                 {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
                                         .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))

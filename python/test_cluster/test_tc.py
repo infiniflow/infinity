@@ -78,7 +78,7 @@ def test_tc1(cluster: InfinityCluster):
             }
         ).astype({"c1": dtype("int32"), "c2": dtype("object")})
 
-        res, extra_result = table1.output(["*"]).to_df()
+        res = table1.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, res_gt)
 
         time.sleep(1)
@@ -87,7 +87,7 @@ def test_tc1(cluster: InfinityCluster):
         infinity2 = cluster.client("node2")
         db2 = infinity2.get_database("default_db")
         table2 = db2.get_table(table_name)
-        res, extra_result = table2.output(["*"]).to_df()
+        res = table2.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, res_gt)
 
         try:
@@ -154,12 +154,12 @@ def test_tc1(cluster: InfinityCluster):
             }
         ).astype({"c1": dtype("int32"), "c2": dtype("object")})
 
-        res, extra_result = table1.output(["*"]).to_df()
+        res = table1.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, res_gt)
 
         db2 = infinity2.get_database("default_db")
         table2 = db2.get_table(table_name)
-        res, extra_result = table2.output(["*"]).to_df()
+        res = table2.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, res_gt)
 
         cluster.set_admin("node2")
@@ -185,9 +185,9 @@ def test_tc1(cluster: InfinityCluster):
         assert (res.node_role == "leader")
         assert (res.node_status == "alive")
 
-        res, extra_result = table1.output(["*"]).to_df()
+        res = table1.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, res_gt)
-        res, extra_result = table2.output(["*"]).to_df()
+        res = table2.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, res_gt)
 
         res = db1.drop_table(table_name, ConflictType.Ignore)
@@ -282,7 +282,7 @@ def test_tc2(cluster: InfinityCluster):
         for server in [infinity1, infinity2, infinity3, infinity4]:
             db = server.get_database("default_db")
             table = db.get_table(table_name)
-            res, extra_result = table.output(["*"]).to_df()
+            res = table.output(["*"]).to_df()
             pd.testing.assert_frame_equal(res, res_gt)
 
         res = db1.drop_table(table_name)

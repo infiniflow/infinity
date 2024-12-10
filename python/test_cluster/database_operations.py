@@ -22,7 +22,7 @@ class instance_state:
                 tables = db_object.get_all_tables()
                 for table_name in tables:
                     table_object = db_object.get_table(table_name)
-                    df, extra_result = table_object.output(["*"]).to_df()
+                    df= table_object.output(["*"]).to_df()
                     res, _, _ = table_object.output(["*"]).to_result()
                     # print(f"instance_state initializing, table {db_name}.{table_name}")
                     # print(res)
@@ -155,7 +155,7 @@ def clear_instance(state : instance_state, client : infinity_http.infinity_http)
 def check_instance_table_equal(state : instance_state, client : infinity_http.infinity_http, db_name : str, table_name : str):
     db_obj = client.get_database(db_name)
     table_obj = db_obj.get_table(table_name)
-    res, extra_result = table_obj.output(["*"]).to_df()
+    res = table_obj.output(["*"]).to_df()
     expected = state.get_table_df(db_name, table_name)
     # print("res = ")
     # print(res)

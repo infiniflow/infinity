@@ -47,13 +47,13 @@ class TestKnn:
             res = table_obj.import_data(test_csv_dir, None)
             assert res.error_code == ErrorCode.OK
 
-            res, extra_result = table_obj.output(["variant_id", "_row_id"]).match_dense("gender_vector", [1.0] * 4, "float", "ip", 10).to_pl()
+            res = table_obj.output(["variant_id", "_row_id"]).match_dense("gender_vector", [1.0] * 4, "float", "ip", 10).to_pl()
             print(res)
 
             time.sleep(1)
             db_obj_2 = infinity2.get_database("default_db")
             table_obj_2 = db_obj_2.get_table("test_knn")
-            res, extra_result = table_obj_2.output(["variant_id", "_row_id"]).match_dense("gender_vector", [1.0] * 4, "float", "ip", 10).to_pl()
+            res = table_obj_2.output(["variant_id", "_row_id"]).match_dense("gender_vector", [1.0] * 4, "float", "ip", 10).to_pl()
             print(res)
 
             res = db_obj.drop_table("test_knn", ConflictType.Error)
