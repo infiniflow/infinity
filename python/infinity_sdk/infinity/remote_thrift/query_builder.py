@@ -516,7 +516,7 @@ class InfinityThriftQueryBuilder(ABC):
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,
-            total_hits_count = self._total_hits_count,
+            total_hits_count=self._total_hits_count,
         )
         self.reset()
         return self._table._execute_query(query)
@@ -535,7 +535,7 @@ class InfinityThriftQueryBuilder(ABC):
 
     def to_arrow(self) -> (Table, Any):
         dataframe, extra_result = self.to_df()
-        return pa.Table.from_pandas(dataframe), extra_result
+        return pa.Table.from_pandas(None, dataframe), extra_result
 
     def explain(self, explain_type=ExplainType.Physical) -> Any:
         query = ExplainQuery(

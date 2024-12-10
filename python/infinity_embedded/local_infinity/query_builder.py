@@ -28,7 +28,8 @@ class Query(ABC):
         group_by: Optional[List[WrapParsedExpr]],
         limit: Optional[WrapParsedExpr],
         offset: Optional[WrapParsedExpr],
-        sort: Optional[List[WrapOrderByExpr]]
+        sort: Optional[List[WrapOrderByExpr]],
+        total_hits_count: Optional[bool]
     ):
         self.columns = columns
         self.highlight = highlight
@@ -38,6 +39,7 @@ class Query(ABC):
         self.limit = limit
         self.offset = offset
         self.sort = sort
+        self.total_hits_count = total_hits_count
 
 
 class ExplainQuery(Query):
@@ -68,6 +70,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._limit = None
         self._offset = None
         self._sort = None
+        self._total_hits_count = None
 
     def reset(self):
         self._columns = None
@@ -78,6 +81,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._limit = None
         self._offset = None
         self._sort = None
+        self._total_hits_count = None
 
     def match_dense(
         self,
@@ -528,6 +532,12 @@ class InfinityLocalQueryBuilder(ABC):
         self._highlight = highlight_list
         return self
 
+    def option(self, option_kv: {}):
+        if 'total_hits_count' in option_kv:
+            if isinstance(option_kv['total_hits_count'], bool):
+                self._total_hits_count = option_kv['total_hits_count']
+        return self
+
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]) -> InfinityLocalQueryBuilder:
         sort_list: List[WrapOrderByExpr] = []
 
@@ -654,7 +664,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._sort = sort_list
         return self
 
-    def to_result(self):
+    def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any], Any]:
         query = Query(
             columns=self._columns,
             highlight=self._highlight,
@@ -664,23 +674,26 @@ class InfinityLocalQueryBuilder(ABC):
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,
+            total_hits_count = self._total_hits_count,
         )
         self.reset()
         return self._table._execute_query(query)
 
-    def to_df(self) -> pd.DataFrame:
+    def to_df(self) -> (pd.DataFrame, Any):
         df_dict = {}
-        data_dict, data_type_dict = self.to_result()
+        data_dict, data_type_dict, extra_result = self.to_result()
         for k, v in data_dict.items():
             data_series = pd.Series(v, dtype=logic_type_to_dtype(data_type_dict[k]))
             df_dict[k] = data_series
-        return pd.DataFrame(df_dict)
+        return pd.DataFrame(df_dict), extra_result
 
-    def to_pl(self) -> pl.DataFrame:
-        return pl.from_pandas(self.to_df())
+    def to_pl(self) -> (pl.DataFrame, Any):
+        dataframe, extra_result = self.to_df()
+        return pl.from_pandas(dataframe), extra_result
 
-    def to_arrow(self) -> Table:
-        return pa.Table.from_pandas(self.to_df())
+    def to_arrow(self) -> (Table, Any):
+        dataframe, extra_result = self.to_df()
+        return pa.Table.from_pandas(None, dataframe), extra_result
 
     def explain(self, explain_type=ExplainType.kPhysical) -> Any:
         query = ExplainQuery(

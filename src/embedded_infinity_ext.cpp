@@ -326,6 +326,7 @@ NB_MODULE(embedded_infinity_ext, m) {
              nb::arg("highlight_list"),
              nb::arg("order_by_list"),
              nb::arg("group_by_list"),
+             nb::arg("total_hits_count_flag"),
              nb::arg("wrap_search_expr") = nullptr,
              nb::arg("where_expr") = nullptr,
              nb::arg("limit_expr") = nullptr,
