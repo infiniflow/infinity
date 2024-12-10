@@ -188,13 +188,13 @@ TestMemIndex::~TestMemIndex() {
     }
 }
 
-void TestMemIndex::AddMemUsed(SizeT usage, SizeT row_cnt) {
+void TestMemIndex::IncreaseMemoryUsage(SizeT usage, SizeT row_cnt) {
     {
         std::lock_guard lck(mtx_);
         mem_used_ += usage;
         row_count_ += row_cnt;
     }
-    tracer_->AddMemUsed(usage);
+    tracer_->IncreaseMemoryUsage(usage);
 }
 
 void TestMemIndexTracer::HandleDump(UniquePtr<DumpIndexTask> task) {
