@@ -43,7 +43,7 @@ MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return {};
             } else {
-                return {index->GetSizeInBytes(), index->DocNum()};
+                return {index->MemoryUsage(), index->DocNum()};
             }
         },
         bmp_);
@@ -163,7 +163,7 @@ void BMPIndexInMem::AddDocs(const SegmentEntry *segment_entry, BufferManager *bu
         bmp_);
 }
 
-SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) {
+SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size) {
     if (!own_memory_) {
         UnrecoverableError("BMPIndexInMem::Dump() called with own_memory_ = false.");
     }
@@ -177,7 +177,9 @@ SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_
             } else {
                 row_count = index->DocNum();
                 index_size = index->GetSizeInBytes();
-                DecreaseMemoryUsage(index->MemoryUsage());
+                if (dump_size != nullptr) {
+                    *dump_size = index->MemoryUsage();
+                }
             }
         },
         bmp_);

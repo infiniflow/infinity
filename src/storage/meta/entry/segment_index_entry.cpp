@@ -379,7 +379,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_bmp_index_.get() == nullptr) {
                 return nullptr;
             }
-            chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager_);
+            chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager_, dump_size);
             chunk_index_entry->SaveIndexFile();
             std::unique_lock lck(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);

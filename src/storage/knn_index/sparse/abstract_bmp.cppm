@@ -119,7 +119,7 @@ public:
 
     AbstractBMP &get_ref() { return bmp_; }
 
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
 
 private:
     RowID begin_row_id_ = {};
