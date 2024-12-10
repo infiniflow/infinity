@@ -257,7 +257,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             }
 
             if(result.result_table_->total_hits_count_flag_) {
-                response["total_hits_count"] = result.result_table_->row_count();
+                response["total_hits_count"] = result.result_table_->total_hits_count_;
             }
 
             response["error_code"] = 0;

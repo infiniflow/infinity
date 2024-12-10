@@ -221,11 +221,7 @@ bool PhysicalLimit::Execute(QueryContext *query_context,
     }
 
     if (total_hits_count_flag) {
-        for (SizeT block_id = block_start_idx; block_id < input_blocks.size(); ++block_id) {
-            auto &input_block = input_blocks[block_id];
-            auto row_count = input_block->row_count();
-            counter->AddHitsCount(row_count);
-        }
+        counter->AddHitsCount(input_row_count);
     }
 
     return true;

@@ -589,6 +589,7 @@ export struct MaterializeSinkState : public SinkState {
 
     bool empty_result_{false};
     bool total_hits_count_flag_{false};
+    SizeT total_hits_count_{};
 };
 
 export struct ResultSinkState : public SinkState {
