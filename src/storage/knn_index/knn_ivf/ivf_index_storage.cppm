@@ -58,7 +58,7 @@ class IVF_Parts_Storage {
     SizeT memory_used_ = 0;
 
 protected:
-    void AddMemUsed(SizeT mem_usage) { memory_used_ += mem_usage; }
+    void IncreaseMemoryUsage(SizeT mem_usage) { memory_used_ += mem_usage; }
     void DecMemUsed(SizeT mem_decreased) { memory_used_ -= mem_decreased; }
     SizeT row_memory_cost_ = 0;
     explicit IVF_Parts_Storage(const u32 embedding_dimension, const u32 centroids_num)
@@ -81,7 +81,7 @@ public:
                                     const void *embedding_ptr,
                                     SegmentOffset segment_offset,
                                     const IVF_Centroids_Storage *ivf_centroids_storage) {
-        AddMemUsed(row_memory_cost_);
+        IncreaseMemoryUsage(row_memory_cost_);
         AppendOneEmbedding(part_id, embedding_ptr, segment_offset, ivf_centroids_storage);
     }
 

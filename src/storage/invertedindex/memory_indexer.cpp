@@ -430,13 +430,13 @@ void MemoryIndexer::ApplyMemUseChange(MemUsageChange mem_change) {
 
 void MemoryIndexer::IncreaseMemoryUsage(SizeT mem) {
     mem_used_ += mem;
-    BaseMemIndex::AddMemUsed(mem);
+    BaseMemIndex::IncreaseMemoryUsageBase(mem);
 }
 
 void MemoryIndexer::DecreaseMemoryUsage(SizeT mem) {
     assert(mem_used_ >= mem);
     mem_used_ -= mem;
-    BaseMemIndex::DecreaseMemoryUsage(mem);
+    BaseMemIndex::DecreaseMemoryUsageBase(mem);
 }
 
 void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>> &merger) {

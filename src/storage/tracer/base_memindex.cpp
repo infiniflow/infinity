@@ -14,24 +14,22 @@
 
 module;
 
-export module base_memindex;
+module base_memindex;
 
 import stl;
 import memindex_tracer;
+import infinity_context;
 
 namespace infinity {
 
-struct TableIndexEntry;
+void BaseMemIndex::IncreaseMemoryUsageBase(SizeT mem) {
+    auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+    memindex_tracer->IncreaseMemoryUsage(mem);
+}
 
-export class BaseMemIndex {
-public:
-    virtual MemIndexTracerInfo GetInfo() const = 0;
+void BaseMemIndex::DecreaseMemoryUsageBase(SizeT mem) {
+    auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+    memindex_tracer->DecreaseMemUsed(mem);
+}
 
-    virtual TableIndexEntry *table_index_entry() const = 0;
-
-protected:
-    void IncreaseMemoryUsageBase(SizeT mem);
-    void DecreaseMemoryUsageBase(SizeT mem);
-};
-
-} // namespace infinity
+}

@@ -193,7 +193,7 @@ public:
         SizeT mem2 = MemoryUsed();
         LOG_TRACE(fmt::format("ivf mem usage = {}", mem2));
         LOG_TRACE(fmt::format("ivf mem added = {}", mem2 - mem1));
-        AddMemUsed(mem2 > mem1 ? mem2 - mem1 : 0);
+        IncreaseMemoryUsageBase(mem2 > mem1 ? mem2 - mem1 : 0);
     }
 
     void BuildIndex() {
