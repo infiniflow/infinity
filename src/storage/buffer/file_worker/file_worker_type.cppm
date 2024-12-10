@@ -29,7 +29,6 @@ export enum class FileWorkerType {
     kHNSWIndexFile,
     kRawFile,
     kSecondaryIndexFile,
-    kSecondaryIndexPartFile,
     kVersionDataFile,
     kIndexFile,
     kEMVBIndexFile,
@@ -56,9 +55,6 @@ export String FileWorkerType2Str(FileWorkerType type) {
         }
         case FileWorkerType::kSecondaryIndexFile: {
             return "secondary index";
-        }
-        case FileWorkerType::kSecondaryIndexPartFile: {
-            return "secondary index part";
         }
         case FileWorkerType::kVersionDataFile: {
             return "version data";

@@ -145,40 +145,36 @@ class SecondaryPGMIndexTemplate final : public SecondaryPGMIndex {
 public:
     SecondaryPGMIndexTemplate() = default;
 
-    ~SecondaryPGMIndexTemplate() final = default;
+    ~SecondaryPGMIndexTemplate() override = default;
 
-    void SaveIndex(LocalFileHandle &file_handle) const final {
+    void SaveIndex(LocalFileHandle &file_handle) const override {
         if (!initialized_) {
-            String error_message = "Not initialized yet.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not initialized yet.");
         }
         pgm_index_->Save(file_handle);
     }
 
-    void LoadIndex(LocalFileHandle &file_handle) final {
+    void LoadIndex(LocalFileHandle &file_handle) override {
         if (initialized_) {
-            String error_message = "Already initialized.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Already initialized.");
         }
         pgm_index_ = MakeUnique<PGMWithExtraFunction<IndexValueType>>();
         pgm_index_->Load(file_handle);
         initialized_ = true;
     }
 
-    void BuildIndex(SizeT data_cnt, const void *data_ptr) final {
+    void BuildIndex(SizeT data_cnt, const void *data_ptr) override {
         if (initialized_) {
-            String error_message = "Already initialized.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Already initialized.");
         }
         auto typed_data_ptr = static_cast<const IndexValueType *>(data_ptr);
         pgm_index_ = MakeUnique<PGMWithExtraFunction<IndexValueType>>(typed_data_ptr, typed_data_ptr + data_cnt);
         initialized_ = true;
     }
 
-    SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const final {
+    SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const override {
         if (!initialized_) {
-            String error_message = "Not initialized yet.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not initialized yet.");
         }
         auto val = *(static_cast<const IndexValueType *>(val_ptr));
         auto [pos, lo, hi] = pgm_index_->search(val);
