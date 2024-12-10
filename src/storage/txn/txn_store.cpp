@@ -296,9 +296,6 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
 }
 
 void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
-    if (added_txn_num_) {
-        table_entry_->DecWriteTxnNum();
-    }
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
         Catalog::RollbackAppend(table_entry_, txn_id, abort_ts, this);
@@ -452,9 +449,6 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
                 break;
             }
         }
-    }
-    if (added_txn_num_) {
-        table_entry_->DecWriteTxnNum();
     }
 }
 
@@ -679,8 +673,6 @@ void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts) {
     for (auto [table_entry, ptr_seq_n] : txn_tables_) {
         table_entry->Commit(commit_ts);
     }
-
-    this->RevertTableStatus();
 }
 
 void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
@@ -699,8 +691,6 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         db_entry->Cleanup();
         catalog_->RemoveDBEntry(db_entry, txn_id);
     }
-
-    this->RevertTableStatus();
 }
 
 bool TxnStore::ReadOnly() const {
@@ -738,6 +728,11 @@ void TxnStore::RevertTableStatus() {
             table_store->GetTableEntry()->SetCreateIndexDone();
         }
         return;
+    }
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        if (table_store->AddedTxnNum()) {
+            table_store->GetTableEntry()->DecWriteTxnNum();
+        }
     }
 }
 

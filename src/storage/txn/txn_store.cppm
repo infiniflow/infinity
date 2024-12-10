@@ -165,6 +165,8 @@ public: // Setter, Getter
 
     void AddWriteTxnNum() { added_txn_num_ = true; }
 
+    bool AddedTxnNum() const { return added_txn_num_; }
+
 private:
     std::mutex mtx_{};
 
