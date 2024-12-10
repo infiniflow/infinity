@@ -23,7 +23,7 @@ class instance_state:
                 for table_name in tables:
                     table_object = db_object.get_table(table_name)
                     df= table_object.output(["*"]).to_df()
-                    res, _, _ = table_object.output(["*"]).to_result()
+                    res, _ = table_object.output(["*"]).to_result()
                     # print(f"instance_state initializing, table {db_name}.{table_name}")
                     # print(res)
                     self.add_table(db_name, table_name, ConflictType.Ignore)
