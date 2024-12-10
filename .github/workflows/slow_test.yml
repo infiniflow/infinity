@@ -126,7 +126,7 @@ jobs:
           # Fix sanitizer: https://github.com/ClickHouse/ClickHouse/issues/64086
           old_value=$(sudo sysctl -n vm.mmap_rnd_bits)
           sudo sysctl -w vm.mmap_rnd_bits=28
-          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY} && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY}"
+          sudo docker exec ${TESTER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && export INF_DIRECTORY=`cat .tester_env` && echo INF_DIRECTORY=${INF_DIRECTORY} && python3 tools/run_cluster_test.py --infinity_path=cmake-build-debug/src/infinity --infinity_dir=${INF_DIRECTORY} --minio_port=9005 --minio_console_port=9006"
           sudo sysctl -w vm.mmap_rnd_bits=$old_value
 
       - name: Collect thread sanitizer output in cluster test

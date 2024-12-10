@@ -11,6 +11,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     table_name = "parquet_embedding_table"
     table_name1 = "parquet_embedding_table1"
+    table_name_err = "parquet_embedding_table_err"
     parquet_filename = "gen_embedding.parquet"
     parquet_filename1 = "gen_embedding1.parquet"
     parquet_path = parquet_dir + "/" + parquet_filename
@@ -54,9 +55,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} (c1 INT, c2 EMBEDDING(INT, {}));\n".format(
-                table_name, dim
-            )
+            "CREATE TABLE {} (c1 INT, c2 EMBEDDING(INT, {}));\n".format(table_name, dim)
         )
         slt_file.write("\n")
 
@@ -91,7 +90,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} (c1 INT, c2 EMBEDDING(INT, {}));\n".format(table_name1, dim)
+            "CREATE TABLE {} (c1 INT, c2 EMBEDDING(INT, {}));\n".format(
+                table_name1, dim
+            )
         )
         slt_file.write("\n")
 
@@ -120,6 +121,31 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("\n")
+
+        # import with incompactible schema
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name_err))
+        slt_file.write("\n")
+
+        slt_file.write("statement ok\n")
+        slt_file.write(
+            "CREATE TABLE {} (c1 INT, c2 EMBEDDING(INT, {}));\n".format(
+                table_name_err, dim + 1
+            )
+        )
+        slt_file.write("\n")
+
+        slt_file.write("statement error\n")
+        slt_file.write(
+            "COPY {} FROM '{}' WITH (FORMAT PARQUET);\n".format(
+                table_name_err, copy_path
+            )
+        )
+        slt_file.write("\n")
+
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name_err))
         slt_file.write("\n")
 
 
