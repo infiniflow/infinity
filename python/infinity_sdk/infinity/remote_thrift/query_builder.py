@@ -506,7 +506,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._sort = sort_list
         return self
 
-    def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any], {}]:
+    def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any], Any]:
         query = Query(
             columns=self._columns,
             highlight=self._highlight,
@@ -521,7 +521,7 @@ class InfinityThriftQueryBuilder(ABC):
         self.reset()
         return self._table._execute_query(query)
 
-    def to_df(self) -> (pd.DataFrame, {}):
+    def to_df(self) -> (pd.DataFrame, Any):
         df_dict = {}
         data_dict, data_type_dict, extra_result = self.to_result()
         for k, v in data_dict.items():
@@ -529,11 +529,11 @@ class InfinityThriftQueryBuilder(ABC):
             df_dict[k] = data_series
         return pd.DataFrame(df_dict), extra_result
 
-    def to_pl(self) -> (pl.DataFrame, {}):
+    def to_pl(self) -> (pl.DataFrame, Any):
         dataframe, extra_result = self.to_df()
         return pl.from_pandas(dataframe), extra_result
 
-    def to_arrow(self) -> (Table, {}):
+    def to_arrow(self) -> (Table, Any):
         dataframe, extra_result = self.to_df()
         return pa.Table.from_pandas(dataframe), extra_result
 

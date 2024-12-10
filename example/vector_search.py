@@ -61,13 +61,15 @@ try:
         ]
     )
 
-    result = (table_instance.
-              output(["num", "vec", "_similarity"]).
-              match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3).
-              option({"total_hits_count": True}).
-              to_pl())
+    result, extra_result = (table_instance.
+                            output(["num", "vec", "_similarity"]).
+                            match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3).
+                            option({"total_hits_count": False}).
+                            to_pl())
 
     print(result)
+    if extra_result is not None:
+        print(extra_result)
     infinity_instance.disconnect()
 
     print('test done')

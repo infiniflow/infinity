@@ -475,7 +475,9 @@ void PhysicalSink::FillSinkStateFromLastOperatorState(FragmentContext *fragment_
                                                       queue_sink_state->task_id_,
                                                       idx,
                                                       output_data_block_count,
-                                                      task_operator_state->Complete());
+                                                      task_operator_state->Complete(),
+                                                      task_operator_state->total_hits_count_flag_,
+                                                      task_operator_state->total_hits_count_);
         if (task_operator_state->Complete() && !fragment_context->IsMaterialize()) {
             fragment_data->data_idx_ = None;
         }

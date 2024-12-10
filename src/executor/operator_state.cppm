@@ -60,6 +60,9 @@ export struct OperatorState {
 
     bool complete_{false};
 
+    bool total_hits_count_flag_{};
+    SizeT total_hits_count_{};
+
     inline void SetComplete() { complete_ = true; }
 
     inline bool Complete() const { return complete_; }
@@ -235,7 +238,6 @@ export struct TopOperatorState : public OperatorState {
 // Projection
 export struct ProjectionOperatorState : public OperatorState {
     inline explicit ProjectionOperatorState() : OperatorState(PhysicalOperatorType::kProjection) {}
-    bool total_hits_count_flag_{false};
 };
 
 // Sort

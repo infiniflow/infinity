@@ -395,7 +395,7 @@ def build_result(res: ttypes.SelectResponse) -> tuple[dict[str | Any, list[Any, 
         data_dict[column_name] = data_list
         data_type_dict[column_name] = column_data_type
 
-    extra_result = {}
+    extra_result = None
     if res.extra_result is not None:
         try:
             extra_result = json.loads(res.extra_result)

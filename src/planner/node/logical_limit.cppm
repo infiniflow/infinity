@@ -28,9 +28,12 @@ namespace infinity {
 
 export class LogicalLimit : public LogicalNode {
 public:
-    inline explicit LogicalLimit(u64 node_id, SharedPtr<BaseExpression> limit_expression, SharedPtr<BaseExpression> offset_expression)
+    inline explicit LogicalLimit(u64 node_id,
+                                 SharedPtr<BaseExpression> limit_expression,
+                                 SharedPtr<BaseExpression> offset_expression,
+                                 bool total_hits_count_flag)
         : LogicalNode(node_id, LogicalNodeType::kLimit), limit_expression_(std::move(limit_expression)),
-          offset_expression_(std::move(offset_expression)) {}
+          offset_expression_(std::move(offset_expression)), total_hits_count_flag_(total_hits_count_flag) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -44,6 +47,8 @@ public:
 
     SharedPtr<BaseExpression> limit_expression_{};
     SharedPtr<BaseExpression> offset_expression_{};
+
+    bool total_hits_count_flag_{false};
 };
 
 } // namespace infinity

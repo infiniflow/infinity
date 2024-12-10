@@ -36,10 +36,11 @@ public:
                                SharedPtr<BaseExpression> limit_expression,
                                SharedPtr<BaseExpression> offset_expression,
                                Vector<SharedPtr<BaseExpression>> sort_expressions,
-                               Vector<OrderType> order_by_types)
+                               Vector<OrderType> order_by_types,
+                               bool total_hits_count_flag)
         : LogicalNode(node_id, LogicalNodeType::kTop), base_table_ref_(std::move(base_table_ref)), limit_expression_(std::move(limit_expression)),
           offset_expression_(std::move(offset_expression)), sort_expressions_(std::move(sort_expressions)),
-          order_by_types_(std::move(order_by_types)) {}
+          order_by_types_(std::move(order_by_types)), total_hits_count_flag_(total_hits_count_flag) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -56,6 +57,7 @@ public:
     SharedPtr<BaseExpression> offset_expression_{};
     Vector<SharedPtr<BaseExpression>> sort_expressions_{};
     Vector<OrderType> order_by_types_{};
+    bool total_hits_count_flag_{};
 };
 
 } // namespace infinity

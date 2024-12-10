@@ -72,9 +72,10 @@ public:
                          u32 offset,
                          Vector<SharedPtr<BaseExpression>> sort_expressions,
                          Vector<OrderType> order_by_types,
-                         SharedPtr<Vector<LoadMeta>> load_metas)
+                         SharedPtr<Vector<LoadMeta>> load_metas,
+                         bool total_hits_count_flag)
         : PhysicalOperator(PhysicalOperatorType::kTop, std::move(left), nullptr, id, load_metas), limit_(limit), offset_(offset),
-          order_by_types_(std::move(order_by_types)), sort_expressions_(std::move(sort_expressions)) {}
+          order_by_types_(std::move(order_by_types)), sort_expressions_(std::move(sort_expressions)), total_hits_count_flag_(total_hits_count_flag) {}
 
     ~PhysicalTop() override = default;
 
@@ -122,6 +123,7 @@ private:
     Vector<OrderType> order_by_types_;                   // ASC or DESC
     Vector<SharedPtr<BaseExpression>> sort_expressions_; // expressions to sort
     CompareTwoRowAndPreferLeft prefer_left_function_;    // compare function
+    bool total_hits_count_flag_{};
     // TODO: save a common threshold value for all tasks
 };
 

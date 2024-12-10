@@ -33,10 +33,9 @@ public:
     inline LogicalProject(u64 node_id,
                           Vector<SharedPtr<BaseExpression>> expressions,
                           u64 projection_index,
-                          Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns,
-                          bool total_hits_count_flag)
+                          Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns)
         : LogicalNode(node_id, LogicalNodeType::kProjection), expressions_(std::move(expressions)), table_index_(projection_index),
-          highlight_columns_(std::move(highlight_columns)), total_hits_count_flag_(total_hits_count_flag) {}
+          highlight_columns_(std::move(highlight_columns)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
