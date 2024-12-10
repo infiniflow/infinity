@@ -23,6 +23,7 @@ import third_party;
 import config;
 import infinity_context;
 import analyzer;
+import tokenizer;
 import stemmer;
 import chinese_analyzer;
 import traditional_chinese_analyzer;
@@ -247,6 +248,19 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
         }
         case Str2Int(STANDARD.data()): {
             UniquePtr<StandardAnalyzer> analyzer = MakeUnique<StandardAnalyzer>();
+
+            TokenizeConfig token_config;
+            // String allow_str("-");
+            String divide_str("@#$");
+            String unite_str("/");
+            // Allow("-"): 2012-02-14 => 2012-02-14
+            // Divide: delimiters
+            // Unite: 2012/02/14 => 20120214
+            // token_config.AddAllows(allow_str);
+            token_config.AddDivides(divide_str);
+            token_config.AddUnites(unite_str);
+            analyzer->SetTokenizerConfig(token_config);
+
             Language lang = STEM_LANG_ENGLISH;
             const char *str = name.data();
             while (*str != '\0' && *str != '-') {

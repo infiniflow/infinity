@@ -34,14 +34,14 @@ public:
 
     virtual ~Analyzer() = default;
 
-    void SetInnerAnalyzer(SharedPtr<Analyzer> &analyzer) { inner_analyzer_ = analyzer; }
-
     void SetExtractSpecialChar(bool extract_special_char, bool convert_to_placeholder = true) {
         extract_special_char_ = extract_special_char;
         convert_to_placeholder_ = convert_to_placeholder;
     }
 
     void SetCharOffset(bool set) { get_char_offset_ = set; }
+
+    void SetTokenizerConfig(const TokenizeConfig &conf) { tokenizer_.SetConfig(conf); }
 
     int Analyze(const Term &input, TermList &output) {
         void *array[2] = {&output, this};
@@ -84,7 +84,6 @@ protected:
 
     Tokenizer tokenizer_;
 
-    SharedPtr<Analyzer> inner_analyzer_;
     /// Whether including speical characters (e.g. puncutations) in the result.
     bool extract_special_char_;
 
