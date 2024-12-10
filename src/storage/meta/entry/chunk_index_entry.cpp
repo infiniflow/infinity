@@ -73,18 +73,12 @@ ChunkIndexEntry::~ChunkIndexEntry() {}
 
 ChunkIndexEntry::ChunkIndexEntry(const ChunkIndexEntry &other)
     : BaseEntry(other), chunk_id_(other.chunk_id_), segment_index_entry_(other.segment_index_entry_), base_name_(other.base_name_),
-      base_rowid_(other.base_rowid_), row_count_(other.row_count_), deprecate_ts_(other.deprecate_ts_.load()), buffer_obj_(other.buffer_obj_),
-      part_buffer_objs_(other.part_buffer_objs_) {}
+      base_rowid_(other.base_rowid_), row_count_(other.row_count_), deprecate_ts_(other.deprecate_ts_.load()), buffer_obj_(other.buffer_obj_) {}
 
 UniquePtr<ChunkIndexEntry> ChunkIndexEntry::Clone(SegmentIndexEntry *segment_index_entry) const {
     auto ret = UniquePtr<ChunkIndexEntry>(new ChunkIndexEntry(*this));
     if (buffer_obj_ != nullptr) {
         buffer_obj_->AddObjRc();
-    }
-    for (auto *part_buffer_obj : part_buffer_objs_) {
-        if (part_buffer_obj != nullptr) {
-            part_buffer_obj->AddObjRc();
-        }
     }
     ret->segment_index_entry_ = segment_index_entry;
     return ret;
@@ -165,21 +159,6 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewSecondaryIndexChunkIndexEntry(Chu
                                                                 row_count,
                                                                 buffer_mgr->persistence_manager());
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-        const u32 part_cnt = (row_count + 8191) / 8192;
-        for (u32 i = 0; i < part_cnt; ++i) {
-            auto part_name = MakeShared<String>(fmt::format("{}_part{}", *secondary_index_file_name, i));
-            auto part_file_worker = MakeUnique<SecondaryIndexFileWorkerParts>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                              index_dir,
-                                                                              std::move(part_name),
-                                                                              index_base,
-                                                                              column_def,
-                                                                              row_count,
-                                                                              i,
-                                                                              buffer_mgr->persistence_manager());
-            BufferObj *part_ptr = buffer_mgr->AllocateBufferObject(std::move(part_file_worker));
-            chunk_index_entry->part_buffer_objs_.push_back(part_ptr);
-        }
     }
     return chunk_index_entry;
 }
@@ -315,7 +294,6 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                                     row_count,
                                                                     buffer_mgr->persistence_manager());
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
-            chunk_index_entry->LoadPartsReader(buffer_mgr);
             break;
         }
         case IndexType::kIVF: {
@@ -412,12 +390,6 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
             info_tracer->AddCleanupInfo(buffer_obj_->GetFilename());
         }
     }
-    for (auto &part_buffer_obj : part_buffer_objs_) {
-        part_buffer_obj->PickForCleanup();
-        if (info_tracer) {
-            info_tracer->AddCleanupInfo(part_buffer_obj->GetFilename());
-        }
-    }
     if (!dropped) {
         return;
     }
@@ -460,11 +432,7 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
 
 Vector<String> ChunkIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
     Vector<String> res;
-    res.reserve(part_buffer_objs_.size() + 1);
     res.emplace_back(buffer_obj_->GetFilename());
-    for (auto *buffer_obj : part_buffer_objs_) {
-        res.emplace_back(buffer_obj->GetFilename());
-    }
     return res;
 }
 
@@ -473,34 +441,6 @@ void ChunkIndexEntry::SaveIndexFile() {
         return;
     }
     buffer_obj_->Save();
-    for (auto *part_buffer_obj : part_buffer_objs_) {
-        part_buffer_obj->Save();
-    }
-}
-
-void ChunkIndexEntry::LoadPartsReader(BufferManager *buffer_mgr) {
-    const auto &index_dir = segment_index_entry_->index_dir();
-    SegmentID segment_id = segment_index_entry_->segment_id();
-    String secondary_index_file_name = IndexFileName(segment_id, chunk_id_);
-    const auto &index_base = segment_index_entry_->table_index_entry()->table_index_def();
-    const auto &column_def = segment_index_entry_->table_index_entry()->column_def();
-    const u32 part_cnt = (row_count_ + 8191) / 8192;
-    part_buffer_objs_.clear();
-    part_buffer_objs_.reserve(part_cnt);
-    for (u32 i = 0; i < part_cnt; ++i) {
-        auto part_name = MakeShared<String>(fmt::format("{}_part{}", secondary_index_file_name, i));
-        auto part_file_worker = MakeUnique<SecondaryIndexFileWorkerParts>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                          MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                          index_dir,
-                                                                          std::move(part_name),
-                                                                          index_base,
-                                                                          column_def,
-                                                                          row_count_,
-                                                                          i,
-                                                                          buffer_mgr->persistence_manager());
-        BufferObj *part_ptr = buffer_mgr->GetBufferObject(std::move(part_file_worker));
-        part_buffer_objs_.push_back(part_ptr);
-    }
 }
 
 void ChunkIndexEntry::DeprecateChunk(TxnTimeStamp commit_ts) {
@@ -509,20 +449,12 @@ void ChunkIndexEntry::DeprecateChunk(TxnTimeStamp commit_ts) {
     LOG_INFO(fmt::format("Deprecate chunk {}, ts: {}", encode(), commit_ts));
 }
 
-BufferHandle ChunkIndexEntry::GetIndexPartAt(u32 i) { return part_buffer_objs_.at(i)->Load(); }
-
 bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
     if (txn == nullptr) {
         return deprecate_ts_.load() == UNCOMMIT_TS;
     }
     TxnTimeStamp begin_ts = txn->BeginTS();
     return begin_ts < deprecate_ts_.load() && BaseEntry::CheckVisible(txn);
-}
-
-void ChunkIndexEntry::Save() {
-    if (buffer_obj_) {
-        buffer_obj_->Save();
-    }
 }
 
 } // namespace infinity

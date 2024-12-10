@@ -61,7 +61,7 @@ public:
         auto new_chunk_index_entry = segment_index_entry->CreateSecondaryIndexChunkIndexEntry(begin_row_id_, row_count, buffer_mgr);
         BufferHandle handle = new_chunk_index_entry->GetIndex();
         auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
-        data_ptr->InsertData(&in_mem_secondary_index_, new_chunk_index_entry);
+        data_ptr->InsertData(&in_mem_secondary_index_);
         return new_chunk_index_entry;
     }
     Pair<u32, Bitmask> RangeQuery(const void *input) const override {

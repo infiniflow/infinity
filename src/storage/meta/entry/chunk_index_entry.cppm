@@ -14,8 +14,6 @@
 
 module;
 
-#include <cassert>
-
 export module chunk_index_entry;
 
 import stl;
@@ -116,13 +114,7 @@ public:
     // Only for fulltext
     u64 GetColumnLengthSum() const;
 
-    inline u32 GetPartNum() const { return (row_count_ + 8191) / 8192; }
-
-    inline u32 GetPartRowCount(const u32 part_id) const { return std::min<u32>(8192, row_count_ - part_id * 8192); }
-
     BufferHandle GetIndex();
-
-    BufferHandle GetIndexPartAt(u32 i);
 
     nlohmann::json Serialize();
 
@@ -133,11 +125,9 @@ public:
 
     virtual void PickCleanup(CleanupScanner *scanner) override {}
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const override;
 
     void SaveIndexFile();
-
-    void LoadPartsReader(BufferManager *buffer_mgr);
 
     BufferObj *GetBufferObj() { return buffer_obj_; }
 
@@ -150,8 +140,6 @@ public:
         return ts >= deprecate_ts;
     }
 
-    void Save();
-
 public:
     ChunkID chunk_id_;
 
@@ -163,7 +151,6 @@ public:
 
 private:
     BufferObj *buffer_obj_{};
-    Vector<BufferObj *> part_buffer_objs_;
 };
 
 } // namespace infinity
