@@ -55,7 +55,7 @@ class ExplainQuery(Query):
         sort: Optional[List[WrapOrderByExpr]],
         explain_type: Optional[BaseExplainType],
     ):
-        super().__init__(columns, highlight, search, filter, group_by, limit, offset, sort)
+        super().__init__(columns, highlight, search, filter, group_by, limit, offset, sort, None)
         self.explain_type = explain_type
 
 
