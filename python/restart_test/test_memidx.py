@@ -5,6 +5,7 @@ from infinity import index
 import time
 import pathlib
 from infinity.common import ConflictType, SparseVector
+import pytest
 
 
 class TestMemIdx:
@@ -336,6 +337,113 @@ class TestMemIdx:
 
             # the 3rd dump
             db_obj.drop_table("test_mem_indexer")
+
+        part3()
+
+    @pytest.mark.skip(reason="bug")
+    def test_mem_bmp(self, infinity_runner: InfinityRunner):
+        config1 = "test/data/config/restart_test/test_memidx/1.toml"
+        config2 = "test/data/config/restart_test/test_memidx/2.toml"
+        config3 = "test/data/config/restart_test/test_memidx/3.toml"
+        uri = common_values.TEST_LOCAL_HOST
+        infinity_runner.clear()
+
+        test_data = [
+            {"c1" : 1, "c2" : SparseVector(indices=[0, 10, 20, 30, 40, 50, 60, 70, 80, 90], values=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])},
+            {"c1" : 2, "c2" : SparseVector(indices=[0, 20, 40, 60, 80], values=[2.0, 2.0, 2.0, 2.0, 2.0])},
+            {"c1" : 3, "c2" : SparseVector(indices=[0, 30, 60, 90], values=[3.0, 3.0, 3.0, 3.0])},
+            {"c1" : 4, "c2" : SparseVector(indices=[0, 40, 80], values=[4.0, 4.0, 4.0])},
+            {"c1" : 5, "c2" : SparseVector(indices=[0], values=[0.0])},
+        ]
+        query_vector = SparseVector(indices=[0, 20, 80], values=[1.0, 2.0, 3.0])
+
+        decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
+
+        @decorator1
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.create_table(
+                "test_mem_bmp",
+                {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int"}},
+            )
+            res = table_obj.create_index(
+                "idx1",
+                index.IndexInfo(
+                    "c2",
+                    index.IndexType.BMP,
+                    {"BLOCK_SIZE": "8", "COMPRESS_TYPE": "compress"},
+                ),
+            )
+            assert res.error_code == infinity.ErrorCode.OK
+
+            # trigger dump
+            for i in range(7):
+                table_obj.insert(test_data)
+
+        part1()
+
+        # config1 can hold 51 rows of ivf mem index before dump
+        # 1. recover by dumpindex wal & memindex recovery
+        decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
+
+        @decorator2
+        def part2(infinity_obj):
+            time.sleep(5)
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_mem_bmp")
+            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            # print(data_dict)
+            assert data_dict["count(star)"] == [35]
+
+            data_dict, data_type_dict = (
+                table_obj.output(["c1"])
+                .match_sparse("c2", query_vector, "ip", 8)
+                .to_result()
+            )
+            assert data_dict["c1"] == [4, 4, 4, 4, 4, 4, 4, 2]
+
+            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            # print(data_dict)
+            assert data_dict["count(star)"] == [35]
+
+            for i in range(3):
+                table_obj.insert(test_data)
+            time.sleep(5)
+
+            data_dict, data_type_dict = (
+                table_obj.output(["c1"])
+                .match_sparse("c2", query_vector, "ip", 11)
+                .to_result()
+            )
+            assert data_dict["c1"] == [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2]
+
+        part2()
+
+        # 2. recover by delta ckp & dumpindex wal & memindex recovery
+        decorator3 = infinity_runner_decorator_factory(config3, uri, infinity_runner)
+
+        @decorator3
+        def part3(infinity_obj):
+            time.sleep(5)
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.get_table("test_mem_bmp")
+
+            def check():
+                data_dict, data_type_dict = (
+                    table_obj.output(["c1"])
+                    .match_sparse("c2", query_vector, "ip", 11)
+                    .to_result()
+                )
+                assert data_dict["c1"] == [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2]
+
+                data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+                assert data_dict["count(star)"] == [50]
+
+            check()
+            infinity_obj.optimize("default_db", "test_mem_bmp", optimize_opt=None)
+            check()
+
+            db_obj.drop_table("test_mem_bmp")
 
         part3()
 
