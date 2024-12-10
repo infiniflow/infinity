@@ -47,7 +47,7 @@ UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id,
                 using T = std::decay_t<decltype(index)>;
                 if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                     if (index != nullptr) {
-                        memindex_tracer->AddMemUsed(index->mem_usage());
+                        memindex_tracer->IncreaseMemoryUsage(index->mem_usage());
                     }
                 }
             },
@@ -166,7 +166,7 @@ void HnswIndexInMem::InsertVecs(SizeT block_offset,
                         break;
                     }
                 }
-                this->AddMemUsed(mem_usage);
+                this->IncreaseMemoryUsageBase(mem_usage);
             }
         },
         hnsw_);
@@ -214,7 +214,7 @@ void HnswIndexInMem::InsertVecs(const SegmentEntry *segment_entry,
                         break;
                     }
                 }
-                this->AddMemUsed(mem_usage);
+                this->IncreaseMemoryUsageBase(mem_usage);
             }
         },
         hnsw_);

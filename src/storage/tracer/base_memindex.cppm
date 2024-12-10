@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ export module base_memindex;
 
 import stl;
 import memindex_tracer;
-import infinity_context;
 
 namespace infinity {
 
@@ -31,15 +30,8 @@ public:
     virtual TableIndexEntry *table_index_entry() const = 0;
 
 protected:
-    void AddMemUsed(SizeT mem) {
-        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-        memindex_tracer->AddMemUsed(mem);
-    }
-
-    void DecreaseMemoryUsage(SizeT mem) {
-        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-        memindex_tracer->DecreaseMemUsed(mem);
-    }
+    void IncreaseMemoryUsageBase(SizeT mem);
+    void DecreaseMemoryUsageBase(SizeT mem);
 };
 
 } // namespace infinity

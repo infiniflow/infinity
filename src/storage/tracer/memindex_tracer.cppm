@@ -49,7 +49,7 @@ public:
 
     void DecreaseMemUsed(SizeT mem_used);
 
-    void AddMemUsed(SizeT usage);
+    void IncreaseMemoryUsage(SizeT usage);
 
     void DumpDone(SizeT actual_dump_size, BaseMemIndex *mem_index);
 
@@ -84,7 +84,7 @@ protected:
     Atomic<SizeT> acc_proposed_dump_ = 0;
 };
 
-inline void MemIndexTracer::AddMemUsed(SizeT add) {
+inline void MemIndexTracer::IncreaseMemoryUsage(SizeT add) {
     // LOG_TRACE(fmt::format("Add mem used: {}, mem index limit: {}", add, index_memory_limit_));
     if (add == 0 || index_memory_limit_ == 0) {
         return;

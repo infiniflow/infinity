@@ -231,7 +231,7 @@ public:
                            const IndexIVFStorageOption &ivf_storage_option)
         : IVF_Parts_Storage(embedding_dimension, centroids_num), sq_bits_(ivf_storage_option.scalar_quantization_bits_),
           common_vec_a_(embedding_dimension), common_vec_b_(embedding_dimension) {
-        AddMemUsed(sizeof(f32) * 2 * embedding_dimension);
+        IncreaseMemoryUsage(sizeof(f32) * 2 * embedding_dimension);
         assert(sq_bits_ == 4 || sq_bits_ == 8);
         // see IVF_Part_Storage
         row_memory_cost_ = sizeof(SegmentOffset) + sizeof(f32);
@@ -347,7 +347,7 @@ public:
         } else {
             row_memory_cost_ += subspace_num_ * 2;
         }
-        AddMemUsed(sizeof(f32) * (expect_subspace_centroid_num_ * embedding_dimension() + expect_subspace_centroid_num_ * subspace_num_));
+        IncreaseMemoryUsage(sizeof(f32) * (expect_subspace_centroid_num_ * embedding_dimension() + expect_subspace_centroid_num_ * subspace_num_));
     }
 
     ~IVF_Parts_Storage_Info() override = default;
