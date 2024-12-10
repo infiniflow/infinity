@@ -24,6 +24,7 @@
 #include <cstring>
 #include <limits>
 #include <sstream>
+#include <arrow/type_fwd.h>
 
 namespace infinity {
 
@@ -40,6 +41,10 @@ enum class EmbeddingDataType : int8_t {
     kElemBFloat16,
     kElemInvalid,
 };
+
+bool operator==(const EmbeddingDataType &type, const arrow::Type::type &arrow_type);
+
+bool operator!=(const EmbeddingDataType &type, const arrow::Type::type &arrow_type);
 
 constexpr auto to_underlying_val(EmbeddingDataType type) { return static_cast<std::underlying_type_t<EmbeddingDataType>>(type); }
 

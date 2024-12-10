@@ -65,36 +65,4 @@ protected:
     const u32 row_count_{};
 };
 
-// row_count * pair<T, u32>
-export class SecondaryIndexFileWorkerParts final : public IndexFileWorker {
-public:
-    explicit SecondaryIndexFileWorkerParts(SharedPtr<String> data_dir,
-                                           SharedPtr<String> temp_dir,
-                                           SharedPtr<String> file_dir,
-                                           SharedPtr<String> file_name,
-                                           SharedPtr<IndexBase> index_base,
-                                           SharedPtr<ColumnDef> column_def,
-                                           u32 row_count,
-                                           u32 part_id,
-                                           PersistenceManager* persistence_manager);
-
-    ~SecondaryIndexFileWorkerParts() override;
-
-    void AllocateInMemory() override;
-
-    void FreeInMemory() override;
-
-    FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexPartFile; }
-
-protected:
-    bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
-
-    void ReadFromFileImpl(SizeT file_size) override;
-
-    const u32 row_count_;
-    const u32 part_id_;
-    u32 part_row_count_ = std::min<u32>(8192, row_count_ - part_id_ * 8192);
-    u32 data_pair_size_ = 0;
-};
-
 } // namespace infinity

@@ -21,6 +21,12 @@
 #include <memory>
 #include <vector>
 
+namespace arrow {
+
+class DataType;
+
+}
+
 namespace infinity {
 
 class DataType {
@@ -54,7 +60,11 @@ public:
 
     bool operator==(const DataType &other) const;
 
+    bool operator==(const arrow::DataType &other) const;
+
     bool operator!=(const DataType &other) const;
+
+    bool operator!=(const arrow::DataType &other) const;
 
     [[nodiscard]] std::string ToString() const;
 

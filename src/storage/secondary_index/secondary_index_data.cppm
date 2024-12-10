@@ -46,9 +46,7 @@ template <typename T>
 concept ConvertToHashU64 = IsAnyOf<T, VarcharT, std::string_view>;
 
 template <typename ValueT>
-struct ConvertToOrdered {
-    static_assert(false, "type not supported");
-};
+struct ConvertToOrdered;
 
 template <KeepOrderedSelf T>
 struct ConvertToOrdered<T> {
@@ -72,7 +70,7 @@ struct ConvertToOrdered<T> {
 
 export template <typename T>
     requires KeepOrderedSelf<T> or ConvertToOrderedI32<T> or ConvertToOrderedI64<T> or ConvertToHashU64<T>
-using ConvertToOrderedType = ConvertToOrdered<T>::type;
+using ConvertToOrderedType = typename ConvertToOrdered<T>::type;
 
 export template <typename RawValueType>
 ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) {
@@ -142,18 +140,21 @@ export class SecondaryIndexData {
 protected:
     u32 chunk_row_count_ = 0;
     // pgm index
-    // will always be loaded
     UniquePtr<SecondaryPGMIndex> pgm_index_;
+    // k-v data
+    void *key_ptr_ = nullptr;
+    SegmentOffset *offset_ptr_ = nullptr;
 
 public:
     explicit SecondaryIndexData(u32 chunk_row_count) : chunk_row_count_(chunk_row_count) {}
 
     virtual ~SecondaryIndexData() = default;
 
+    [[nodiscard]] Pair<const void *, const SegmentOffset *> GetKeyOffsetPointer() const { return {key_ptr_, offset_ptr_}; }
+
     [[nodiscard]] inline auto SearchPGM(const void *val_ptr) const {
         if (!pgm_index_) {
-            String error_message = "Not initialized yet.";
-            UnrecoverableError(error_message);
+            UnrecoverableError("Not initialized yet.");
         }
         return pgm_index_->SearchIndex(val_ptr);
     }
@@ -164,13 +165,11 @@ public:
 
     virtual void ReadIndexInner(LocalFileHandle &file_handle) = 0;
 
-    virtual void InsertData(const void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) = 0;
+    virtual void InsertData(const void *ptr) = 0;
 
-    virtual void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks, SharedPtr<ChunkIndexEntry> &merged_chunk_index_entry) = 0;
+    virtual void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks) = 0;
 };
 
 export SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);
-
-export u32 GetSecondaryIndexDataPairSize(const SharedPtr<DataType> &data_type);
 
 } // namespace infinity
