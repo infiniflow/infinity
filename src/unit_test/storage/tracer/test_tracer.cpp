@@ -41,7 +41,7 @@ public:
 
     TableIndexEntry *table_index_entry() const override { return nullptr; }
 
-    void AddMemUsed(SizeT usage, SizeT row_cnt);
+    void IncreaseMemoryUsage(SizeT usage, SizeT row_cnt);
 
     void Dump(SizeT &usage, SizeT &row_cnt) && {
         std::lock_guard lck(mtx_);
@@ -120,7 +120,7 @@ TestMemIndex *TestCatalog::GetMemIndex(const String &index_name) {
 void TestCatalog::AppendMemIndex(const String &index_name, SizeT mem_used, SizeT row_cnt) {
     std::lock_guard lck(mtx_);
     auto *memindex = GetMemIndexInner(index_name);
-    memindex->AddMemUsed(mem_used, row_cnt);
+    memindex->IncreaseMemoryUsage(mem_used, row_cnt);
 }
 
 bool TestCatalog::DumpMemIndex(const String &index_name, SizeT &mem_used, SizeT &row_cnt) {
