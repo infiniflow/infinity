@@ -40,10 +40,14 @@ import vector_buffer;
 import data_type;
 import logical_type;
 import expression_state;
+import expression_type;
+import reference_expression;
+import in_expression;
 import infinity_exception;
 import third_party;
 import logger;
 import index_defines;
+import logger;
 
 namespace infinity {
 
@@ -51,20 +55,48 @@ void ReadDataBlock(DataBlock *output,
                    BufferManager *buffer_mgr,
                    const SizeT row_count,
                    BlockEntry *current_block_entry,
-                   const Vector<SizeT> &column_ids) {
-    auto block_id = current_block_entry->block_id();
-    auto segment_id = current_block_entry->segment_id();
+                   const Vector<SizeT> &column_ids,
+                   const Vector<bool> &column_should_load) {
+    const auto block_id = current_block_entry->block_id();
+    const auto segment_id = current_block_entry->segment_id();
     for (SizeT i = 0; i < column_ids.size(); ++i) {
-        SizeT column_id = column_ids[i];
-        if (column_id == COLUMN_IDENTIFIER_ROW_ID) {
-            u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+        if (const SizeT column_id = column_ids[i]; column_id == COLUMN_IDENTIFIER_ROW_ID) {
+            const u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
             output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
-        } else {
+        } else if (column_should_load[i]) {
             ColumnVector column_vector = current_block_entry->GetConstColumnVector(buffer_mgr, column_id);
             output->column_vectors[i]->AppendWith(column_vector, 0, row_count);
+        } else {
+            // no need to load this column
+            output->column_vectors[i]->Finalize(row_count);
         }
     }
     output->Finalize();
+}
+
+void CollectUsedColumnRef(BaseExpression *expr, Vector<bool> &column_should_load) {
+    switch (expr->type()) {
+        case ExpressionType::kColumn: {
+            LOG_ERROR(std::format("{}: ColumnExpression should not be in the leftover_filter after optimizer.", __func__));
+            break;
+        }
+        case ExpressionType::kReference: {
+            const auto *ref_expr = static_cast<const ReferenceExpression *>(expr);
+            column_should_load[ref_expr->column_index()] = true;
+            break;
+        }
+        case ExpressionType::kIn: {
+            auto *in_expr = static_cast<InExpression *>(expr);
+            CollectUsedColumnRef(in_expr->left_operand().get(), column_should_load);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+    for (const auto &child : expr->arguments()) {
+        CollectUsedColumnRef(child.get(), column_should_load);
+    }
 }
 
 void MergeFalseIntoBitmask(const VectorBuffer *input_bool_column_buffer,
@@ -130,12 +162,13 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
         auto db_for_filter = db_for_filter_p.get();
         Vector<SharedPtr<DataType>> read_column_types = *(base_table_ref_->column_types_);
         Vector<SizeT> column_ids = base_table_ref_->column_ids_;
-        {
-            if (read_column_types.empty() || read_column_types.back()->type() != LogicalType::kRowID) {
-                read_column_types.push_back(MakeShared<DataType>(LogicalType::kRowID));
-                column_ids.push_back(COLUMN_IDENTIFIER_ROW_ID);
-            }
+        if (read_column_types.empty() || read_column_types.back()->type() != LogicalType::kRowID) {
+            read_column_types.push_back(MakeShared<DataType>(LogicalType::kRowID));
+            column_ids.push_back(COLUMN_IDENTIFIER_ROW_ID);
         }
+        // collect the base_table_ref columns used in filter
+        Vector<bool> column_should_load(column_ids.size(), false);
+        CollectUsedColumnRef(leftover_filter_.get(), column_should_load);
         db_for_filter->Init(read_column_types);
         auto bool_column = ColumnVector::Make(MakeShared<infinity::DataType>(LogicalType::kBoolean));
         // filter and build bitmask, if filter_expression_ != nullptr
@@ -146,7 +179,7 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
             const auto block_row_count = block_entry->row_count();
             const auto row_count = std::min<SizeT>(segment_row_count - segment_row_count_read, block_row_count);
             db_for_filter->Reset(row_count);
-            ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, column_ids);
+            ReadDataBlock(db_for_filter, buffer_mgr, row_count, block_entry, column_ids, column_should_load);
             bool_column->Initialize(ColumnVectorType::kCompactBit, row_count);
             expr_evaluator.Init(db_for_filter);
             expr_evaluator.Execute(leftover_filter_, filter_state, bool_column);
