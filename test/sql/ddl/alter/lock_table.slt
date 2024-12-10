@@ -42,11 +42,26 @@ UNLOCK TABLE products;
 statement ok
 INSERT INTO products VALUES (2, 2, 'abcdef');
 
+statement ok
+DELETE FROM products WHERE product_no=1;
+
+statement ok
+DELETE FROM products WHERE product_no=-1;
+
+statement ok
+COMPACT TABLE products;
+
+statement ok
+LOCK TABLE products;
+
 query
 SELECT * FROM products;
 ----
 1 2 abcdef
 2 2 abcdef
+
+statement ok
+UNLOCK TABLE products;
 
 statement ok
 DROP TABLE products;
