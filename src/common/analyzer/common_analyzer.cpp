@@ -29,14 +29,7 @@ constexpr int MAX_TUPLE_LENGTH = 1024;
 
 CommonLanguageAnalyzer::CommonLanguageAnalyzer()
     : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(MakeUnique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
-      extract_eng_stem_(true), extract_synonym_(false), cjk_(false), remove_stopwords_(false) {
-    TokenizeConfig token_config;
-    String divide_str("@#$");
-    String unite_str("/");
-    token_config.AddDivides(divide_str);
-    token_config.AddUnites(unite_str);
-    tokenizer_.SetConfig(token_config);
-}
+      extract_eng_stem_(true), extract_synonym_(false), cjk_(false), remove_stopwords_(false) {}
 
 CommonLanguageAnalyzer::~CommonLanguageAnalyzer() {}
 
