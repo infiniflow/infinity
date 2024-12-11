@@ -1882,7 +1882,7 @@ table_instance.output(["num", "vec"]).offset(1).limit(2).to_pl()
 table_object.option(option_dict)
 ```
 
-Indicating some search options.
+Indicates some search options.
 
 #### Parameters
 
