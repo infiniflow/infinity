@@ -192,6 +192,21 @@ private:
     bool added_txn_num_{false};
 
     bool has_update_{false};
+
+public:
+    void SetCompacting() { table_status_ = TxnStoreStatus::kCompacting; }
+
+    void SetCreatingIndex() { table_status_ = TxnStoreStatus::kCreatingIndex; }
+
+    void TryRevert();
+
+private:
+    enum struct TxnStoreStatus {
+        kNone = 0,
+        kCreatingIndex,
+        kCompacting,
+    };
+    TxnStoreStatus table_status_{TxnStoreStatus::kNone};
 };
 
 export class TxnStore {
@@ -234,18 +249,11 @@ public:
 
     void RevertTableStatus();
 
-    void SetCompacting() { table_status_ = TxnStoreStatus::kCompacting; }
+    void SetCompacting(TableEntry *table_entry);
 
-    void SetCreatingIndex() { table_status_ = TxnStoreStatus::kCreatingIndex; }
+    void SetCreatingIndex(TableEntry *table_entry);
 
 private:
-    enum struct TxnStoreStatus {
-        kNone = 0,
-        kCreatingIndex,
-        kCompacting,
-    };
-    TxnStoreStatus table_status_{TxnStoreStatus::kNone};
-
     // Txn store
     Txn *txn_{}; // TODO: remove this
     Catalog *catalog_{};

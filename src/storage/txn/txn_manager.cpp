@@ -318,7 +318,6 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 
 void TxnManager::CleanupTxn(Txn *txn) {
     TxnType txn_type = txn->GetTxnType();
-    txn->txn_store()->RevertTableStatus();
     switch (txn_type) {
         case TxnType::kRead: {
             // For read-only Txn only remove txn from txn_map

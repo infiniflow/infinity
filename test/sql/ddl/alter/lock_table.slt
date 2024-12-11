@@ -57,7 +57,6 @@ LOCK TABLE products;
 query
 SELECT * FROM products;
 ----
-1 2 abcdef
 2 2 abcdef
 
 statement ok
