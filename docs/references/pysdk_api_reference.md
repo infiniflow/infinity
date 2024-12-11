@@ -1860,7 +1860,7 @@ Creates a limit expression with an offset value, setting the output to start fro
 
 ##### offset_value: `int`, *Required*
 
-An integer indicating the offset position of the limit expression.
+An integer specifying the offset position of the limit expression.
 
 #### Returns
 
