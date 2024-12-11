@@ -1830,7 +1830,7 @@ Creates an expression to limit the number of the output rows to a maximum of `li
 
 ##### limit_num: `int`, *Required*
 
-An integer indicating the limit row count.
+An integer specifying the maximum number of output rows.
 
 #### Returns
 
