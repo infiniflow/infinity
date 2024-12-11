@@ -362,6 +362,24 @@ MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const 
     return MergeFlag::kInvalid;
 };
 
+void CatalogDeltaOperation::CheckDelete() {
+    if (type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
+        auto *add_segment_op = static_cast<AddSegmentEntryOp *>(this);
+        if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
+            add_segment_op->merge_flag_ = MergeFlag::kDelete;
+        }
+    } else if (type_ == CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
+        auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(this);
+        if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
+            add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
+            LOG_DEBUG(fmt::format("Delete chunk: {} at {}", *encode_, add_chunk_index_op->deprecate_ts_));
+        }
+    } else if (type_ == CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY) {
+        [[maybe_unused]] auto *add_segment_index_op = static_cast<AddSegmentIndexEntryOp *>(this);
+    }
+}
+
+
 AddDBEntryOp::AddDBEntryOp(DBEntry *db_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry, commit_ts), db_entry_dir_(db_entry->db_entry_dir()),
       comment_(db_entry->db_comment_ptr()) {}
@@ -1242,18 +1260,8 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
     max_commit_ts_ = std::max(max_commit_ts_, max_commit_ts);
 
     for (auto &new_op : delta_entry->operations()) {
-        if (new_op->type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
-            auto *add_segment_op = static_cast<AddSegmentEntryOp *>(new_op.get());
-            if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
-                add_segment_op->merge_flag_ = MergeFlag::kDelete;
-            }
-        } else if (new_op->type_ == CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
-            auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(new_op.get());
-            if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
-                add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
-                LOG_DEBUG(fmt::format("Delete chunk: {} at {}", *new_op->encode_, add_chunk_index_op->deprecate_ts_));
-            }
-        }
+        new_op->CheckDelete();
+
         const String &encode = *new_op->encode_;
         if (encode.empty()) {
             String error_message = "encode is empty";

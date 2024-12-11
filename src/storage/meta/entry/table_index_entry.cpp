@@ -206,6 +206,29 @@ void TableIndexEntry::CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeS
 //     }
 // }
 
+void TableIndexEntry::CommitCompact([[maybe_unused]] TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store) {
+    std::unique_lock w_lock(rw_locker_);
+    for (const auto &[segment_store, old_segments] : compact_store.compact_data_) {
+        auto *segment_entry = segment_store.segment_entry_;
+
+        auto iter = index_by_segment_.find(segment_entry->segment_id());
+        if (iter == index_by_segment_.end()) {
+            continue;
+        }
+        [[maybe_unused]] auto *segment_index_entry = iter->second.get();
+
+        for (auto *old_segment : old_segments) {
+            auto iter = index_by_segment_.find(old_segment->segment_id());
+            if (iter == index_by_segment_.end()) {
+                continue;
+            }
+            auto *old_segment_index_entry = iter->second.get();
+            old_segment_index_entry->SetDeprecated(commit_ts);
+        }
+    }
+}
+
+
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;
 
@@ -225,7 +248,7 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
         std::shared_lock r_lock(rw_locker_);
         for (const auto &[segment_id, index_entry] : this->index_by_segment_) {
-            if (index_entry->commit_ts_ <= max_commit_ts) {
+            if (index_entry->commit_ts_ <= max_commit_ts && !index_entry->deleted_) {
                 segment_index_entry_candidates.push_back(index_entry);
             }
         }

@@ -1231,4 +1231,12 @@ Pair<u64, u32> SegmentIndexEntry::GetFulltextColumnLenInfo() {
 
 void SegmentIndexEntry::SetMemoryIndexer(UniquePtr<MemoryIndexer> &&memory_indexer) { memory_indexer_ = std::move(memory_indexer); }
 
+void SegmentIndexEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
+    std::unique_lock lock(rw_locker_);
+    for (auto &chunk_index_entry : chunk_index_entries_) {
+        chunk_index_entry->DeprecateChunk(deprecate_ts);
+    }
+    this->deleted_ = true;
+}
+
 } // namespace infinity

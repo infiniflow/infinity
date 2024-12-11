@@ -112,6 +112,8 @@ public:
 
     MergeFlag NextDeleteFlag(MergeFlag new_merge_flag) const;
 
+    void CheckDelete();
+
 public:
     TxnTimeStamp begin_ts_{0};
     TransactionID txn_id_{0};

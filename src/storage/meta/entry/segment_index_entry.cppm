@@ -230,6 +230,8 @@ public:
 
     ChunkID GetNextChunkID() { return next_chunk_id_++; }
 
+    void SetDeprecated(TxnTimeStamp deprecate_ts);
+
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id);
 
