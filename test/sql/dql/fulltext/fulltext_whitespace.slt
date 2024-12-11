@@ -1,0 +1,29 @@
+
+statement ok
+DROP TABLE IF EXISTS ft_whitespace;
+
+statement ok
+CREATE TABLE ft_whitespace(num int, doc varchar DEFAULT 'default text');
+
+statement ok
+INSERT INTO ft_whitespace VALUES (1, '2020-01-01 2023-01-01'), (2, '2023 01 01'), (3, '01 01 2023'), (4);
+
+statement ok
+CREATE INDEX ft_index ON ft_whitespace(doc) USING FULLTEXT WITH (analyzer = whitespace);
+
+query I
+SELECT * FROM ft_whitespace;
+----
+1 2020-01-01 2023-01-01
+2 2023 01 01
+3 01 01 2023
+4 default text
+
+query I rowsort
+SELECT * FROM ft_whitespace SEARCH MATCH TEXT ('doc^4.5', '2023-01-01^6.6', 'topn=10');
+----
+1 2020-01-01 2023-01-01
+
+# Clean up
+statement ok
+DROP TABLE ft_whitespace;
