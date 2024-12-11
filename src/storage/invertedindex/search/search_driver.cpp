@@ -23,9 +23,6 @@
 #define SearchScannerSuffix InfinitySyntax
 #include "search_scanner_derived_helper.h"
 #undef SearchScannerSuffix
-// #define SearchScannerSuffix Plain
-// #include "search_scanner_derived_helper.h"
-// #undef SearchScannerSuffix
 
 import stl;
 import term;
