@@ -2414,7 +2414,7 @@ A `tuple[dict[str, list[Any]], dict[str, Any]], {}` object
 table_object.to_df()
 ```
 
-Returns the query result as a tuple consists of a pandas DataFrame and a dict.
+Returns the query result as a tuple consisting of a pandas DataFrame and a dict.
 
 :::tip NOTE
 Call `to_df()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
