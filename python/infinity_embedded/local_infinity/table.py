@@ -388,6 +388,10 @@ class LocalTable():
         self.query_builder.sort(order_by_expr_list)
         return self
 
+    def option(self, option_kv: {}):
+        self.query_builder.option(option_kv)
+        return self
+
     def to_df(self):
         return self.query_builder.to_df()
 
@@ -432,12 +436,16 @@ class LocalTable():
         if query.group_by is not None:
             group_by_list = query.group_by
 
+        total_hits_count_flag = False
+        if query.total_hits_count:
+            total_hits_count_flag = True
         res = self._conn.search(db_name=self._db_name,
                                 table_name=self._table_name,
                                 select_list=query.columns,
                                 highlight_list=highlight,
                                 order_by_list=order_by_list,
                                 group_by_list=group_by_list,
+                                total_hits_count_flag=total_hits_count_flag,
                                 search_expr=query.search,
                                 where_expr=query.filter,
                                 limit_expr=query.limit,

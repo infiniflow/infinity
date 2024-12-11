@@ -62,7 +62,7 @@ class RemoteTable():
 
     @name_validity_check("index_name", "Index")
     def create_index(self, index_name: str, index_info: IndexInfo,
-                     conflict_type: ConflictType = ConflictType.Error, index_comment = ""):
+                     conflict_type: ConflictType = ConflictType.Error, index_comment=""):
         index_name = index_name.strip()
 
         index_info_to_use = index_info.to_ttype()
@@ -400,8 +400,13 @@ class RemoteTable():
                 raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE,
                                         "order_by_expr_list must be a list of [column_name, sort_type]")
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE, "sort_type must be SortType.Asc or SortType.Desc")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE,
+                                        "sort_type must be SortType.Asc or SortType.Desc")
         self.query_builder.sort(order_by_expr_list)
+        return self
+
+    def option(self, option_kv: {}):
+        self.query_builder.option(option_kv)
         return self
 
     def to_result(self):
@@ -453,7 +458,8 @@ class RemoteTable():
                                 group_by_list=None,
                                 limit_expr=query.limit,
                                 offset_expr=query.offset,
-                                order_by_list=query.sort)
+                                order_by_list=query.sort,
+                                total_hits_count=query.total_hits_count)
 
         # process the results
         if res.error_code == ErrorCode.OK:

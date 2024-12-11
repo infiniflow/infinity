@@ -52,6 +52,8 @@ public:
     u64 table_index_{};
 
     Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns_{};
+
+    bool total_hits_count_flag_{false};
 };
 
 } // namespace infinity

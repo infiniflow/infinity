@@ -731,10 +731,17 @@ class table_http_result:
         r = self.table_http.net.request(url, "get", h, d)
         self.table_http.net.raise_exception(r)
         # print(r.json())
-        if "output" in r.json():
-            self.output_res = r.json()["output"]
+        result_json = r.json()
+        if "output" in result_json:
+            self.output_res = result_json["output"]
         else:
             self.output_res = []
+
+        if "total_hits_count" in result_json:
+            self.total_hits_count = result_json["total_hits_count"]
+        else:
+            self.total_hits_count = None
+
         return self
 
     def explain(self, ExplainType=ExplainType.Physical):
@@ -902,6 +909,10 @@ class table_http_result:
                 df_dict[k] = new_tup
         # print(self.output_res)
         # print(df_dict)
+        extra_result = None
+        if self.total_hits_count is not None:
+            extra_result = {}
+            extra_result["total_hits_count"] = self.total_hits_count
 
         df_type = {}
         for k in df_dict:
@@ -936,17 +947,19 @@ class table_http_result:
                     if (function_name in bool_functions):
                         df_type[k] = dtype('bool')
                         break
-        return df_dict, df_type
+        return df_dict, df_type, extra_result
 
     def to_pl(self):
-        return pl.from_pandas(self.to_df())
+        dataframe, extra_result = self.to_df()
+        return pl.from_pandas(dataframe), extra_result
 
     def to_df(self):
-        df_dict, df_type = self.to_result()
-        return pd.DataFrame(df_dict).astype(df_type)
+        df_dict, df_type, extra_result = self.to_result()
+        return pd.DataFrame(df_dict).astype(df_type), extra_result
 
     def to_arrow(self):
-        return pa.Table.from_pandas(self.to_df())
+        dataframe, extra_result = self.to_df()
+        return pa.Table.from_pandas(dataframe), extra_result
 
 @dataclass
 class database_result():

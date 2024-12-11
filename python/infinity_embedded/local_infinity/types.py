@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import struct
+import json
 from collections import defaultdict
 from typing import Any, Tuple, Dict, List
 import polars as pl
@@ -407,7 +408,7 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     match_tensor_expr.embedding_data = data
     return match_tensor_expr
 
-def build_result(res: WrapQueryResult) -> tuple[dict[str | Any, list[Any, Any]], dict[str | Any, Any]]:
+def build_result(res: WrapQueryResult) -> tuple[dict[str | Any, list[Any, Any]], dict[str | Any, Any], Any]:
     data_dict = {}
     data_type_dict = {}
     column_counter = defaultdict(int)
@@ -426,4 +427,11 @@ def build_result(res: WrapQueryResult) -> tuple[dict[str | Any, list[Any, Any]],
         data_dict[column_name] = data_list
         data_type_dict[column_name] = column_data_type
 
-    return data_dict, data_type_dict
+    extra_result = None
+    if res.extra_result is not None:
+        try:
+            extra_result = json.loads(res.extra_result)
+        except json.JSONDecodeError:
+            pass
+
+    return data_dict, data_type_dict, extra_result

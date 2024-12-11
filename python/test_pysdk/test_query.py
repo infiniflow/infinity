@@ -85,7 +85,7 @@ class TestInfinity:
         query_builder.match_dense('vec', [3.0] * 5, 'float', 'ip', 2)
         query_builder.match_text('body', 'harmful', 2, None)
         query_builder.fusion(method='rrf', topn=10, fusion_params=None)
-        res = query_builder.to_df()
+        res, extra_result = query_builder.to_df()
         print(res)
         res = table.drop_index("my_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK

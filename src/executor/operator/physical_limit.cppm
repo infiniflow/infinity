@@ -45,6 +45,13 @@ public:
     virtual SizeT Limit(SizeT row_count) = 0;
 
     virtual bool IsLimitOver() = 0;
+
+    SizeT TotalHitsCount() const { return total_hits_count_; }
+
+    void AddHitsCount(u64 row_count);
+
+private:
+    Atomic<u64> total_hits_count_{};
 };
 
 export class AtomicCounter final : public LimitCounter {
@@ -87,7 +94,8 @@ public:
                            UniquePtr<PhysicalOperator> left,
                            SharedPtr<BaseExpression> limit_expr,
                            SharedPtr<BaseExpression> offset_expr,
-                           SharedPtr<Vector<LoadMeta>> load_metas);
+                           SharedPtr<Vector<LoadMeta>> load_metas,
+                           bool total_hits_count_flag);
 
     ~PhysicalLimit() final = default;
 
@@ -96,7 +104,8 @@ public:
     static bool Execute(QueryContext *query_context,
                         const Vector<UniquePtr<DataBlock>> &input_blocks,
                         Vector<UniquePtr<DataBlock>> &output_blocks,
-                        LimitCounter *counter);
+                        LimitCounter *counter,
+                        bool total_hits_count_flag);
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
@@ -115,6 +124,7 @@ private:
     SharedPtr<BaseExpression> offset_expr_{};
 
     UniquePtr<LimitCounter> counter_{};
+    bool total_hits_count_flag_{};
 };
 
 } // namespace infinity

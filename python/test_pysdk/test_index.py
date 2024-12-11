@@ -166,7 +166,7 @@ class TestInfinity:
         res = table_obj.create_index("my_index", index.IndexInfo("body", index.IndexType.FullText), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         # fulltext search when index is created: expect success
-        res = table_obj.output(["doctitle", "_score"]).match_text("body^5", "harmful chemical", 3).to_pl()
+        res, extra_result = table_obj.output(["doctitle", "_score"]).match_text("body^5", "harmful chemical", 3).to_pl()
         print(res)
         res = table_obj.drop_index("my_index")
         assert res.error_code == ErrorCode.OK
@@ -640,13 +640,13 @@ class TestInfinity:
                               "docdate": data["docdate"][i], "body": data["body"][i]})
             table_obj.insert(value)
         time.sleep(5)
-        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
+        res, extra_result = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
             "body^5", "harmful chemical", 3).to_pl()
         assert not res.is_empty()
         print(res)
 
         # Check if highlight work
-        res = table_obj.output(["doctitle", "docdate", "body", "_row_id", "_score"]).highlight(["body"]).match_text(
+        res, extra_result = table_obj.output(["doctitle", "docdate", "body", "_row_id", "_score"]).highlight(["body"]).match_text(
             "body^5", "harmful chemical", 3).to_pl()
         assert not res.is_empty()
         for body in res["body"].to_list():
@@ -700,12 +700,12 @@ class TestInfinity:
                                                      index.IndexType.FullText))
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
+        res, extra_result = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
             "body^5", "harmful chemical", 3).to_pl()
         assert not res.is_empty()
         print(res)
 
-        res = table_obj.output(["doctitle", "docdate", "body2", "_row_id", "_score"]).match_text(
+        res, extra_result = table_obj.output(["doctitle", "docdate", "body2", "_row_id", "_score"]).match_text(
             "body2^5", "harmful chemical", 3).to_pl()
         assert res.is_empty()
         print(res)
@@ -750,12 +750,12 @@ class TestInfinity:
         embedding_data = [i for i in range(128)]
         value = [{"c1": embedding_data} for _ in range(1024)]
         table_obj.insert(value)
-        res = table_obj.output(["*"]).to_pl()
+        res, extra_result = table_obj.output(["*"]).to_pl()
         print(res)
 
         # delete data
         table_obj.delete()
-        res = table_obj.output(["*"]).to_pl()
+        res, extra_result = table_obj.output(["*"]).to_pl()
         print(res)
 
         # create index
@@ -790,7 +790,7 @@ class TestInfinity:
         embedding_data = [i for i in range(128)]
         value = [{"c1": embedding_data, "c2": i} for i in range(10)]
         table_obj.insert(value)
-        res = table_obj.output(["*"]).to_pl()
+        res, extra_result = table_obj.output(["*"]).to_pl()
         print(res)
         # update data
         embedding_data = [i + 0.1 * i for i in range(128)]
@@ -799,7 +799,7 @@ class TestInfinity:
         value = [{"c1": embedding_data} for _ in range(10)]
         for i in range(10):
             table_obj.update("c2 = " + str(i), {"c1": embedding_data})
-        res = table_obj.output(["*"]).to_pl()
+        res, extra_result = table_obj.output(["*"]).to_pl()
         print(res)
         res = db_obj.drop_table(
             "test_create_index_on_update_table" + suffix, ConflictType.Error)

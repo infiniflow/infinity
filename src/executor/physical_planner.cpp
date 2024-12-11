@@ -752,7 +752,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
                                          std::move(input_physical_operator),
                                          logical_limit->limit_expression_,
                                          logical_limit->offset_expression_,
-                                         logical_operator->load_metas());
+                                         logical_operator->load_metas(),
+                                         logical_limit->total_hits_count_flag_);
     } else {
         i64 child_limit = (static_pointer_cast<ValueExpression>(logical_limit->limit_expression_))->GetValue().value_.big_int;
 
@@ -763,7 +764,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
                                                         std::move(input_physical_operator),
                                                         MakeShared<ValueExpression>(Value::MakeBigInt(child_limit)),
                                                         nullptr,
-                                                        logical_operator->load_metas());
+                                                        logical_operator->load_metas(),
+                                                        logical_limit->total_hits_count_flag_);
         return MakeUnique<PhysicalMergeLimit>(query_context_ptr_->GetNextNodeID(),
                                               std::move(child_limit_op),
                                               logical_limit->limit_expression_,
@@ -810,7 +812,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
                                        merge_offset, // start from offset
                                        logical_operator_top->sort_expressions_,
                                        logical_operator_top->order_by_types_,
-                                       logical_operator_top->load_metas());
+                                       logical_operator_top->load_metas(),
+                                       logical_operator_top->total_hits_count_flag_);
     } else {
         // need MergeTop
         auto child_top_op = MakeUnique<PhysicalTop>(logical_operator_top->node_id(),
@@ -819,7 +822,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildTop(const SharedPtr<LogicalNod
                                                     u32{}, // start from 0
                                                     logical_operator_top->sort_expressions_,
                                                     logical_operator_top->order_by_types_,
-                                                    logical_operator_top->load_metas());
+                                                    logical_operator_top->load_metas(),
+                                                    logical_operator_top->total_hits_count_flag_);
         return MakeUnique<PhysicalMergeTop>(query_context_ptr_->GetNextNodeID(),
                                             logical_operator_top->base_table_ref_,
                                             std::move(child_top_op),

@@ -590,17 +590,18 @@ struct ExplainResponse {
 
 struct SelectRequest {
 1: i64 session_id,
-2:  string db_name,
-3:  string table_name,
-4:  list<ParsedExpr> select_list = [],
-5:  optional list<ParsedExpr> highlight_list = [],
-6:  optional SearchExpr search_expr,
-7:  optional ParsedExpr where_expr,
-8:  optional list<ParsedExpr> group_by_list = [],
-9:  optional ParsedExpr having_expr,
-10:  optional ParsedExpr limit_expr,
-11:  optional ParsedExpr offset_expr,
-12:  optional list<OrderByExpr> order_by_list = [],
+2: string db_name,
+3: string table_name,
+4: list<ParsedExpr> select_list = [],
+5: optional list<ParsedExpr> highlight_list = [],
+6: optional SearchExpr search_expr,
+7: optional ParsedExpr where_expr,
+8: optional list<ParsedExpr> group_by_list = [],
+9: optional ParsedExpr having_expr,
+10: optional ParsedExpr limit_expr,
+11: optional ParsedExpr offset_expr,
+12: optional list<OrderByExpr> order_by_list = [],
+13: optional bool total_hits_count,
 }
 
 struct SelectResponse {
@@ -608,6 +609,7 @@ struct SelectResponse {
 2: string error_msg,
 3: list<ColumnDef> column_defs = [],
 4: list<ColumnField> column_fields = [];
+5: string extra_result;
 }
 
 struct DeleteRequest {

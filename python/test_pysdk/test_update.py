@@ -103,7 +103,7 @@ class TestInfinity:
         res = table_obj.update("c1 = 1", {"c2": 90, "c3": 900})
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
@@ -111,7 +111,7 @@ class TestInfinity:
         with pytest.raises(Exception):
             table_obj.update(None, {"c2": 90, "c3": 900})
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
@@ -187,7 +187,7 @@ class TestInfinity:
             try:
                 tb_obj.insert([{"c1": common_values.types_example_array[i],
                                 "c2": common_values.types_example_array[i]}])
-                res = tb_obj.output(["*"]).to_df()
+                res, extra_result = tb_obj.output(["*"]).to_df()
                 print(res)
                 print("insert c1 = " + str(common_values.types_example_array[i]) +
                       ", c2 = " + str(common_values.types_example_array[i]))
@@ -196,7 +196,7 @@ class TestInfinity:
 
             try:
                 tb_obj.update("c1 = 2", {"c2": common_values.types_example_array[i]})
-                res = tb_obj.output(["*"]).to_df()
+                res, extra_result = tb_obj.output(["*"]).to_df()
                 print("update type: {} \n {}".format(common_values.types_array[i], res))
 
             except Exception as e:
@@ -224,7 +224,7 @@ class TestInfinity:
             try:
                 tb_obj.insert([{"c1": common_values.types_example_array[i],
                                 "c2": common_values.types_example_array[i]}])
-                res = tb_obj.output(["*"]).to_df()
+                res, extra_result = tb_obj.output(["*"]).to_df()
                 print(res)
                 print("insert c1 = " + str(common_values.types_example_array[i]) +
                       ", c2 = " + str(common_values.types_example_array[i]))
@@ -234,7 +234,7 @@ class TestInfinity:
             try:
                 tb_obj.update("c1 = " + str(common_values.types_example_array[i]),
                               {"c2": common_values.types_example_array[i]})
-                res = tb_obj.output(["*"]).to_df()
+                res, extra_result = tb_obj.output(["*"]).to_df()
                 print("update type: {} \n {}".format(common_values.types_array[i], res))
 
             except Exception as e:
@@ -255,12 +255,12 @@ class TestInfinity:
         values = [{"c1": 1, "c2": 2} for _ in range(8192)]
         # values = [{"c1": 1, "c2": 2}]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # update
         table_obj.update("c1 = 1", {"c2": 20})
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
 
         res = db_obj.drop_table("test_update_table_with_one_block"+suffix, ConflictType.Error)
@@ -278,12 +278,12 @@ class TestInfinity:
         for i in range(1024):
             values = [{"c1": 1, "c2": 2} for _ in range(8)]
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # update
         table_obj.update("c1 = 1", {"c2": 20})
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
 
         res = db_obj.drop_table("test_update_table_with_one_segment"+suffix, ConflictType.Error)
@@ -299,17 +299,17 @@ class TestInfinity:
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
         table_obj.delete("c1 = 1")
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
 
         # update
         table_obj.update("c1 = 1", {"c2": 20})
-        update_res = table_obj.output(["*"]).to_df()
+        update_res, extra_result = table_obj.output(["*"]).to_df()
         print(update_res)
 
         res = db_obj.drop_table("test_update_before_delete"+suffix, ConflictType.Error)
@@ -325,12 +325,12 @@ class TestInfinity:
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # update
         table_obj.update("c1 = 1", {"c2": 21})
-        update_res = table_obj.output(["*"]).to_df()
+        update_res, extra_result = table_obj.output(["*"]).to_df()
         print(update_res)
 
         res = db_obj.drop_table("test_update_inserted_data"+suffix, ConflictType.Error)
@@ -349,14 +349,14 @@ class TestInfinity:
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8)]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         time.sleep(60)
 
         # update
         table_obj.update("c1 = 1", {"c2": 21})
-        update_res = table_obj.output(["*"]).to_df()
+        update_res, extra_result = table_obj.output(["*"]).to_df()
         print(update_res)
 
         res = db_obj.drop_table("test_update_inserted_long_before"+suffix, ConflictType.Error)
@@ -374,7 +374,7 @@ class TestInfinity:
         # update
         with pytest.raises(InfinityException) as e:
             table_obj.update("c1 = 1", {"c2": 21})
-            update_res = table_obj.output(["*"]).to_df()
+            update_res, extra_result = table_obj.output(["*"]).to_df()
             print(update_res)
 
         assert e.type == InfinityException
@@ -390,7 +390,7 @@ class TestInfinity:
                                         ConflictType.Error)
         # update
         table_obj.update("c1 = 1", {"c2": types_example})
-        update_res = table_obj.output(["*"]).to_df()
+        update_res, extra_result = table_obj.output(["*"]).to_df()
         print(update_res)
 
         res = db_obj.drop_table("test_update_invalid_value"+suffix, ConflictType.Error)
@@ -411,7 +411,7 @@ class TestInfinity:
 
         # update
         table_obj.update("c1 = 1", {"c2": types_example})
-        update_res = table_obj.output(["*"]).to_df()
+        update_res, extra_result = table_obj.output(["*"]).to_df()
         print(update_res)
 
         res = db_obj.drop_table("test_update_new_value"+suffix, ConflictType.Error)
@@ -435,7 +435,7 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.NOT_SUPPORTED_TYPE_CONVERSION
 
-        update_res = table_obj.output(["*"]).to_df()
+        update_res, extra_result = table_obj.output(["*"]).to_df()
         print(update_res)
 
         res = db_obj.drop_table("test_update_invalid_value"+suffix, ConflictType.Error)
@@ -462,12 +462,12 @@ class TestInfinity:
         for i in range(10):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
         table_obj.update(filter_list, {"c2": types_example})
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
 
         res = db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Error)
@@ -495,14 +495,14 @@ class TestInfinity:
         for i in range(10):
             values = [{"c1": i, "c2": 3.0} for _ in range(10)]
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         # delete
         with pytest.raises(Exception):
             table_obj.update(filter_list, {"c2": types_example})
 
-        delete_res = table_obj.output(["*"]).to_df()
+        delete_res, extra_result = table_obj.output(["*"]).to_df()
         print(delete_res)
 
         res = db_obj.drop_table("test_invalid_filter_expression"+suffix, ConflictType.Error)
@@ -531,12 +531,12 @@ class TestInfinity:
             }
         ])
 
-        res = table_instance.output(["*"]).to_pl()
+        res, extra_result = table_instance.output(["*"]).to_pl()
         print(res)
 
         table_instance.update("id = 1", {"content_demo_sparse":SparseVector([1, 2, 3], [1.1, 1.1, 1.1])})
 
-        res = table_instance.output(["*"]).to_pl()
+        res, extra_result = table_instance.output(["*"]).to_pl()
         print(res)
 
         res = db_obj.drop_table("test_update_sparse_vector"+suffix, ConflictType.Error)

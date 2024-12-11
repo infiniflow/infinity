@@ -49,11 +49,11 @@ class TestInfinity:
         table_obj = db_obj.get_table("test_to_pl"+suffix)
         table_obj.insert([{"c1": 1, "c2": 2}])
         print()
-        res = table_obj.output(["c1", "c2"]).to_pl()
+        res, extra_result = table_obj.output(["c1", "c2"]).to_pl()
         print(res)
-        res = table_obj.output(["c1", "c1"]).to_pl()
+        res, extra_result = table_obj.output(["c1", "c1"]).to_pl()
         print(res)
-        res = table_obj.output(["c1", "c2", "c1"]).to_pl()
+        res, extra_result = table_obj.output(["c1", "c2", "c1"]).to_pl()
         print(res)
         db_obj.drop_table("test_to_pl"+suffix, ConflictType.Error)
     def test_to_pa(self, suffix):
@@ -65,11 +65,11 @@ class TestInfinity:
         table_obj = db_obj.get_table("test_to_pa"+suffix)
         table_obj.insert([{"c1": 1, "c2": 2.0}])
         print()
-        res = table_obj.output(["c1", "c2"]).to_arrow()
+        res, extra_result = table_obj.output(["c1", "c2"]).to_arrow()
         print(res)
-        res = table_obj.output(["c1", "c1"]).to_arrow()
+        res, extra_result = table_obj.output(["c1", "c1"]).to_arrow()
         print(res)
-        res = table_obj.output(["c1", "c2", "c1"]).to_arrow()
+        res, extra_result = table_obj.output(["c1", "c2", "c1"]).to_arrow()
         print(res)
         db_obj.drop_table("test_to_pa"+suffix, ConflictType.Error)
     def test_to_df(self, suffix):
@@ -81,11 +81,11 @@ class TestInfinity:
         table_obj = db_obj.get_table("test_to_df"+suffix)
         table_obj.insert([{"c1": 1, "c2": 2.0}])
         print()
-        res = table_obj.output(["c1", "c2"]).to_df()
+        res, extra_result = table_obj.output(["c1", "c2"]).to_df()
         print(res)
-        res = table_obj.output(["c1", "c1"]).to_df()
+        res, extra_result = table_obj.output(["c1", "c1"]).to_df()
         print(res)
-        res = table_obj.output(["c1", "c2", "c1"]).to_df()
+        res, extra_result = table_obj.output(["c1", "c2", "c1"]).to_df()
         print(res)
         db_obj.drop_table("test_to_df"+suffix, ConflictType.Error)
 
@@ -102,8 +102,8 @@ class TestInfinity:
 
         with pytest.raises(InfinityException) as e:
             insert_res_df = table_obj.output([]).to_df()
-            insert_res_arrow = table_obj.output([]).to_arrow()
-            insert_res_pl = table_obj.output([]).to_pl()
+            insert_res_arrow, extra_result = table_obj.output([]).to_arrow()
+            insert_res_pl, extra_result = table_obj.output([]).to_pl()
             print(insert_res_df, insert_res_arrow, insert_res_pl)
 
         assert e.value.args[0] == ErrorCode.EMPTY_SELECT_FIELDS
@@ -129,7 +129,7 @@ class TestInfinity:
                           {"c1": 1000, "c2": 2.0},
                           {"c1": 10000, "c2": 2.0}])
 
-        insert_res_df = table_obj.output(["c1", condition_list]).to_pl()
+        insert_res_df, extra_result = table_obj.output(["c1", condition_list]).to_pl()
         print(insert_res_df)
 
         db_obj.drop_table("test_with_valid_select_list_output"+suffix, ConflictType.Error)
@@ -151,7 +151,7 @@ class TestInfinity:
                           {"c1": 10000, "c2": 2.0}])
 
         with pytest.raises(Exception):
-            insert_res_df = table_obj.output(["c1", condition_list]).to_pl()
+            insert_res_df, extra_result = table_obj.output(["c1", condition_list]).to_pl()
             print(insert_res_df)
 
         db_obj.drop_table("test_with_invalid_select_list_output"+suffix, ConflictType.Error)
@@ -180,7 +180,7 @@ class TestInfinity:
                           {"c1": 1000, "c2": 2.0},
                           {"c1": 10000, "c2": 2.0}])
         # TODO add more filter function
-        insert_res_df = InfinityThriftQueryBuilder(table_obj).output(["*"]).filter(filter_list).to_pl()
+        insert_res_df, extra_result = InfinityThriftQueryBuilder(table_obj).output(["*"]).filter(filter_list).to_pl()
         print(str(insert_res_df))
 
         db_obj.drop_table("test_output_with_valid_filter_function"+suffix, ConflictType.Error)
@@ -209,7 +209,7 @@ class TestInfinity:
                           {"c1": 10000, "c2": 2.0}])
         # TODO add more filter function
         with pytest.raises(Exception) as e:
-            insert_res_df = InfinityThriftQueryBuilder(table_obj).output(["*"]).filter(filter_list).to_pl()
+            insert_res_df, extra_result = InfinityThriftQueryBuilder(table_obj).output(["*"]).filter(filter_list).to_pl()
             print(str(insert_res_df))
 
         print(e.type)

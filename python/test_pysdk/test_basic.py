@@ -175,12 +175,12 @@ class TestInfinity:
             [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
         assert res.error_code == ErrorCode.OK
         # search
-        res = table_obj.output(["c1 + 0.1"]).to_df()
+        res, extra_result = table_obj.output(["c1 + 0.1"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 + 0.1)': (1.1, 2.1)}).astype(
             {'(c1 + 0.1)': dtype('float64')}))
 
-        res = table_obj.output(
+        res, extra_result = table_obj.output(
             ["*"]).filter("c1 > 1").to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (2,), 'c2': (2.2,)}).astype(
@@ -237,7 +237,7 @@ class TestInfinity:
 
         res = export_table_obj.import_data(common_values.TEST_TMP_DIR + suffix + test_export_csv_file)
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+        res, extra_result = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
 
         res = db_obj.drop_table("my_table_export"+suffix)
@@ -249,7 +249,7 @@ class TestInfinity:
         res = export_table_obj.import_data(common_values.TEST_TMP_DIR + suffix + test_export_jsonl_file,
                                            import_options={"file_type": "jsonl"})
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+        res, extra_result = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
         res = db_obj.drop_table("my_table_export"+suffix)
         assert res.error_code == ErrorCode.OK
@@ -261,7 +261,7 @@ class TestInfinity:
         res = export_table_obj.import_data(common_values.TEST_TMP_DIR + suffix + test_export_csv_file,
                                            import_options={"file_type": "csv"})
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+        res, extra_result = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
         res = db_obj.drop_table("my_table_export"+suffix)
         assert res.error_code == ErrorCode.OK
@@ -272,7 +272,7 @@ class TestInfinity:
         os.remove(common_values.TEST_TMP_DIR + suffix + test_export_jsonl_file_part)
 
         # search
-        res = table_obj.output(
+        res, extra_result = table_obj.output(
             ["c1"]).filter("c1 > 1").to_df()
         print(res)
         res = db_obj.drop_table("my_table4"+suffix)

@@ -60,6 +60,9 @@ export struct OperatorState {
 
     bool complete_{false};
 
+    bool total_hits_count_flag_{};
+    SizeT total_hits_count_{};
+
     inline void SetComplete() { complete_ = true; }
 
     inline bool Complete() const { return complete_; }
@@ -585,6 +588,8 @@ export struct MaterializeSinkState : public SinkState {
     Vector<UniquePtr<DataBlock>> data_block_array_{};
 
     bool empty_result_{false};
+    bool total_hits_count_flag_{false};
+    SizeT total_hits_count_{};
 };
 
 export struct ResultSinkState : public SinkState {

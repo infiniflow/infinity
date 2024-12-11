@@ -59,7 +59,7 @@ class TestMemIdx:
             time.sleep(5)
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_memidx1")
-            data_dict, data_type_dict = (
+            data_dict, data_type_dict, _ = (
                 table_obj.output(["c1"])
                 .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6)
                 .to_result()
@@ -67,7 +67,7 @@ class TestMemIdx:
             # print(data_dict["c1"])
             assert data_dict["c1"] == [4, 4, 4, 4, 4, 2]
 
-            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
             # print(data_dict)
             assert data_dict["count(star)"] == [10]
 
@@ -88,14 +88,14 @@ class TestMemIdx:
             table_obj = db_obj.get_table("test_memidx1")
 
             def check():
-                data_dict, data_type_dict = (
+                data_dict, data_type_dict, _ = (
                     table_obj.output(["c1"])
                     .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6)
                     .to_result()
                 )
                 assert data_dict["c1"] == [8, 6, 6, 4, 4, 4]
 
-                data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+                data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
                 assert data_dict["count(star)"] == [13]
 
             check()
@@ -177,11 +177,11 @@ class TestMemIdx:
             time.sleep(5)
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_mem_ivf")
-            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
             # print(data_dict)
             assert data_dict["count(star)"] == [56]
 
-            data_dict, data_type_dict = (
+            data_dict, data_type_dict, _ = (
                 table_obj.output(["c1"])
                 .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6, {"nprobe" : "100"})
                 .to_result()
@@ -189,7 +189,7 @@ class TestMemIdx:
             # print(data_dict["c1"])
             assert data_dict["c1"] == [4, 4, 4, 4, 4, 2]
 
-            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
             # print(data_dict)
             assert data_dict["count(star)"] == [56]
 
@@ -210,14 +210,14 @@ class TestMemIdx:
             table_obj = db_obj.get_table("test_mem_ivf")
 
             def check():
-                data_dict, data_type_dict = (
+                data_dict, data_type_dict, _ = (
                     table_obj.output(["c1"])
                     .match_dense("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6)
                     .to_result()
                 )
                 assert data_dict["c1"] == [8, 6, 6, 4, 4, 4]
 
-                data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+                data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
                 assert data_dict["count(star)"] == [59]
 
             check()
@@ -277,11 +277,11 @@ class TestMemIdx:
             time.sleep(5)
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_mem_indexer")
-            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
             # print(data_dict)
             assert data_dict["count(star)"] == [5]
 
-            data_dict, data_type_dict = (
+            data_dict, data_type_dict, _ = (
                 table_obj.output(["c1"])
                 .match_text('c2', 'test text', 3)
                 .to_result()
@@ -289,7 +289,7 @@ class TestMemIdx:
             # print(data_dict["c1"])
             assert data_dict["c1"] == [1, 2, 3]
 
-            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
             # print(data_dict)
             assert data_dict["count(star)"] == [5]
 
@@ -318,7 +318,7 @@ class TestMemIdx:
             table_obj = db_obj.get_table("test_mem_indexer")
 
             def check(rows):
-                data_dict, data_type_dict = (
+                data_dict, data_type_dict, _ = (
                     table_obj.output(["c1"])
                     .match_text('c2', 'this what', 3)
                     .to_result()
@@ -326,7 +326,7 @@ class TestMemIdx:
                 # print(data_dict["c1"])
                 assert data_dict["c1"] == [7, 8, 10]
 
-                data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+                data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
                 assert data_dict["count(star)"] == [rows]
 
             check(11)
@@ -675,12 +675,12 @@ class TestMemIdx:
         def part2(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
-            data_dict, data_type_dict = (
+            data_dict, data_type_dict, _ = (
                 table_obj.output(["c1"]).filter("c2 >= 8192").to_result()
             )
             assert data_dict["c1"] == [8192 + i for i in range(100)]
 
-            data_dict, data_type_dict = (
+            data_dict, data_type_dict, _ = (
                 table_obj.output(["c1"])
                 .match_sparse("c3", SparseVector(indices=[1], values=[1.0]), "ip", 100)
                 .to_result()
@@ -723,7 +723,7 @@ class TestMemIdx:
         def part2(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_memidx5")
-            data_dict, data_type_dict = (
+            data_dict, data_type_dict, _ = (
                 table_obj.output(["c1"]).match_text("c2", "hello", 2).to_result()
             )
             assert data_dict["c1"] == [1, 2]

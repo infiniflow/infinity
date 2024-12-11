@@ -100,6 +100,7 @@ public:
 
     // Project expression list
     Vector<SharedPtr<BaseExpression>> projection_expressions_{};
+    bool total_hits_count_flag_{false};
 
     // Highlight info
     Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns_{};

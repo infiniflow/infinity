@@ -1131,7 +1131,17 @@ QueryResult Infinity::Search(const String &db_name,
                              Vector<ParsedExpr *> *output_columns,
                              Vector<ParsedExpr *> *highlight_columns,
                              Vector<OrderByExpr *> *order_by_list,
-                             Vector<ParsedExpr *> *group_by_list) {
+                             Vector<ParsedExpr *> *group_by_list,
+                             bool total_hits_count_flag) {
+    if (total_hits_count_flag) {
+        if (limit == nullptr) {
+            QueryResult query_result;
+            query_result.result_table_ = nullptr;
+            query_result.status_ = Status::InvalidQueryOption("'total_hits_count' is only valid when limit keyword is set");
+            return query_result;
+        }
+    }
+
     DeferFn free_output_columns([&]() {
         if (output_columns != nullptr) {
             for (auto &output_column : *output_columns) {
@@ -1195,6 +1205,7 @@ QueryResult Infinity::Search(const String &db_name,
     select_statement->offset_expr_ = offset;
     select_statement->order_by_list_ = order_by_list;
     select_statement->group_by_list_ = group_by_list;
+    select_statement->total_hits_count_flag_ = total_hits_count_flag;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     output_columns = nullptr;

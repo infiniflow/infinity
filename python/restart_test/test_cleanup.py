@@ -161,7 +161,7 @@ class TestCleanup:
 
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
-            data_dict, _ = table_obj.output(["count(*)"]).to_result()
+            data_dict, _, _ = table_obj.output(["count(*)"]).to_result()
             count_star = data_dict["count(star)"][0]
             assert count_star == insert_n
 

@@ -47,7 +47,7 @@ class TestInsertParallel:
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("parallel_insert_test")
 
-        res = table_obj.output(['*']).to_df()
+        res, extra_result = table_obj.output(['*']).to_df()
         print(res)
         assert len(res) == total_row_count
 
@@ -91,7 +91,7 @@ class TestInsertParallel:
             table_obj.insert(value)
             value.clear()
         print(f"test_insert_one_thread: cost {time.time() - start_ts} s")
-        res = table_obj.output(['*']).to_df()
+        res, extra_result = table_obj.output(['*']).to_df()
         print(res)
         assert len(res) == total_row_count
 
@@ -141,7 +141,7 @@ class TestInsertParallel:
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("parallel_insert_test")
 
-        res = table_obj.output(['*']).to_df()
+        res, extra_result = table_obj.output(['*']).to_df()
         print(res)
         assert len(res) == total_row_count
 

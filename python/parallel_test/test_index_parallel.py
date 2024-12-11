@@ -52,7 +52,7 @@ class TestIndexParallel(TestSdk):
             table_obj = db_obj.get_table("test_fulltext_index_parallel")
 
             while time.time() < end_time:
-                res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
+                res, extra_result = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
                     "body^5", "harmful chemical", 3).to_pl()
                 print(res)
                 time.sleep(0.1)
@@ -149,7 +149,7 @@ class TestIndexParallel(TestSdk):
             print("begin import")
             table_obj.import_data(file_path)
             print("import complete")
-        res = table_obj.output(["variant_id"]).match_dense(
+        res, extra_result = table_obj.output(["variant_id"]).match_dense(
             knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
         print(res)
 
@@ -199,7 +199,7 @@ class TestIndexParallel(TestSdk):
             table_obj = db_obj.get_table("test_vector_index_parallel")
 
             while time.time() < end_time:
-                res = table_obj.output(["variant_id"]).match_dense(
+                res, extra_result = table_obj.output(["variant_id"]).match_dense(
                     knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
                 print(res)
                 time.sleep(0.1)
@@ -313,7 +313,7 @@ class TestIndexParallel(TestSdk):
 
             while time.time() < end_time:
                 try:
-                    res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
+                    res, extra_result = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
                         "body^5", "harmful chemical", 3).to_pl()
                     # print(f"thread {thread_id}: check result:\n{res}")
                     self.logger.info(f"thread {thread_id}: check result:\n{res}")

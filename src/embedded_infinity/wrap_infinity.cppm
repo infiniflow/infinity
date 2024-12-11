@@ -125,6 +125,7 @@ export struct WrapQueryResult {
     Vector<String> names;
     Vector<WrapColumnDef> column_defs;
     Vector<ColumnField> column_fields;
+    String extra_result;
     // show database
     String database_name;
     String store_dir;
@@ -432,6 +433,7 @@ export WrapQueryResult WrapSearch(Infinity &instance,
                                   Vector<WrapParsedExpr> highlight_list,
                                   Vector<WrapOrderByExpr> order_by_list,
                                   Vector<WrapParsedExpr> group_by_list,
+                                  bool total_hits_count_flag,
                                   WrapSearchExpr *wrap_search_expr = nullptr,
                                   WrapParsedExpr *where_expr = nullptr,
                                   WrapParsedExpr *limit_expr = nullptr,

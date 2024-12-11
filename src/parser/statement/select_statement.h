@@ -67,6 +67,8 @@ public:
 
     SetOperatorType set_op_{SetOperatorType::kUnion};
     SelectStatement *nested_select_{nullptr};
+
+    bool total_hits_count_flag_{false};
 };
 
 } // namespace infinity

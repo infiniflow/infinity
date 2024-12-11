@@ -201,9 +201,9 @@ TEST_F(InfinityTest, test1) {
         col2->names_.emplace_back(col2_name);
         output_columns->emplace_back(col2);
 
-        SearchExpr * search_expr = nullptr;
+        SearchExpr *search_expr = nullptr;
 
-        result = infinity->Search("default_db", "table1", search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
+        result = infinity->Search("default_db", "table1", search_expr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, false);
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         EXPECT_EQ(data_block->row_count(), 1);
         Value value = data_block->GetValue(0, 0);

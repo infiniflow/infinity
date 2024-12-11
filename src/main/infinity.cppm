@@ -193,7 +193,8 @@ public:
                        Vector<ParsedExpr *> *output_columns,
                        Vector<ParsedExpr *> *highlight_columns,
                        Vector<OrderByExpr *> *order_by_list,
-                       Vector<ParsedExpr *> *group_by_list);
+                       Vector<ParsedExpr *> *group_by_list,
+                       bool total_hits_count_flag);
 
     QueryResult Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_options = OptimizeOptions{});
 

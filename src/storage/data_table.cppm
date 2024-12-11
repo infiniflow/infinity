@@ -103,6 +103,8 @@ public:
     TableType type_{TableType::kInvalid};
     Vector<SharedPtr<DataBlock>> data_blocks_{};
     SharedPtr<String> result_msg_{};
+    bool total_hits_count_flag_{false};
+    SizeT total_hits_count_{};
 };
 
 } // namespace infinity

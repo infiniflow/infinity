@@ -6747,6 +6747,7 @@ class SelectRequest(object):
      - limit_expr
      - offset_expr
      - order_by_list
+     - total_hits_count
 
     """
 
@@ -6755,7 +6756,7 @@ class SelectRequest(object):
     ], highlight_list=[
     ], search_expr=None, where_expr=None, group_by_list=[
     ], having_expr=None, limit_expr=None, offset_expr=None, order_by_list=[
-    ],):
+    ], total_hits_count=None,):
         self.session_id = session_id
         self.db_name = db_name
         self.table_name = table_name
@@ -6780,6 +6781,7 @@ class SelectRequest(object):
             order_by_list = [
             ]
         self.order_by_list = order_by_list
+        self.total_hits_count = total_hits_count
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -6879,6 +6881,11 @@ class SelectRequest(object):
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
+            elif fid == 13:
+                if ftype == TType.BOOL:
+                    self.total_hits_count = iprot.readBool()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -6949,6 +6956,10 @@ class SelectRequest(object):
                 iter384.write(oprot)
             oprot.writeListEnd()
             oprot.writeFieldEnd()
+        if self.total_hits_count is not None:
+            oprot.writeFieldBegin('total_hits_count', TType.BOOL, 13)
+            oprot.writeBool(self.total_hits_count)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -6974,13 +6985,14 @@ class SelectResponse(object):
      - error_msg
      - column_defs
      - column_fields
+     - extra_result
 
     """
 
 
     def __init__(self, error_code=None, error_msg=None, column_defs=[
     ], column_fields=[
-    ],):
+    ], extra_result=None,):
         self.error_code = error_code
         self.error_msg = error_msg
         if column_defs is self.thrift_spec[3][4]:
@@ -6991,6 +7003,7 @@ class SelectResponse(object):
             column_fields = [
             ]
         self.column_fields = column_fields
+        self.extra_result = extra_result
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -7033,6 +7046,11 @@ class SelectResponse(object):
                     iprot.readListEnd()
                 else:
                     iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.STRING:
+                    self.extra_result = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -7064,6 +7082,10 @@ class SelectResponse(object):
             for iter398 in self.column_fields:
                 iter398.write(oprot)
             oprot.writeListEnd()
+            oprot.writeFieldEnd()
+        if self.extra_result is not None:
+            oprot.writeFieldBegin('extra_result', TType.STRING, 5)
+            oprot.writeString(self.extra_result.encode('utf-8') if sys.version_info[0] == 2 else self.extra_result)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
@@ -9471,6 +9493,7 @@ SelectRequest.thrift_spec = (
     (11, TType.STRUCT, 'offset_expr', [ParsedExpr, None], None, ),  # 11
     (12, TType.LIST, 'order_by_list', (TType.STRUCT, [OrderByExpr, None], False), [
     ], ),  # 12
+    (13, TType.BOOL, 'total_hits_count', None, None, ),  # 13
 )
 all_structs.append(SelectResponse)
 SelectResponse.thrift_spec = (
@@ -9481,6 +9504,7 @@ SelectResponse.thrift_spec = (
     ], ),  # 3
     (4, TType.LIST, 'column_fields', (TType.STRUCT, [ColumnField, None], False), [
     ], ),  # 4
+    (5, TType.STRING, 'extra_result', 'UTF8', None, ),  # 5
 )
 all_structs.append(DeleteRequest)
 DeleteRequest.thrift_spec = (

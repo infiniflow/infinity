@@ -15,6 +15,7 @@
 import re
 import functools
 import inspect
+from typing import Any
 import pandas as pd
 import polars as pl
 from sqlglot import condition
@@ -365,9 +366,9 @@ def name_validity_check(arg_name: str, name_type: str = "Table"):
     return decorator
 
 
-def select_res_to_polars(res) -> pl.DataFrame:
+def select_res_to_polars(res) -> (pl.DataFrame, Any):
     df_dict = {}
-    data_dict, data_type_dict = build_result(res)
+    data_dict, data_type_dict, extra_result = build_result(res)
     for k, v in data_dict.items():
         data_series = pd.Series(v, dtype=logic_type_to_dtype(data_type_dict[k]))
         df_dict[k] = data_series

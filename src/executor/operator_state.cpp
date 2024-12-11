@@ -117,6 +117,10 @@ bool QueueSourceState::GetData() {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)next_op_state;
             limit_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            if (fragment_data->total_hits_count_flag_) {
+                limit_op_state->total_hits_count_flag_ = true;
+                limit_op_state->total_hits_count_ += fragment_data->total_hits_count_;
+            }
             if (!limit_op_state->input_complete_) {
                 limit_op_state->input_complete_ = completed;
             }
@@ -129,6 +133,12 @@ bool QueueSourceState::GetData() {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             auto top_op_state = (MergeTopOperatorState *)next_op_state;
             top_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+
+            if (fragment_data->total_hits_count_flag_) {
+                top_op_state->total_hits_count_flag_ = true;
+                top_op_state->total_hits_count_ += fragment_data->total_hits_count_;
+            }
+
             if (!top_op_state->input_complete_) {
                 top_op_state->input_complete_ = completed;
             }
