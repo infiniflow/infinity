@@ -86,7 +86,7 @@ try:
             },
             {
                 "num": 7,
-                "body": "Chris",
+                "name": "Chris",
                 "age": 21,
                 "score": 88.0,
             },

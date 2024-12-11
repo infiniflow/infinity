@@ -26,55 +26,85 @@ table_obj.insert(
 # varchar functions
 
 #function char_length
-res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 1").to_df()
+res, extra_result = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 1").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 3").to_df()
+res, extra_result = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 3").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 4").to_df()
+res, extra_result = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = 4").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = char_length(c2)").to_df()
+res, extra_result = table_obj.output(["*", "char_length(c1)"]).filter("char_length(c1) = char_length(c2)").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 #function regex
-res = table_obj.output(["*", "regex(c1, 'bc')"]).filter("regex(c1, 'bc')").to_df()
+res, extra_result = table_obj.output(["*", "regex(c1, 'bc')"]).filter("regex(c1, 'bc')").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*"]).filter("regex(c1, '(\w+([-+.]\w+)*)@(\w+([-.]\w+)*)\.(\w+([-.]\w+)*)')").to_df()
+res, extra_result = table_obj.output(["*"]).filter("regex(c1, '(\w+([-+.]\w+)*)@(\w+([-.]\w+)*)\.(\w+([-.]\w+)*)')").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 #function substring
-res = table_obj.output(["*", "substring(c1, 0, 2)"]).filter("substring(c1, 0, 2) = 'ab'").to_df()
+res, extra_result = table_obj.output(["*", "substring(c1, 0, 2)"]).filter("substring(c1, 0, 2) = 'ab'").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*", "substring(c1, 0, 4)"]).filter("substring(c1, 0, 4) = 'test'").to_df()
+res, extra_result = table_obj.output(["*", "substring(c1, 0, 4)"]).filter("substring(c1, 0, 4) = 'test'").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 #function upper and lower
-res = table_obj.output(["*", "upper(c1)"]).filter("upper(c1) = 'TEST@GMAIL.COM'").to_df()
+res, extra_result = table_obj.output(["*", "upper(c1)"]).filter("upper(c1) = 'TEST@GMAIL.COM'").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*"]).filter("lower('ABC') = c1").to_df()
+res, extra_result = table_obj.output(["*"]).filter("lower('ABC') = c1").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 #function ltrim, rtrim, trim
-res = table_obj.output(["*", "ltrim(c1)"]).filter("ltrim(c1) = 'abc'").to_df()
+res, extra_result = table_obj.output(["*", "ltrim(c1)"]).filter("ltrim(c1) = 'abc'").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*", "rtrim(c1)"]).filter("rtrim(c1) = 'abc'").to_df()
+res, extra_result = table_obj.output(["*", "rtrim(c1)"]).filter("rtrim(c1) = 'abc'").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*", "trim(c1)"]).filter("trim(c1) = 'abc'").to_df()
+res, extra_result = table_obj.output(["*", "trim(c1)"]).filter("trim(c1) = 'abc'").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()
+res, extra_result = table_obj.output(["*"]).filter("trim('   abc   ') = rtrim(ltrim('   abc   '))").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 #function char_position
-res = table_obj.output(["*", "char_position(c1, 'bc')"]).filter("char_position(c1, c1) <> 0").to_df()
+res, extra_result = table_obj.output(["*", "char_position(c1, 'bc')"]).filter("char_position(c1, c1) <> 0").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 # math functions
 db_obj.drop_table("function_example", ConflictType.Ignore)
@@ -87,27 +117,39 @@ table_obj.insert(
         {"c1": 9, "c2": 10}, {"c1": 11, "c2": 12}, {"c1": 13, "c2": 14}, {"c1": 15, "c2": 16},])
 
 #function sqrt
-res = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).to_df()
+res, extra_result = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
-res = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).filter("sqrt(c1) = 3").to_df()
+res, extra_result = table_obj.output(["*", "sqrt(c1)", "sqrt(c2)"]).filter("sqrt(c1) = 3").to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 #function round
-res = table_obj.output(["*", "round(c1)", "round(c2)"]).to_df()
+res, extra_result = table_obj.output(["*", "round(c1)", "round(c2)"]).to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 #function ceiling
-res = table_obj.output(["*", "ceil(c1)", "ceil(c2)"]).to_df()
+res, extra_result = table_obj.output(["*", "ceil(c1)", "ceil(c2)"]).to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 #function floor
-res = table_obj.output(["*", "floor(c1)", "floor(c2)"]).to_df()
+res, extra_result = table_obj.output(["*", "floor(c1)", "floor(c2)"]).to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 #function ln
-res = table_obj.output(["*", "ln(c1)", "ln(c2)"]).to_df()
+res, extra_result = table_obj.output(["*", "ln(c1)", "ln(c2)"]).to_df()
 print(res)
+if extra_result is not None:
+    print(extra_result)
 
 res = db_obj.drop_table("function_example")
 
