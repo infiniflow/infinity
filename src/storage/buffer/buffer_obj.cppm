@@ -158,7 +158,7 @@ protected:
 private:
     u32 id_;
 
-    u32 obj_rc_ = 1;
+    u32 obj_rc_ = 0;
 };
 
 } // namespace infinity

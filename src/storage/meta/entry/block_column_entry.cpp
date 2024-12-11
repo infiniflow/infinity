@@ -67,14 +67,16 @@ BlockColumnEntry::BlockColumnEntry(const BlockColumnEntry &other)
     std::shared_lock lock(other.mutex_);
     outline_buffers_ = other.outline_buffers_;
     last_chunk_offset_ = other.last_chunk_offset_;
-}
 
-UniquePtr<BlockColumnEntry> BlockColumnEntry::Clone(BlockEntry *block_entry) const {
-    auto ret = UniquePtr<BlockColumnEntry>(new BlockColumnEntry(*this));
     buffer_->AddObjRc();
     for (auto *outline_buffer : outline_buffers_) {
         outline_buffer->AddObjRc();
     }
+}
+
+UniquePtr<BlockColumnEntry> BlockColumnEntry::Clone(BlockEntry *block_entry) const {
+    auto ret = UniquePtr<BlockColumnEntry>(new BlockColumnEntry(*this));
+
     ret->block_entry_ = block_entry;
     return ret;
 }
@@ -105,6 +107,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
                                                   buffer_mgr->persistence_manager());
 
     block_column_entry->buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+    block_column_entry->buffer_->AddObjRc();
     return block_column_entry;
 }
 
@@ -132,6 +135,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                   buffer_manager->persistence_manager());
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker), true /*restart*/);
+    column_entry->buffer_->AddObjRc();
 
     if (next_outline_idx > 0) {
         SizeT buffer_size = last_chunk_offset;
@@ -142,6 +146,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                                     buffer_size,
                                                                     buffer_manager->persistence_manager());
         auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker), true /*restart*/);
+        buffer_obj->AddObjRc();
         column_entry->outline_buffers_.push_back(buffer_obj);
     }
     column_entry->last_chunk_offset_ = last_chunk_offset;
@@ -171,6 +176,7 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
                                                       0,
                                                       buffer_mgr->persistence_manager());
         this->buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+        buffer_->AddObjRc();
     }
 
     ColumnVector column_vector(column_type_);
@@ -293,6 +299,7 @@ void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] 
                 String file_path = outline_buffer->GetFilename();
                 info_tracer->AddCleanupInfo(std::move(file_path));
             }
+            outline_buffer = nullptr;
         }
     }
 }
