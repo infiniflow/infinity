@@ -52,9 +52,7 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    SizeT TaskletCount() override {
-        return left_->TaskletCount();
-    }
+    SizeT TaskletCount() override { return left_->TaskletCount(); }
 
     Vector<SharedPtr<BaseExpression>> expressions_{};
 

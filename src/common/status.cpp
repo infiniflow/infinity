@@ -448,6 +448,10 @@ Status Status::FileIsOpen(const String &filename) { return Status(ErrorCode::kFi
 
 Status Status::Unknown(const String &name) { return Status(ErrorCode::kUnknown, MakeUnique<String>(fmt::format("Unknown {}", name))); }
 
+Status Status::InvalidQueryOption(const String &detail) {
+    return Status(ErrorCode::kUnknown, MakeUnique<String>(fmt::format("Invalid query option: {}", detail)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));

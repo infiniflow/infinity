@@ -28,6 +28,7 @@ from infinity.common import InfinityException
 
 TRY_TIMES = 10
 
+
 class ThriftInfinityClient:
     def __init__(self, uri: URI, *, try_times: int = TRY_TIMES, logger: logging.Logger = None):
         self.lock = rwlock.RWLockRead()
@@ -115,12 +116,14 @@ class ThriftInfinityClient:
                         if old_session_i == self.session_i:
                             self._reconnect()
                             self.session_i += 1
-                            self.logger.debug(f"Tried {i} times, session_id: {self.session_id}, session_i: {self.session_i}, exception: {str(e)}")
+                            self.logger.debug(
+                                f"Tried {i} times, session_id: {self.session_id}, session_i: {self.session_i}, exception: {str(e)}")
                 except Exception as e:
                     raise
             else:
                 return CommonResponse(ErrorCode.TOO_MANY_CONNECTIONS, f"Try {self.try_times} times, but still failed")
             return ret
+
         return wrapper
 
     @retry_wrapper
@@ -259,7 +262,7 @@ class ThriftInfinityClient:
 
     @retry_wrapper
     def select(self, db_name: str, table_name: str, select_list, highlight_list, search_expr,
-               where_expr, group_by_list, limit_expr, offset_expr, order_by_list):
+               where_expr, group_by_list, limit_expr, offset_expr, order_by_list, total_hits_count):
         return self.client.Select(SelectRequest(session_id=self.session_id,
                                                 db_name=db_name,
                                                 table_name=table_name,
@@ -270,7 +273,8 @@ class ThriftInfinityClient:
                                                 group_by_list=group_by_list,
                                                 limit_expr=limit_expr,
                                                 offset_expr=offset_expr,
-                                                order_by_list=order_by_list
+                                                order_by_list=order_by_list,
+                                                total_hits_count=total_hits_count
                                                 ))
 
     @retry_wrapper
@@ -384,7 +388,7 @@ class ThriftInfinityClient:
     def flush(self, flush_request: ttypes.FlushRequest):
         flush_request.session_id = self.session_id
         return self.client.Flush(flush_request)
-    
+
     @retry_wrapper
     def compact(self, db_name: str, table_name: str):
         return self.client.Compact(CompactRequest(session_id=self.session_id, db_name=db_name, table_name=table_name))

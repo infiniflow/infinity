@@ -40,7 +40,7 @@ class TestInsertDeleteParallelSimple:
         infinity_obj = connection_pool.get_conn()
         db_obj = infinity_obj.get_database(db_name)
         table_obj = db_obj.get_table(table_name)
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         assert len(res) == 0
         res = db_obj.drop_table(table_name, ConflictType.Error)

@@ -332,19 +332,26 @@ void PhysicalTop::Init() {
 
 // Behavior now: always sort the output results
 bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
-    auto prev_op_state = operator_state->prev_op_state_;
+    TopOperatorState *top_operator_state = (TopOperatorState *)operator_state;
+    auto prev_op_state = top_operator_state->prev_op_state_;
     if ((offset_ != 0) and !(prev_op_state->Complete())) {
         String error_message = "Only 1 PhysicalTop job but !(prev_op_state->Complete())";
         UnrecoverableError(error_message);
     }
     auto &input_data_block_array = prev_op_state->data_block_array_;
-    auto &output_data_block_array = operator_state->data_block_array_;
+    auto &output_data_block_array = top_operator_state->data_block_array_;
+
+    SizeT total_hits_row_count = std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), 0, [](u32 x, const auto &y) -> u32 {
+        return x + y->row_count();
+    });
     // sometimes the input_data_block_array is empty, but the operator is not complete
-    if (std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), 0, [](u32 x, const auto &y) -> u32 {
-            return x + y->row_count();
-        }) == 0) {
+    if (total_hits_row_count == 0) {
         if (prev_op_state->Complete()) {
-            operator_state->SetComplete();
+            if (total_hits_count_flag_) {
+                top_operator_state->total_hits_count_flag_ = true;
+                top_operator_state->total_hits_count_ = 0;
+            }
+            top_operator_state->SetComplete();
         }
         return true;
     }
@@ -352,13 +359,17 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
         String error_message = "output data_block_array_ is not empty";
         UnrecoverableError(error_message);
     }
-    auto eval_columns = GetEvalColumns(sort_expressions_, (static_cast<TopOperatorState *>(operator_state))->expr_states_, input_data_block_array);
+    auto eval_columns = GetEvalColumns(sort_expressions_, top_operator_state->expr_states_, input_data_block_array);
     TopSolver solve_top(limit_, prefer_left_function_);
     auto output_row_cnt = solve_top.WriteTopResultsToOutput(eval_columns, input_data_block_array, output_data_block_array);
     input_data_block_array.clear();
     HandleOutputOffset(output_row_cnt, offset_, output_data_block_array);
     if (prev_op_state->Complete()) {
-        operator_state->SetComplete();
+        if (total_hits_count_flag_) {
+            top_operator_state->total_hits_count_flag_ = true;
+            top_operator_state->total_hits_count_ = total_hits_row_count;
+        }
+        top_operator_state->SetComplete();
     }
     return true;
 }

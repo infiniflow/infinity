@@ -101,7 +101,7 @@ class TestInfinity:
         res = table_obj.insert([{"c2": 3, "c1": 3}, {"c1": 4, "c2": 4}])
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, 2, 3, 4), 'c2': (0, 1, 2, 3, 4)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
@@ -121,7 +121,7 @@ class TestInfinity:
         assert table_obj
         res = table_obj.insert([{"c1": -1, "c2": True}, {"c1": 2, "c2": False}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-1, 2), 'c2': (True, False)}).astype(
             {'c1': dtype('float32'), 'c2': dtype('bool')}))
@@ -145,7 +145,7 @@ class TestInfinity:
         assert table_instance
         res = table_instance.insert({"c1": 1, "c7": "Tom"})
         assert res.error_code == ErrorCode.OK
-        res = table_instance.output(["*"]).to_df()
+        res, extra_result = table_instance.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1,), 'c2': (0,), 'c3': (0,), 'c4': (0,), 'c5': (0,), 'c6': (0,), 'c7': ("Tom",), 'c8': (1.0,),
@@ -171,7 +171,7 @@ class TestInfinity:
             [{"c1": -1, "c2": 1, "c3": -1}, {"c1": 2, "c2": -2, "c3": 2}, {"c1": -3, "c2": 3, "c3": -3},
              {"c1": 4, "c2": -4, "c3": 4}, {"c1": -5, "c2": 5, "c3": -5}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (-1, 2, -3, 4, -5), 'c2': (1, -2, 3, -4, 5), 'c3': (-1, 2, -3, 4, -5)}).astype(
@@ -197,7 +197,7 @@ class TestInfinity:
         res = table_obj.insert([{"c1": "^789$ test insert varchar"}])
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ("test_insert_varchar", " test insert varchar ",
                                                                 "^789$ test insert varchar")}))
         res = db_obj.drop_table("test_insert_varchar"+suffix, ConflictType.Error)
@@ -217,7 +217,7 @@ class TestInfinity:
             res = table_obj.insert([{"c1": "test_insert_big_varchar" * 1000}])
             assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ["test_insert_big_varchar" * 1000] * 100}))
 
@@ -242,13 +242,13 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [-7, -8, -9]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9])}))
         res = table_obj.insert([{"c1": [1, 2, 3]}, {"c1": [4, 5, 6]}, {
             "c1": [7, 8, 9]}, {"c1": [-7, -8, -9]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9],
                                                                 [1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9])}))
 
@@ -269,7 +269,7 @@ class TestInfinity:
         res = table_obj.insert([{"c1": embedding_insert_float[3]}])
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': embedding_insert_float}))
 
@@ -288,7 +288,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": embedding_insert_float[3]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': [np.array(x).astype(np.float16).tolist() for x in embedding_insert_float]}))
@@ -307,7 +307,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": embedding_insert_float[3]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         tmp_bf16 = np.array(embedding_insert_float).astype('<f4')
         tmp_bf16.view('<i2')[:, ::2] = 0
@@ -429,7 +429,7 @@ class TestInfinity:
         # insert
         values = [{"c1": [1.1 for _ in range(1024)]}]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_pl()
+        insert_res, extra_result = table_obj.output(["*"]).to_pl()
         print(insert_res)
 
         res = table_obj.drop_index("my_index_1", ConflictType.Error)
@@ -456,13 +456,13 @@ class TestInfinity:
             values = [{"c1": i * 100 + j, "c2": i * 100 + j + 1}
                       for j in range(100)]
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
     def _test_read_after_shutdown(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("test_insert_table_with_10000_columns"+suffix)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table(
@@ -479,7 +479,7 @@ class TestInfinity:
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8192)]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table("test_batch_insert"+suffix, ConflictType.Error)
@@ -494,7 +494,7 @@ class TestInfinity:
 
         with pytest.raises(InfinityException) as e:
             table_obj.insert([])
-            insert_res = table_obj.output(["*"]).to_df()
+            insert_res, extra_result = table_obj.output(["*"]).to_df()
             print(insert_res)
 
         assert e.type == InfinityException
@@ -522,7 +522,7 @@ class TestInfinity:
                                 {"c1": {"70": -7.7, "80": -8.8, "90": -9.9}}])
         assert res.error_code == ErrorCode.OK
         print(table_obj.output(["*"]).to_pl())
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (
@@ -551,13 +551,13 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": np.array([[7, 8, 9], [-7, -8, -9]])}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
         res = table_obj.insert([{"c1": [1, 2, 3]}, {"c1": [4, 5, 6]}, {
             "c1": [7, 8, 9, -7, -8, -9]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]],
                                                                 [[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
 
@@ -575,7 +575,7 @@ class TestInfinity:
         res = table_obj.insert([{"c1": [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]]}])
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([[1.1, 2.2, 3.3]], [[4.4, 5.5, 6.6]], [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]])}))
 
@@ -598,13 +598,13 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": np.array([[7, 8, 9], [-7, -8, -9]])}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
         res = table_obj.insert([{"c1": [1, 2, 3]}, {"c1": [4, 5, 6]}, {
             "c1": [7, 8, 9, -7, -8, -9]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]],
                                                                 [[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
 
@@ -622,7 +622,7 @@ class TestInfinity:
         res = table_obj.insert([{"c1": [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]]}])
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([[1.1, 2.2, 3.3]], [[4.4, 5.5, 6.6]], [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]])}))
 
@@ -646,7 +646,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [[[13, 14], [15, 16], [17, 18]]]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([[[1, 2], [3, 4]], [[5, 6]]], [[[7, 8]], [[9, 10], [11, 12]]], [[[13, 14], [15, 16], [17, 18]]])}))
@@ -686,7 +686,7 @@ class TestInfinity:
         assert table_obj
         res = table_obj.insert([{"body": "", "vec": [1.0]}, {"vec": [2.0], "body": "DEF"}, {"vec": [4.0]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'num': (33, 33, 33), 'body': ("", "DEF", "ABC"), 'vec': ([1.0], [2.0], [4.0])}).astype(
@@ -727,7 +727,7 @@ class TestInfinity:
         # insert
         values = [{"c1": 1, "c2": types_example}]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table(
@@ -750,7 +750,7 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
 
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table(
@@ -769,7 +769,7 @@ class TestInfinity:
         # insert
         with pytest.raises(Exception):
             table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table(
@@ -787,7 +787,7 @@ class TestInfinity:
 
         # insert
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_pl()
+        insert_res, extra_result = table_obj.output(["*"]).to_pl()
         print(insert_res)
 
         res = db_obj.drop_table(
@@ -808,7 +808,7 @@ class TestInfinity:
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(batch)]
         table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table(
@@ -836,7 +836,7 @@ class TestInfinity:
                 assert e.value.args[0] == ErrorCode.NOT_SUPPORTED
             else:
                 table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table(
@@ -857,7 +857,7 @@ class TestInfinity:
             for i in range(5):
                 values = [{"c1": 1, "c2": 1} for _ in range(batch)]
                 table_obj.insert(values)
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table(
@@ -879,7 +879,7 @@ class TestInfinity:
         values = [{"c1": column_types_example} for _ in range(5)]
         table_obj.insert(values)
 
-        insert_res = table_obj.output(["*"]).to_df()
+        insert_res, extra_result = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table(
@@ -909,7 +909,7 @@ class TestInfinity:
 
         with pytest.raises(InfinityException) as e:
             table_obj.insert([{column_name: 1}])
-            insert_res = table_obj.output(["*"]).to_df()
+            insert_res, extra_result = table_obj.output(["*"]).to_df()
             print(insert_res)
 
         assert e.type == InfinityException
@@ -970,7 +970,7 @@ class TestInfinity:
                     }
                 )
             table_obj.insert(insert_data)
-        res = table_obj.output(["count(*)"]).to_pl()
+        res, extra_result = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == total_row_count
 
         db_obj.drop_table("hr_data_mix"+suffix, ConflictType.Error)

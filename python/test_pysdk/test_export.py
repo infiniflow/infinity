@@ -74,7 +74,7 @@ class TestInfinity:
         table_obj = db_obj.create_table("test_export_csv"+suffix, {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["count(*)"]).to_pl()
+        res, extra_result = table_obj.output(["count(*)"]).to_pl()
         print(res)
 
         test_export_csv_file_path = common_values.TEST_TMP_DIR + suffix +"test_export_csv.csv"
@@ -124,7 +124,7 @@ class TestInfinity:
         table_obj = db_obj.create_table("test_export_jsonl"+suffix, {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["count(*)"]).to_pl()
+        res, extra_result = table_obj.output(["count(*)"]).to_pl()
         print(res)
 
         test_export_jsonl_file_path = common_values.TEST_TMP_DIR + suffix + "test_export_jsonl.jsonl"
@@ -174,7 +174,7 @@ class TestInfinity:
         table_obj = db_obj.create_table("test_export_fvecs"+suffix, {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["count(*)"]).to_pl()
+        res, extra_result = table_obj.output(["count(*)"]).to_pl()
         print(res)
 
         test_export_fvecs_file_path = common_values.TEST_TMP_DIR + suffix + "test_export_fvecs.fvecs"

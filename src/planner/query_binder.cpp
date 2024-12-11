@@ -224,6 +224,7 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     // 11. SELECT (not flatten subquery)
     BuildSelectList(query_context_ptr_, bound_select_statement);
     bound_select_statement->aggregate_expressions_ = bind_context_ptr_->aggregate_exprs_;
+    bound_select_statement->total_hits_count_flag_ = statement.total_hits_count_flag_;
 
     // 12. highlight list
     if (statement.highlight_list_ != nullptr) {
@@ -910,7 +911,8 @@ void QueryBinder::BuildSelectList(QueryContext *, UniquePtr<BoundSelectStatement
     if (!bound_select_statement->having_expressions_.empty() || !bound_select_statement->group_by_expressions_.empty() ||
         !bind_context_ptr_->aggregate_exprs_.empty()) {
         if (!project_binder->BoundColumn().empty()) {
-            Status status = Status::SyntaxError(fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregate function", project_binder->BoundColumn()));
+            Status status = Status::SyntaxError(
+                fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregate function", project_binder->BoundColumn()));
             RecoverableError(status);
         }
     }
@@ -1012,7 +1014,7 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     if (statement.where_expr_ != nullptr) {
         auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-        if(where_expr->Type().type() != LogicalType::kBoolean) {
+        if (where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
             RecoverableError(status);
         }
@@ -1042,7 +1044,7 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     if (statement.where_expr_ != nullptr) {
         auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
-        if(where_expr->Type().type() != LogicalType::kBoolean) {
+        if (where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
             RecoverableError(status);
         }

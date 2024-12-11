@@ -171,7 +171,11 @@ curl --request GET \
                  "metric_type": "cosine",
                  "topn": 4
              }
-         ]
+         ],
+         "option":
+         {
+             "total_hits_count": "true"
+         }
      } '
 
 echo -e '\n\n-- search with sparse vector'

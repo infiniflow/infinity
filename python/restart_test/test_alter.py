@@ -55,7 +55,7 @@ class TestAlter:
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
 
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             pd.testing.assert_frame_equal(
                 res,
                 pd.DataFrame(
@@ -136,7 +136,7 @@ class TestAlter:
         def part2(infinity_obj):
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table(table_name)
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             pd.testing.assert_frame_equal(
                 res,
                 pd.DataFrame(
@@ -163,7 +163,7 @@ class TestAlter:
             res = table_obj.list_indexes()
             assert len(res.index_names) == 1
 
-            data_dict, _ = (
+            data_dict, _, _ = (
                 table_obj.output(["c1"])
                 .match_text(fields="c3", matching_text="test", topn=1)
                 .to_result()

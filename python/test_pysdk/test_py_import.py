@@ -80,7 +80,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
         # search
-        res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+        res, extra_result = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
         res = db_obj.drop_table("test_import"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -107,14 +107,14 @@ class TestInfinity:
             table_obj = db_obj.create_table("test_import_different_file_format_data"+suffix,
                                             {"c1": {"type": "vector,128,float"}}, ConflictType.Error)
             table_obj.import_data(common_values.TEST_TMP_DIR + file_name, {"file_type": file_format})
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             print(res)
         else:
             print(common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format)
             table_obj.import_data(
                 os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
                 {"file_type": file_format})
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             print(res)
 
         res = db_obj.drop_table("test_import_different_file_format_data"+suffix, ConflictType.Error)
@@ -128,7 +128,7 @@ class TestInfinity:
                                         {"c1": {"type": "vector,128,float"}}, ConflictType.Error)
         table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_import_empty_file_fvecs"+suffix, ConflictType.Error)
 
@@ -140,7 +140,7 @@ class TestInfinity:
                                         {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
         table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_import_empty_file_csv"+suffix, ConflictType.Error)
 
@@ -152,7 +152,7 @@ class TestInfinity:
                                         {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
         table_obj.import_data(os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/test_empty." + file_format)
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_import_empty_file_jsonl"+suffix, ConflictType.Error)
 
@@ -170,7 +170,7 @@ class TestInfinity:
                 os.getcwd() + common_values.TEST_DATA_DIR + file_format + "/pysdk_test." + file_format,
                 {"file_type": file_format})
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_import_format_unrecognized_data"+suffix, ConflictType.Error)
 
@@ -206,7 +206,7 @@ class TestInfinity:
                                   import_options={
                                       "delimiter": delimiter[1]
                                   })
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             print(res)
             db_obj.drop_table("test_csv_with_different_delimiter"+suffix, ConflictType.Error)
         else:
@@ -235,7 +235,7 @@ class TestInfinity:
         table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test_" + delimiter + ".csv",
                               import_options={"delimiter": " "})
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_csv_with_different_delimiter_more_than_one_character"+suffix, ConflictType.Error)
 
@@ -251,7 +251,7 @@ class TestInfinity:
                                         ConflictType.Error)
         table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test_commas.csv",
                               import_options={"header": has_header})
-        res = table_obj.output(["*"]).to_pl()
+        res, extra_result = table_obj.output(["*"]).to_pl()
         print(res)
         db_obj.drop_table("test_import_csv_with_headers"+suffix, ConflictType.Error)
 
@@ -275,7 +275,7 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.IMPORT_FILE_FORMAT_ERROR
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_import_fvecs_table_with_more_columns"+suffix, ConflictType.Error)
 
@@ -298,7 +298,7 @@ class TestInfinity:
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_import_embedding_with_not_match_definition"+suffix, ConflictType.Error)
 
@@ -321,7 +321,7 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.IMPORT_FILE_FORMAT_ERROR
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_import_embedding_with_not_match_definition"+suffix, ConflictType.Error)
 
@@ -341,7 +341,7 @@ class TestInfinity:
             test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
             res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
             assert res.error_code == ErrorCode.OK
-            res = table_obj.output(["*"]).to_df()
+            res, extra_result = table_obj.output(["*"]).to_df()
             print(res)
         db_obj.drop_table("test_import_embedding_with_not_match_definition"+suffix, ConflictType.Ignore)
 
@@ -359,7 +359,7 @@ class TestInfinity:
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_pl()
+        res, extra_result = table_obj.output(["*"]).to_pl()
         print(res)
         db_obj.drop_table("test_import_varchar_with_not_match_definition"+suffix, ConflictType.Error)
 
@@ -379,7 +379,7 @@ class TestInfinity:
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_import_10000_columns"+suffix, ConflictType.Error)
 
@@ -403,7 +403,7 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.COLUMN_COUNT_MISMATCH or e.value.args[0] == ErrorCode.IMPORT_FILE_FORMAT_ERROR
 
-        res = table_obj.output(["*"]).to_df()
+        res, extra_result = table_obj.output(["*"]).to_df()
         print(res)
         db_obj.drop_table("test_table_with_not_matched_columns"+suffix, ConflictType.Error)
 
@@ -423,7 +423,7 @@ class TestInfinity:
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["count(*)"]).to_pl()
+        res, extra_result = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == data_size
         db_obj.drop_table("test_import_with_different_size"+suffix, ConflictType.Ignore)
 
@@ -443,7 +443,7 @@ class TestInfinity:
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.output(["count(*)"]).to_pl()
+        res, extra_result = table_obj.output(["count(*)"]).to_pl()
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 1024 * 8192
         db_obj.drop_table("test_import_exceeding_rows"+suffix, ConflictType.Error)
 
@@ -499,7 +499,7 @@ class TestInfinity:
         test_csv_dir = common_values.TEST_TMP_DIR + "test_default.jsonl"
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "jsonl"})
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_pl()
+        res, extra_result = table_obj.output(["*"]).to_pl()
         print(res)
         db_obj.drop_table("test_import_jsonl_file_with_default"+suffix, ConflictType.Error)
 
@@ -531,7 +531,7 @@ class TestInfinity:
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_import_default.csv"
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_pl()
+        res, extra_result = table_obj.output(["*"]).to_pl()
         print(res)
         db_obj.drop_table("test_import_csv_file_with_default"+suffix, ConflictType.Error)
 
@@ -566,6 +566,6 @@ class TestInfinity:
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_default.json"
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "json"})
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["*"]).to_pl()
+        res, extra_result = table_obj.output(["*"]).to_pl()
         print(res)
         db_obj.drop_table("test_import_json_file_with_default"+suffix, ConflictType.Error)

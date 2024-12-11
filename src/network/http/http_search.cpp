@@ -66,6 +66,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
+        bool total_hits_count_flag{};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -189,6 +190,31 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 if (!search_expr) {
                     return;
                 }
+            } else if (IsEqual(key, "option")) {
+                auto &option_object = elem.value();
+                if (!option_object.is_object()) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "Option field should be object";
+                    return;
+                }
+
+                for (const auto &option : option_object.items()) {
+                    String key = option.key();
+                    ToLower(key);
+                    if (key == "total_hits_count") {
+                        String value = option.value();
+                        ToLower(value);
+                        if (value == "true") {
+                            total_hits_count_flag = true;
+                        } else if (value == "false") {
+                            total_hits_count_flag = false;
+                        } else {
+                            response["error_code"] = ErrorCode::kInvalidExpression;
+                            response["error_message"] = fmt::format("Unknown search option: {}, value: {}", key, value);
+                            return;
+                        }
+                    }
+                }
             } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = "Unknown expression: " + key;
@@ -205,7 +231,8 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                                                         output_columns,
                                                         highlight_columns,
                                                         order_by_list,
-                                                        nullptr);
+                                                        nullptr,
+                                                        total_hits_count_flag);
 
         output_columns = nullptr;
         highlight_columns = nullptr;
@@ -227,6 +254,10 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     }
                     response["output"].push_back(json_result_row);
                 }
+            }
+
+            if(result.result_table_->total_hits_count_flag_) {
+                response["total_hits_count"] = result.result_table_->total_hits_count_;
             }
 
             response["error_code"] = 0;

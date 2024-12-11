@@ -61,6 +61,7 @@ private:
     SharedPtr<BaseExpression> offset_expr_{};
 
     UniquePtr<LimitCounter> counter_{};
+    bool total_hits_count_flag_{};
 };
 
 } // namespace infinity

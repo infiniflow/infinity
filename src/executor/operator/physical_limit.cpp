@@ -37,6 +37,8 @@ import logger;
 
 namespace infinity {
 
+void LimitCounter::AddHitsCount(u64 row_count) { total_hits_count_ += row_count; }
+
 SizeT AtomicCounter::Offset(SizeT row_count) {
     auto success = false;
     SizeT result = 0;
@@ -141,9 +143,10 @@ PhysicalLimit::PhysicalLimit(u64 id,
                              UniquePtr<PhysicalOperator> left,
                              SharedPtr<BaseExpression> limit_expr,
                              SharedPtr<BaseExpression> offset_expr,
-                             SharedPtr<Vector<LoadMeta>> load_metas)
+                             SharedPtr<Vector<LoadMeta>> load_metas,
+                             bool total_hits_count_flag)
     : PhysicalOperator(PhysicalOperatorType::kLimit, std::move(left), nullptr, id, load_metas), limit_expr_(std::move(limit_expr)),
-      offset_expr_(std::move(offset_expr)) {
+      offset_expr_(std::move(offset_expr)), total_hits_count_flag_(total_hits_count_flag) {
     i64 offset = 0;
     i64 limit = (static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
 
@@ -162,10 +165,11 @@ void PhysicalLimit::Init() {}
 bool PhysicalLimit::Execute(QueryContext *query_context,
                             const Vector<UniquePtr<DataBlock>> &input_blocks,
                             Vector<UniquePtr<DataBlock>> &output_blocks,
-                            LimitCounter *counter) {
+                            LimitCounter *counter,
+                            bool total_hits_count_flag) {
     SizeT input_row_count = 0;
 
-    for (SizeT block_id = 0; block_id < input_blocks.size(); block_id++) {
+    for (SizeT block_id = 0; block_id < input_blocks.size(); ++block_id) {
         input_row_count += input_blocks[block_id]->row_count();
     }
 
@@ -191,7 +195,7 @@ bool PhysicalLimit::Execute(QueryContext *query_context,
         }
     }
 
-    for (SizeT block_id = block_start_idx; block_id < input_blocks.size(); block_id++) {
+    for (SizeT block_id = block_start_idx; block_id < input_blocks.size(); ++block_id) {
         auto &input_block = input_blocks[block_id];
         auto row_count = input_block->row_count();
         if (row_count == 0) {
@@ -216,14 +220,27 @@ bool PhysicalLimit::Execute(QueryContext *query_context,
         }
     }
 
+    if (total_hits_count_flag) {
+        counter->AddHitsCount(input_row_count);
+    }
+
     return true;
 }
 
 bool PhysicalLimit::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    auto result = Execute(query_context, operator_state->prev_op_state_->data_block_array_, operator_state->data_block_array_, counter_.get());
+    auto result = Execute(query_context,
+                          operator_state->prev_op_state_->data_block_array_,
+                          operator_state->data_block_array_,
+                          counter_.get(),
+                          total_hits_count_flag_);
 
     operator_state->prev_op_state_->data_block_array_.clear();
     if (counter_->IsLimitOver() || operator_state->prev_op_state_->Complete()) {
+        if (total_hits_count_flag_) {
+            LimitOperatorState *limit_operator_state = (LimitOperatorState *)operator_state;
+            limit_operator_state->total_hits_count_flag_ = true;
+            limit_operator_state->total_hits_count_ = counter_->TotalHitsCount();
+        }
         operator_state->SetComplete();
     }
     return result;

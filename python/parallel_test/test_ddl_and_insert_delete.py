@@ -77,7 +77,7 @@ def insert(db_obj: Database):
             value.append({"tag": random.randint(0, 9),
                           "c1": [random.random(), random.random(), random.random(), random.random()]})
         table_obj.insert(value)
-        res = table_obj.output(['*']).to_df()
+        res, extra_result = table_obj.output(['*']).to_df()
         print(res)
     except Exception as e:
         return

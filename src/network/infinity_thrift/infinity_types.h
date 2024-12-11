@@ -4599,7 +4599,7 @@ void swap(ExplainResponse &a, ExplainResponse &b);
 std::ostream& operator<<(std::ostream& out, const ExplainResponse& obj);
 
 typedef struct _SelectRequest__isset {
-  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true) {}
+  _SelectRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), highlight_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), total_hits_count(false) {}
   bool session_id :1;
   bool db_name :1;
   bool table_name :1;
@@ -4612,6 +4612,7 @@ typedef struct _SelectRequest__isset {
   bool limit_expr :1;
   bool offset_expr :1;
   bool order_by_list :1;
+  bool total_hits_count :1;
 } _SelectRequest__isset;
 
 class SelectRequest : public virtual ::apache::thrift::TBase {
@@ -4622,7 +4623,8 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   SelectRequest() noexcept
                 : session_id(0),
                   db_name(),
-                  table_name() {
+                  table_name(),
+                  total_hits_count(0) {
 
 
 
@@ -4642,6 +4644,7 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   ParsedExpr limit_expr;
   ParsedExpr offset_expr;
   std::vector<OrderByExpr>  order_by_list;
+  bool total_hits_count;
 
   _SelectRequest__isset __isset;
 
@@ -4668,6 +4671,8 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
   void __set_offset_expr(const ParsedExpr& val);
 
   void __set_order_by_list(const std::vector<OrderByExpr> & val);
+
+  void __set_total_hits_count(const bool val);
 
   bool operator == (const SelectRequest & rhs) const
   {
@@ -4711,6 +4716,10 @@ class SelectRequest : public virtual ::apache::thrift::TBase {
       return false;
     else if (__isset.order_by_list && !(order_by_list == rhs.order_by_list))
       return false;
+    if (__isset.total_hits_count != rhs.__isset.total_hits_count)
+      return false;
+    else if (__isset.total_hits_count && !(total_hits_count == rhs.total_hits_count))
+      return false;
     return true;
   }
   bool operator != (const SelectRequest &rhs) const {
@@ -4730,11 +4739,12 @@ void swap(SelectRequest &a, SelectRequest &b);
 std::ostream& operator<<(std::ostream& out, const SelectRequest& obj);
 
 typedef struct _SelectResponse__isset {
-  _SelectResponse__isset() : error_code(false), error_msg(false), column_defs(true), column_fields(true) {}
+  _SelectResponse__isset() : error_code(false), error_msg(false), column_defs(true), column_fields(true), extra_result(false) {}
   bool error_code :1;
   bool error_msg :1;
   bool column_defs :1;
   bool column_fields :1;
+  bool extra_result :1;
 } _SelectResponse__isset;
 
 class SelectResponse : public virtual ::apache::thrift::TBase {
@@ -4744,7 +4754,8 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
   SelectResponse& operator=(const SelectResponse&);
   SelectResponse() noexcept
                  : error_code(0),
-                   error_msg() {
+                   error_msg(),
+                   extra_result() {
 
 
   }
@@ -4754,6 +4765,7 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
   std::string error_msg;
   std::vector<ColumnDef>  column_defs;
   std::vector<ColumnField>  column_fields;
+  std::string extra_result;
 
   _SelectResponse__isset __isset;
 
@@ -4765,6 +4777,8 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
 
   void __set_column_fields(const std::vector<ColumnField> & val);
 
+  void __set_extra_result(const std::string& val);
+
   bool operator == (const SelectResponse & rhs) const
   {
     if (!(error_code == rhs.error_code))
@@ -4774,6 +4788,8 @@ class SelectResponse : public virtual ::apache::thrift::TBase {
     if (!(column_defs == rhs.column_defs))
       return false;
     if (!(column_fields == rhs.column_fields))
+      return false;
+    if (!(extra_result == rhs.extra_result))
       return false;
     return true;
   }
