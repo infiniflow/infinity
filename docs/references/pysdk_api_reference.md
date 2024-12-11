@@ -2460,7 +2460,7 @@ res, extra_res = table_object.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3
 table_object.to_arrow()
 ```
 
-Returns the query result as a tuple consists of an Apache Arrow Table and a dict.
+Returns the query result as a tuple consisting of an Apache Arrow Table and a dict.
 
 :::tip NOTE
 Call `to_arrow()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
