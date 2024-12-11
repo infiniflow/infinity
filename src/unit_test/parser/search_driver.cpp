@@ -272,3 +272,40 @@ graphic cards
         }
     }
 }
+
+TEST_F(SearchDriverTest, whitespace_analyzer_test) {
+    using namespace infinity;
+    std::string row_quires = R"##(
+#basic_filter_boost with explicit field
+name:芯片^1.2
+name:dune^1.2
+num:123.456^7.8
+label:DS-K3AJ303/Dm140^1.2
+date:2025-01-01^1.2
+
+#clause
+DS-K3AJ303/Dm140^1.2 OR 2025-01-01^1.2
+(邓肯 上帝) AND (foo bar)
+_exists_:"author" AND page_count:xxx AND name:star^1.3
+
+#quote
+"TO BE OR NOT TO BE"
+"nanjing吉祥物\"羽宝\"头部head" "DS-K3AJ303/Dm140"
+"吉祥物nanjing\"DS-K3AJ303/Dm140\"头部"
+    )##";
+
+    Map<String, String> column2analyzer;
+    for (auto v : std::array{"name", "num", "label", "date", "_exists_", "body"}) {
+        column2analyzer[v] = "whitespace";
+    }
+    String default_field("body");
+    SearchDriver driver(column2analyzer, default_field);
+    IStringStream iss(row_quires);
+    try {
+        int rc = ParseStream(driver, iss);
+        EXPECT_EQ(rc, 0);
+    } catch (RecoverableException &e) {
+        // // catch because dict resource file does not exist in CI environment
+        // std::cerr << fmt::format("RecoverableException: {}\n", e.what());
+    }
+}
