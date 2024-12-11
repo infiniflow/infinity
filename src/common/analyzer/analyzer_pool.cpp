@@ -32,7 +32,7 @@ import korean_analyzer;
 import standard_analyzer;
 import ngram_analyzer;
 import rag_analyzer;
-import keyword_analyzer;
+import whitespace_analyzer;
 import ik_analyzer;
 import logger;
 
@@ -322,7 +322,10 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             return {MakeUnique<NGramAnalyzer>(ngram), Status::OK()};
         }
         case Str2Int(KEYWORD.data()): {
-            return {MakeUnique<KeywordAnalyzer>(), Status::OK()};
+            return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
+        }
+        case Str2Int(WHITESPACE.data()): {
+            return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
         }
         default: {
             if(std::filesystem::is_regular_file(name)) {

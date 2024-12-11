@@ -23,9 +23,6 @@
 #define SearchScannerSuffix InfinitySyntax
 #include "search_scanner_derived_helper.h"
 #undef SearchScannerSuffix
-// #define SearchScannerSuffix Plain
-// #include "search_scanner_derived_helper.h"
-// #undef SearchScannerSuffix
 
 import stl;
 import term;
@@ -275,7 +272,7 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::stri
 
 // Unescape reserved characters per https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
 // Shall keep sync with ESCAPEABLE in search_lexer.l
-// [\x20+\-=&|!(){}\[\]^"~*?:\\/]
+// [\x20()^"'~*?:\\]
 std::string SearchDriver::Unescape(const std::string &text) {
     std::string result;
     result.reserve(text.size());
@@ -283,26 +280,16 @@ std::string SearchDriver::Unescape(const std::string &text) {
         if (text[i] == '\\' && i + 1 < text.size()) {
             switch (text[i + 1]) {
                 case ' ':
-                case '+':
-                case '-':
-                case '=':
-                case '&':
-                case '|':
-                case '!':
                 case '(':
                 case ')':
-                case '{':
-                case '}':
-                case '[':
-                case ']':
                 case '^':
                 case '"':
+                case '\'':
                 case '~':
                 case '*':
                 case '?':
                 case ':':
                 case '\\':
-                case '/':
                     result.push_back(text[i + 1]);
                     ++i;
                     break;

@@ -45,8 +45,11 @@ UANY    {ASC}|{U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
 UANYN   {ASCN}|{U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
 UONLY   {U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
 
-ESCAPABLE [\x20+\-=&|!(){}\[\]^"~*?:\\/]
-ESCAPED    \\{ESCAPABLE}
+ESCAPABLE   [\x20()^"'~*?:\\]
+ESCAPED     \\{ESCAPABLE}
+NOESCAPE    [[:graph:]]{-}[\x20()^"'~*?:\\]
+SQNOESCAPE  [\x00-\xff]{-}['\\]
+DQNOESCAPE  [\x00-\xff]{-}["\\]
 
 %x SINGLE_QUOTED_STRING
 %x DOUBLE_QUOTED_STRING
@@ -55,47 +58,40 @@ ESCAPED    \\{ESCAPABLE}
 %{          /** Code executed at the beginning of yylex **/
             yylval = lval;
 
-            /* Note: special characters in pattern shall be double-quoted or escaped with backslash: " <^.+|/()[]{}" */
+            /* Note: special characters in pattern shall be double-quoted or escaped with backslash: ' ()^"~*?:\\' */
 %}
 
 [ \t\n]+        /* ignore \t\n and space */;
 
-AND |
-&& |
-"+"      { return token::AND; }
+AND     { return token::AND; }
 
-OR |
-"||"      { return token::OR; }
+OR      { return token::OR; }
 
-NOT |
-! |
--        { return token::NOT; }
+NOT     { return token::NOT; }
 
 "("     { return token::LPAREN; }
 
 ")"     { return token::RPAREN; }
 
-:        { return token::OP_COLON; }
+:       { return token::OP_COLON; }
 
 "^"[0-9]+("."[0-9]*)? |
 "^."[0-9]+         { yylval->build(std::strtof(yytext+1, NULL)); return token::CARAT; }
 
 "~"[0-9]+          { yylval->build(std::strtoul(yytext+1, NULL, 10)); return token::TILDE; }
 
--?[0-9]+("."[0-9]*)? |
--?"."[0-9]+ |
-([a-zA-Z0-9_]|{UONLY}|{ESCAPED})+        { yylval->build<InfString>(InfString(yytext, false)); return token::STRING; }  // https://stackoverflow.com/questions/9611682/flexlexer-support-for-unicode
+({UONLY}|{ESCAPED}|{NOESCAPE})+ { yylval->build<InfString>(InfString(yytext, false)); return token::STRING; }  // https://stackoverflow.com/questions/9611682/flexlexer-support-for-unicode
 
-\'                            { BEGIN SINGLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
-<SINGLE_QUOTED_STRING>\'\'    { string_buffer << '\''; }
-<SINGLE_QUOTED_STRING>[^']*   { string_buffer << yytext; }
-<SINGLE_QUOTED_STRING>\'      { BEGIN INITIAL; yylval->build<InfString>(InfString(string_buffer.str(), true)); return token::STRING; }
-<SINGLE_QUOTED_STRING><<EOF>> { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
+\'                                      { BEGIN SINGLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
+<SINGLE_QUOTED_STRING>{SQNOESCAPE}+     { string_buffer << yytext; }
+<SINGLE_QUOTED_STRING>\\([\x00-\xff]?)  { string_buffer << yytext; }
+<SINGLE_QUOTED_STRING>\'                { BEGIN INITIAL; yylval->build<InfString>(InfString(std::move(string_buffer).str(), true)); return token::STRING; }
+<SINGLE_QUOTED_STRING><<EOF>>           { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
 
-\"                            { BEGIN DOUBLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
-<DOUBLE_QUOTED_STRING>\"\"    { string_buffer << '\"'; }
-<DOUBLE_QUOTED_STRING>[^"]*   { string_buffer << yytext; }
-<DOUBLE_QUOTED_STRING>\"      { BEGIN INITIAL; yylval->build<InfString>(InfString(string_buffer.str(), true)); return token::STRING; }
-<DOUBLE_QUOTED_STRING><<EOF>> { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
+\"                                      { BEGIN DOUBLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
+<DOUBLE_QUOTED_STRING>{DQNOESCAPE}+     { string_buffer << yytext; }
+<DOUBLE_QUOTED_STRING>\\([\x00-\xff]?)  { string_buffer << yytext; }
+<DOUBLE_QUOTED_STRING>\"                { BEGIN INITIAL; yylval->build<InfString>(InfString(std::move(string_buffer).str(), true)); return token::STRING; }
+<DOUBLE_QUOTED_STRING><<EOF>>           { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
 
 %%

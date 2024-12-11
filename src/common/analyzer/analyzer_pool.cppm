@@ -42,6 +42,7 @@ public:
     static constexpr std::string_view RAG = "rag";
     static constexpr std::string_view IK = "ik";
     static constexpr std::string_view KEYWORD = "keyword";
+    static constexpr std::string_view WHITESPACE = "whitespace";
 
 private:
     CacheType cache_{};
