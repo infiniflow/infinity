@@ -103,13 +103,10 @@ Example: `"blooms"`
 #### AND multiple terms
 
 - `"space AND efficient"`
-- `"space && efficient"`
-- `"space + efficient"`
 
 #### OR multiple terms
 
 - `"Bloom OR filter"`
-- `"Bloom || filter"`
 - `"Bloom filter"`
 
 :::tip NOTE
@@ -135,7 +132,7 @@ Example: `"title:(quick OR brown) AND body:foobar"`
 
 #### Escape character
 
-Use `\` to escape reserved characters like `:` `~` `(` `)` `"` `+` `-` `=` `&` `|` `[` `]` `{` `}` `*` `?` `\` `/`. For example: `"space\-efficient"`.
+Use `\` to escape reserved characters like ` ` `(` `)` `^` `"` `'` `~` `*` `?` `:` `\`. For example: `"space\:efficient"`.
 
 ### Scoring
 
