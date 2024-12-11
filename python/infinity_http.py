@@ -3,6 +3,7 @@ import time
 
 import requests
 import logging
+import json
 from test_pysdk.common.common_data import *
 from infinity.common import ConflictType, InfinityException, SparseVector, SortType
 from typing import Optional, Any
@@ -711,6 +712,9 @@ class table_http_result:
         self._match_sparse = []
         self._search_exprs = []
         self._sort = []
+        self._limit = None
+        self._offset = None
+        self._option = None
 
     def select(self):
         url = f"databases/{self.table_http.database_name}/tables/{self.table_http.table_name}/docs"
@@ -726,6 +730,12 @@ class table_http_result:
             tmp["highlight"] = self._highlight
         if len(self._sort):
             tmp["sort"] = self._sort
+        if self._limit is not None:
+            tmp["limit"] = str(self._limit)
+        if self._offset is not None:
+            tmp["offset"] = str(self._offset)
+        if self._option is not None:
+            tmp["option"] = self._option
         # print(tmp)
         d = self.table_http.net.set_up_data([], tmp)
         r = self.table_http.net.request(url, "get", h, d)
@@ -764,6 +774,13 @@ class table_http_result:
             tmp["output"] = self._output
         if len(self._highlight):
             tmp["highlight"] = self._highlight
+        if self._limit is not None:
+            tmp["limit"] = self._limit
+        if self._offset is not None:
+            tmp["offset"] = self._offset
+        if self._option is not None:
+            tmp["option"] = self._option
+
         tmp["explain_type"] = ExplainType_transfrom(ExplainType)
         # print(tmp)
         d = self.table_http.net.set_up_data([], tmp)
@@ -801,6 +818,23 @@ class table_http_result:
             else:
                 tmp[order_by_expr[0]] = "desc"
             self._sort.append(tmp)
+        return self
+
+    def limit(self, limit_num):
+        self._limit = limit_num
+        return self
+
+    def offset(self, offset):
+        self._offset = offset
+        return self
+
+    def option(self, option: {}):
+        # option_str = json.dumps(option)
+        # option_str = str(option)
+        # option_str.replace("'\"'", "")
+        # eval(option_str)
+        # option_str.replace("'", "")
+        self._option = option
         return self
 
     def match_text(self, fields: str, query: str, topn: int, opt_params: Optional[dict] = None):

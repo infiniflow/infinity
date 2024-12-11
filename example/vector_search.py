@@ -70,6 +70,7 @@ try:
     print(result)
     if extra_result is not None:
         print(extra_result)
+
     infinity_instance.disconnect()
 
     print('test done')

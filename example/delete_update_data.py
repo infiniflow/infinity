@@ -87,8 +87,10 @@ try:
 
     print('about to update data')
     table_instance.update("num = 2", {"body": "unnecessary and harmful", "vec": [14.0, 7.2, 0.8, 10.9]})
-    result = table_instance.output(["*"]).to_pl()
+    result, extra_result = table_instance.output(["*"]).to_pl()
     print(result)
+    if extra_result is not None:
+        print(extra_result)
 
     infinity_instance.disconnect()
     print('test done')

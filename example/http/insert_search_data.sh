@@ -144,7 +144,11 @@ curl --request GET \
          ],
          "filter": "num > 1 and year < 2024",
          "offset": "1",
-         "limit": "1"
+         "limit": "1",
+         "option":
+         {
+             "total_hits_count": "true"
+         }
      } '
 
 echo -e '\n\n-- search with dense vector'
@@ -171,11 +175,7 @@ curl --request GET \
                  "metric_type": "cosine",
                  "topn": 4
              }
-         ],
-         "option":
-         {
-             "total_hits_count": "true"
-         }
+         ]
      } '
 
 echo -e '\n\n-- search with sparse vector'

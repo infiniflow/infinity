@@ -90,7 +90,7 @@ try:
         infinity.common.ConflictType.Error,
     )
 
-    result = (
+    result, extra_result = (
         table_instance.output(
             ["num", "body", "vec", "sparse", "year", "tensor", "score()"]
         )
@@ -108,6 +108,8 @@ try:
         .to_pl()
         # .explain(explain_type=infinity.table.ExplainType.UnOpt)
     )
+    if extra_result is not None:
+        print(extra_result)
 
     print(result)
     infinity_instance.disconnect()
