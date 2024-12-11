@@ -55,6 +55,7 @@ import infinity_context;
 import admin_statement;
 import global_resource_usage;
 import wal_manager;
+import defer_op;
 
 namespace infinity {
 
@@ -534,6 +535,7 @@ WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 // }
 
 TxnTimeStamp Txn::Commit() {
+    DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
     if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly()) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
@@ -623,6 +625,7 @@ void Txn::CancelCommitBottom() {
 }
 
 void Txn::Rollback() {
+    DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
     auto state = this->GetTxnState();
     TxnTimeStamp abort_ts = 0;
     if (state == TxnState::kStarted) {
