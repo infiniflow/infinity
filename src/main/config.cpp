@@ -271,7 +271,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
         // Peer connect timeout
         i64 peer_connect_timeout = DEFAULT_PEER_CONNECT_TIMEOUT;
-        UniquePtr<IntegerOption> peer_connect_timeout_option = MakeUnique<IntegerOption>(PEER_CONNECT_TIMEOUT_OPTION_NAME, peer_connect_timeout, 10000, 0);
+        UniquePtr<IntegerOption> peer_connect_timeout_option =
+            MakeUnique<IntegerOption>(PEER_CONNECT_TIMEOUT_OPTION_NAME, peer_connect_timeout, 10000, 0);
         status = global_options_.AddOption(std::move(peer_connect_timeout_option));
         if (!status.ok()) {
             fmt::print("Fatal: {}", status.message());
@@ -482,6 +483,45 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Dense index building worker
+        i64 dense_index_building_worker = Thread::hardware_concurrency() / 2;
+        if (dense_index_building_worker < 2) {
+            dense_index_building_worker = 2;
+        }
+        UniquePtr<IntegerOption> dense_index_building_worker_option =
+            MakeUnique<IntegerOption>(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME, dense_index_building_worker, Thread::hardware_concurrency(), 1);
+        status = global_options_.AddOption(std::move(dense_index_building_worker_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Sparse index building worker
+        i64 sparse_index_building_worker = Thread::hardware_concurrency() / 2;
+        if (sparse_index_building_worker < 2) {
+            sparse_index_building_worker = 2;
+        }
+        UniquePtr<IntegerOption> sparse_index_building_worker_option =
+            MakeUnique<IntegerOption>(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME, sparse_index_building_worker, Thread::hardware_concurrency(), 1);
+        status = global_options_.AddOption(std::move(sparse_index_building_worker_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Fulltext index building worker
+        i64 fulltext_index_building_worker = Thread::hardware_concurrency() / 2;
+        if (fulltext_index_building_worker < 2) {
+            fulltext_index_building_worker = 2;
+        }
+        UniquePtr<IntegerOption> fulltext_index_building_worker_option =
+            MakeUnique<IntegerOption>(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME, fulltext_index_building_worker, Thread::hardware_concurrency(), 1);
+        status = global_options_.AddOption(std::move(fulltext_index_building_worker_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Result Cache
         String result_cache(DEFAULT_RESULT_CACHE);
         auto result_cache_option = MakeUnique<StringOption>(RESULT_CACHE_OPTION_NAME, result_cache);
@@ -492,7 +532,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
 
         i64 cache_result_num = DEFAULT_CACHE_RESULT_CAPACITY;
-        auto cache_result_num_option = MakeUnique<IntegerOption>(CACHE_RESULT_CAPACITY_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
+        auto cache_result_num_option =
+            MakeUnique<IntegerOption>(CACHE_RESULT_CAPACITY_OPTION_NAME, cache_result_num, std::numeric_limits<i64>::max(), 0);
         status = global_options_.AddOption(std::move(cache_result_num_option));
         if (!status.ok()) {
             fmt::print("Fatal: {}", status.message());
@@ -1912,6 +1953,60 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             global_options_.AddOption(std::move(mem_index_memory_quota_option));
                             break;
                         }
+                        case GlobalOptionIndex::kDenseIndexBuildingWorker: {
+                            i64 dense_index_building_worker = Thread::hardware_concurrency() / 2;
+                            if (elem.second.is_integer()) {
+                                dense_index_building_worker = elem.second.value_or(dense_index_building_worker);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> dense_index_building_worker_option =
+                                MakeUnique<IntegerOption>(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                          dense_index_building_worker,
+                                                          Thread::hardware_concurrency(),
+                                                          1);
+                            if (!dense_index_building_worker_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid dense vector index building number: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(dense_index_building_worker_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kSparseIndexBuildingWorker: {
+                            i64 sparse_index_building_worker = Thread::hardware_concurrency() / 2;
+                            if (elem.second.is_integer()) {
+                                sparse_index_building_worker = elem.second.value_or(sparse_index_building_worker);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> sparse_index_building_worker_option =
+                                MakeUnique<IntegerOption>(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                          sparse_index_building_worker,
+                                                          Thread::hardware_concurrency(),
+                                                          1);
+                            if (!sparse_index_building_worker_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid sparse vector index building number: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(sparse_index_building_worker_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kFulltextIndexBuildingWorker: {
+                            i64 fulltext_index_building_worker = Thread::hardware_concurrency() / 2;
+                            if (elem.second.is_integer()) {
+                                fulltext_index_building_worker = elem.second.value_or(fulltext_index_building_worker);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> fulltext_index_building_worker_option =
+                                MakeUnique<IntegerOption>(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                          fulltext_index_building_worker,
+                                                          Thread::hardware_concurrency(),
+                                                          1);
+                            if (!fulltext_index_building_worker_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid fulltext vector index building number: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(fulltext_index_building_worker_option));
+                            break;
+                        }
                         case GlobalOptionIndex::kResultCache: {
                             String result_cache_str(DEFAULT_RESULT_CACHE);
                             if (elem.second.is_string()) {
@@ -1976,6 +2071,52 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     UniquePtr<IntegerOption> mem_index_memory_quota_option =
                         MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME, mem_index_memory_quota, std::numeric_limits<i64>::max(), 0);
                     Status status = global_options_.AddOption(std::move(mem_index_memory_quota_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kDenseIndexBuildingWorker) == nullptr) {
+                    // dense index building worker
+                    i64 dense_index_building_worker = Thread::hardware_concurrency() / 2;
+                    if (dense_index_building_worker < 2) {
+                        dense_index_building_worker = 2;
+                    }
+                    UniquePtr<IntegerOption> dense_index_building_worker_option = MakeUnique<IntegerOption>(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                                                                            dense_index_building_worker,
+                                                                                                            Thread::hardware_concurrency(),
+                                                                                                            1);
+                    Status status = global_options_.AddOption(std::move(dense_index_building_worker_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kSparseIndexBuildingWorker) == nullptr) {
+                    // sparse index building worker
+                    i64 sparse_index_building_worker = Thread::hardware_concurrency() / 2;
+                    if (sparse_index_building_worker < 2) {
+                        sparse_index_building_worker = 2;
+                    }
+                    UniquePtr<IntegerOption> sparse_index_building_worker_option = MakeUnique<IntegerOption>(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                                                                             sparse_index_building_worker,
+                                                                                                             Thread::hardware_concurrency(),
+                                                                                                             1);
+                    Status status = global_options_.AddOption(std::move(sparse_index_building_worker_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kMemIndexMemoryQuota) == nullptr) {
+                    // fulltext index building worker
+                    i64 fulltext_index_building_worker = Thread::hardware_concurrency() / 2;
+                    if (fulltext_index_building_worker < 2) {
+                        fulltext_index_building_worker = 2;
+                    }
+                    UniquePtr<IntegerOption> fulltext_index_building_worker_option =
+                        MakeUnique<IntegerOption>(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                  fulltext_index_building_worker,
+                                                  Thread::hardware_concurrency(),
+                                                  1);
+                    Status status = global_options_.AddOption(std::move(fulltext_index_building_worker_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2543,6 +2684,21 @@ i64 Config::MemIndexCapacity() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexCapacity);
 }
 
+i64 Config::DenseIndexBuildingWorker() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kDenseIndexBuildingWorker);
+}
+
+i64 Config::SparseIndexBuildingWorker() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kSparseIndexBuildingWorker);
+}
+
+i64 Config::FulltextIndexBuildingWorker() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kFulltextIndexBuildingWorker);
+}
+
 StorageType Config::StorageType() {
     std::lock_guard<std::mutex> guard(mutex_);
     String storage_type_str = global_options_.GetStringValue(GlobalOptionIndex::kStorageType);
@@ -2741,6 +2897,9 @@ void Config::PrintAll() {
     fmt::print(" - compact_interval: {}\n", Utility::FormatTimeInfo(CompactInterval()));
     fmt::print(" - optimize_index_interval: {}\n", Utility::FormatTimeInfo(OptimizeIndexInterval()));
     fmt::print(" - memindex_capacity: {}\n", MemIndexCapacity()); // mem index capacity is line number
+    fmt::print(" - dense_index_building_worker: {}\n", DenseIndexBuildingWorker());
+    fmt::print(" - sparse_index_building_worker: {}\n", SparseIndexBuildingWorker());
+    fmt::print(" - fulltext_index_building_worker: {}\n", FulltextIndexBuildingWorker());
     fmt::print(" - storage_type: {}\n", ToString(StorageType()));
     switch (StorageType()) {
         case StorageType::kLocal: {
