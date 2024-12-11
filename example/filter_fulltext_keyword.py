@@ -101,16 +101,22 @@ try:
     )
 
     # output 7, 8, 9, 10
-    result = table_instance.output(["*"]).filter("(score > 80.0) and (score <= 90.0)").to_pl()
+    result, extra_result = table_instance.output(["*"]).filter("(score > 80.0) and (score <= 90.0)").to_pl()
     print(result)
+    if extra_result is not None:
+        print(extra_result)
 
     # output 6, 8
-    result = table_instance.output(["*"]).filter("filter_fulltext('uuid', 'UUID-2-1 UUID-2-3')").to_pl()
+    result, extra_result = table_instance.output(["*"]).filter("filter_fulltext('uuid', 'UUID-2-1 UUID-2-3')").to_pl()
     print(result)
+    if extra_result is not None:
+        print(extra_result)
 
     # output 8
-    result = table_instance.output(["*"]).filter("(score > 80.0) and (score <= 90.0) and filter_fulltext('uuid', 'UUID-2-1 UUID-2-3')").to_pl()
+    result, extra_result = table_instance.output(["*"]).filter("(score > 80.0) and (score <= 90.0) and filter_fulltext('uuid', 'UUID-2-1 UUID-2-3')").to_pl()
     print(result)
+    if extra_result is not None:
+        print(extra_result)
 
     # drop table
     db_instance.drop_table("my_table")

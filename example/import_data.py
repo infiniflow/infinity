@@ -48,8 +48,10 @@ try:
     table_instance.import_data(project_directory + "/../test/data/csv/fulltext_delete.csv",
                                {"header": True, "file_type": "csv", "delimiter": "\t"})
 
-    result = table_instance.output(["num", "doc"]).to_pl()
+    result, extra_result = table_instance.output(["num", "doc"]).to_pl()
     print(result)
+    if extra_result is not None:
+        print(extra_result)
 
     infinity_instance.disconnect()
 

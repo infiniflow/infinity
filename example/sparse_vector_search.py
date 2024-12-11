@@ -61,8 +61,11 @@ try:
         ]
     )
 
-    result = table_instance.output(["num", "vec", "_similarity"]).match_sparse("vec", infinity.common.SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3).to_pl()
+    result, extra_result = table_instance.output(["num", "vec", "_similarity"]).match_sparse("vec", infinity.common.SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3).to_pl()
     print(result)
+    if extra_result is not None:
+        print(extra_result)
+
     infinity_instance.disconnect()
 
     print('test done')

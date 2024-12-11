@@ -61,8 +61,10 @@ try:
         ]
     )
 
-    res = table_instance.output(["num", "body", "vec"]).to_pl()
+    res, extra_result = table_instance.output(["num", "body", "vec"]).to_pl()
     print(res)
+    if extra_result is not None:
+        print(extra_result)
 
     infinity_instance.disconnect()
 

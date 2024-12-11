@@ -72,7 +72,7 @@ try:
             },
             {
                 "num": 7,
-                "body": "Chris",
+                "name": "Chris",
                 "score": 88.0,
             },
             {
@@ -99,8 +99,10 @@ try:
     # result = table_instance.output(["num", "name", "score"]).filter("not (score > 80.0)").to_pl()
     # print(result)
 
-    result = table_instance.output(["num", "name", "score"]).filter("num <> 9").to_pl()
+    result, extra_result = table_instance.output(["num", "name", "score"]).filter("num <> 9").to_pl()
     print(result)
+    if extra_result is not None:
+        print(extra_result)
     infinity_instance.disconnect()
 
     print('test done')
