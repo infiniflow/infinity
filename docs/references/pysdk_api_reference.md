@@ -1824,7 +1824,7 @@ table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Desc]
 table_object.limit(limit_num)
 ```
 
-Creates a limit expression to limit the output rows not more than `limit_num`.
+Creates an expression to limit the number of the output rows to a maximum of `limit_num`.
 
 #### Parameters
 
