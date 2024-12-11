@@ -2437,7 +2437,7 @@ res, extra_res = table_object.output(["c1", "c2"]).to_df()
 table_object.to_pl()
 ```
 
-Returns the query result as a tuple consists of a Polars DataFrame and a dict.
+Returns the query result as a tuple consisting of a Polars DataFrame and a dict.
 
 :::tip NOTE
 Call `to_pl()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
