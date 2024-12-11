@@ -2033,10 +2033,10 @@ To display your query results, you must chain this method with `output(columns)`
 A non-empty text string to search for. You can use various search options within the matching text, including:
 
 - Single terms: `"blooms"`
-- OR multiple terms: `"Bloom OR filter"`, `"Bloom || filter"` or just `"Bloom filter"`
+- OR multiple terms: `"Bloom OR filter"` or just `"Bloom filter"`
 - Phrase search: `'"Bloom filter"'`
-- AND multiple terms: `"space AND efficient"`, `"space && efficient"` or `"space + efficient"`
-- Escaping reserved characters: `"space\-efficient"`
+- AND multiple terms: `"space AND efficient"`
+- Escaping reserved characters: `"space\:efficient"`
 - Sloppy phrase search: `'"harmful chemical"~10'`
 - Field-specific search: `"title:(quick OR brown) AND body:foobar"`
 
@@ -2052,17 +2052,17 @@ An optional dictionary specifying the following search options:
   - If `"fields"` is an empty string, this parameter specifies the default field to search on.
 - **"operator"**: `str`, *Optional*
   - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators, quotation marks and escape characters will function as full-text search operators, such as:
-    - AND operator: `AND`, `&&`, `+`
-    - OR operator: `OR`, `||`
-    - NOT operator: `NOT`, `!`, `-`
+    - AND operator: `AND`
+    - OR operator: `OR`
+    - NOT operator: `NOT`
     - PAREN operator: `(`, `)`, need to appear in pairs, and can be nested.
     - COLON operator: `:`: Used to specify field-specific search, e.g., `body:foobar` searches for `foobar` in the `body` field.
     - CARAT operator: `^`: Used to boost the importance of a term, e.g., `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
     - TILDE operator: `~`: Used for sloppy phrase search, e.g., `"harmful chemical"~10` searches for the phrase `"harmful chemical"` within a tolerable distance of 10 words.
     - SINGLE_QUOTED_STRING: Used to search for a phrase, e.g., `'Bloom filter'`.
     - DOUBLE_QUOTED_STRING: Used to search for a phrase, e.g., `"Bloom filter"`.
-    - Escape characters: Used to escape reserved characters, e.g., `space\-efficient`. Starting with a backslash `\` will escape the following characters:   
-      `' '`, `'+'`, `'-'`, `'='`, `'&'`, `'|'`, `'!'`, `'('`, `')'`, `'{'`, `'}'`, `'['`, `']'`, `'^'`, `'"'`, `'~'`, `'*'`, `'?'`, `':'`, `'\'`, `'/'`
+    - Escape characters: Used to escape reserved characters, e.g., `space\:efficient`. Starting with a backslash `\` will escape the following characters:   
+      `' '`, `'('`, `')'`, `'^'`, `'"'`, `'\''`, `'~'`, `'*'`, `'?'`, `':'`, `'\\'`
   - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.  
     Useful for searching text including code numbers like `"A01-233:BC"`.
     - `{"operator": "or"}`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.  

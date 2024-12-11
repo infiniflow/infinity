@@ -14,24 +14,20 @@
 
 module;
 
-#include <sstream>
-#include <string>
-module keyword_analyzer;
-
+export module whitespace_analyzer;
 import stl;
 import term;
 import analyzer;
 
 namespace infinity {
 
-int KeywordAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
-    std::istringstream is(input.text_);
-    std::string t;
-    u32 offset = 0;
-    while (is >> t) {
-        func(data, t.data(), t.size(), offset++, 0, Term::AND, 0, false);
-    }
-    return 0;
-}
+export class WhitespaceAnalyzer : public Analyzer {
+public:
+    WhitespaceAnalyzer() = default;
+    ~WhitespaceAnalyzer() override = default;
+
+protected:
+    int AnalyzeImpl(const Term &input, void *data, HookType func) override;
+};
 
 } // namespace infinity

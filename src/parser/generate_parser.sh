@@ -5,5 +5,4 @@ flex -di --reentrant --bison-bridge --bison-location -Cem -oexpression_lexer.cpp
 bison -oexpression_parser.cpp --header=expression_parser.h expression_parser.y -Wcounterexamples -d -v
 
 flex -+dvB8 -Cem -osearch_lexer.cpp search_lexer.l
-flex -+dvB8 -Cem -osearch_lexer_plain.cpp search_lexer_plain.l
 bison -osearch_parser.cpp --header=search_parser.h search_parser.y -Wcounterexamples -d -v
