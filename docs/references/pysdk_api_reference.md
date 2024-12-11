@@ -1794,7 +1794,7 @@ table_object.output(["*"]).filter("filter_fulltext('doc', 'first second', 'minim
 table_object.sort(sort_expression_list)
 ```
 
-Creates a sort expression with `sort expression list`.
+Creates a sort expression using `sort_expression_list`.
 
 #### Parameters
 
