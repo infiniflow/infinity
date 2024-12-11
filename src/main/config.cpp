@@ -1785,6 +1785,61 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
+
+                        case GlobalOptionIndex::kDenseIndexBuildingWorker: {
+                            i64 dense_index_building_worker = Thread::hardware_concurrency() / 2;
+                            if (elem.second.is_integer()) {
+                                dense_index_building_worker = elem.second.value_or(dense_index_building_worker);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> dense_index_building_worker_option =
+                                MakeUnique<IntegerOption>(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                          dense_index_building_worker,
+                                                          Thread::hardware_concurrency(),
+                                                          1);
+                            if (!dense_index_building_worker_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid dense vector index building number: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(dense_index_building_worker_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kSparseIndexBuildingWorker: {
+                            i64 sparse_index_building_worker = Thread::hardware_concurrency() / 2;
+                            if (elem.second.is_integer()) {
+                                sparse_index_building_worker = elem.second.value_or(sparse_index_building_worker);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> sparse_index_building_worker_option =
+                                MakeUnique<IntegerOption>(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                          sparse_index_building_worker,
+                                                          Thread::hardware_concurrency(),
+                                                          1);
+                            if (!sparse_index_building_worker_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid sparse vector index building number: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(sparse_index_building_worker_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kFulltextIndexBuildingWorker: {
+                            i64 fulltext_index_building_worker = Thread::hardware_concurrency() / 2;
+                            if (elem.second.is_integer()) {
+                                fulltext_index_building_worker = elem.second.value_or(fulltext_index_building_worker);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> fulltext_index_building_worker_option =
+                                MakeUnique<IntegerOption>(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                          fulltext_index_building_worker,
+                                                          Thread::hardware_concurrency(),
+                                                          1);
+                            if (!fulltext_index_building_worker_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid fulltext vector index building number: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(fulltext_index_building_worker_option));
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage' field", var_name));
                         }
@@ -1871,6 +1926,52 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     }
                 }
 
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kDenseIndexBuildingWorker) == nullptr) {
+                    // dense index building worker
+                    i64 dense_index_building_worker = Thread::hardware_concurrency() / 2;
+                    if (dense_index_building_worker < 2) {
+                        dense_index_building_worker = 2;
+                    }
+                    UniquePtr<IntegerOption> dense_index_building_worker_option = MakeUnique<IntegerOption>(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                                                                            dense_index_building_worker,
+                                                                                                            Thread::hardware_concurrency(),
+                                                                                                            1);
+                    Status status = global_options_.AddOption(std::move(dense_index_building_worker_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kSparseIndexBuildingWorker) == nullptr) {
+                    // sparse index building worker
+                    i64 sparse_index_building_worker = Thread::hardware_concurrency() / 2;
+                    if (sparse_index_building_worker < 2) {
+                        sparse_index_building_worker = 2;
+                    }
+                    UniquePtr<IntegerOption> sparse_index_building_worker_option = MakeUnique<IntegerOption>(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                                                                             sparse_index_building_worker,
+                                                                                                             Thread::hardware_concurrency(),
+                                                                                                             1);
+                    Status status = global_options_.AddOption(std::move(sparse_index_building_worker_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kMemIndexMemoryQuota) == nullptr) {
+                    // fulltext index building worker
+                    i64 fulltext_index_building_worker = Thread::hardware_concurrency() / 2;
+                    if (fulltext_index_building_worker < 2) {
+                        fulltext_index_building_worker = 2;
+                    }
+                    UniquePtr<IntegerOption> fulltext_index_building_worker_option =
+                        MakeUnique<IntegerOption>(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME,
+                                                  fulltext_index_building_worker,
+                                                  Thread::hardware_concurrency(),
+                                                  1);
+                    Status status = global_options_.AddOption(std::move(fulltext_index_building_worker_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
             } else {
                 return Status::InvalidConfig("No 'storage' section in configure file.");
             }
@@ -1953,60 +2054,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             global_options_.AddOption(std::move(mem_index_memory_quota_option));
                             break;
                         }
-                        case GlobalOptionIndex::kDenseIndexBuildingWorker: {
-                            i64 dense_index_building_worker = Thread::hardware_concurrency() / 2;
-                            if (elem.second.is_integer()) {
-                                dense_index_building_worker = elem.second.value_or(dense_index_building_worker);
-                            } else {
-                                return Status::InvalidConfig("'lru_num' field isn't integer.");
-                            }
-                            UniquePtr<IntegerOption> dense_index_building_worker_option =
-                                MakeUnique<IntegerOption>(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME,
-                                                          dense_index_building_worker,
-                                                          Thread::hardware_concurrency(),
-                                                          1);
-                            if (!dense_index_building_worker_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid dense vector index building number: {}", 0));
-                            }
-                            global_options_.AddOption(std::move(dense_index_building_worker_option));
-                            break;
-                        }
-                        case GlobalOptionIndex::kSparseIndexBuildingWorker: {
-                            i64 sparse_index_building_worker = Thread::hardware_concurrency() / 2;
-                            if (elem.second.is_integer()) {
-                                sparse_index_building_worker = elem.second.value_or(sparse_index_building_worker);
-                            } else {
-                                return Status::InvalidConfig("'lru_num' field isn't integer.");
-                            }
-                            UniquePtr<IntegerOption> sparse_index_building_worker_option =
-                                MakeUnique<IntegerOption>(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME,
-                                                          sparse_index_building_worker,
-                                                          Thread::hardware_concurrency(),
-                                                          1);
-                            if (!sparse_index_building_worker_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid sparse vector index building number: {}", 0));
-                            }
-                            global_options_.AddOption(std::move(sparse_index_building_worker_option));
-                            break;
-                        }
-                        case GlobalOptionIndex::kFulltextIndexBuildingWorker: {
-                            i64 fulltext_index_building_worker = Thread::hardware_concurrency() / 2;
-                            if (elem.second.is_integer()) {
-                                fulltext_index_building_worker = elem.second.value_or(fulltext_index_building_worker);
-                            } else {
-                                return Status::InvalidConfig("'lru_num' field isn't integer.");
-                            }
-                            UniquePtr<IntegerOption> fulltext_index_building_worker_option =
-                                MakeUnique<IntegerOption>(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME,
-                                                          fulltext_index_building_worker,
-                                                          Thread::hardware_concurrency(),
-                                                          1);
-                            if (!fulltext_index_building_worker_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid fulltext vector index building number: {}", 0));
-                            }
-                            global_options_.AddOption(std::move(fulltext_index_building_worker_option));
-                            break;
-                        }
                         case GlobalOptionIndex::kResultCache: {
                             String result_cache_str(DEFAULT_RESULT_CACHE);
                             if (elem.second.is_string()) {
@@ -2071,52 +2118,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     UniquePtr<IntegerOption> mem_index_memory_quota_option =
                         MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME, mem_index_memory_quota, std::numeric_limits<i64>::max(), 0);
                     Status status = global_options_.AddOption(std::move(mem_index_memory_quota_option));
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                }
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kDenseIndexBuildingWorker) == nullptr) {
-                    // dense index building worker
-                    i64 dense_index_building_worker = Thread::hardware_concurrency() / 2;
-                    if (dense_index_building_worker < 2) {
-                        dense_index_building_worker = 2;
-                    }
-                    UniquePtr<IntegerOption> dense_index_building_worker_option = MakeUnique<IntegerOption>(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME,
-                                                                                                            dense_index_building_worker,
-                                                                                                            Thread::hardware_concurrency(),
-                                                                                                            1);
-                    Status status = global_options_.AddOption(std::move(dense_index_building_worker_option));
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                }
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kSparseIndexBuildingWorker) == nullptr) {
-                    // sparse index building worker
-                    i64 sparse_index_building_worker = Thread::hardware_concurrency() / 2;
-                    if (sparse_index_building_worker < 2) {
-                        sparse_index_building_worker = 2;
-                    }
-                    UniquePtr<IntegerOption> sparse_index_building_worker_option = MakeUnique<IntegerOption>(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME,
-                                                                                                             sparse_index_building_worker,
-                                                                                                             Thread::hardware_concurrency(),
-                                                                                                             1);
-                    Status status = global_options_.AddOption(std::move(sparse_index_building_worker_option));
-                    if (!status.ok()) {
-                        UnrecoverableError(status.message());
-                    }
-                }
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kMemIndexMemoryQuota) == nullptr) {
-                    // fulltext index building worker
-                    i64 fulltext_index_building_worker = Thread::hardware_concurrency() / 2;
-                    if (fulltext_index_building_worker < 2) {
-                        fulltext_index_building_worker = 2;
-                    }
-                    UniquePtr<IntegerOption> fulltext_index_building_worker_option =
-                        MakeUnique<IntegerOption>(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME,
-                                                  fulltext_index_building_worker,
-                                                  Thread::hardware_concurrency(),
-                                                  1);
-                    Status status = global_options_.AddOption(std::move(fulltext_index_building_worker_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
