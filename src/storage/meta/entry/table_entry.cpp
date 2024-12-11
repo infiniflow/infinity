@@ -1558,7 +1558,7 @@ bool TableEntry::SetCompact(TableStatus &status, Txn *txn) {
         return false;
     }
     table_status_ = TableStatus::kCompacting;
-    txn->txn_store()->SetCompacting();
+    txn->txn_store()->SetCompacting(this);
     LOG_TRACE(fmt::format("SetCompact success. Table {} is in status: {}", encode(), u8(table_status_)));
     return true;
 }
@@ -1571,7 +1571,7 @@ bool TableEntry::SetCreatingIndex(TableStatus &status, Txn *txn) {
         return false;
     }
     table_status_ = TableStatus::kCreatingIndex;
-    txn->txn_store()->SetCreatingIndex();
+    txn->txn_store()->SetCreatingIndex(this);
     LOG_TRACE(fmt::format("SetCreatingIndex success. Table {} is in status: {}", encode(), u8(table_status_)));
     return true;
 }

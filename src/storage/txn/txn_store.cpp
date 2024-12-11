@@ -296,9 +296,6 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
 }
 
 void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
-    if (added_txn_num_) {
-        table_entry_->DecWriteTxnNum();
-    }
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
         Catalog::RollbackAppend(table_entry_, txn_id, abort_ts, this);
@@ -453,9 +450,6 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
             }
         }
     }
-    if (added_txn_num_) {
-        table_entry_->DecWriteTxnNum();
-    }
 }
 
 void TxnTableStore::MaintainCompactionAlg() {
@@ -523,6 +517,20 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *t
     for (const auto &[segment_id, segment_store] : txn_segments_store_) {
         bool set_sealed = set_sealed_segments_.contains(segment_store.segment_entry_);
         segment_store.AddDeltaOp(local_delta_ops, append_state_.get(), txn_, set_sealed);
+    }
+}
+
+void TxnTableStore::TryRevert() {
+    if (table_status_ == TxnStoreStatus::kCompacting) {
+        table_status_ = TxnStoreStatus::kNone;
+        table_entry_->SetCompactDone();
+    } else if (table_status_ == TxnStoreStatus::kCreatingIndex) {
+        table_status_ = TxnStoreStatus::kNone;
+        table_entry_->SetCreateIndexDone();
+    }
+    if (added_txn_num_) {
+        added_txn_num_ = false;
+        table_entry_->DecWriteTxnNum();
     }
 }
 
@@ -679,8 +687,6 @@ void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts) {
     for (auto [table_entry, ptr_seq_n] : txn_tables_) {
         table_entry->Commit(commit_ts);
     }
-
-    this->RevertTableStatus();
 }
 
 void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
@@ -699,8 +705,6 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         db_entry->Cleanup();
         catalog_->RemoveDBEntry(db_entry, txn_id);
     }
-
-    this->RevertTableStatus();
 }
 
 bool TxnStore::ReadOnly() const {
@@ -727,18 +731,13 @@ bool TxnStore::ReadOnly() const {
 }
 
 void TxnStore::RevertTableStatus() {
-    if (table_status_ == TxnStoreStatus::kCompacting) {
-        for (const auto &[table_name, table_store] : txn_tables_store_) {
-            LOG_INFO(fmt::format("Txn {}: Revert table {} status from compacting to done", txn_->TxnID(), table_name));
-            table_store->GetTableEntry()->SetCompactDone();
-        }
-    } else if (table_status_ == TxnStoreStatus::kCreatingIndex) {
-        for (const auto &[table_name, table_store] : txn_tables_store_) {
-            LOG_INFO(fmt::format("Txn {}: Revert table {} status from creating index to done", txn_->TxnID(), table_name));
-            table_store->GetTableEntry()->SetCreateIndexDone();
-        }
-        return;
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        table_store->TryRevert();
     }
 }
+
+void TxnStore::SetCompacting(TableEntry *table_entry) { GetTxnTableStore(table_entry)->SetCompacting(); }
+
+void TxnStore::SetCreatingIndex(TableEntry *table_entry) { GetTxnTableStore(table_entry)->SetCreatingIndex(); }
 
 } // namespace infinity
