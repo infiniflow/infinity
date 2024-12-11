@@ -1854,7 +1854,7 @@ table_instance.output(["num", "vec"]).limit(2).to_pl()
 table_object.limit(limit_num).offset(offset_value)
 ```
 
-Must combine with limit expression, it will create a limit expression with offset value to limit the output rows not more than `limit_num` start from `offset_value`.
+Creates a limit expression with an offset value, setting the output to start from `offset_value` and limiting the row count to a maximum of `limit_num`. This method must be used in conjunction with `limit()`.
 
 #### Parameters
 
