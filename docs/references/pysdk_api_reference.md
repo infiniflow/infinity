@@ -1800,7 +1800,7 @@ Creates a sort expression with `sort expression list`.
 
 ##### sort_expression_list: `list`, *Required*
 
-A sort expression list to define how to sort the result
+An expression list defining how to sort the results.
 
 #### Returns
 
