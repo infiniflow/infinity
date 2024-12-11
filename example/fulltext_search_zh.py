@@ -112,9 +112,11 @@ try:
         r'"Bloom filter"',  # phrase: adjacent multiple terms
     ]
     for question in questions:
-        qb_result = table_instance.output(["num", "body", "_score"]).highlight(["body"]).match_text("body", question, 10).to_pl()
+        qb_result, extra_result = table_instance.output(["num", "body", "_score"]).highlight(["body"]).match_text("body", question, 10).to_pl()
         print(f"question: {question}")
         print(qb_result)
+        if extra_result is not None:
+            print(extra_result)
 
     infinity_instance.disconnect()
 

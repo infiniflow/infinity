@@ -55,8 +55,10 @@ try:
         )
 
     table_instance.create_index("index1", infinity.index.IndexInfo("id", infinity.index.IndexType.Secondary))
-    res = table_instance.filter("id='ID_1'").output(["*"]).to_pl()
+    res, extra_result = table_instance.filter("id='ID_1'").output(["*"]).to_pl()
     print(res)
+    if extra_result is not None:
+        print(extra_result)
 
     infinity_instance.disconnect()
 

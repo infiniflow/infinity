@@ -202,17 +202,26 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     String key = option.key();
                     ToLower(key);
                     if (key == "total_hits_count") {
-                        String value = option.value();
-                        ToLower(value);
-                        if (value == "true") {
-                            total_hits_count_flag = true;
-                        } else if (value == "false") {
-                            total_hits_count_flag = false;
+                        if(option.value().is_string()) {
+                            String value = option.value();
+                            ToLower(value);
+                            if (value == "true") {
+                                total_hits_count_flag = true;
+                            } else if (value == "false") {
+                                total_hits_count_flag = false;
+                            } else {
+                                response["error_code"] = ErrorCode::kInvalidExpression;
+                                response["error_message"] = fmt::format("Unknown search option: {}, value: {}", key, value);
+                                return;
+                            }
+                        } else if(option.value().is_boolean()) {
+                            total_hits_count_flag = option.value();
                         } else {
                             response["error_code"] = ErrorCode::kInvalidExpression;
-                            response["error_message"] = fmt::format("Unknown search option: {}, value: {}", key, value);
+                            response["error_message"] = "Invalid total hits count type";
                             return;
                         }
+
                     }
                 }
             } else {

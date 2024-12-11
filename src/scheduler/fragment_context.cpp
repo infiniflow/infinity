@@ -1529,6 +1529,7 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
                                                        std::set<ConstraintType>()));
     }
 
+    SizeT total_hits_count = 0;
     for (const auto &task : tasks_) {
         if (task->sink_state_->state_type() != SinkStateType::kMaterialize) {
             String error_message = "Parallel materialized fragment will only have common sink state";
@@ -1540,12 +1541,14 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
             result_table = DataTable::MakeResultTable(column_defs);
         }
         result_table->total_hits_count_flag_ = materialize_sink_state->total_hits_count_flag_;
+        total_hits_count += materialize_sink_state->total_hits_count_;
 
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
             result_table->Append(std::move(result_data_block));
         }
         materialize_sink_state->data_block_array_.clear();
     }
+    result_table->total_hits_count_ = total_hits_count;
 
     return result_table;
 }
@@ -1590,6 +1593,7 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
             result_table = DataTable::MakeResultTable(column_defs);
         }
         result_table->total_hits_count_flag_ = materialize_sink_state->total_hits_count_flag_;
+        result_table->total_hits_count_ = materialize_sink_state->total_hits_count_;
 
         for (auto &result_data_block : materialize_sink_state->data_block_array_) {
             result_table->Append(std::move(result_data_block));
