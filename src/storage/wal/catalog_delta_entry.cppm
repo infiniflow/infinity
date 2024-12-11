@@ -308,6 +308,7 @@ public:
     TxnTimeStamp min_ts_{0};
     TxnTimeStamp max_ts_{0};
     ChunkID next_chunk_id_{0};
+    TxnTimeStamp deprecate_ts_{0};
 };
 
 /// class AddSegmentColumnEntryOperation

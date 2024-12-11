@@ -73,7 +73,8 @@ public:
                                                                    u32 next_chunk_id,
                                                                    TransactionID txn_id,
                                                                    TxnTimeStamp begin_ts,
-                                                                   TxnTimeStamp commit_ts);
+                                                                   TxnTimeStamp commit_ts,
+                                                                   TxnTimeStamp deprecate_ts);
 
     void UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> new_entry);
 
@@ -110,6 +111,7 @@ public:
     inline TxnTimeStamp min_ts() const { return min_ts_; }
     inline TxnTimeStamp max_ts() const { return max_ts_; }
     inline ChunkID next_chunk_id() const { return next_chunk_id_; }
+    inline TxnTimeStamp deprecate_ts() const { return deprecate_ts_; }
     SharedPtr<String> index_dir() const { return index_dir_; }
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
@@ -232,6 +234,11 @@ public:
 
     void SetDeprecated(TxnTimeStamp deprecate_ts);
 
+    bool CheckDeprecate(TxnTimeStamp ts) {
+        TxnTimeStamp deprecate_ts = deprecate_ts_.load();
+        return ts >= deprecate_ts;
+    }
+
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id);
 
@@ -267,6 +274,7 @@ private:
 
     u64 ft_column_len_sum_{}; // increase only
     u32 ft_column_len_cnt_{}; // increase only
+    Atomic<TxnTimeStamp> deprecate_ts_ = UNCOMMIT_TS;
 
 public:
     bool TrySetOptimizing();

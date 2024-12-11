@@ -154,7 +154,8 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
                                                                            u32 next_chunk_id,
                                                                            TransactionID txn_id,
                                                                            TxnTimeStamp begin_ts,
-                                                                           TxnTimeStamp commit_ts) {
+                                                                           TxnTimeStamp commit_ts,
+                                                                           TxnTimeStamp deprecate_ts) {
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -171,6 +172,7 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
 
     segment_index_entry->commit_ts_.store(commit_ts);
     segment_index_entry->buffer_manager_ = buffer_manager;
+    segment_index_entry->deprecate_ts_.store(deprecate_ts);
     return segment_index_entry;
 }
 
@@ -181,6 +183,7 @@ void SegmentIndexEntry::UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> ne
     min_ts_ = new_entry->min_ts_;
     max_ts_ = new_entry->max_ts_;
     next_chunk_id_ = new_entry->next_chunk_id_.load();
+    deprecate_ts_ = new_entry->deprecate_ts_.load();
 }
 
 // String SegmentIndexEntry::IndexFileName(SegmentID segment_id) { return fmt::format("seg{}.idx", segment_id); }
@@ -1173,6 +1176,7 @@ nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
         }
         index_entry_json["ft_column_len_sum"] = this->ft_column_len_sum_;
         index_entry_json["ft_column_len_cnt"] = this->ft_column_len_cnt_;
+        index_entry_json["deprecate_ts"] = this->deprecate_ts_.load();
     }
 
     return index_entry_json;
@@ -1208,6 +1212,13 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     segment_index_entry->ft_column_len_sum_ = index_entry_json["ft_column_len_sum"];
     segment_index_entry->ft_column_len_cnt_ = index_entry_json["ft_column_len_cnt"];
 
+    if (index_entry_json["deprecate_ts"].is_null()) {
+        segment_index_entry->deleted_ = false;
+    } else {
+        segment_index_entry->deleted_ = true;
+        segment_index_entry->deprecate_ts_ = index_entry_json["deprecate_ts"];
+    }
+
     return segment_index_entry;
 }
 
@@ -1237,6 +1248,7 @@ void SegmentIndexEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
         chunk_index_entry->DeprecateChunk(deprecate_ts);
     }
     this->deleted_ = true;
+    this->deprecate_ts_ = deprecate_ts;
 }
 
 } // namespace infinity

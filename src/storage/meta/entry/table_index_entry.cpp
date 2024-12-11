@@ -478,9 +478,17 @@ Vector<String> TableIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp b
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
+    TxnTimeStamp visible_ts = scanner->visible_ts();
     std::shared_lock r_lock(rw_locker_);
-    for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
-        segment_index_entry->PickCleanup(scanner);
+    for (auto iter = index_by_segment_.begin(); iter != index_by_segment_.end();) {
+        auto &[segment_id, segment_index_entry] = *iter;
+        if (segment_index_entry->CheckDeprecate(visible_ts)) {
+            scanner->AddEntry(std::move(segment_index_entry));
+            iter = index_by_segment_.erase(iter);
+        } else {
+            segment_index_entry->PickCleanup(scanner);
+            ++iter;
+        }
     }
 }
 
