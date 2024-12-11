@@ -1842,7 +1842,7 @@ An integer specifying the maximum number of output rows.
 #### Examples
 
 ```python
-# Limit the output row count not more than 2
+# Limit the output row count to a maximum of two
 table_instance.output(["num", "vec"]).limit(2).to_pl()
 ```
 
