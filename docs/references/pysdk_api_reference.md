@@ -1812,7 +1812,7 @@ An expression list defining how to sort the results.
 #### Examples
 
 ```python
-# Output result sorted by `c2` expression in ascending order, and `c1` expression in descending order
+# Output results sorted by the `c2` expression in ascending order and the `c1` expression in descending order
 table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Desc]]).to_df()
 ```
 
