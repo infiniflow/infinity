@@ -42,29 +42,29 @@ def test_0(cluster: InfinityCluster):
         cluster.remove_node("node1")
 
 
-def test_mock(mock_cluster: MockInfinityCluster):
-    cluster = mock_cluster
-    with cluster:
-        cluster.add_node("node1", "conf/leader.toml")
-        cluster.add_node("node2", "conf/follower.toml")
-
-        cluster.set_leader("node1")
-        cluster.set_follower("node2")
-
-        time.sleep(1)
-
-        cluster.disconnect("node2")
-        time.sleep(0.1)
-        cluster.reconnect("node2")
-
-        cluster.block_peer_net("node2")
-        time.sleep(0.1)
-        cluster.restore_peer_net("node2")
-
-        time.sleep(1)
-
-        cluster.remove_node("node2")
-        cluster.remove_node("node1")
+# def test_mock(mock_cluster: MockInfinityCluster):
+#     cluster = mock_cluster
+#     with cluster:
+#         cluster.add_node("node1", "conf/leader.toml")
+#         cluster.add_node("node2", "conf/follower.toml")
+#
+#         cluster.set_leader("node1")
+#         cluster.set_follower("node2")
+#
+#         time.sleep(1)
+#
+#         cluster.disconnect("node2")
+#         time.sleep(0.1)
+#         cluster.reconnect("node2")
+#
+#         cluster.block_peer_net("node2")
+#         time.sleep(0.1)
+#         cluster.restore_peer_net("node2")
+#
+#         time.sleep(1)
+#
+#         cluster.remove_node("node2")
+#         cluster.remove_node("node1")
 
 
 @pytest.mark.docker

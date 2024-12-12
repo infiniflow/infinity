@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import functools
 import inspect
 from typing import Optional, Union, List, Any
@@ -59,7 +60,7 @@ class LocalTable():
 
     @name_validity_check("index_name", "Index")
     def create_index(self, index_name: str, index_info: IndexInfo,
-                     conflict_type: ConflictType = ConflictType.Error, index_comment : str = ""):
+                     conflict_type: ConflictType = ConflictType.Error, index_comment: str = ""):
         index_name = index_name.strip()
 
         create_index_conflict: LocalConflictType
@@ -166,8 +167,8 @@ class LocalTable():
                 constant_expression = get_local_constant_expr_from_python_value(value)
                 parse_exprs.append(constant_expression)
             insert_row = WrapInsertRowExpr()
-            insert_row.columns=column_names
-            insert_row.values=parse_exprs
+            insert_row.columns = column_names
+            insert_row.values = parse_exprs
             fields.append(insert_row)
 
         res = self._conn.insert(db_name=db_name, table_name=table_name, fields=fields)
@@ -384,7 +385,8 @@ class LocalTable():
                 raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE,
                                         "order_by_expr_list must be a list of [column_name, sort_type]")
             if order_by_expr[1] not in [SortType.Asc, SortType.Desc]:
-                raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE, "sort_type must be SortType.Asc or SortType.Desc")
+                raise InfinityException(ErrorCode.INVALID_PARAMETER_VALUE,
+                                        "sort_type must be SortType.Asc or SortType.Desc")
         self.query_builder.sort(order_by_expr_list)
         return self
 
