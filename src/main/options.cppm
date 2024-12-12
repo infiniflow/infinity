@@ -165,8 +165,10 @@ export enum class GlobalOptionIndex : i8 {
     kPeerConnectTimeout = 49,
     kPeerRecvTimeout = 50,
     kPeerSendTimeout = 51,
-
-    kInvalid = 52,
+    kDenseIndexBuildingWorker = 53,
+    kSparseIndexBuildingWorker = 54,
+    kFulltextIndexBuildingWorker = 55,
+    kInvalid = 57,
 };
 
 export struct GlobalOptions {

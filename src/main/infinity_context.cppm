@@ -64,7 +64,7 @@ public:
 
     void UnInit();
 
-    void SetIndexThreadPool(SizeT thread_num);
+    void SetIndexThreadPool();
     void RestoreIndexThreadPoolToDefault();
 
     void AddThriftServerFn(std::function<void()> start_func, std::function<void()> stop_func);
@@ -90,11 +90,11 @@ private:
     atomic_bool infinity_context_inited_{false};
 
     // For fulltext index
-    ThreadPool inverting_thread_pool_{4};
+    ThreadPool inverting_thread_pool_{2};
     ThreadPool commiting_thread_pool_{2};
 
     // For hnsw index
-    ThreadPool hnsw_build_thread_pool_{4};
+    ThreadPool hnsw_build_thread_pool_{2};
 
     mutable std::mutex mutex_;
 

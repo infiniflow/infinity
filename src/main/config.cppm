@@ -102,6 +102,9 @@ public:
     void SetOptimizeInterval(i64);
 
     i64 MemIndexCapacity();
+    i64 DenseIndexBuildingWorker();
+    i64 SparseIndexBuildingWorker();
+    i64 FulltextIndexBuildingWorker();
 
     StorageType StorageType();
     String ObjectStorageUrl();
