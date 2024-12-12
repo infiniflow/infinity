@@ -44,7 +44,7 @@ if __name__ == "__main__":
     print("Note: this script must be run under root directory of the project.")
     current_path = os.getcwd()
     python_test_dir = current_path + "/python"
-    parser = argparse.ArgumentParser(description="Http Api Test For Infinity")
+    parser = argparse.ArgumentParser(description="Http API Test For Infinity")
     parser.add_argument(
         "-m",
         "--pytest_mark",
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    print("Start Http Api testing...")
+    print("Start Http API testing...")
     start = time.time()
     try:
         python_sdk_test(python_test_dir, args.pytest_mark)

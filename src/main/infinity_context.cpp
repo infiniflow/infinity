@@ -239,8 +239,7 @@ Status InfinityContext::ChangeServerRole(NodeRole target_role, bool from_leader,
             }
             task_scheduler_ = MakeUnique<TaskScheduler>(config_.get());
 
-            i64 cpu_limit = config_->CPULimit();
-            SetIndexThreadPool(cpu_limit);
+            SetIndexThreadPool();
             break;
         }
         case NodeRole::kStandalone: {
@@ -513,21 +512,18 @@ void InfinityContext::UnInit() {
     config_.reset();
 }
 
-void InfinityContext::SetIndexThreadPool(SizeT thread_num) {
-    thread_num = thread_num / 2;
-    if (thread_num < 2)
-        thread_num = 2;
-    LOG_TRACE(fmt::format("Set index thread pool size to {}", thread_num));
-    inverting_thread_pool_.resize(thread_num);
-    commiting_thread_pool_.resize(thread_num);
-    hnsw_build_thread_pool_.resize(thread_num);
+void InfinityContext::SetIndexThreadPool() {
+    LOG_TRACE("Set index thread pool.");
+    inverting_thread_pool_.resize(config_->DenseIndexBuildingWorker());
+    commiting_thread_pool_.resize(config_->SparseIndexBuildingWorker());
+    hnsw_build_thread_pool_.resize(config_->FulltextIndexBuildingWorker());
 }
 
 void InfinityContext::RestoreIndexThreadPoolToDefault() {
-    LOG_TRACE("Restore index thread pool size to default");
-    inverting_thread_pool_.resize(4);
-    commiting_thread_pool_.resize(2);
-    hnsw_build_thread_pool_.resize(4);
+    LOG_TRACE("Restore index thread pool size to default.");
+    inverting_thread_pool_.resize(config_->DenseIndexBuildingWorker());
+    commiting_thread_pool_.resize(config_->SparseIndexBuildingWorker());
+    hnsw_build_thread_pool_.resize(config_->FulltextIndexBuildingWorker());
 }
 
 void InfinityContext::AddThriftServerFn(std::function<void()> start_func, std::function<void()> stop_func) {

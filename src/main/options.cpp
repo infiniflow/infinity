@@ -78,6 +78,10 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(TEMP_DIR_OPTION_NAME)] = GlobalOptionIndex::kTempDir;
     name2index_[String(MEMINDEX_MEMORY_QUOTA_OPTION_NAME)] = GlobalOptionIndex::kMemIndexMemoryQuota;
 
+    name2index_[String(DENSE_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kDenseIndexBuildingWorker;
+    name2index_[String(SPARSE_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kSparseIndexBuildingWorker;
+    name2index_[String(FULLTEXT_INDEX_BUILDING_WORKER_OPTION_NAME)] = GlobalOptionIndex::kFulltextIndexBuildingWorker;
+
     name2index_[String(RESULT_CACHE_OPTION_NAME)] = GlobalOptionIndex::kResultCache;
     name2index_[String(CACHE_RESULT_CAPACITY_OPTION_NAME)] = GlobalOptionIndex::kCacheResultCapacity;
 

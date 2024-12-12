@@ -226,7 +226,8 @@ int main() {
                                                                          output_columns,
                                                                          nullptr,
                                                                          nullptr,
-                                                                         nullptr);
+                                                                         nullptr,
+                                                                         false);
                     });
                 results.push_back(fmt::format("-> Select QPS: {}", total_times / tims_costing_second));
             }

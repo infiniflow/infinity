@@ -1788,13 +1788,134 @@ table_object.output(["*"]).filter("filter_fulltext('doc', 'first second', 'minim
 
 ---
 
+### sort
+
+```python
+table_object.sort(sort_expression_list)
+```
+
+Creates a sort expression using `sort_expression_list`.
+
+#### Parameters
+
+##### sort_expression_list: `list`, *Required*
+
+An expression list defining how to sort the results.
+
+#### Returns
+
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value indicating a specific error condition.
+  - `error_msg`: `str` A message providing additional details about the error.
+
+#### Examples
+
+```python
+# Output results sorted by the `c2` expression in ascending order and the `c1` expression in descending order
+table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Desc]]).to_df()
+```
+
+---
+
+### limit
+
+```python
+table_object.limit(limit_num)
+```
+
+Creates an expression to limit the number of the output rows to a maximum of `limit_num`.
+
+#### Parameters
+
+##### limit_num: `int`, *Required*
+
+An integer specifying the maximum number of output rows.
+
+#### Returns
+
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value indicating a specific error condition.
+  - `error_msg`: `str` A message providing additional details about the error.
+
+#### Examples
+
+```python
+# Limit the output row count to a maximum of two
+table_instance.output(["num", "vec"]).limit(2).to_pl()
+```
+
+---
+
+### offset
+
+```python
+table_object.limit(limit_num).offset(offset_value)
+```
+
+Creates a limit expression with an offset value, setting the output to start from `offset_value` and limiting the row count to a maximum of `limit_num`. This method must be used in conjunction with `limit()`.
+
+#### Parameters
+
+##### offset_value: `int`, *Required*
+
+An integer specifying the offset position of the limit expression.
+
+#### Returns
+
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value indicating a specific error condition.
+  - `error_msg`: `str` A message providing additional details about the error.
+
+#### Examples
+
+```python
+# Limit the output row count not more than 2, start from position 1
+table_instance.output(["num", "vec"]).offset(1).limit(2).to_pl()
+```
+
+### option
+
+```python
+table_object.option(option_dict)
+```
+
+Indicates some search options.
+
+#### Parameters
+
+##### option_dict: `dict`, *Required*
+
+A dictionary specifying the following search options:
+
+- **"total_hits_count"**: `bool`, *Optional*
+  - Must combine with limit expression. If `"total_hits_count"` is `True`, the query will output an extra result including total hits row count of the query.
+
+#### Returns
+
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value indicating a specific error condition.
+  - `error_msg`: `str` A message providing additional details about the error.
+
+#### Examples
+
+```python
+# Limit the output row count not more than 2, start from position 1, output an extra result to indicate total hits row count
+table_instance.output(["num", "vec"]).limit(2).offset(1).option({"total_hits_count": True}).to_pl()
+```
+
+---
+
 ### match_dense
 
 ```python
 table_object.match_dense(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).
+Creates a dense vector search expression to identify the closest top n rows to the given dense vector. Suitable for working with dense vectors (dense embeddings) or multi-vectors (multiple dense embeddings in one row).
 
 :::tip NOTE
 To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
@@ -2033,10 +2154,10 @@ To display your query results, you must chain this method with `output(columns)`
 A non-empty text string to search for. You can use various search options within the matching text, including:
 
 - Single terms: `"blooms"`
-- OR multiple terms: `"Bloom OR filter"`, `"Bloom || filter"` or just `"Bloom filter"`
+- OR multiple terms: `"Bloom OR filter"` or just `"Bloom filter"`
 - Phrase search: `'"Bloom filter"'`
-- AND multiple terms: `"space AND efficient"`, `"space && efficient"` or `"space + efficient"`
-- Escaping reserved characters: `"space\-efficient"`
+- AND multiple terms: `"space AND efficient"`
+- Escaping reserved characters: `"space\:efficient"`
 - Sloppy phrase search: `'"harmful chemical"~10'`
 - Field-specific search: `"title:(quick OR brown) AND body:foobar"`
 
@@ -2052,17 +2173,17 @@ An optional dictionary specifying the following search options:
   - If `"fields"` is an empty string, this parameter specifies the default field to search on.
 - **"operator"**: `str`, *Optional*
   - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators, quotation marks and escape characters will function as full-text search operators, such as:
-    - AND operator: `AND`, `&&`, `+`
-    - OR operator: `OR`, `||`
-    - NOT operator: `NOT`, `!`, `-`
+    - AND operator: `AND`
+    - OR operator: `OR`
+    - NOT operator: `NOT`
     - PAREN operator: `(`, `)`, need to appear in pairs, and can be nested.
     - COLON operator: `:`: Used to specify field-specific search, e.g., `body:foobar` searches for `foobar` in the `body` field.
     - CARAT operator: `^`: Used to boost the importance of a term, e.g., `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
     - TILDE operator: `~`: Used for sloppy phrase search, e.g., `"harmful chemical"~10` searches for the phrase `"harmful chemical"` within a tolerable distance of 10 words.
     - SINGLE_QUOTED_STRING: Used to search for a phrase, e.g., `'Bloom filter'`.
     - DOUBLE_QUOTED_STRING: Used to search for a phrase, e.g., `"Bloom filter"`.
-    - Escape characters: Used to escape reserved characters, e.g., `space\-efficient`. Starting with a backslash `\` will escape the following characters:   
-      `' '`, `'+'`, `'-'`, `'='`, `'&'`, `'|'`, `'!'`, `'('`, `')'`, `'{'`, `'}'`, `'['`, `']'`, `'^'`, `'"'`, `'~'`, `'*'`, `'?'`, `':'`, `'\'`, `'/'`
+    - Escape characters: Used to escape reserved characters, e.g., `space\:efficient`. Starting with a backslash `\` will escape the following characters:   
+      `' '`, `'('`, `')'`, `'^'`, `'"'`, `'\''`, `'~'`, `'*'`, `'?'`, `':'`, `'\\'`
   - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.  
     Useful for searching text including code numbers like `"A01-233:BC"`.
     - `{"operator": "or"}`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.  
@@ -2285,7 +2406,7 @@ We recommend calling `to_df()`, `to_pl()`, or `to_arrow()` to format your result
 
 #### Returns 
 
-`tuple[dict[str, list[Any]], dict[str, Any]]`
+A `tuple[dict[str, list[Any]], dict[str, Any]], {}` object
 
 ### to_df
 
@@ -2293,7 +2414,7 @@ We recommend calling `to_df()`, `to_pl()`, or `to_arrow()` to format your result
 table_object.to_df()
 ```
 
-Returns the query result in pandas DataFrame format.
+Returns the query result as a tuple consisting of a pandas DataFrame and a dict.
 
 :::tip NOTE
 Call `to_df()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
@@ -2301,13 +2422,13 @@ Call `to_df()` in a chain after (not necessarily "immediately after") `output(co
 
 #### Returns
 
-A `pandas.DataFrame` object.
+A `tuple[pandas.DataFrame, {}]` object
 
 #### Examples
 
 ```python
 # Format columns "c1" and C2" of the current table into a pandas DataFrame
-res = table_object.output(["c1", "c2"]).to_df()
+res, extra_res = table_object.output(["c1", "c2"]).to_df()
 ```
 
 ### to_pl
@@ -2316,7 +2437,7 @@ res = table_object.output(["c1", "c2"]).to_df()
 table_object.to_pl()
 ```
 
-Returns the query result in Polas DataFrame format.
+Returns the query result as a tuple consisting of a Polars DataFrame and a dict.
 
 :::tip NOTE
 Call `to_pl()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
@@ -2324,13 +2445,13 @@ Call `to_pl()` in a chain after (not necessarily "immediately after") `output(co
 
 #### Returns
 
-A `polas.DataFrame` object.
+A `tuple[polas.DataFrame, {}]` object.
 
 #### Examples
 
 ```python
-# Format a vector search result into a Polas DataFrame. 
-res = table_object.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10).to_pl()
+# Format a vector search result into a Polars DataFrame. 
+res, extra_res = table_object.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10).to_pl()
 ```
 
 ### to_arrow
@@ -2339,7 +2460,7 @@ res = table_object.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float
 table_object.to_arrow()
 ```
 
-Returns the query result in Apache Arrow Table format.
+Returns the query result as a tuple consisting of an Apache Arrow Table and a dict.
 
 :::tip NOTE
 Call `to_arrow()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
@@ -2347,13 +2468,13 @@ Call `to_arrow()` in a chain after (not necessarily "immediately after") `output
 
 #### Returns
 
-A `pyarrow.Table` object.
+A `tuple[pyarrow.Table, {}]` object.
 
 #### Examples
 
 ```python
 # Format the current table object into an Apache Arrow Table. 
-res = table_object.output(["*"]).filter("score >= 90").to_arrow()
+res, extra_result = table_object.output(["*"]).filter("score >= 90").to_arrow()
 ```
 
 ---
