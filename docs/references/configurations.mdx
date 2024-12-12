@@ -153,6 +153,18 @@ mem_index_capacity       = 1048576
 # Range: {"local"|"minio"}  
 storage_type             = "local"
 
+# The number of dense vector index building worker threads. Defaults to the half number of CPU cores.
+# Range: [1, number of CPU cores]
+dense_index_building_worker = 2
+
+# The number of sparse vector index building worker threads. Defaults to the half number of CPU cores.
+# Range: [1, number of CPU cores]
+sparse_index_building_worker = 2
+
+# The number of fulltext index building worker threads. Defaults to the half number of CPU cores.
+# Range: [1, number of CPU cores]
+fulltext_index_building_worker = 2
+
 # Object storage configuration
 [storage.object_storage]
 # URL of the object storage server
