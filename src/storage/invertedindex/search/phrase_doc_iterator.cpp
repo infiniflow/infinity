@@ -41,7 +41,7 @@ void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&col
     column_length_reader_ = std::move(column_length_reader);
     u64 total_df = column_length_reader_->GetTotalDF();
     float avg_column_len = column_length_reader_->GetAvgColumnLength();
-    float smooth_idf = std::log(1.0F + (total_df - estimate_doc_freq_ + 0.5F) / (estimate_doc_freq_ + 0.5F));
+    float smooth_idf = std::log1p((total_df - estimate_doc_freq_ + 0.5F) / (estimate_doc_freq_ + 0.5F));
     bm25_common_score_ = weight_ * smooth_idf * (k1 + 1.0F);
     bm25_score_upper_bound_ = bm25_common_score_ / (1.0F + k1 * b / avg_column_len);
     if (SHOULD_LOG_TRACE()) {
