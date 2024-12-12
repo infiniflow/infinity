@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +15,10 @@
 import struct
 import json
 from collections import defaultdict
-from typing import Any, Tuple, Dict, List
-import polars as pl
+from typing import Any
 import numpy as np
 from numpy import dtype
-from infinity_embedded.common import VEC, SparseVector, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity_embedded.common import VEC, SparseVector, InfinityException
 from infinity_embedded.embedded_infinity_ext import *
 from infinity_embedded.errors import ErrorCode
 from datetime import date, time, datetime, timedelta

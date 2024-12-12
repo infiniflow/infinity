@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from pathlib import Path
 from typing import Union
 from dataclasses import dataclass
@@ -75,9 +76,11 @@ class ConflictType(object):
     Error = 1
     Replace = 2
 
+
 class SortType(object):
     Asc = 0
     Desc = 1
+
 
 class InfinityException(Exception):
     def __init__(self, error_code=0, error_message=None):

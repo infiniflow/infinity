@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,11 +25,10 @@ from infinity_embedded.errors import ErrorCode
 from infinity_embedded.common import InfinityException, SparseVector
 from infinity_embedded.local_infinity.types import build_result, logic_type_to_dtype
 from infinity_embedded.utils import binary_exp_to_paser_exp
-from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapOrderByExpr, WrapFunctionExpr, \
+from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapFunctionExpr, \
     WrapColumnExpr, WrapConstantExpr, ParsedExprType, LiteralType
 from infinity_embedded.embedded_infinity_ext import WrapEmbeddingType, WrapColumnDef, WrapDataType, LogicalType, \
     EmbeddingDataType, WrapSparseType, ConstraintType
-from datetime import date, time, datetime, timedelta
 
 
 def traverse_conditions(cons, fn=None):
