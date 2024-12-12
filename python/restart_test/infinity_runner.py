@@ -75,7 +75,7 @@ class InfinityRunner:
         self.process = subprocess.Popen(cmd, shell=True, env=my_env)
         self.i += 1
 
-    def uninit(self):
+    def uninit(self, kill: bool = False):
         if self.process is None:
             return
         timeout = 60
@@ -84,6 +84,12 @@ class InfinityRunner:
             pids.append(child.pid)
         if len(pids) == 0:
             raise Exception("Cannot find infinity process.")
+
+        if kill:
+            os.system(f"kill -9 {' '.join(map(str, pids))}")
+            self.process = None
+            return
+
         ret = os.system(f"bash {self.script_path} {timeout} {' '.join(map(str, pids))}")
         if ret != 0:
             raise Exception("An error occurred.")
@@ -122,7 +128,7 @@ class InfinityRunner:
 
 
 def infinity_runner_decorator_factory(
-    config_path: str | None, uri: str, infinity_runner: InfinityRunner, shutdown_out: bool = False
+    config_path: str | None, uri: str, infinity_runner: InfinityRunner, shutdown_out: bool = False, kill: bool = False
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
@@ -136,7 +142,7 @@ def infinity_runner_decorator_factory(
                 except Exception:
                     if not shutdown_out:
                         raise
-                infinity_runner.uninit()
+                infinity_runner.uninit(kill)
 
         return wrapper
 

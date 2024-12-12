@@ -97,7 +97,7 @@ class TestCompact:
         infinity_runner.clear()
 
         decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
-        decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner)
+        decorator2 = infinity_runner_decorator_factory(config2, uri, infinity_runner, kill=True)
 
         table_name = "test_compact2"
         import_path = "test/data/csv/embedding_int_dim3.csv"
