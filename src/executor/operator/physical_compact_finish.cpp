@@ -33,6 +33,8 @@ import internal_types;
 import infinity_context;
 import infinity_exception;
 import status;
+import txn_store;
+import segment_index_entry;
 
 namespace infinity {
 
@@ -78,6 +80,29 @@ void PhysicalCompactFinish::SaveSegmentData(QueryContext *query_context, const C
         segment_data.emplace_back(compact_segment_data.new_segment_, compact_segment_data.old_segments_);
     }
     LOG_DEBUG(ss.str());
+
+    for (const auto &compact_segment_data : compact_state_data->segment_data_list_) {
+        TxnStore *txn_store = txn->txn_store();
+        TxnTableStore *txn_table_store = txn_store->GetTxnTableStore(table_entry);
+        auto index_map = table_entry->IndexMetaMap();
+        for (const auto &[index_name, index_meta] : *index_map) {
+            auto [table_index_entry, status] = index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+            if (!status.ok()) {
+                continue;
+            }
+            Vector<SegmentIndexEntry *> segment_index_entries;
+            auto &segment_index_map = table_index_entry->index_by_segment();
+            for (const auto *old_segment :  compact_segment_data.old_segments_) {
+                auto iter = segment_index_map.find(old_segment->segment_id());
+                if (iter == segment_index_map.end()) {
+                    continue;
+                }
+                auto *segment_index_entry = iter->second.get();
+                segment_index_entries.push_back(segment_index_entry);
+            }
+            txn_table_store->AddSegmentIndexesStore(table_index_entry, std::move(segment_index_entries));
+        }
+    }
 
     txn->Compact(table_entry, std::move(segment_data), compact_type_);
 }

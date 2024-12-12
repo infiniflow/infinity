@@ -910,6 +910,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 auto min_ts = add_segment_index_entry_op->min_ts_;
                 auto max_ts = add_segment_index_entry_op->max_ts_;
                 auto next_chunk_id = add_segment_index_entry_op->next_chunk_id_;
+                auto deprecate_ts = add_segment_index_entry_op->deprecate_ts_;
 
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
@@ -917,7 +918,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                 if (auto iter = table_entry->segment_map_.find(segment_id); iter != table_entry->segment_map_.end()) {
                     auto *table_index_entry = table_entry->GetIndexReplay(index_name, txn_id, begin_ts);
                     auto *segment_entry = iter->second.get();
-                    if (segment_entry->status() == SegmentStatus::kDeprecated) {
+                    if (merge_flag != MergeFlag::kDelete && segment_entry->status() == SegmentStatus::kDeprecated) {
                         String error_message = fmt::format("Segment {} is deprecated", segment_id);
                         UnrecoverableError(error_message);
                     }
@@ -930,14 +931,15 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
                                                                                              next_chunk_id,
                                                                                              txn_id,
                                                                                              begin_ts,
-                                                                                             commit_ts);
+                                                                                             commit_ts,
+                                                                                             deprecate_ts);
                     if (merge_flag == MergeFlag::kNew) {
                         bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
                         if (!insert_ok) {
                             String error_message = fmt::format("Segment index {} is already in the catalog", segment_id);
                             UnrecoverableError(error_message);
                         }
-                    } else if (merge_flag == MergeFlag::kUpdate) {
+                    } else if (merge_flag == MergeFlag::kUpdate || merge_flag == MergeFlag::kDelete) {
                         auto iter = table_index_entry->index_by_segment().find(segment_id);
                         if (iter == table_index_entry->index_by_segment().end()) {
                             String error_message = fmt::format("Segment index {} is not found", segment_id);

@@ -73,13 +73,14 @@ ChunkIndexEntry::~ChunkIndexEntry() {}
 
 ChunkIndexEntry::ChunkIndexEntry(const ChunkIndexEntry &other)
     : BaseEntry(other), chunk_id_(other.chunk_id_), segment_index_entry_(other.segment_index_entry_), base_name_(other.base_name_),
-      base_rowid_(other.base_rowid_), row_count_(other.row_count_), deprecate_ts_(other.deprecate_ts_.load()), buffer_obj_(other.buffer_obj_) {}
+      base_rowid_(other.base_rowid_), row_count_(other.row_count_), deprecate_ts_(other.deprecate_ts_.load()), buffer_obj_(other.buffer_obj_) {
+    if (buffer_obj_) {
+        buffer_obj_->AddObjRc();
+    }
+}
 
 UniquePtr<ChunkIndexEntry> ChunkIndexEntry::Clone(SegmentIndexEntry *segment_index_entry) const {
     auto ret = UniquePtr<ChunkIndexEntry>(new ChunkIndexEntry(*this));
-    if (buffer_obj_ != nullptr) {
-        buffer_obj_->AddObjRc();
-    }
     ret->segment_index_entry_ = segment_index_entry;
     return ret;
 }
@@ -110,6 +111,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewHnswIndexChunkIndexEntry(ChunkID 
                                                       buffer_mgr->persistence_manager(),
                                                       index_size);
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+        chunk_index_entry->buffer_obj_->AddObjRc();
     }
     return chunk_index_entry;
 }
@@ -132,6 +134,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewFtChunkIndexEntry(SegmentIndexEnt
                                                      row_count * sizeof(u32),
                                                      buffer_mgr->persistence_manager());
         chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+        chunk_index_entry->buffer_obj_->AddObjRc();
     }
     return chunk_index_entry;
 }
@@ -159,6 +162,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewSecondaryIndexChunkIndexEntry(Chu
                                                                 row_count,
                                                                 buffer_mgr->persistence_manager());
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+        chunk_index_entry->buffer_obj_->AddObjRc();
     }
     return chunk_index_entry;
 }
@@ -185,6 +189,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewIVFIndexChunkIndexEntry(ChunkID c
                                                           column_def,
                                                           buffer_mgr->persistence_manager());
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+        chunk_index_entry->buffer_obj_->AddObjRc();
     }
     return chunk_index_entry;
 }
@@ -213,6 +218,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewEMVBIndexChunkIndexEntry(ChunkID 
                                                            segment_start_offset,
                                                            buffer_mgr->persistence_manager());
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+        chunk_index_entry->buffer_obj_->AddObjRc();
     }
     return chunk_index_entry;
 }
@@ -241,6 +247,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewBMPIndexChunkIndexEntry(ChunkID c
                                                           buffer_mgr->persistence_manager(),
                                                           index_size);
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+        chunk_index_entry->buffer_obj_->AddObjRc();
     }
     return chunk_index_entry;
 }
@@ -340,6 +347,9 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
         default: {
             UnrecoverableError(fmt::format("Unsupported index type: {}", index_base->ToString()));
         }
+    }
+    if (chunk_index_entry->buffer_obj_) {
+        chunk_index_entry->buffer_obj_->AddObjRc();
     }
     chunk_index_entry->commit_ts_ = commit_ts;
     chunk_index_entry->deprecate_ts_ = deprecate_ts;

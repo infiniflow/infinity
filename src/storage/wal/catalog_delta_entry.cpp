@@ -362,6 +362,24 @@ MergeFlag CatalogDeltaOperation::NextDeleteFlag(MergeFlag new_merge_flag) const 
     return MergeFlag::kInvalid;
 };
 
+void CatalogDeltaOperation::CheckDelete() {
+    if (type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
+        auto *add_segment_op = static_cast<AddSegmentEntryOp *>(this);
+        if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
+            add_segment_op->merge_flag_ = MergeFlag::kDelete;
+        }
+    } else if (type_ == CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
+        auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(this);
+        if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
+            add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
+            LOG_DEBUG(fmt::format("Delete chunk: {} at {}", *encode_, add_chunk_index_op->deprecate_ts_));
+        }
+    } else if (type_ == CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY) {
+        [[maybe_unused]] auto *add_segment_index_op = static_cast<AddSegmentIndexEntryOp *>(this);
+    }
+}
+
+
 AddDBEntryOp::AddDBEntryOp(DBEntry *db_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry, commit_ts), db_entry_dir_(db_entry->db_entry_dir()),
       comment_(db_entry->db_comment_ptr()) {}
@@ -402,7 +420,8 @@ AddTableIndexEntryOp::AddTableIndexEntryOp(TableIndexEntry *table_index_entry, T
 
 AddSegmentIndexEntryOp::AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY, segment_index_entry, commit_ts), segment_index_entry_(segment_index_entry),
-      min_ts_(segment_index_entry->min_ts()), max_ts_(segment_index_entry->max_ts()), next_chunk_id_(segment_index_entry->next_chunk_id()) {}
+      min_ts_(segment_index_entry->min_ts()), max_ts_(segment_index_entry->max_ts()), next_chunk_id_(segment_index_entry->next_chunk_id()),
+      deprecate_ts_(segment_index_entry->deprecate_ts()) {}
 
 AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry, commit_ts), base_name_(chunk_index_entry->base_name_),
@@ -539,6 +558,7 @@ UniquePtr<AddSegmentIndexEntryOp> AddSegmentIndexEntryOp::ReadAdv(const char *&p
     add_segment_index_op->min_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     add_segment_index_op->max_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     add_segment_index_op->next_chunk_id_ = ReadBufAdv<ChunkID>(ptr);
+    add_segment_index_op->deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     return add_segment_index_op;
 }
 
@@ -624,6 +644,7 @@ SizeT AddSegmentIndexEntryOp::GetSizeInBytes() const {
     auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
     total_size += sizeof(TxnTimeStamp) + sizeof(TxnTimeStamp);
     total_size += sizeof(ChunkID);
+    total_size += sizeof(TxnTimeStamp);
     return total_size;
 }
 
@@ -719,6 +740,7 @@ void AddSegmentIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->min_ts_);
     WriteBufAdv(buf, this->max_ts_);
     WriteBufAdv(buf, this->next_chunk_id_);
+    WriteBufAdv(buf, this->deprecate_ts_);
 }
 
 void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
@@ -799,11 +821,12 @@ const String AddTableIndexEntryOp::ToString() const {
 }
 
 const String AddSegmentIndexEntryOp::ToString() const {
-    return fmt::format("AddSegmentIndexEntryOp {} min_ts: {} max_ts: {}, next_chunk_id: {}",
+    return fmt::format("AddSegmentIndexEntryOp {} min_ts: {} max_ts: {}, next_chunk_id: {}, deprecate_ts: {}",
                        CatalogDeltaOperation::ToString(),
                        min_ts_,
                        max_ts_,
-                       next_chunk_id_);
+                       next_chunk_id_,
+                       deprecate_ts_);
 }
 
 const String AddChunkIndexEntryOp::ToString() const {
@@ -868,7 +891,7 @@ bool AddTableIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
 bool AddSegmentIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddSegmentIndexEntryOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && min_ts_ == rhs_op->min_ts_ && max_ts_ == rhs_op->max_ts_ &&
-           next_chunk_id_ == rhs_op->next_chunk_id_;
+           next_chunk_id_ == rhs_op->next_chunk_id_ && deprecate_ts_ == rhs_op->deprecate_ts_;
 }
 
 bool AddChunkIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
@@ -1242,18 +1265,8 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
     max_commit_ts_ = std::max(max_commit_ts_, max_commit_ts);
 
     for (auto &new_op : delta_entry->operations()) {
-        if (new_op->type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
-            auto *add_segment_op = static_cast<AddSegmentEntryOp *>(new_op.get());
-            if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
-                add_segment_op->merge_flag_ = MergeFlag::kDelete;
-            }
-        } else if (new_op->type_ == CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
-            auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(new_op.get());
-            if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
-                add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
-                LOG_DEBUG(fmt::format("Delete chunk: {} at {}", *new_op->encode_, add_chunk_index_op->deprecate_ts_));
-            }
-        }
+        new_op->CheckDelete();
+
         const String &encode = *new_op->encode_;
         if (encode.empty()) {
             String error_message = "encode is empty";

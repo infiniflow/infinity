@@ -573,6 +573,7 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, commit_ts);
         if (!status.ok())
             continue;
+        table_index_entry->CommitCompact(txn_id, commit_ts, compact_store);
         const IndexBase *index_base = table_index_entry->index_base();
         switch (index_base->index_type_) {
             case IndexType::kFullText: {
@@ -828,7 +829,8 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
                                                                                     0 /*next_chunk_id*/,
                                                                                     0 /*txn_id*/,
                                                                                     ts /*begin_ts*/,
-                                                                                    ts /*commit_ts*/);
+                                                                                    ts /*commit_ts*/,
+                                                                                    UNCOMMIT_TS /*deprecate_ts*/);
                 table_index_entry->index_by_segment().emplace(segment_id, segment_index_entry);
             } else {
                 segment_index_entry = iter->second;

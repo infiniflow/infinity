@@ -112,6 +112,8 @@ public:
 
     MergeFlag NextDeleteFlag(MergeFlag new_merge_flag) const;
 
+    void CheckDelete();
+
 public:
     TxnTimeStamp begin_ts_{0};
     TransactionID txn_id_{0};
@@ -306,6 +308,7 @@ public:
     TxnTimeStamp min_ts_{0};
     TxnTimeStamp max_ts_{0};
     ChunkID next_chunk_id_{0};
+    TxnTimeStamp deprecate_ts_{0};
 };
 
 /// class AddSegmentColumnEntryOperation

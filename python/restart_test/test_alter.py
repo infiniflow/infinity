@@ -229,3 +229,48 @@ class TestAlter:
             db_obj.drop_table(table_name)
 
         part2()
+
+    def test_restart_after_alter_and_checkpoint(self, infinity_runner: InfinityRunner):
+        table_name = "test_alter4"
+        config = "test/data/config/restart_test/test_alter/1.toml"
+
+        infinity_runner.clear()
+        uri = common_values.TEST_LOCAL_HOST
+        data_dir = "/var/infinity/data"
+
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, ConflictType.Ignore)
+            table_obj = db_obj.create_table(
+                table_name,
+                {
+                    "c1": {"type": "int"},
+                    "c2": {"type": "int"},
+                    "c3": {"type": "varchar"},
+                },
+            )
+            table_obj.insert([{"c1": 1, "c2": 2, "c3": "test"}])
+
+            table_obj.add_columns({"c4": {"type": "varchar", "default": "tttt"}})
+            table_obj.drop_columns(["c2"])
+
+            infinity_obj.flush_data()
+
+            table_obj.drop_columns(["c3"])
+
+            infinity_obj.flush_delta()
+        
+        part1()
+
+        @decorator
+        def part2(infinity_obj):
+            dropped_column_dirs = pathlib.Path(data_dir).rglob("1.col")
+            assert len(list(dropped_column_dirs)) == 0
+
+            dropped_column_dirs = pathlib.Path(data_dir).rglob("2.col")
+            assert len(list(dropped_column_dirs)) == 0
+
+        part2()

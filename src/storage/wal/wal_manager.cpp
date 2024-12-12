@@ -1330,7 +1330,8 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
                                                                                          0 /*next_chunk_id*/,
                                                                                          txn_id /*txn_id*/,
                                                                                          commit_ts /*begin_ts*/,
-                                                                                         commit_ts);
+                                                                                         commit_ts,
+                                                                                         UNCOMMIT_TS /*deprecate_ts*/);
             index_by_segment.emplace(cmd.segment_id_, segment_index_entry_ptr);
             segment_index_entry = segment_index_entry_ptr.get();
         }

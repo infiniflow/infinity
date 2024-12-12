@@ -145,6 +145,8 @@ public:
 
     void CommitCreateIndex(TxnIndexStore *txn_index_store, TxnTimeStamp commit_ts, bool is_replay = false);
 
+    void CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, TxnCompactStore &compact_store);
+
     // void RollbackPopulateIndex(TxnIndexStore *txn_index_store, Txn *txn);
 
     // replay
