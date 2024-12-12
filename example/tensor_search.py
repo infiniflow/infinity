@@ -62,10 +62,14 @@ try:
             },
         ]
     )
-    result = table_instance.output(["num", "vec", "_score"]).match_tensor("vec",
-                                                                          [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
-                                                                          'float', 2).to_pl()
+    result, extra_result = table_instance.output(["num", "vec", "_score"]).match_tensor("vec",
+                                                                                        [[0.9, 0.0, 0.0, 0.0],
+                                                                                         [1.1, 0.0, 0.0, 0.0]],
+                                                                                        'float', 2).to_pl()
     print(result)
+    if extra_result is not None:
+        print(extra_result)
+
     infinity_instance.disconnect()
 
     print('test done')

@@ -1775,6 +1775,10 @@ Searches for data in a specified table. The search can range from a simple vecto
   - `"highlight"`: `string[]`
   - `"filter"`: `string`
   - `"fusion"`: `object`
+  - `"sort"` : `object[]`
+  - `"limit"` : `string`
+  - `"offset"` : `string`
+  - `"option"` : `object`
 
 ##### Request example
 
@@ -2006,7 +2010,17 @@ curl --request GET \
       - `"query_tensor"`: The tensor data to compare against. This should be provided as a list of lists of numerical values.
       - `"element_type"`: The element data type of the query tensor. Usually `"float"`.
 
+- `"sort"` : `object[]`
+  Defines how to sort the results.
 
+- `"limit"` : `string`
+  Indicates the limit row count.
+
+- `"offset"` : `string`
+  Indicates the offset position of the limit expression. You must use this parameter together with `limit`.
+
+- `"option"` : `object`
+  Indicates some search options.  This parameter must be used in conjunction with `limit`.
 
 #### Response
 
@@ -2029,11 +2043,14 @@ The response includes a JSON object like the following:
             "age": 16
         }
     ]
+    "total_hits_count": 3
 }
 ```
 
 - `"error_code"`: `integer`  
   `0`: The operation succeeds.
+- `"total_hits_count"`: `integer`, Optional
+  Available if you set a search option with `"total_hits_count": "true"`
 
 </TabItem>
   <TabItem value="s500">
