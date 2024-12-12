@@ -21,6 +21,7 @@ from infinity.index import IndexInfo
 from infinity.common import InfinityException, INSERT_DATA
 from infinity.errors import ErrorCode
 
+
 class ExplainType(Enum):
     Analyze = 1
     Ast = 2

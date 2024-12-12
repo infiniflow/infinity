@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
         return "%"
     else:
         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown binary expression: {binary_expr_key}")
+
 
 def deprecated_api(message):
     warnings.warn(message, DeprecationWarning, stacklevel=2)

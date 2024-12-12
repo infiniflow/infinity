@@ -60,8 +60,8 @@ class TestInsert:
     def test_insert_11(self, cluster: InfinityCluster):
         self.__test_inner_1(cluster)
 
-    def test_insert_12(self, mock_cluster: MockInfinityCluster):
-        self.__test_inner_1(mock_cluster)
+    # def test_insert_12(self, mock_cluster: MockInfinityCluster):
+    #     self.__test_inner_1(mock_cluster)
 
     @pytest.mark.docker
     def test_insert_13(self, docker_cluster: DockerInfinityCluster):

@@ -18,7 +18,7 @@ import numpy as np
 from infinity.common import VEC, SparseVector, InfinityException
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from collections import defaultdict
-from typing import Any, Tuple, Dict, List, Optional
+from typing import Any, Optional
 from datetime import date, time, datetime, timedelta
 
 import polars as pl
@@ -174,13 +174,15 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 
+
 def parse_date_bytes(column_vector):
     parsed_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
     date_list = []
     epoch = date(1970, 1, 1)
-    for value in parsed_list: 
-        date_list.append((epoch + timedelta(days = value)).strftime('%Y-%m-%d'))
+    for value in parsed_list:
+        date_list.append((epoch + timedelta(days=value)).strftime('%Y-%m-%d'))
     return date_list
+
 
 def parse_time_bytes(column_vector):
     parsed_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
@@ -192,14 +194,17 @@ def parse_time_bytes(column_vector):
         time_list.append(time(hour=hours, minute=minutes, second=seconds).strftime('%H:%M:%S'))
     return time_list
 
+
 def parse_datetime_bytes(column_vector):
     parsed_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
     datetime_list = []
     epoch = datetime(1970, 1, 1)
     for i in range(0, len(parsed_list), 2):
         if i + 1 < len(parsed_list):
-            datetime_list.append((epoch + timedelta(days = parsed_list[i], seconds = parsed_list[i + 1])).strftime('%Y-%m-%d %H:%M:%S'));
+            datetime_list.append(
+                (epoch + timedelta(days=parsed_list[i], seconds=parsed_list[i + 1])).strftime('%Y-%m-%d %H:%M:%S'));
     return datetime_list
+
 
 def parse_interval_bytes(column_vector):
     parsed_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
@@ -207,6 +212,7 @@ def parse_interval_bytes(column_vector):
     for value in parsed_list:
         interval_list.append(str(timedelta(seconds=value).total_seconds()) + 's')
     return interval_list
+
 
 def parse_bytes(bytes_data):
     results = []
@@ -298,6 +304,7 @@ def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[
     else:
         raise NotImplementedError(
             f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
+
 
 def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
     dimension = column_data_type.physical_type.sparse_type.dimension
@@ -491,6 +498,7 @@ def make_match_sparse_expr(vector_column_name: str, sparse_data: SparseVector | 
         for k, v in opt_params.items():
             match_sparse_options.append(InitParameter(param_name=k, param_value=v))
 
-    match_sparse_expr = MatchSparseExpr(column_expr=column_expr, query_sparse_expr=query_sparse_expr, metric_type=metric_type,
+    match_sparse_expr = MatchSparseExpr(column_expr=column_expr, query_sparse_expr=query_sparse_expr,
+                                        metric_type=metric_type,
                                         topn=topn, opt_params=match_sparse_options, filter_expr=filter_expr)
     return match_sparse_expr

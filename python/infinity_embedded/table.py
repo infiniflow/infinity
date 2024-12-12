@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional, Union, Any
 
-from infinity_embedded.index import IndexInfo
 from infinity_embedded.common import InfinityException, INSERT_DATA
 from infinity_embedded.embedded_infinity_ext import ExplainType as LocalExplainType
 from infinity_embedded.errors import ErrorCode
+
 
 class ExplainType(Enum):
     Analyze = 1
@@ -29,7 +27,6 @@ class ExplainType(Enum):
     Physical = 5
     Pipeline = 6
     Fragment = 7
-
 
     def to_local_ttype(self):
         if self is ExplainType.Ast:

@@ -47,5 +47,6 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
     else:
         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown binary expression: {binary_expr_key}")
 
+
 def deprecated_api(message):
     warnings.warn(message, DeprecationWarning, stacklevel=2)
