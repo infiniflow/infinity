@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ from infinity_embedded.common import InfinityException
 
 from infinity_embedded.embedded_infinity_ext import IndexType as LocalIndexType, WrapIndexInfo
 from infinity_embedded.embedded_infinity_ext import InitParameter as LocalInitParameter
-from infinity_embedded.embedded_infinity_ext import WrapIndexInfo as LocalIndexInfo
 from infinity_embedded.errors import ErrorCode
 
 

@@ -26,7 +26,6 @@ from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
 from infinity.common import InfinityException, SparseVector
 from infinity.errors import ErrorCode
-from datetime import date, time, datetime, timedelta
 
 
 def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:

@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,12 +20,14 @@ import os
 # import pkg_resources
 # __version__ = pkg_resources.get_distribution("infinity_sdk").version
 
-from infinity_embedded.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH, InfinityException, LOCAL_INFINITY_CONFIG_PATH
+from infinity_embedded.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH, InfinityException, \
+    LOCAL_INFINITY_CONFIG_PATH
 from infinity_embedded.infinity import InfinityConnection
 from infinity_embedded.local_infinity.infinity import LocalInfinityConnection
 from infinity_embedded.errors import ErrorCode
 
-def connect(uri = LOCAL_INFINITY_PATH, config_path = LOCAL_INFINITY_CONFIG_PATH) -> InfinityConnection:
+
+def connect(uri=LOCAL_INFINITY_PATH, config_path=LOCAL_INFINITY_CONFIG_PATH) -> InfinityConnection:
     if isinstance(uri, str) and len(uri) != 0:
         return LocalInfinityConnection(uri, config_path)
     else:
