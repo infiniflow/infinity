@@ -1214,7 +1214,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     segment_index_entry->ft_column_len_sum_ = index_entry_json["ft_column_len_sum"];
     segment_index_entry->ft_column_len_cnt_ = index_entry_json["ft_column_len_cnt"];
 
-    if (index_entry_json["deprecate_ts"].is_null() || index_entry_json["deprecate_ts"] == UNCOMMIT_TS) {
+    if (!index_entry_json.contains("deprecate_ts") || index_entry_json["deprecate_ts"] == UNCOMMIT_TS) {
         segment_index_entry->deleted_ = false;
     } else {
         segment_index_entry->deleted_ = true;
