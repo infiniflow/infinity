@@ -458,17 +458,17 @@ void PeerClient::SyncLogs(SyncLogTask *peer_task) {
             LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
         }
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
-        peer_task->error_message_ = thrift_exception.what();
+        peer_task->error_message_ = fmt::format("Sync log to node, transport error: {}, error: {}", peer_task->node_name_, thrift_exception.what());
         peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
-        LOG_ERROR(fmt::format("Sync log to node, transport error: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
+        LOG_ERROR(peer_task->error_message_);
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
         if (!status.ok()) {
             LOG_ERROR(status.message());
         }
     } catch (apache::thrift::TApplicationException &application_exception) {
-        peer_task->error_message_ = application_exception.what();
+        peer_task->error_message_ = fmt::format("Sync log to node, application: {}, error: {}", peer_task->node_name_, application_exception.what());
         peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
-        LOG_ERROR(fmt::format("Sync log to node, application: {}, error: {}", peer_task->node_name_, peer_task->error_message_));
+        LOG_ERROR(peer_task->error_message_);
         Status status = InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(peer_task->node_name_, UpdateNodeOp::kLostConnection);
         if (!status.ok()) {
             LOG_ERROR(status.message());
@@ -500,18 +500,20 @@ void PeerClient::ChangeRole(ChangeRoleTask *change_role_task) {
             LOG_ERROR(fmt::format("Sync log to node: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
         }
     } catch (apache::thrift::transport::TTransportException &thrift_exception) {
-        change_role_task->error_message_ = thrift_exception.what();
+        change_role_task->error_message_ =
+            fmt::format("Sync log to node, transport error: {}, error: {}", change_role_task->node_name_, thrift_exception.what());
         change_role_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
-        LOG_ERROR(fmt::format("Sync log to node, transport error: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
+        LOG_ERROR(change_role_task->error_message_);
         Status status =
             InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(change_role_task->node_name_, UpdateNodeOp::kLostConnection);
         if (!status.ok()) {
             LOG_ERROR(status.message());
         }
     } catch (apache::thrift::TApplicationException &application_exception) {
-        change_role_task->error_message_ = application_exception.what();
+        change_role_task->error_message_ =
+            fmt::format("Sync log to node, application: {}, error: {}", change_role_task->node_name_, application_exception.what());
         change_role_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectServer);
-        LOG_ERROR(fmt::format("Sync log to node, application: {}, error: {}", change_role_task->node_name_, change_role_task->error_message_));
+        LOG_ERROR(change_role_task->error_message_);
         Status status =
             InfinityContext::instance().cluster_manager()->UpdateNodeByLeader(change_role_task->node_name_, UpdateNodeOp::kLostConnection);
         if (!status.ok()) {
