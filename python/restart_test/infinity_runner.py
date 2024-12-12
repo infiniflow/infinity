@@ -87,6 +87,7 @@ class InfinityRunner:
 
         if kill:
             os.system(f"kill -9 {' '.join(map(str, pids))}")
+            time.sleep(1)
             while any(psutil.pid_exists(pid) for pid in pids):
                 time.sleep(1)
             self.process = None
