@@ -100,6 +100,7 @@ public:
     void AppendOutlineBuffer(BufferObj *buffer) {
         std::unique_lock lock(mutex_);
         outline_buffers_.emplace_back(buffer);
+        buffer->AddObjRc();
     }
 
     BufferObj *GetOutlineBuffer(SizeT idx) const {

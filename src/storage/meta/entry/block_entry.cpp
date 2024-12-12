@@ -75,11 +75,12 @@ BlockEntry::BlockEntry(const BlockEntry &other)
     checkpoint_ts_ = other.checkpoint_ts_;
     using_txn_id_ = other.using_txn_id_;
     checkpoint_row_count_ = other.checkpoint_row_count_;
+
+    version_buffer_object_->AddObjRc();
 }
 
 UniquePtr<BlockEntry> BlockEntry::Clone(SegmentEntry *segment_entry) const {
     auto ret = UniquePtr<BlockEntry>(new BlockEntry(*this));
-    version_buffer_object_->AddObjRc();
     ret->segment_entry_ = segment_entry;
     for (auto &column : columns_) {
         ret->columns_.emplace_back(column->Clone(ret.get()));
@@ -112,6 +113,7 @@ BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, T
                                                              block_entry->row_capacity_,
                                                              buffer_mgr->persistence_manager());
     block_entry->version_buffer_object_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
+    block_entry->version_buffer_object_->AddObjRc();
     return block_entry;
 }
 
@@ -147,6 +149,7 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
                                                              row_capacity,
                                                              buffer_mgr->persistence_manager());
     block_entry->version_buffer_object_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+    block_entry->version_buffer_object_->AddObjRc();
 
     block_entry->checkpoint_ts_ = check_point_ts;
     block_entry->checkpoint_row_count_ = checkpoint_row_count;

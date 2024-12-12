@@ -116,6 +116,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
             auto file_name = MakeShared<String>(fmt::format("file_{}", i));
             auto file_worker = MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_size, buffer_mgr.persistence_manager());
             auto *buffer_obj = buffer_mgr.AllocateBufferObject(std::move(file_worker));
+            buffer_obj->AddObjRc();
             buffer_objs.push_back(buffer_obj);
             {
                 auto buffer_handle = buffer_obj->Load();
@@ -374,6 +375,7 @@ public:
             file_info.file_size_ = file_size;
             auto file_worker = MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_size, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
+            file_info.buffer_obj_->AddObjRc();
         } else {
             auto file_worker = MakeUnique<DataFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_info.file_size_, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->GetBufferObject(std::move(file_worker));
@@ -449,6 +451,7 @@ public:
         if (alloc_new) {
             auto file_worker = MakeUnique<VarFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, 0, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->AllocateBufferObject(std::move(file_worker));
+            file_info.buffer_obj_->AddObjRc();
         } else {
             auto file_worker = MakeUnique<VarFileWorker>(data_dir_, temp_dir_, MakeShared<String>(""), file_name, file_info.file_size_, nullptr);
             file_info.buffer_obj_ = buffer_mgr_->GetBufferObject(std::move(file_worker));
