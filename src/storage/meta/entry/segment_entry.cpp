@@ -543,7 +543,7 @@ SegmentStatus SegmentEntry::GetSaveStatus(TxnTimeStamp ts) const {
             return SegmentStatus::kSealed;
         }
         case SegmentStatus::kDeprecated: {
-            return ts > deprecate_ts_ ? SegmentStatus::kDeprecated : SegmentStatus::kSealed;
+            return ts >= deprecate_ts_ ? SegmentStatus::kDeprecated : SegmentStatus::kSealed;
         }
     }
 };
