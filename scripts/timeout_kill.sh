@@ -15,6 +15,7 @@ fi
 # kill all infinity process
 for pid in "${@:2}"; do
     # Send SIGTERM
+    echo "Terminate pid: $pid"
     kill -15 $pid
 done
 
@@ -27,6 +28,7 @@ while true; do
     # Check if all processes are still running
     all_dead=true
     for pid in "${@:2}"; do
+        echo "Check pid: $pid status"
         if ps -p $pid > /dev/null; then
             all_dead=false
             break
@@ -43,7 +45,10 @@ while true; do
     if [ $current_time -ge $end_time ]; then
         echo "Some processes did not terminate in time. Sending SIGKILL."
         for pid in "${@:2}"; do
-            kill -9 $pid
+            if ps -p $pid > /dev/null; then
+                echo "Pid: $pid didn't terminate"
+                kill -9 $pid
+            fi
         done
         exit 2  # Return a different value
     fi
