@@ -29,18 +29,24 @@ import infinity_exception;
 namespace infinity {
 
 BlockMaxWandIterator::~BlockMaxWandIterator() {
-    String msg = "BlockMaxWandIterator pivot_history: ";
-    SizeT num_history = pivot_history_.size();
-    for (SizeT i=0; i<num_history; i++) {
-        auto &p = pivot_history_[i];
-        u32 pivot = std::get<0>(p);
-        u64 row_id = std::get<1>(p);
-        float score = std::get<2>(p);
-        //oss << " (" << pivot << ", " << row_id << ", " << score << ")";
-        msg += fmt::format(" ({}, {}, {:6f})", pivot, row_id, score);
+    if (SHOULD_LOG_TRACE()) {
+        String msg = "BlockMaxWandIterator pivot_history: ";
+        SizeT num_history = pivot_history_.size();
+        for (SizeT i = 0; i < num_history; i++) {
+            auto &p = pivot_history_[i];
+            u32 pivot = std::get<0>(p);
+            u64 row_id = std::get<1>(p);
+            float score = std::get<2>(p);
+            //oss << " (" << pivot << ", " << row_id << ", " << score << ")";
+            msg += fmt::format(" ({}, {}, {:6f})", pivot, row_id, score);
+        }
+        msg += fmt::format("\nnext_sort_cnt_ {}, next_it0_docid_mismatch_cnt_ {}, next_sum_score_low_cnt_ {}, next_sum_score_bm_low_cnt_ {}",
+                           next_sort_cnt_,
+                           next_it0_docid_mismatch_cnt_,
+                           next_sum_score_low_cnt_,
+                           next_sum_score_bm_low_cnt_);
+        LOG_TRACE(msg);
     }
-    msg += fmt::format("\nnext_sort_cnt_ {}, next_it0_docid_mismatch_cnt_ {}, next_sum_score_low_cnt_ {}, next_sum_score_bm_low_cnt_ {}", next_sort_cnt_, next_it0_docid_mismatch_cnt_, next_sum_score_low_cnt_, next_sum_score_bm_low_cnt_);
-    LOG_TRACE(msg);
 }
 
 BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iterators)
