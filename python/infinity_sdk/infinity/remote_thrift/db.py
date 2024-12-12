@@ -28,6 +28,7 @@ from infinity.remote_thrift.utils import (
 from infinity.common import ConflictType
 from infinity.common import InfinityException
 
+
 class RemoteDatabase(Database, ABC):
     def __init__(self, conn, name: str):
         self._conn = conn
