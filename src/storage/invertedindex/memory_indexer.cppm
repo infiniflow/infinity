@@ -183,6 +183,6 @@ private:
     UniquePtr<BufWriter> buf_writer_;
 
     SegmentIndexEntry *segment_index_entry_{nullptr};
-    SizeT mem_used_{0};
+    Atomic<SizeT> mem_used_{0};
 };
 } // namespace infinity
