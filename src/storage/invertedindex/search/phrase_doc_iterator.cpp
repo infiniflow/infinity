@@ -2,6 +2,7 @@ module;
 
 #include <cassert>
 #include <iostream>
+#include <vector>
 
 module phrase_doc_iterator;
 
@@ -31,6 +32,8 @@ PhraseDocIterator::PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters,
         estimate_doc_freq_ = std::min(estimate_doc_freq_, pos_iters_[i]->GetDocFreq());
     }
     estimate_iterate_cost_ = {1, estimate_doc_freq_};
+    block_max_bm25_score_cache_part_info_end_ids_.resize(pos_iters_.size(), INVALID_ROWID);
+    block_max_bm25_score_cache_part_info_vals_.resize(pos_iters_.size());
 }
 
 void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader) {
@@ -44,6 +47,9 @@ void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&col
     float smooth_idf = std::log1p((total_df - estimate_doc_freq_ + 0.5F) / (estimate_doc_freq_ + 0.5F));
     bm25_common_score_ = weight_ * smooth_idf * (k1 + 1.0F);
     bm25_score_upper_bound_ = bm25_common_score_ / (1.0F + k1 * b / avg_column_len);
+    f1 = k1 * (1.0F - b);
+    f2 = k1 * b / avg_column_len;
+    f3 = f2 * std::numeric_limits<u16>::max();
     if (SHOULD_LOG_TRACE()) {
         OStringStream oss;
         oss << "TermDocIterator: ";
@@ -80,10 +86,71 @@ bool PhraseDocIterator::Next(const RowID doc_id) {
             bool found = GetPhraseMatchData();
             if (found && (threshold_ <= 0.0f || BM25Score() > threshold_)) {
                 doc_id_ = target_doc_id;
+                UpdateBlockRangeDocID();
                 return true;
             }
             ++target_doc_id;
         }
+    }
+}
+
+void PhraseDocIterator::UpdateBlockRangeDocID() {
+    RowID min_doc_id = 0;
+    RowID max_doc_id = INVALID_ROWID;
+    for (const auto &it : pos_iters_) {
+        min_doc_id = std::max(min_doc_id, it->BlockLowestPossibleDocID());
+        max_doc_id = std::min(max_doc_id, it->BlockLastDocID());
+    }
+    block_min_possible_doc_id_ = min_doc_id;
+    block_last_doc_id_ = max_doc_id;
+}
+
+float PhraseDocIterator::BlockMaxBM25Score() {
+    if (const auto last_doc_id = BlockLastDocID(); last_doc_id != block_max_bm25_score_cache_end_id_) {
+        block_max_bm25_score_cache_end_id_ = last_doc_id;
+        // bm25_common_score_ / (1.0F + k1 * ((1.0F - b) / block_max_tf + b / block_max_percentage / avg_column_len));
+        // block_max_bm25_score_cache_ = bm25_common_score_ / (1.0F + f1 / block_max_tf + f3 / block_max_percentage_u16);
+        float div_add_min = std::numeric_limits<float>::max();
+        for (SizeT i = 0; i < pos_iters_.size(); ++i) {
+            const auto *iter = pos_iters_[i].get();
+            float current_div_add_min = {};
+            if (const auto iter_block_last_doc_id = iter->BlockLastDocID();
+                iter_block_last_doc_id == block_max_bm25_score_cache_part_info_end_ids_[i]) {
+                current_div_add_min = block_max_bm25_score_cache_part_info_vals_[i];
+            } else {
+                block_max_bm25_score_cache_part_info_end_ids_[i] = iter_block_last_doc_id;
+                const auto [block_max_tf, block_max_percentage_u16] = iter->GetBlockMaxInfo();
+                current_div_add_min = f1 / block_max_tf + f3 / block_max_percentage_u16;
+                block_max_bm25_score_cache_part_info_vals_[i] = current_div_add_min;
+            }
+            div_add_min = std::min(div_add_min, current_div_add_min);
+        }
+        block_max_bm25_score_cache_ = bm25_common_score_ / (1.0F + div_add_min);
+    }
+    return block_max_bm25_score_cache_;
+}
+
+// Move block cursor to ensure its last_doc_id is no less than given doc_id.
+// Returns false and update doc_id_ to INVALID_ROWID if the iterator is exhausted.
+// Note that this routine decode skip_list only, and doesn't update doc_id_ when returns true.
+// Caller may invoke BlockMaxBM25Score() after this routine.
+bool PhraseDocIterator::NextShallow(RowID doc_id) {
+    if (threshold_ > BM25ScoreUpperBound()) [[unlikely]] {
+        doc_id_ = INVALID_ROWID;
+        return false;
+    }
+    while (true) {
+        for (const auto &iter : pos_iters_) {
+            if (!iter->SkipTo(doc_id)) {
+                doc_id_ = INVALID_ROWID;
+                return false;
+            }
+        }
+        UpdateBlockRangeDocID();
+        if (threshold_ <= 0.0f || BlockMaxBM25Score() > threshold_) {
+            return true;
+        }
+        doc_id = BlockLastDocID() + 1;
     }
 }
 
@@ -112,6 +179,7 @@ void PhraseDocIterator::PrintTree(std::ostream &os, const String &prefix, bool i
     }
     os << ")";
     os << " (doc_freq: " << GetDocFreq() << ")";
+    os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";
     os << '\n';
 }
 

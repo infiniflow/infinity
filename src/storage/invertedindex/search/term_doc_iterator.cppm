@@ -27,10 +27,11 @@ import doc_iterator;
 import column_length_io;
 import third_party;
 import parse_fulltext_options;
+import blockmax_leaf_iterator;
 
 namespace infinity {
 
-export class TermDocIterator final : public DocIterator {
+export class TermDocIterator final : public BlockMaxLeafIterator {
 public:
     TermDocIterator(UniquePtr<PostingIterator> &&iter, u64 column_id, float weight, FulltextSimilarity ft_similarity);
 
@@ -48,15 +49,15 @@ public:
 
     void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader);
 
-    RowID BlockMinPossibleDocID() const { return iter_->BlockLowestPossibleDocID(); }
-    RowID BlockLastDocID() const { return iter_->BlockLastDocID(); }
-    float BlockMaxBM25Score();
+    RowID BlockMinPossibleDocID() const override { return iter_->BlockLowestPossibleDocID(); }
+    RowID BlockLastDocID() const override { return iter_->BlockLastDocID(); }
+    float BlockMaxBM25Score() override;
 
     // Move block cursor to ensure its last_doc_id is no less than given doc_id.
     // Returns false and update doc_id_ to INVALID_ROWID if the iterator is exhausted.
     // Note that this routine decode skip_list only, and doesn't update doc_id_ when returns true.
     // Caller may invoke BlockMaxBM25Score() after this routine.
-    bool NextShallow(RowID doc_id);
+    bool NextShallow(RowID doc_id) override;
 
     // Overriden methods
     DocIteratorType GetType() const override { return DocIteratorType::kTermDocIterator; }
@@ -65,7 +66,7 @@ public:
 
     bool Next(RowID doc_id) override;
 
-    float BM25Score();
+    float BM25Score() override;
 
     float Score() override {
         switch (ft_similarity_) {

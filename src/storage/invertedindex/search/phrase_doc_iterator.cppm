@@ -10,10 +10,11 @@ import posting_iterator;
 import index_defines;
 import column_length_io;
 import parse_fulltext_options;
+import blockmax_leaf_iterator;
 
 namespace infinity {
 
-export class PhraseDocIterator final : public DocIterator {
+export class PhraseDocIterator final : public BlockMaxLeafIterator {
 public:
     PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop, FulltextSimilarity ft_similarity);
 
@@ -32,7 +33,21 @@ public:
 
     bool Next(RowID doc_id) override;
 
-    float BM25Score();
+    RowID BlockMinPossibleDocID() const override { return block_min_possible_doc_id_; }
+
+    RowID BlockLastDocID() const override { return block_last_doc_id_; }
+
+    void UpdateBlockRangeDocID();
+
+    float BlockMaxBM25Score() override;
+
+    // Move block cursor to ensure its last_doc_id is no less than given doc_id.
+    // Returns false and update doc_id_ to INVALID_ROWID if the iterator is exhausted.
+    // Note that this routine decode skip_list only, and doesn't update doc_id_ when returns true.
+    // Caller may invoke BlockMaxBM25Score() after this routine.
+    bool NextShallow(RowID doc_id) override;
+
+    float BM25Score() override;
 
     float Score() override {
         switch (ft_similarity_) {
@@ -86,6 +101,10 @@ private:
     UniquePtr<FullTextColumnLengthReader> column_length_reader_ = nullptr;
     float block_max_bm25_score_cache_ = 0.0f;
     RowID block_max_bm25_score_cache_end_id_ = INVALID_ROWID;
+    Vector<RowID> block_max_bm25_score_cache_part_info_end_ids_;
+    Vector<float> block_max_bm25_score_cache_part_info_vals_;
+    RowID block_min_possible_doc_id_ = INVALID_ROWID;
+    RowID block_last_doc_id_ = INVALID_ROWID;
 
     float tf_ = 0.0f;          // current doc_id_'s tf
     u32 estimate_doc_freq_{0}; // estimated at the beginning
