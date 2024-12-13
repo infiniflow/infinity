@@ -20,7 +20,7 @@ module blockmax_wand_iterator;
 import stl;
 import third_party;
 import index_defines;
-import term_doc_iterator;
+import blockmax_leaf_iterator;
 import multi_doc_iterator;
 import internal_types;
 import logger;
@@ -55,9 +55,9 @@ BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iter
     estimate_iterate_cost_ = {};
     SizeT num_iterators = children_.size();
     for (SizeT i = 0; i < num_iterators; i++){
-        TermDocIterator *tdi = dynamic_cast<TermDocIterator *>(children_[i].get());
+        BlockMaxLeafIterator *tdi = dynamic_cast<BlockMaxLeafIterator *>(children_[i].get());
         if (tdi == nullptr) {
-            UnrecoverableError("BMW only supports TermDocIterator");
+            UnrecoverableError("BMW only supports BlockMaxLeafIterator");
         }
         bm25_score_upper_bound_ += tdi->BM25ScoreUpperBound();
         estimate_iterate_cost_ += tdi->GetEstimateIterateCost();
