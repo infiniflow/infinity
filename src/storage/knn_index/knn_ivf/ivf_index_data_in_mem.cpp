@@ -112,7 +112,7 @@ public:
 
     ~IVFIndexInMemT() {
         if (own_ivf_index_storage_) {
-            BaseMemIndex::DecreaseMemoryUsage(MemoryUsed());
+            DecreaseMemoryUsageBase(MemoryUsed());
         }
     }
 

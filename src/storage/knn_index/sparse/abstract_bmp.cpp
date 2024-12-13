@@ -101,7 +101,7 @@ BMPIndexInMem::~BMPIndexInMem() {
                 if (index != nullptr) {
                     delete index;
                 }
-                DecreaseMemoryUsage(mem_used);
+                DecreaseMemoryUsageBase(mem_used);
             }
         },
         bmp_);
@@ -134,7 +134,7 @@ void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_e
                 MemIndexInserterIter<SparseRefT> iter(block_offset, block_column_entry, buffer_mgr, row_offset, row_count);
                 index->AddDocs(std::move(iter));
                 SizeT mem_after = index->MemoryUsage();
-                AddMemUsed(mem_after - mem_before);
+                IncreaseMemoryUsageBase(mem_after - mem_before);
                 LOG_INFO(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
             }
         },
