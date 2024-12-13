@@ -566,7 +566,7 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
             }
         }
     };
-    auto term_num_threshold = [](const u32 topn) -> u32 {
+    [[maybe_unused]] auto term_num_threshold = [](const u32 topn) -> u32 {
         if (topn < 5u) {
             return std::numeric_limits<u32>::max();
         }
@@ -597,6 +597,16 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
         auto choose_algo = EarlyTermAlgo::kNaive;
         switch (params.early_term_algo) {
             case EarlyTermAlgo::kAuto: {
+                if (params.topn) {
+                    // always prefer BMW
+                    choose_algo = EarlyTermAlgo::kBMW;
+                } else if (term_children_need_batch()) {
+                    // topn == 0, case of filter
+                    choose_algo = EarlyTermAlgo::kBatch;
+                } else {
+                    choose_algo = EarlyTermAlgo::kNaive;
+                }
+                /* TODO: now always use BMW
                 if ((params.topn == 0u || sub_doc_iters.size() > term_num_threshold(params.topn)) && term_children_need_batch()) {
                     choose_algo = EarlyTermAlgo::kBatch;
                 } else if (params.topn == 0u) {
@@ -604,6 +614,7 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
                 } else {
                     choose_algo = EarlyTermAlgo::kBMW;
                 }
+                */
                 break;
             }
             case EarlyTermAlgo::kBMW:
