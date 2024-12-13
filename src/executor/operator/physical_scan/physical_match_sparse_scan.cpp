@@ -533,12 +533,17 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             const auto [chunk_index_entries, memory_index_entry] = segment_index_entry->GetBMPIndexSnapshot();
             for (SizeT query_id = 0; query_id < query_n; ++query_id) {
                 for (auto chunk_index_entry : chunk_index_entries) {
+                    if (!chunk_index_entry->CheckVisible(txn)) {
+                        continue;
+                    }
                     BufferHandle buffer_handle = chunk_index_entry->GetIndex();
                     const auto *bmp_index = reinterpret_cast<const AbstractBMP *>(buffer_handle.GetData());
                     bmp_search(*bmp_index, query_id, false, filter);
+                    LOG_TRACE(fmt::format("Search Match Sparse in chunk {}", chunk_index_entry->encode()));
                 }
                 if (memory_index_entry.get() != nullptr) {
                     bmp_search(memory_index_entry->get(), query_id, true, filter);
+                    LOG_TRACE(fmt::format("Search Match Sparse in mem index of {}", segment_index_entry->encode()));
                 }
             }
         };
