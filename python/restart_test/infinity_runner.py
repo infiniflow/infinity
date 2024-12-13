@@ -75,10 +75,9 @@ class InfinityRunner:
         self.process = subprocess.Popen(cmd, shell=True, env=my_env)
         self.i += 1
 
-    def uninit(self, kill: bool = False):
+    def uninit(self, kill: bool = False, timeout: int = 60):
         if self.process is None:
             return
-        timeout = 60
         pids = []
         for child in psutil.Process(self.process.pid).children(recursive=True):
             pids.append(child.pid)
@@ -131,7 +130,13 @@ class InfinityRunner:
 
 
 def infinity_runner_decorator_factory(
-    config_path: str | None, uri: str, infinity_runner: InfinityRunner, shutdown_out: bool = False, kill: bool = False
+    config_path: str | None,
+    uri: str,
+    infinity_runner: InfinityRunner,
+    *,
+    shutdown_out: bool = False,
+    kill: bool = False,
+    terminate_timeout: int = 60,
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
@@ -145,7 +150,7 @@ def infinity_runner_decorator_factory(
                 except Exception:
                     if not shutdown_out:
                         raise
-                infinity_runner.uninit(kill)
+                infinity_runner.uninit(kill, terminate_timeout)
 
         return wrapper
 
