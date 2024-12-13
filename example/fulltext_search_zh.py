@@ -102,7 +102,7 @@ try:
         r"羽毛球",  # single term
         r'"羽毛球锦标赛"',  # phrase: adjacent multiple terms
         r"2018年世界羽毛球锦标赛在哪个城市举办？",  # OR multiple terms
-        r"high\-tech",  # Escape reserved character '-'
+        r"high\:tech",  # Escape reserved character ':'
         r'"high tech"',  # phrase: adjacent multiple terms
         r'"high-tech"',  # phrase: adjacent multiple terms
         r"graphics card",  # OR multiple terms
