@@ -163,9 +163,9 @@ jobs:
         env:
           old_value: ${{ steps.start_tests_debug.outputs.old_mmmap_rnd_bits }}
         run: |
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
           if [ $? -ne 0 ]; then
               echo "Failed to kill infinity debug version"
               exit 1
@@ -216,9 +216,9 @@ jobs:
         # && !contains(github.event.pull_request.labels.*.name, 'invalid')
         id: stop_py_tests
         run: |
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity release version"
             exit 1
