@@ -137,6 +137,7 @@ def infinity_runner_decorator_factory(
     shutdown_out: bool = False,
     kill: bool = False,
     terminate_timeout: int = 60,
+    check_kill: bool = True
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
@@ -150,7 +151,11 @@ def infinity_runner_decorator_factory(
                 except Exception:
                     if not shutdown_out:
                         raise
-                infinity_runner.uninit(kill, terminate_timeout)
+                try:
+                    infinity_runner.uninit(kill, terminate_timeout)
+                except Exception:
+                    if check_kill:
+                        raise
 
         return wrapper
 
