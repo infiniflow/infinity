@@ -75,15 +75,23 @@ class InfinityRunner:
         self.process = subprocess.Popen(cmd, shell=True, env=my_env)
         self.i += 1
 
-    def uninit(self):
+    def uninit(self, kill: bool = False, timeout: int = 60):
         if self.process is None:
             return
-        timeout = 60
         pids = []
         for child in psutil.Process(self.process.pid).children(recursive=True):
             pids.append(child.pid)
         if len(pids) == 0:
             raise Exception("Cannot find infinity process.")
+
+        if kill:
+            os.system(f"kill -9 {' '.join(map(str, pids))}")
+            time.sleep(1)
+            while any(psutil.pid_exists(pid) for pid in pids):
+                time.sleep(1)
+            self.process = None
+            return
+
         ret = os.system(f"bash {self.script_path} {timeout} {' '.join(map(str, pids))}")
         if ret != 0:
             raise Exception("An error occurred.")
@@ -122,7 +130,14 @@ class InfinityRunner:
 
 
 def infinity_runner_decorator_factory(
-    config_path: str | None, uri: str, infinity_runner: InfinityRunner, shutdown_out: bool = False
+    config_path: str | None,
+    uri: str,
+    infinity_runner: InfinityRunner,
+    *,
+    shutdown_out: bool = False,
+    kill: bool = False,
+    terminate_timeout: int = 60,
+    check_kill: bool = True
 ):
     def decorator(f):
         def wrapper(*args, **kwargs):
@@ -136,7 +151,11 @@ def infinity_runner_decorator_factory(
                 except Exception:
                     if not shutdown_out:
                         raise
-                infinity_runner.uninit()
+                try:
+                    infinity_runner.uninit(kill, terminate_timeout)
+                except Exception:
+                    if check_kill:
+                        raise
 
         return wrapper
 

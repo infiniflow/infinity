@@ -46,7 +46,7 @@ if __name__ == "__main__":
                 "-v",
                 test_case,
                 f"--infinity_path={infinity_path}",
-                # "-x",
+                "-x",
                 "-s",
                 "-m",
                 "not slow",

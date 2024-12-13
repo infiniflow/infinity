@@ -38,7 +38,7 @@ import global_resource_usage;
 namespace infinity {
 
 TxnManager::TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts)
-    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), current_ts_(start_ts), is_running_(false) {
+    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), current_ts_(start_ts), max_committed_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("TxnManager");
 #endif
@@ -131,7 +131,7 @@ TxnTimeStamp TxnManager::GetWriteCommitTS(Txn *txn) {
     current_ts_ += 2;
     TxnTimeStamp commit_ts = current_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
-    committing_txns_.emplace(txn);
+    committing_txns_.emplace(commit_ts, txn);
     txn->SetTxnWrite();
     return commit_ts;
 }
@@ -143,8 +143,7 @@ bool TxnManager::CheckTxnConflict(Txn *txn) {
     {
         std::lock_guard guard(locker_);
         // LOG_INFO(fmt::format("Txn {}(commit_ts:{}) check conflict", txn->TxnID(), txn->CommitTS()));
-        for (Txn *committing_txn : committing_txns_) {
-            TxnTimeStamp committing_ts = committing_txn->CommitTS();
+        for (auto &[committing_ts, committing_txn] : committing_txns_) {
             if (commit_ts > committing_ts) {
                 candidate_txns.push_back(committing_txn->shared_from_this());
                 min_checking_ts = std::min(min_checking_ts, committing_txn->BeginTS());
@@ -345,8 +344,9 @@ void TxnManager::CleanupTxn(Txn *txn) {
             TransactionID txn_id = txn->TxnID();
             {
                 // cleanup the txn from committing_txn and txm_map
+                auto commit_ts = txn->CommitTS();
                 std::lock_guard guard(locker_);
-                SizeT remove_n = committing_txns_.erase(txn);
+                SizeT remove_n = committing_txns_.erase(commit_ts);
                 if (remove_n == 0) {
                     UnrecoverableError("Txn not found in committing_txns_");
                 }
@@ -354,6 +354,10 @@ void TxnManager::CleanupTxn(Txn *txn) {
                 if (remove_n == 0) {
                     String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
                     UnrecoverableError(error_message);
+                }
+
+                if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
+                    max_committed_ts_ = commit_ts;
                 }
             }
             break;
