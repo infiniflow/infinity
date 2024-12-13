@@ -769,6 +769,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
                                                         logical_limit->total_hits_count_flag_);
         return MakeUnique<PhysicalMergeLimit>(query_context_ptr_->GetNextNodeID(),
                                               std::move(child_limit_op),
+                                              logical_limit->base_table_ref_,
                                               logical_limit->limit_expression_,
                                               nullptr,
                                               MakeShared<Vector<LoadMeta>>());

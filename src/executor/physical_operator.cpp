@@ -52,10 +52,11 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
 
     auto load_metas = *load_metas_.get();
     // FIXME: After columnar reading is supported, use a different table_ref for each LoadMetas
-    auto table_ref = table_refs[load_metas[0].binding_.table_idx];
-    if (table_ref.get() == nullptr) {
+    const auto table_refs_it = table_refs.find(load_metas[0].binding_.table_idx);
+    if (table_refs_it == table_refs.end()) {
         UnrecoverableError("TableRef not found");
     }
+    const auto *table_ref = table_refs_it->second.get();
 
     OutputToDataBlockHelper output_to_data_block_helper;
     for (SizeT i = 0; i < operator_state->prev_op_state_->data_block_array_.size(); ++i) {

@@ -143,7 +143,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                 root = top;
             }
         } else if (limit_expression_.get() != nullptr) {
-            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), limit_expression_, offset_expression_, total_hits_count_flag_);
+            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), std::static_pointer_cast<BaseTableRef>(table_ref_ptr_), limit_expression_, offset_expression_, total_hits_count_flag_);
             limit->set_left_node(root);
             root = limit;
         }
@@ -389,7 +389,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         }
 
         if (limit_expression_.get() != nullptr) {
-            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), limit_expression_, offset_expression_, total_hits_count_flag_);
+            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), base_table_ref, limit_expression_, offset_expression_, total_hits_count_flag_);
             limit->set_left_node(root);
             root = limit;
         }
