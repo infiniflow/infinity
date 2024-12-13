@@ -68,7 +68,7 @@ template class BMPIvt<f64, BMPCompressType::kCompressed>;
 template class BMPIvt<f64, BMPCompressType::kRaw>;
 
 template <typename DataType, typename IdxType>
-SizeT TailFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc, SizeT &mem_usage) {
+SizeT TailFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
     Vector<IdxType> indices;
     Vector<DataType> data;
     indices.reserve(doc.nnz_);
@@ -78,7 +78,6 @@ SizeT TailFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &
         data.push_back(doc.data_[i]);
     }
     tail_terms_.emplace_back(std::move(indices), std::move(data));
-    mem_usage += doc.nnz_ * (sizeof(IdxType) + sizeof(DataType));
     return tail_terms_.size();
 }
 
@@ -149,7 +148,7 @@ template class TailFwd<f64, i8>;
 
 template <typename DataType, typename IdxType>
 Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc, SizeT &mem_usage) {
-    SizeT tail_size = tail_fwd_.AddDoc(doc, mem_usage);
+    SizeT tail_size = tail_fwd_.AddDoc(doc);
     if (tail_size < block_size_) {
         return None;
     }

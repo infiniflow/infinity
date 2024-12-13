@@ -61,7 +61,7 @@ void BlockData<DataType, BMPCompressType::kRaw>::Calculate(Vector<DataType> &upp
 template <typename DataType>
 void BlockData<DataType, BMPCompressType::kRaw>::AddBlock(BMPBlockID block_id, DataType max_score, SizeT &mem_usage) {
     if (block_id >= (BMPBlockID)max_scores_.size()) {
-        mem_usage += sizeof(BMPBlockID);
+        mem_usage += sizeof(BMPBlockID) * (block_id + 1 - max_scores_.size());
         max_scores_.resize(block_id + 1, 0.0);
     }
     max_scores_[block_id] = max_score;

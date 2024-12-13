@@ -62,7 +62,7 @@ private:
 public:
     TailFwd(SizeT block_size) { tail_terms_.reserve(block_size); }
 
-    SizeT AddDoc(const SparseVecRef<DataType, IdxType> &doc, SizeT &mem_usage);
+    SizeT AddDoc(const SparseVecRef<DataType, IdxType> &doc);
 
     const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &GetTailTerms() const { return tail_terms_; }
 
