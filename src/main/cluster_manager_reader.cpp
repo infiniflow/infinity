@@ -125,7 +125,7 @@ Status ClusterManager::RegisterToLeaderNoLock() {
     Status status = Status::OK();
     if (register_peer_task->error_code_ != 0) {
         status.code_ = static_cast<ErrorCode>(register_peer_task->error_code_);
-        status.msg_ = MakeUnique<String>(register_peer_task->error_message_);
+        status.msg_ = MakeUnique<String>(fmt::format("From leader: {}", register_peer_task->error_message_));
         return status;
     }
     auto now = std::chrono::system_clock::now();
