@@ -20,7 +20,6 @@ export module fst:node;
 import :common_inputs;
 import :writer;
 import :bytes;
-import :error;
 
 namespace infinity {
 
