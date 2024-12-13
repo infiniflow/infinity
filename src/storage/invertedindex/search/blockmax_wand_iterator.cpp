@@ -20,7 +20,7 @@ module blockmax_wand_iterator;
 import stl;
 import third_party;
 import index_defines;
-import term_doc_iterator;
+import blockmax_leaf_iterator;
 import multi_doc_iterator;
 import internal_types;
 import logger;
@@ -29,18 +29,24 @@ import infinity_exception;
 namespace infinity {
 
 BlockMaxWandIterator::~BlockMaxWandIterator() {
-    String msg = "BlockMaxWandIterator pivot_history: ";
-    SizeT num_history = pivot_history_.size();
-    for (SizeT i=0; i<num_history; i++) {
-        auto &p = pivot_history_[i];
-        u32 pivot = std::get<0>(p);
-        u64 row_id = std::get<1>(p);
-        float score = std::get<2>(p);
-        //oss << " (" << pivot << ", " << row_id << ", " << score << ")";
-        msg += fmt::format(" ({}, {}, {:6f})", pivot, row_id, score);
+    if (SHOULD_LOG_TRACE()) {
+        String msg = "BlockMaxWandIterator pivot_history: ";
+        SizeT num_history = pivot_history_.size();
+        for (SizeT i = 0; i < num_history; i++) {
+            auto &p = pivot_history_[i];
+            u32 pivot = std::get<0>(p);
+            u64 row_id = std::get<1>(p);
+            float score = std::get<2>(p);
+            //oss << " (" << pivot << ", " << row_id << ", " << score << ")";
+            msg += fmt::format(" ({}, {}, {:6f})", pivot, row_id, score);
+        }
+        msg += fmt::format("\nnext_sort_cnt_ {}, next_it0_docid_mismatch_cnt_ {}, next_sum_score_low_cnt_ {}, next_sum_score_bm_low_cnt_ {}",
+                           next_sort_cnt_,
+                           next_it0_docid_mismatch_cnt_,
+                           next_sum_score_low_cnt_,
+                           next_sum_score_bm_low_cnt_);
+        LOG_TRACE(msg);
     }
-    msg += fmt::format("\nnext_sort_cnt_ {}, next_it0_docid_mismatch_cnt_ {}, next_sum_score_low_cnt_ {}, next_sum_score_bm_low_cnt_ {}", next_sort_cnt_, next_it0_docid_mismatch_cnt_, next_sum_score_low_cnt_, next_sum_score_bm_low_cnt_);
-    LOG_TRACE(msg);
 }
 
 BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iterators)
@@ -49,9 +55,9 @@ BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iter
     estimate_iterate_cost_ = {};
     SizeT num_iterators = children_.size();
     for (SizeT i = 0; i < num_iterators; i++){
-        TermDocIterator *tdi = dynamic_cast<TermDocIterator *>(children_[i].get());
+        BlockMaxLeafIterator *tdi = dynamic_cast<BlockMaxLeafIterator *>(children_[i].get());
         if (tdi == nullptr) {
-            UnrecoverableError("BMW only supports TermDocIterator");
+            UnrecoverableError("BMW only supports BlockMaxLeafIterator");
         }
         bm25_score_upper_bound_ += tdi->BM25ScoreUpperBound();
         estimate_iterate_cost_ += tdi->GetEstimateIterateCost();
@@ -101,10 +107,10 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
         });
         // remove exhausted lists
         for (int i = int(num_iterators) - 1; i >= 0 && sorted_iterators_[i]->DocID() == INVALID_ROWID; i--) {
-            if (SHOULD_LOG_DEBUG()) {
+            if (SHOULD_LOG_TRACE()) {
                 OStringStream oss;
                 sorted_iterators_[i]->PrintTree(oss, "Exhaused: ", true);
-                LOG_DEBUG(oss.str());
+                LOG_TRACE(oss.str());
             }
             bm25_score_upper_bound_ -= sorted_iterators_[i]->BM25ScoreUpperBound();
             sorted_iterators_.pop_back();
@@ -142,10 +148,10 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
             if (ok) [[likely]] {
                 sum_score_bm += sorted_iterators_[i]->BlockMaxBM25Score();
             } else {
-                if (SHOULD_LOG_DEBUG()) {
+                if (SHOULD_LOG_TRACE()) {
                     OStringStream oss;
                     sorted_iterators_[i]->PrintTree(oss, "Exhausted: ", true);
-                    LOG_DEBUG(oss.str());
+                    LOG_TRACE(oss.str());
                 }
                 sorted_iterators_.erase(sorted_iterators_.begin() + i);
                 num_iterators = sorted_iterators_.size();

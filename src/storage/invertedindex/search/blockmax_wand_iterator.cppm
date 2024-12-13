@@ -18,7 +18,7 @@ export module blockmax_wand_iterator;
 import stl;
 import index_defines;
 import doc_iterator;
-import term_doc_iterator;
+import blockmax_leaf_iterator;
 import multi_doc_iterator;
 import internal_types;
 
@@ -50,8 +50,8 @@ private:
     RowID common_block_min_possible_doc_id_{}; // not always exist
     RowID common_block_last_doc_id_{};
     float common_block_max_bm25_score_{};
-    Vector<TermDocIterator *> sorted_iterators_; // sort by DocID(), in ascending order
-    Vector<TermDocIterator *> backup_iterators_;
+    Vector<BlockMaxLeafIterator *> sorted_iterators_; // sort by DocID(), in ascending order
+    Vector<BlockMaxLeafIterator *> backup_iterators_;
     SizeT pivot_;
     // bm25 score cache
     bool bm25_score_cached_ = false;
