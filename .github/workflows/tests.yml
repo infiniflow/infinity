@@ -144,9 +144,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_tests_debug_minio
         run: |
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -174,9 +174,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_tests_debug
         run: |
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-debug/src/infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -315,9 +315,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_tests_release_minio
         run: |
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -345,9 +345,9 @@ jobs:
         if: ${{ !cancelled() }}
         id: stop_tests_release
         run: |
-          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
           sudo chmod +x scripts/timeout_kill.sh
-          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 15 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
