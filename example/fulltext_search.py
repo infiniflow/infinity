@@ -81,8 +81,8 @@ try:
         r"Bloom filter",  # OR multiple terms
         r'"Bloom filter"',  # phrase: adjacent multiple terms
         r"space efficient",  # OR multiple terms
-        r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
-        r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
+        r"space\:efficient",  # Escape reserved character ':', equivalent to: `space efficient`
+        r'"space\:efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
         r'"harmful chemical"~10',  # sloppy phrase, refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
     ]
     for question in questions:
