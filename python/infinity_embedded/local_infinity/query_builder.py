@@ -1,3 +1,17 @@
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
 from abc import ABC
@@ -18,18 +32,19 @@ from infinity_embedded.local_infinity.utils import get_search_optional_filter_fr
 from infinity_embedded.table import ExplainType as BaseExplainType
 from infinity_embedded.errors import ErrorCode
 
+
 class Query(ABC):
     def __init__(
-        self,
-        columns: Optional[List[WrapParsedExpr]],
-        highlight: Optional[List[WrapParsedExpr]],
-        search: Optional[WrapSearchExpr],
-        filter: Optional[WrapParsedExpr],
-        group_by: Optional[List[WrapParsedExpr]],
-        limit: Optional[WrapParsedExpr],
-        offset: Optional[WrapParsedExpr],
-        sort: Optional[List[WrapOrderByExpr]],
-        total_hits_count: Optional[bool]
+            self,
+            columns: Optional[List[WrapParsedExpr]],
+            highlight: Optional[List[WrapParsedExpr]],
+            search: Optional[WrapSearchExpr],
+            filter: Optional[WrapParsedExpr],
+            group_by: Optional[List[WrapParsedExpr]],
+            limit: Optional[WrapParsedExpr],
+            offset: Optional[WrapParsedExpr],
+            sort: Optional[List[WrapOrderByExpr]],
+            total_hits_count: Optional[bool]
     ):
         self.columns = columns
         self.highlight = highlight
@@ -44,16 +59,16 @@ class Query(ABC):
 
 class ExplainQuery(Query):
     def __init__(
-        self,
-        columns: Optional[List[WrapParsedExpr]],
-        highlight: Optional[List[WrapParsedExpr]],
-        search: Optional[WrapSearchExpr],
-        filter: Optional[WrapParsedExpr],
-        group_by: Optional[List[WrapParsedExpr]],
-        limit: Optional[WrapParsedExpr],
-        offset: Optional[WrapParsedExpr],
-        sort: Optional[List[WrapOrderByExpr]],
-        explain_type: Optional[BaseExplainType],
+            self,
+            columns: Optional[List[WrapParsedExpr]],
+            highlight: Optional[List[WrapParsedExpr]],
+            search: Optional[WrapSearchExpr],
+            filter: Optional[WrapParsedExpr],
+            group_by: Optional[List[WrapParsedExpr]],
+            limit: Optional[WrapParsedExpr],
+            offset: Optional[WrapParsedExpr],
+            sort: Optional[List[WrapOrderByExpr]],
+            explain_type: Optional[BaseExplainType],
     ):
         super().__init__(columns, highlight, search, filter, group_by, limit, offset, sort, None)
         self.explain_type = explain_type
@@ -84,13 +99,13 @@ class InfinityLocalQueryBuilder(ABC):
         self._total_hits_count = None
 
     def match_dense(
-        self,
-        vector_column_name: str,
-        embedding_data: VEC,
-        embedding_data_type: str,
-        distance_type: str,
-        topn: int,
-        knn_params: {} = None,
+            self,
+            vector_column_name: str,
+            embedding_data: VEC,
+            embedding_data_type: str,
+            distance_type: str,
+            topn: int,
+            knn_params: {} = None,
     ) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
@@ -108,7 +123,8 @@ class InfinityLocalQueryBuilder(ABC):
         if embedding_data_type == "bit":
             if len(embedding_data) % 8 != 0:
                 raise InfinityException(
-                    ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Embeddings with data bit must have dimension of times of 8!"
+                    ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
+                    f"Embeddings with data bit must have dimension of times of 8!"
                 )
             else:
                 new_embedding_data = []
@@ -174,7 +190,8 @@ class InfinityLocalQueryBuilder(ABC):
             elem_type = EmbeddingDataType.kElemBFloat16
             data.bf16_array_value = embedding_data
         else:
-            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE,
+                                    f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.kInvalid
         if distance_type == "l2":
@@ -218,12 +235,12 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def match_sparse(
-        self,
-        vector_column_name: str,
-        sparse_data: SparseVector | dict,
-        metric_type: str,
-        topn: int,
-        opt_params: {} = None,
+            self,
+            vector_column_name: str,
+            sparse_data: SparseVector | dict,
+            metric_type: str,
+            topn: int,
+            opt_params: {} = None,
     ) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
@@ -298,7 +315,7 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def match_text(
-        self, fields: str, matching_text: str, topn: int, extra_options: Optional[dict]
+            self, fields: str, matching_text: str, topn: int, extra_options: Optional[dict]
     ) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
@@ -324,12 +341,12 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def match_tensor(
-        self,
-        column_name: str,
-        query_data: VEC,
-        query_data_type: str,
-        topn: int,
-        extra_option: Optional[dict] = None,
+            self,
+            column_name: str,
+            query_data: VEC,
+            query_data_type: str,
+            topn: int,
+            extra_option: Optional[dict] = None,
     ) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
@@ -674,7 +691,7 @@ class InfinityLocalQueryBuilder(ABC):
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,
-            total_hits_count = self._total_hits_count,
+            total_hits_count=self._total_hits_count,
         )
         self.reset()
         return self._table._execute_query(query)

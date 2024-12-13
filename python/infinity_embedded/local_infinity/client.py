@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@ class LocalQueryResult:
     def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, index_names=None,
                  column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None,
                  comment=None,
-                 table_name=None, index_name=None, index_type=None, index_comment=None, deleted_rows=0, extra_result=None):
+                 table_name=None, index_name=None, index_type=None, index_comment=None, deleted_rows=0,
+                 extra_result=None):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
@@ -44,7 +45,7 @@ class LocalQueryResult:
 
 
 class LocalInfinityClient:
-    def __init__(self, path: str = LOCAL_INFINITY_PATH, config_path = LOCAL_INFINITY_CONFIG_PATH):
+    def __init__(self, path: str = LOCAL_INFINITY_PATH, config_path=LOCAL_INFINITY_CONFIG_PATH):
         self.path = path
         Infinity.LocalInit(path, config_path)
         self.client = Infinity.LocalConnect()
