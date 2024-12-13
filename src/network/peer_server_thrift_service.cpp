@@ -69,6 +69,7 @@ void PeerServerThriftService::Register(infinity_peer_server::RegisterResponse &r
             response.leader_term = leader_node->leader_term();
             response.heart_beat_interval = leader_node->heartbeat_interval();
         } else {
+            LOG_ERROR(fmt::format("Node: {} fail to register with leader, error: {}", request.node_name, status.message()));
             response.error_code = static_cast<i64>(status.code());
             response.error_message = status.message();
         }

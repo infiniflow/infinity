@@ -114,6 +114,11 @@ Status ClusterManager::AddNodeInfo(const SharedPtr<NodeInfo> &other_node) {
             return Status::DuplicateNode(other_node_name);
         }
 
+        if (other_node->node_ip() == this_node_->node_ip() and other_node->node_port() == this_node_->node_port()) {
+            return Status::InvalidServerAddress(
+                fmt::format("Follower or learner peer server address {}: {} are same as leader", this_node_->node_ip(), this_node_->node_port()));
+        }
+
         // Add by register
         auto iter = other_node_map_.find(other_node_name);
         if (iter != other_node_map_.end()) {
