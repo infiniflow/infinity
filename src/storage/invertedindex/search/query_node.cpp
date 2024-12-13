@@ -508,7 +508,6 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     Vector<std::unique_ptr<DocIterator>> keyword_iters;
     sub_doc_iters.reserve(children_.size());
-    bool all_are_term = true;           // describe sub_doc_iters
     bool all_are_term_or_phrase = true; // describe sub_doc_iters
     const QueryNode *only_child = nullptr;
     const auto next_params = params.RemoveMSM();
@@ -519,11 +518,8 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
                 keyword_iters.emplace_back(std::move(iter));
             } else {
                 sub_doc_iters.emplace_back(std::move(iter));
-                if (child_type != QueryNodeType::TERM) {
-                    all_are_term = false;
-                    if (child_type != QueryNodeType::PHRASE) {
-                        all_are_term_or_phrase = false;
-                    }
+                if (child_type != QueryNodeType::TERM && child_type != QueryNodeType::PHRASE) {
+                    all_are_term_or_phrase = false;
                 }
             }
         }
@@ -531,11 +527,10 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
     if (sub_doc_iters.size() < 2) {
         // 0 or 1
         // no need for WAND
-        all_are_term = false;
         all_are_term_or_phrase = false;
     }
-    const u32 msm_bar = keyword_iters.empty() ? 1u : 0u;
-    auto GetIterResultT = [&]<typename T>() -> std::unique_ptr<DocIterator> {
+    auto GetIterResultT = [&params, &sub_doc_iters, &keyword_iters]<typename T>() -> std::unique_ptr<DocIterator> {
+        const u32 msm_bar = keyword_iters.empty() ? 1u : 0u;
         if (params.minimum_should_match > sub_doc_iters.size()) {
             return nullptr;
         } else if (params.minimum_should_match <= msm_bar) {
@@ -580,30 +575,34 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
         }
         return 50u / std::log10f(topn);
     };
+    auto term_children_need_batch = [&sub_doc_iters]() -> bool {
+        u64 total_df = 0u;
+        u64 df_sum = 0u;
+        for (const auto &iter : sub_doc_iters) {
+            if (iter->GetType() == DocIteratorType::kTermDocIterator) {
+                const auto tdi = static_cast<const TermDocIterator *>(iter.get());
+                total_df = tdi->GetTotalDF();
+                df_sum += tdi->GetDocFreq();
+            }
+        }
+        return df_sum && (df_sum * 5ull >= total_df);
+    };
     if (sub_doc_iters.empty() && keyword_iters.empty()) {
         return nullptr;
     }
     if (sub_doc_iters.size() + keyword_iters.size() == 1) {
         return only_child->CreateSearch(params, is_top_level);
     }
-    if (is_top_level && all_are_term && params.ft_similarity == FulltextSimilarity::kBM25) {
+    if (is_top_level && all_are_term_or_phrase && params.ft_similarity == FulltextSimilarity::kBM25) {
         auto choose_algo = EarlyTermAlgo::kNaive;
         switch (params.early_term_algo) {
             case EarlyTermAlgo::kAuto: {
-                if (params.topn > 0u && sub_doc_iters.size() <= term_num_threshold(params.topn)) {
-                    choose_algo = EarlyTermAlgo::kBMW;
+                if ((params.topn == 0u || sub_doc_iters.size() > term_num_threshold(params.topn)) && term_children_need_batch()) {
+                    choose_algo = EarlyTermAlgo::kBatch;
+                } else if (params.topn == 0u) {
+                    choose_algo = EarlyTermAlgo::kNaive;
                 } else {
-                    // check df
-                    const auto total_df = static_cast<const TermDocIterator *>(sub_doc_iters.front().get())->GetTotalDF();
-                    u64 df_sum = 0u;
-                    for (const auto &iter : sub_doc_iters) {
-                        df_sum += static_cast<const TermDocIterator *>(iter.get())->GetDocFreq();
-                    }
-                    if (df_sum * 5ull < total_df) {
-                        choose_algo = EarlyTermAlgo::kBMW;
-                    } else {
-                        choose_algo = EarlyTermAlgo::kBatch;
-                    }
+                    choose_algo = EarlyTermAlgo::kBMW;
                 }
                 break;
             }
@@ -618,47 +617,42 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
                 break;
             }
         }
-        if (choose_algo == EarlyTermAlgo::kBMW) {
-            return GetIterResultT.template operator()<BlockMaxWandIterator>();
-        } else if (choose_algo == EarlyTermAlgo::kBatch) {
-            return GetIterResultT.template operator()<BatchOrIterator>();
-        } else if (choose_algo == EarlyTermAlgo::kNaive) {
-            return GetIterResultT.template operator()<OrIterator>();
+        switch (choose_algo) {
+            case EarlyTermAlgo::kBMW: {
+                return GetIterResultT.template operator()<BlockMaxWandIterator>();
+            }
+            case EarlyTermAlgo::kNaive: {
+                return GetIterResultT.template operator()<OrIterator>();
+            }
+            case EarlyTermAlgo::kBatch: {
+                assert(params.early_term_algo == EarlyTermAlgo::kAuto || params.early_term_algo == EarlyTermAlgo::kBatch);
+                // go to next "if" block
+                break;
+            }
+            default: {
+                UnrecoverableError(fmt::format("{}: Unexpected case!", __func__));
+                return nullptr;
+            }
         }
-        UnrecoverableError("Unreachable code");
-        return nullptr;
     }
     if ((params.early_term_algo == EarlyTermAlgo::kAuto || params.early_term_algo == EarlyTermAlgo::kBatch) &&
-        params.ft_similarity == FulltextSimilarity::kBM25) {
-        // try to apply batch when possible
-        // collect all term children info
-        u64 total_df = 0u;
-        u64 df_sum = 0u;
-        for (const auto &iter : sub_doc_iters) {
+        params.ft_similarity == FulltextSimilarity::kBM25 && term_children_need_batch()) {
+        // must have child other than term
+        Vector<std::unique_ptr<DocIterator>> term_iters;
+        Vector<std::unique_ptr<DocIterator>> not_term_iters = std::move(keyword_iters);
+        for (auto &iter : sub_doc_iters) {
             if (iter->GetType() == DocIteratorType::kTermDocIterator) {
-                const auto tdi = static_cast<const TermDocIterator *>(iter.get());
-                total_df = tdi->GetTotalDF();
-                df_sum += tdi->GetDocFreq();
+                term_iters.emplace_back(std::move(iter));
+            } else {
+                not_term_iters.emplace_back(std::move(iter));
             }
         }
-        if (df_sum && (df_sum * 5ull >= total_df)) {
-            // must have child other than term
-            Vector<std::unique_ptr<DocIterator>> term_iters;
-            Vector<std::unique_ptr<DocIterator>> not_term_iters = std::move(keyword_iters);
-            for (auto &iter : sub_doc_iters) {
-                if (iter->GetType() == DocIteratorType::kTermDocIterator) {
-                    term_iters.emplace_back(std::move(iter));
-                } else {
-                    not_term_iters.emplace_back(std::move(iter));
-                }
-            }
-            auto batch_or_iter = MakeUnique<BatchOrIterator>(std::move(term_iters));
-            not_term_iters.emplace_back(std::move(batch_or_iter));
-            if (params.minimum_should_match <= 0) {
-                return MakeUnique<OrIterator>(std::move(not_term_iters));
-            } else {
-                return MakeUnique<MinimumShouldMatchWrapper<OrIterator>>(std::move(not_term_iters), params.minimum_should_match);
-            }
+        auto batch_or_iter = MakeUnique<BatchOrIterator>(std::move(term_iters));
+        not_term_iters.emplace_back(std::move(batch_or_iter));
+        if (params.minimum_should_match <= 0) {
+            return MakeUnique<OrIterator>(std::move(not_term_iters));
+        } else {
+            return MakeUnique<MinimumShouldMatchWrapper<OrIterator>>(std::move(not_term_iters), params.minimum_should_match);
         }
     }
     if (all_are_term_or_phrase) {
