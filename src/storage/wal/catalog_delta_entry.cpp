@@ -391,7 +391,7 @@ AddTableEntryOp::AddTableEntryOp(TableEntry *table_entry, TxnTimeStamp commit_ts
       table_comment_(table_entry->GetTableComment()) {}
 
 AddSegmentEntryOp::AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts, String segment_filter_binary_data)
-    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry, commit_ts), status_(segment_entry->status()),
+    : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY, segment_entry, commit_ts), status_(segment_entry->GetSaveStatus(commit_ts)),
       column_count_(segment_entry->column_count()), row_count_(segment_entry->row_count()), // FIXME: use append_state
       actual_row_count_(segment_entry->actual_row_count()),                                 // FIXME: use append_state
       row_capacity_(segment_entry->row_capacity()), min_row_ts_(segment_entry->min_row_ts()), max_row_ts_(segment_entry->max_row_ts()),

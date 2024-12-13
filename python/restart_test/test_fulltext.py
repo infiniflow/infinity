@@ -37,7 +37,7 @@ class TestFullText:
         infinity_runner.clear()
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
-        decorator2 = infinity_runner_decorator_factory(config, uri, infinity_runner, True)
+        decorator2 = infinity_runner_decorator_factory(config, uri, infinity_runner, shutdown_out=True)
 
         @decorator
         def part1(infinity_obj):

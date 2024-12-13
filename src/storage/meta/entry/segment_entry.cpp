@@ -532,6 +532,22 @@ SharedPtr<BlockEntry> SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
     return block_entries_[block_id];
 }
 
+SegmentStatus SegmentEntry::GetSaveStatus(TxnTimeStamp ts) const {
+    switch (status_) {
+        case SegmentStatus::kUnsealed:
+        case SegmentStatus::kSealed: {
+            return status_;
+        }
+        case SegmentStatus::kCompacting:
+        case SegmentStatus::kNoDelete: {
+            return SegmentStatus::kSealed;
+        }
+        case SegmentStatus::kDeprecated: {
+            return ts >= deprecate_ts_ ? SegmentStatus::kDeprecated : SegmentStatus::kSealed;
+        }
+    }
+};
+
 nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
@@ -554,7 +570,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
         json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
         json_res["begin_ts"] = TxnTimeStamp(this->begin_ts_);
         json_res["txn_id"] = TransactionID(this->txn_id_);
-        json_res["status"] = static_cast<std::underlying_type_t<SegmentStatus>>(this->status_);
+        json_res["status"] = static_cast<std::underlying_type_t<SegmentStatus>>(this->GetSaveStatus(max_commit_ts));
         if (status_ != SegmentStatus::kUnsealed) {
             LOG_TRACE(fmt::format("SegmentEntry::Serialize: Begin try to save FastRoughFilter to json file"));
             this->GetFastRoughFilter()->SaveToJsonFile(json_res);
