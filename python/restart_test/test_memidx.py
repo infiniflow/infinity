@@ -340,7 +340,7 @@ class TestMemIdx:
 
         part3()
 
-    @pytest.mark.skip(reason="bug")
+    # @pytest.mark.skip(reason="bug")
     def test_mem_bmp(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_memidx/1.toml"
         config2 = "test/data/config/restart_test/test_memidx/2.toml"
@@ -391,18 +391,18 @@ class TestMemIdx:
             time.sleep(5)
             db_obj = infinity_obj.get_database("default_db")
             table_obj = db_obj.get_table("test_mem_bmp")
-            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
             # print(data_dict)
             assert data_dict["count(star)"] == [35]
 
-            data_dict, data_type_dict = (
+            data_dict, data_type_dict, _ = (
                 table_obj.output(["c1"])
                 .match_sparse("c2", query_vector, "ip", 8)
                 .to_result()
             )
             assert data_dict["c1"] == [4, 4, 4, 4, 4, 4, 4, 2]
 
-            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
             # print(data_dict)
             assert data_dict["count(star)"] == [35]
 
@@ -410,7 +410,7 @@ class TestMemIdx:
                 table_obj.insert(test_data)
             time.sleep(5)
 
-            data_dict, data_type_dict = (
+            data_dict, data_type_dict, _ = (
                 table_obj.output(["c1"])
                 .match_sparse("c2", query_vector, "ip", 11)
                 .to_result()
@@ -429,14 +429,14 @@ class TestMemIdx:
             table_obj = db_obj.get_table("test_mem_bmp")
 
             def check():
-                data_dict, data_type_dict = (
+                data_dict, data_type_dict, _ = (
                     table_obj.output(["c1"])
                     .match_sparse("c2", query_vector, "ip", 11)
                     .to_result()
                 )
                 assert data_dict["c1"] == [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2]
 
-                data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+                data_dict, data_type_dict, _ = table_obj.output(["count(*)"]).to_result()
                 assert data_dict["count(star)"] == [50]
 
             check()
