@@ -135,7 +135,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
     SizeT file_size = 0;
     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        UnrecoverableError(fmt::format("Read path: {}, error: {}", read_path, status.message()));
     }
     if (use_object_cache) {
         file_handle->Seek(obj_addr_.part_offset_);

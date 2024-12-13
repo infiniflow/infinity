@@ -105,6 +105,8 @@ public:
     // Only used by follower and learner when received the replicated log from leader
     void SetStartTS(TxnTimeStamp new_start_ts) { current_ts_ = new_start_ts; }
 
+    TxnTimeStamp max_committed_ts() { return max_committed_ts_; }
+
 private:
     mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};
@@ -113,12 +115,13 @@ private:
     WalManager *wal_mgr_;
 
     Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
-    HashSet<Txn *> committing_txns_;     // the txns in committing stage, can use flat_map
+    Map<TxnTimeStamp, Txn *> committing_txns_; // the txns in committing stage
     Set<TxnTimeStamp> checking_ts_{};   // the begin ts of txn that is used to check conflict
 
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> current_ts_{};         // The next txn ts
+    Atomic<TxnTimeStamp> max_committed_ts_{};
     TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager

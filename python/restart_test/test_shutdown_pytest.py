@@ -66,7 +66,7 @@ class TestShutDownPytest:
         gen = self.run_pytest_seperately(test_dir, pytest_mark=pytest_mark)
 
         decorator = infinity_runner_decorator_factory(
-            config, uri, infinity_runner, True
+            config, uri, infinity_runner, shutdown_out=True
         )
 
         def shutdown_func():

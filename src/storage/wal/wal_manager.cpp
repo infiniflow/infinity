@@ -494,7 +494,9 @@ void WalManager::FullCheckpointInner(Txn *txn) {
     TxnTimeStamp last_ckp_ts = last_ckp_ts_;
     TxnTimeStamp last_full_ckp_ts = last_full_ckp_ts_;
     auto [max_commit_ts, wal_size] = GetCommitState();
-    max_commit_ts = std::min(max_commit_ts, txn->BeginTS()); // txn commit after txn->BeginTS() should be ignored
+    // max_commit_ts = std::min(max_commit_ts, txn->BeginTS()); // txn commit after txn->BeginTS() should be ignored
+    TxnManager *txn_mgr = storage_->txn_manager();
+    max_commit_ts = txn_mgr->max_committed_ts();
     // wal_size may be larger than the actual size. but it's ok. it only makes the swap of wal file a little bit later.
 
     if (max_commit_ts == last_full_ckp_ts) {
