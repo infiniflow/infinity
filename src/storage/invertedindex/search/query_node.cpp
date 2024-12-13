@@ -648,7 +648,7 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
     }
     if ((params.early_term_algo == EarlyTermAlgo::kAuto || params.early_term_algo == EarlyTermAlgo::kBatch) &&
         params.ft_similarity == FulltextSimilarity::kBM25 && term_children_need_batch()) {
-        // must have child other than term
+        // term_iters will be non-empty
         Vector<std::unique_ptr<DocIterator>> term_iters;
         Vector<std::unique_ptr<DocIterator>> not_term_iters = std::move(keyword_iters);
         for (auto &iter : sub_doc_iters) {
@@ -658,8 +658,15 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
                 not_term_iters.emplace_back(std::move(iter));
             }
         }
+        if (not_term_iters.empty()) {
+            assert(all_are_term_or_phrase);
+            sub_doc_iters = std::move(term_iters);
+            keyword_iters.clear();
+            return GetIterResultT.template operator()<BatchOrIterator>();
+        }
         auto batch_or_iter = MakeUnique<BatchOrIterator>(std::move(term_iters));
         not_term_iters.emplace_back(std::move(batch_or_iter));
+        // now at least 2 children in not_term_iters
         if (params.minimum_should_match <= 0) {
             return MakeUnique<OrIterator>(std::move(not_term_iters));
         } else {
