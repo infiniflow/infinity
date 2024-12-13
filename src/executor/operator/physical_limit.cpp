@@ -102,7 +102,7 @@ SizeT UnSyncCounter::Offset(SizeT row_count) {
     i64 last_offset = offset_ - row_count;
 
     if (last_offset > 0) {
-        result = row_count - 1;
+        result = row_count;
         offset_ = last_offset;
     } else {
         result = offset_;
@@ -179,15 +179,10 @@ bool PhysicalLimit::Execute(QueryContext *query_context,
     }
 
     SizeT limit = counter->Limit(input_row_count - offset);
-    SizeT block_start_idx = 0;
+    SizeT block_start_idx = input_blocks.size();
 
-    for (SizeT block_id = 0; block_id < input_blocks.size(); block_id++) {
-        if (input_blocks[block_id]->row_count() == 0) {
-            continue;
-        }
-        SizeT row_count = input_blocks[block_id]->row_count();
-
-        if (offset > row_count) {
+    for (SizeT block_id = 0; block_id < input_blocks.size(); ++block_id) {
+        if (const SizeT row_count = input_blocks[block_id]->row_count(); offset >= row_count) {
             offset -= row_count;
         } else {
             block_start_idx = block_id;
@@ -195,26 +190,21 @@ bool PhysicalLimit::Execute(QueryContext *query_context,
         }
     }
 
+    const auto output_types = input_blocks.front()->types();
     for (SizeT block_id = block_start_idx; block_id < input_blocks.size(); ++block_id) {
         auto &input_block = input_blocks[block_id];
         auto row_count = input_block->row_count();
         if (row_count == 0) {
             continue;
         }
+        const auto append_count = std::min(row_count - offset, limit);
         auto block = DataBlock::MakeUniquePtr();
-
-        block->Init(input_block->types());
-        if (limit >= row_count) {
-            block->AppendWith(input_block.get(), offset, row_count);
-            limit -= row_count;
-        } else {
-            block->AppendWith(input_block.get(), offset, limit);
-            limit = 0;
-        }
+        block->Init(output_types);
+        block->AppendWith(input_block.get(), offset, append_count);
         block->Finalize();
         output_blocks.push_back(std::move(block));
         offset = 0;
-
+        limit -= append_count;
         if (limit == 0) {
             break;
         }
