@@ -621,7 +621,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
         auto begin_ts = op->begin_ts_;
         std::string_view encode = *op->encode_;
         MergeFlag merge_flag = op->merge_flag_;
-        if (op->commit_ts_ < full_ckp_commit_ts_) {
+        if (op->commit_ts_ <= full_ckp_commit_ts_) {
             // Ignore the old txn
             continue;
         }

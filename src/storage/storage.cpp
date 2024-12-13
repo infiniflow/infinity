@@ -294,6 +294,7 @@ Status Storage::AdminToWriter() {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
     memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
+    cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
     bg_processor_->Start();
 
@@ -634,7 +635,6 @@ Status Storage::SetStorageMode(StorageMode target_mode) {
         LOG_WARN(fmt::format("Set unchanged mode"));
         return Status::OK();
     }
-    cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
     switch (current_mode) {
         case StorageMode::kUnInitialized: {
             if (target_mode != StorageMode::kAdmin) {
@@ -732,6 +732,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
     memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
+    cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
     new_catalog_->StartMemoryIndexCommit();
     new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);

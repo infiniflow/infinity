@@ -118,6 +118,8 @@ public:
 
     static SharedPtr<SegmentEntry> Deserialize(const nlohmann::json &table_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
+    SegmentStatus GetSaveStatus(TxnTimeStamp ts) const;
+
 public:
     void AddBlockReplay(SharedPtr<BlockEntry> block_entry);
 

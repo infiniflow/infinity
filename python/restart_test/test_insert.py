@@ -28,7 +28,7 @@ class TestInsert:
         shutdown = False
         error = False
 
-        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, True)
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner, shutdown_out=True)
 
         def insert_func(table_obj):
             nonlocal cur_insert_n, shutdown, error
