@@ -56,6 +56,10 @@ public:
         return 0;
     }
 
+    [[nodiscard]] inline const SharedPtr<BaseExpression> &limit_expr() const { return limit_expr_; }
+
+    [[nodiscard]] inline const SharedPtr<BaseExpression> &offset_expr() const { return offset_expr_; }
+
 private:
     SharedPtr<BaseExpression> limit_expr_{};
     SharedPtr<BaseExpression> offset_expr_{};

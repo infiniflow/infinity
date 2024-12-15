@@ -420,6 +420,12 @@ class TestInfinity:
                                         {"c1": {"type": "int"}, "c2": {"type": "varchar"}})
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_import_with_different_size.csv"
+
+        with open(test_csv_dir, 'r') as file:
+            row_count = sum(1 for line in file)
+
+        assert row_count == data_size
+
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
