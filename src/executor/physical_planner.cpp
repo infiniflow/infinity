@@ -747,7 +747,13 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
 
     SharedPtr<LogicalLimit> logical_limit = static_pointer_cast<LogicalLimit>(logical_operator);
     UniquePtr<PhysicalOperator> input_physical_operator = BuildPhysicalOperator(input_logical_node);
-    if (input_physical_operator->TaskletCount() <= 1) {
+
+    i64 offset = 0;
+    if (logical_limit->offset_expression_.get() != nullptr) {
+        offset = (static_pointer_cast<ValueExpression>(logical_limit->offset_expression_))->GetValue().value_.big_int;
+    }
+
+    if (input_physical_operator->TaskletCount() <= 1 or offset != 0) {
         return MakeUnique<PhysicalLimit>(logical_operator->node_id(),
                                          std::move(input_physical_operator),
                                          logical_limit->limit_expression_,
@@ -755,21 +761,16 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildLimit(const SharedPtr<LogicalN
                                          logical_operator->load_metas(),
                                          logical_limit->total_hits_count_flag_);
     } else {
-        i64 child_limit = (static_pointer_cast<ValueExpression>(logical_limit->limit_expression_))->GetValue().value_.big_int;
-
-        if (logical_limit->offset_expression_.get() != nullptr) {
-            child_limit += (static_pointer_cast<ValueExpression>(logical_limit->offset_expression_))->GetValue().value_.big_int;
-        }
         auto child_limit_op = MakeUnique<PhysicalLimit>(logical_operator->node_id(),
                                                         std::move(input_physical_operator),
-                                                        MakeShared<ValueExpression>(Value::MakeBigInt(child_limit)),
+                                                        logical_limit->limit_expression_,
                                                         nullptr,
                                                         logical_operator->load_metas(),
                                                         logical_limit->total_hits_count_flag_);
         return MakeUnique<PhysicalMergeLimit>(query_context_ptr_->GetNextNodeID(),
                                               std::move(child_limit_op),
                                               logical_limit->limit_expression_,
-                                              logical_limit->offset_expression_,
+                                              nullptr,
                                               MakeShared<Vector<LoadMeta>>());
     }
 }
