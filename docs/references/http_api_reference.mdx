@@ -408,8 +408,8 @@ curl --request POST \
     - String: `"varchar"`
     - Dense vector: e.g., `"vector,128,float"`
       - `vector`: The column is a dense vector column.
-      - The second item in the string: The dimension of the dense vector.
-      - The third item in the string: The element type of the dense vector. Can be:
+      - The second item in the string: The dimension of dense vectors.
+      - The third item in the string: The element type of dense vectors. Can be:
         - `"int8"`
         - `"int16"`
         - `"int"`/`"int32"`/`"integer"`
@@ -420,8 +420,8 @@ curl --request POST \
         - `"bfloat16"`
     - Sparse vector: e.g., `"sparse,128,float,int"`
       - `sparse`: The column is a sparse vector column.
-      - The second item in the string: The dimension of the sparse vector.
-      - The third item in the string: The element type of the sparse vector. Can be:
+      - The second item in the string: The dimension of sparse vectors.
+      - The third item in the string: The element type of sparse vectors. Can be:
         - `"int8"`
         - `"int16"`
         - `"int"`/`"int32"`/`"integer"`
@@ -437,7 +437,7 @@ curl --request POST \
         - `int64`
     - Tensor vector: e.g., `"tensor,4,float"`
       - `tensor`: The column is a tensor column.
-      - The second item in the string: The dimension of each vector unit in the tensor.
+      - The second item in the string: The dimension of each vector unit in a tensor.
       - The third item in the string: The element type of the tensors. Can be:
         - `"int8"`
         - `"int16"`
@@ -449,8 +449,8 @@ curl --request POST \
         - `"bfloat16"`
     - Tensor array: e.g., `"tensorarray,6,float"`
       - `tensorarray`: The column is a tensor-array column.
-      - The second item in the string: The dimension of each vector unit in the tensor arrays.
-      - The third item in the string: The element type of the tensors. Can be:
+      - The second item in the string: The dimension of each vector unit in a tensor array.
+      - The third item in the string: The element type of tensor arrays. Can be:
         - `"int8"`
         - `"int16"`
         - `"int"`/`"int32"`/`"integer"`
@@ -461,8 +461,8 @@ curl --request POST \
         - `"bfloat16"`
     - Multivector: e.g., `"multivector,128,float"`
       - `multivector`: The column is a multi-vector column.
-      - The second item in the string: The dimension of each vector unit.
-      - The third item in the string: The element type of the tensors. Can be:
+      - The second item in the string: The dimension of each vector unit in a multi-vector.
+      - The third item in the string: The element type of multi-vectors. Can be:
         - `"int8"`
         - `"int16"`
         - `"int"`/`"int32"`/`"integer"`

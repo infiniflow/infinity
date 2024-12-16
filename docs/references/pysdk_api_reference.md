@@ -382,24 +382,11 @@ A non-empty string indicating the name of the table, which must adhere to the fo
 
 ##### columns_definition: `dict[str, dict[str, Any]]`, *Required*
 
-Definitions for all table columns as a dictionary. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value information in key-value pairs:
+Definitions for all table columns as a dictionary. Each key in the dictionary is a column name (a `str` following the same rule as `table_name`), with a corresponding 'value' dictionary defining the column's data type and default value information in key-value pairs:
 
 - **Data type** (`"type"`)  
   The data type of the column.  
   - Numeric:  
-  - `"int8"`
-  - `"int16"`
-  - `"int"`/`"int32"`/`"integer"`
-  - `"int64"`
-  - `"float"`/`"float32"`
-  - `"double"`/`"float64"`
-  - `"float16"`
-  - `"bfloat16"`
-- String: `"varchar"`
-- Dense vector: e.g., `"vector,128,float"`
-  - `vector`: The column is a dense vector column.
-  - The second item in the string: The dimension of the dense vector.
-  - The third item in the string: The element type of the dense vector. Can be:
     - `"int8"`
     - `"int16"`
     - `"int"`/`"int32"`/`"integer"`
@@ -408,59 +395,72 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
     - `"double"`/`"float64"`
     - `"float16"`
     - `"bfloat16"`
-- Sparse vector: e.g., `"sparse,128,float,int"`
-  - `sparse`: The column is a sparse vector column.
-  - The second item in the string: The dimension of the sparse vector.
-  - The third item in the string: The element type of the sparse vector. Can be:
-    - `"int8"`
-    - `"int16"`
-    - `"int"`/`"int32"`/`"integer"`
-    - `"int64"`
-    - `"float"`/`"float32"`
-    - `"double"`/`"float64"`
-    - `"float16"`
-    - `"bfloat16"`
-  - The fourth item in the string: The data type of the sparse vector indices. Can be:
-    - `int8`
-    - `int16`
-    - `int`/`int32`/`integer`
-    - `int64`
-- Tensor vector: e.g., `"tensor,4,float"`
-  - `tensor`: The column is a tensor column.
-  - The second item in the string: The dimension of each vector unit in the tensor.
-  - The third item in the string: The element type of the tensors. Can be:
-    - `"int8"`
-    - `"int16"`
-    - `"int"`/`"int32"`/`"integer"`
-    - `"int64"`
-    - `"float"`/`"float32"`
-    - `"double"`/`"float64"`
-    - `"float16"`
-    - `"bfloat16"`
-- Tensor array: e.g., `"tensorarray,6,float"`
-  - `tensorarray`: The column is a tensor-array column.
-  - The second item in the string: The dimension of each vector unit in the tensor arrays.
-  - The third item in the string: The element type of the tensors. Can be:
-    - `"int8"`
-    - `"int16"`
-    - `"int"`/`"int32"`/`"integer"`
-    - `"int64"`
-    - `"float"`/`"float32"`
-    - `"double"`/`"float64"`
-    - `"float16"`
-    - `"bfloat16"`
-- Multivector: e.g., `"multivector,128,float"`
-  - `multivector`: The column is a multi-vector column.
-  - The second item in the string: The dimension of each vector unit.
-  - The third item in the string: The element type of the tensors. Can be:
-    - `"int8"`
-    - `"int16"`
-    - `"int"`/`"int32"`/`"integer"`
-    - `"int64"`
-    - `"float"`/`"float32"`
-    - `"double"`/`"float64"`
-    - `"float16"`
-    - `"bfloat16"`
+  - String: `"varchar"`
+  - Dense vector: e.g., `"vector,128,float"`
+    - `vector`: The column is a dense vector column.
+    - The second item in the string: The dimension of dense vector.
+    - The third item in the string: The element type of dense vector. Can be:
+      - `"int8"`
+      - `"int16"`
+      - `"int"`/`"int32"`/`"integer"`
+      - `"int64"`
+      - `"float"`/`"float32"`
+      - `"double"`/`"float64"`
+      - `"float16"`
+      - `"bfloat16"`
+  - Sparse vector: e.g., `"sparse,128,float,int"`
+    - `sparse`: The column is a sparse vector column.
+    - The second item in the string: The dimension of sparse vector.
+    - The third item in the string: The element type of sparse vector. Can be:
+      - `"int8"`
+      - `"int16"`
+      - `"int"`/`"int32"`/`"integer"`
+      - `"int64"`
+      - `"float"`/`"float32"`
+      - `"double"`/`"float64"`
+      - `"float16"`
+      - `"bfloat16"`
+    - The fourth item in the string: The data type of sparse vector indices. Can be:
+      - `int8`
+      - `int16`
+      - `int`/`int32`/`integer`
+      - `int64`
+  - Tensor vector: e.g., `"tensor,4,float"`
+    - `tensor`: The column is a tensor column.
+    - The second item in the string: The dimension of each vector unit in a tensor.
+    - The third item in the string: The element type of tensors. Can be:
+      - `"int8"`
+      - `"int16"`
+      - `"int"`/`"int32"`/`"integer"`
+      - `"int64"`
+      - `"float"`/`"float32"`
+      - `"double"`/`"float64"`
+      - `"float16"`
+      - `"bfloat16"`
+  - Tensor array: e.g., `"tensorarray,6,float"`
+    - `tensorarray`: The column is a tensor-array column.
+    - The second item in the string: The dimension of each vector unit in a tensor array.
+    - The third item in the string: The element type of tensor arrays. Can be:
+      - `"int8"`
+      - `"int16"`
+      - `"int"`/`"int32"`/`"integer"`
+      - `"int64"`
+      - `"float"`/`"float32"`
+      - `"double"`/`"float64"`
+      - `"float16"`
+      - `"bfloat16"`
+  - Multivector: e.g., `"multivector,128,float"`
+    - `multivector`: The column is a multi-vector column.
+    - The second item in the string: The dimension of each vector unit in a multivector.
+    - The third item in the string: The element type of multi-vectors. Can be:
+      - `"int8"`
+      - `"int16"`
+      - `"int"`/`"int32"`/`"integer"`
+      - `"int64"`
+      - `"float"`/`"float32"`
+      - `"double"`/`"float64"`
+      - `"float16"`
+      - `"bfloat16"`
 - **Default value** (`"default"`)  
   The default value for unspecified cells in that column.  
 
@@ -770,6 +770,31 @@ A non-empty string indicating the name of the table to retrieve.
 
 ```python
 table_object = db_object.get_table("my_table")
+```
+
+---
+
+### show_columns
+
+```python
+table_object.show_columns()
+```
+
+Show the column definition of the current table.
+
+#### Returns
+
+An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+
+:::tip NOTE
+This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
+:::
+
+#### Examples
+
+```python
+res = table_object.show_columns()
+print(res)
 ```
 
 ---
@@ -1146,31 +1171,6 @@ A structure containing these attributes:
 
 ```python
 table_object.drop_index("my_index")
-```
-
----
-
-### show_columns
-
-```python
-table_object.show_columns()
-```
-
-Show the column definition of the current table.
-
-#### Returns
-
-An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
-
-:::tip NOTE
-This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
-:::
-
-#### Examples
-
-```python
-res = table_object.show_columns()
-print(res)
 ```
 
 ---
