@@ -873,7 +873,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     bool opt_success = false;
     DeferFn defer_fn([&] {
         if (!opt_success) {
-            LOG_WARN(fmt::format("Index {} segment {} optimize fail or skip.", index_name, segment_id_));
+            LOG_WARN(fmt::format("Index {} segment {} optimize fail.", index_name, segment_id_));
             ResetOptimizing();
         }
     });
@@ -897,6 +897,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             }
         }
         if (old_chunks.size() <= 1) { // TODO
+            opt_success = true;
             return nullptr;
         }
     }
