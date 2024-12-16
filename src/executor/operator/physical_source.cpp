@@ -31,6 +31,26 @@ import logger;
 
 namespace infinity {
 
+String ToString(SourceType source_type) {
+    switch (source_type) {
+        case SourceType::kInvalid: {
+            return "Invalid";
+        }
+        case SourceType::kTable: {
+            return "Table";
+        }
+        case SourceType::kLocalQueue: {
+            return "LocalQueue";
+        }
+        case SourceType::kEmpty: {
+            return "Empty";
+        }
+        case SourceType::kRemote: {
+            return "Remote";
+        }
+    }
+}
+
 void PhysicalSource::Init() {}
 
 bool PhysicalSource::Execute(QueryContext *, OperatorState *) { return true; }

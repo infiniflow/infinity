@@ -66,12 +66,12 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     //     String error_msg = cleanup_tracer->GetCleanupInfo();
     //     LOG_ERROR(std::move(error_msg));
     // }
+    String location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
     if (IS_LOGGER_INITIALIZED()) {
-        LOG_CRITICAL(message);
+        PrintStacktrace(location_message);
     }
     Logger::Flush();
-    PrintStacktrace(message);
-    throw UnrecoverableException(fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line));
+    throw UnrecoverableException(location_message);
 }
 
 #else

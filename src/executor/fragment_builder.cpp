@@ -129,7 +129,6 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kInsert:
         case PhysicalOperatorType::kImport:
         case PhysicalOperatorType::kExport:
-        case PhysicalOperatorType::kMatch:
         case PhysicalOperatorType::kReadCache: {
             current_fragment_ptr->AddOperator(phys_op);
             if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
@@ -260,6 +259,16 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kCrossProduct: {
             String error_message = fmt::format("Not support {}.", phys_op->GetName());
             UnrecoverableError(error_message);
+        }
+        case PhysicalOperatorType::kMatch: {
+            current_fragment_ptr->AddOperator(phys_op);
+            if (phys_op->left() != nullptr or phys_op->right() != nullptr) {
+                String error_message = fmt::format("{} shouldn't have child.", phys_op->GetName());
+                UnrecoverableError(error_message);
+            }
+            current_fragment_ptr->SetFragmentType(FragmentType::kSerialMaterialize);
+            current_fragment_ptr->SetSourceNode(query_context_ptr_, SourceType::kTable, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+            return;
         }
         case PhysicalOperatorType::kMatchSparseScan:
         case PhysicalOperatorType::kMatchTensorScan:
