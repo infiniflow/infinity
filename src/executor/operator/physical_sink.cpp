@@ -35,6 +35,23 @@ import column_def;
 
 namespace infinity {
 
+String ToString(SinkType sink_type) {
+    switch (sink_type) {
+        case SinkType::kInvalid: {
+            return "Invalid";
+        }
+        case SinkType::kLocalQueue: {
+            return "LocalQueue";
+        }
+        case SinkType::kRemote: {
+            return "Remote";
+        }
+        case SinkType::kResult: {
+            return "Result";
+        }
+    }
+}
+
 void PhysicalSink::Init() {}
 
 bool PhysicalSink::Execute(QueryContext *, OperatorState *) { return true; }

@@ -1227,10 +1227,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
         case ShowStmtType::kIndexChunk: {
             String show_str;
             if (intent_size != 0) {
-            show_str = String(intent_size - 2, ' ');
-            show_str += "-> SHOW INDEX CHUNK";
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW INDEX CHUNK";
             } else {
-            show_str = "SHOW INDEX CHUNK";
+                show_str = "SHOW INDEX CHUNK";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -1673,10 +1673,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
         case ShowStmtType::kDeltaLogs: {
             String show_str;
             if (intent_size != 0) {
-            show_str = String(intent_size - 2, ' ');
-            show_str += "-> SHOW DELTA LOGS ";
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW DELTA LOGS ";
             } else {
-            show_str = "SHOW DELTA LOGS ";
+                show_str = "SHOW DELTA LOGS ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -2180,7 +2180,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalSource *source_node,
     } else {
         explain_header_str = "SOURCE ";
     }
-    explain_header_str += "(" + std::to_string(source_node->node_id()) + ")";
+    explain_header_str += "(" + std::to_string(source_node->node_id()) + ") " + ToString(source_node->source_type());
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -2191,7 +2191,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalSink *sink_node, SharedPtr<Vecto
     } else {
         explain_header_str = "SINK ";
     }
-    explain_header_str += "(" + std::to_string(sink_node->node_id()) + ")";
+    explain_header_str += "(" + std::to_string(sink_node->node_id()) + ") " + ToString(sink_node->sink_type());
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
