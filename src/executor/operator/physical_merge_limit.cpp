@@ -29,11 +29,12 @@ namespace infinity {
 
 PhysicalMergeLimit::PhysicalMergeLimit(u64 id,
                                        UniquePtr<PhysicalOperator> left,
+                                       SharedPtr<BaseTableRef> base_table_ref,
                                        SharedPtr<BaseExpression> limit_expr,
                                        SharedPtr<BaseExpression> offset_expr,
                                        SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kMergeLimit, std::move(left), nullptr, id, load_metas), limit_expr_(std::move(limit_expr)),
-      offset_expr_(std::move(offset_expr)) {
+    : PhysicalOperator(PhysicalOperatorType::kMergeLimit, std::move(left), nullptr, id, std::move(load_metas)),
+      base_table_ref_(std::move(base_table_ref)), limit_expr_(std::move(limit_expr)), offset_expr_(std::move(offset_expr)) {
     i64 offset = 0;
     i64 limit = (static_pointer_cast<ValueExpression>(limit_expr_))->GetValue().value_.big_int;
 

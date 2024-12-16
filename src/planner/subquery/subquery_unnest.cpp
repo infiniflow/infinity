@@ -101,7 +101,7 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             // Step1 Generate limit operator on the subquery
             SharedPtr<ValueExpression> limit_expression = MakeShared<ValueExpression>(Value::MakeBigInt(1));
             SharedPtr<ValueExpression> offset_expression = MakeShared<ValueExpression>(Value::MakeBigInt(0));
-            SharedPtr<LogicalLimit> limit_node = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), limit_expression, offset_expression, false);
+            SharedPtr<LogicalLimit> limit_node = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), nullptr, limit_expression, offset_expression, false);
 
             limit_node->set_left_node(subquery_plan);
             // Step2 Generate aggregate first operator on the limit operator
