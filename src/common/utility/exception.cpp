@@ -68,8 +68,7 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     // }
     String location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
     if (IS_LOGGER_INITIALIZED()) {
-        PrintStacktrace(message);
-        LOG_CRITICAL(location_message);
+        PrintStacktrace(location_message);
     }
     Logger::Flush();
     throw UnrecoverableException(location_message);
