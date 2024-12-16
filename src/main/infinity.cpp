@@ -1055,7 +1055,7 @@ QueryResult Infinity::Explain(const String &db_name,
         }
     });
     DeferFn free_highlight_columns([&]() {
-        if (output_columns != nullptr) {
+        if (highlight_columns != nullptr) {
             for (auto &highlight_column : *highlight_columns) {
                 delete highlight_column;
                 highlight_column = nullptr;
@@ -1065,7 +1065,7 @@ QueryResult Infinity::Explain(const String &db_name,
         }
     });
     DeferFn free_order_by_list([&]() {
-        if (output_columns != nullptr) {
+        if (order_by_list != nullptr) {
             for (auto &order_by : *order_by_list) {
                 delete order_by;
                 order_by = nullptr;
@@ -1075,7 +1075,7 @@ QueryResult Infinity::Explain(const String &db_name,
         }
     });
     DeferFn free_group_by_list([&]() {
-        if (output_columns != nullptr) {
+        if (group_by_list != nullptr) {
             for (auto &group_by : *group_by_list) {
                 delete group_by;
                 group_by = nullptr;
@@ -1087,8 +1087,8 @@ QueryResult Infinity::Explain(const String &db_name,
 
     UniquePtr<QueryContext> query_context_ptr;
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
-    UniquePtr<ExplainStatement> explain_statment = MakeUnique<ExplainStatement>();
-    explain_statment->type_ = explain_type;
+    UniquePtr<ExplainStatement> explain_statement = MakeUnique<ExplainStatement>();
+    explain_statement->type_ = explain_type;
 
     SelectStatement *select_statement = new SelectStatement();
 
@@ -1112,9 +1112,9 @@ QueryResult Infinity::Explain(const String &db_name,
     select_statement->order_by_list_ = order_by_list;
     select_statement->group_by_list_ = group_by_list;
 
-    explain_statment->statement_ = select_statement;
+    explain_statement->statement_ = select_statement;
 
-    QueryResult result = query_context_ptr->QueryStatement(explain_statment.get());
+    QueryResult result = query_context_ptr->QueryStatement(explain_statement.get());
     output_columns = nullptr;
     highlight_columns = nullptr;
     order_by_list = nullptr;
@@ -1153,7 +1153,7 @@ QueryResult Infinity::Search(const String &db_name,
         }
     });
     DeferFn free_highlight_columns([&]() {
-        if (output_columns != nullptr) {
+        if (highlight_columns != nullptr) {
             for (auto &highlight_column : *highlight_columns) {
                 delete highlight_column;
                 highlight_column = nullptr;
@@ -1163,7 +1163,7 @@ QueryResult Infinity::Search(const String &db_name,
         }
     });
     DeferFn free_order_by_list([&]() {
-        if (output_columns != nullptr) {
+        if (order_by_list != nullptr) {
             for (auto &order_by : *order_by_list) {
                 delete order_by;
                 order_by = nullptr;
@@ -1173,7 +1173,7 @@ QueryResult Infinity::Search(const String &db_name,
         }
     });
     DeferFn free_group_by_list([&]() {
-        if (output_columns != nullptr) {
+        if (group_by_list != nullptr) {
             for (auto &group_by : *group_by_list) {
                 delete group_by;
                 group_by = nullptr;

@@ -921,7 +921,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     bool opt_success = false;
                     DeferFn defer_fn([&] {
                         if (!opt_success) {
-                            LOG_WARN(fmt::format("Index {} segment {} optimize fail or skip.", index_name, segment_id));
+                            LOG_WARN(fmt::format("Index {} segment {} optimize fail.", index_name, segment_id));
                             segment_index_entry->ResetOptimizing();
                         }
                     });
@@ -930,6 +930,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     Vector<ChunkIndexEntry *> old_chunks;
                     segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, txn);
                     if (chunk_index_entries.size() <= 1) {
+                        opt_success = true;
                         continue;
                     }
 

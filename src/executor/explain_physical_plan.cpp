@@ -239,18 +239,22 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             break;
         }
         case PhysicalOperatorType::kSource: {
+            Explain((PhysicalSource *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kSink: {
+            Explain((PhysicalSink *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kInvalid: {
             break;
         }
         case PhysicalOperatorType::kParallelAggregate: {
+            Explain((PhysicalParallelAggregate *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kMergeParallelAggregate: {
+            Explain((PhysicalMergeParallelAggregate *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kIntersect: {
@@ -266,6 +270,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             break;
         }
         case PhysicalOperatorType::kMergeLimit: {
+            Explain((PhysicalMergeLimit *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kMergeTop: {
@@ -273,6 +278,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             break;
         }
         case PhysicalOperatorType::kMergeSort: {
+            Explain((PhysicalMergeSort *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kMergeKnn: {
@@ -1221,10 +1227,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
         case ShowStmtType::kIndexChunk: {
             String show_str;
             if (intent_size != 0) {
-            show_str = String(intent_size - 2, ' ');
-            show_str += "-> SHOW INDEX CHUNK";
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW INDEX CHUNK";
             } else {
-            show_str = "SHOW INDEX CHUNK";
+                show_str = "SHOW INDEX CHUNK";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -1667,10 +1673,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
         case ShowStmtType::kDeltaLogs: {
             String show_str;
             if (intent_size != 0) {
-            show_str = String(intent_size - 2, ' ');
-            show_str += "-> SHOW DELTA LOGS ";
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW DELTA LOGS ";
             } else {
-            show_str = "SHOW DELTA LOGS ";
+                show_str = "SHOW DELTA LOGS ";
             }
             show_str += "(";
             show_str += std::to_string(show_node->node_id());
@@ -2174,7 +2180,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalSource *source_node,
     } else {
         explain_header_str = "SOURCE ";
     }
-    explain_header_str += "(" + std::to_string(source_node->node_id()) + ")";
+    explain_header_str += "(" + std::to_string(source_node->node_id()) + ") " + ToString(source_node->source_type());
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -2185,7 +2191,7 @@ void ExplainPhysicalPlan::Explain(const PhysicalSink *sink_node, SharedPtr<Vecto
     } else {
         explain_header_str = "SINK ";
     }
-    explain_header_str += "(" + std::to_string(sink_node->node_id()) + ")";
+    explain_header_str += "(" + std::to_string(sink_node->node_id()) + ") " + ToString(sink_node->sink_type());
     result->emplace_back(MakeShared<String>(explain_header_str));
 }
 
@@ -2282,6 +2288,30 @@ void ExplainPhysicalPlan::Explain(const PhysicalMergeLimit *merge_limit_node,
     }
     explain_header_str += "(" + std::to_string(merge_limit_node->node_id()) + ")";
     result->emplace_back(MakeShared<String>(explain_header_str));
+
+    {
+        String limit_value_str = String(intent_size, ' ') + " - limit: ";
+        ExplainLogicalPlan::Explain(merge_limit_node->limit_expr().get(), limit_value_str);
+        result->emplace_back(MakeShared<String>(limit_value_str));
+    }
+
+    if (merge_limit_node->offset_expr().get() != 0) {
+        String offset_value_str = String(intent_size, ' ') + " - offset: ";
+        ExplainLogicalPlan::Explain(merge_limit_node->offset_expr().get(), offset_value_str);
+        result->emplace_back(MakeShared<String>(offset_value_str));
+    }
+
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = merge_limit_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
 }
 
 void ExplainPhysicalPlan::Explain(const PhysicalMergeTop *merge_top_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {

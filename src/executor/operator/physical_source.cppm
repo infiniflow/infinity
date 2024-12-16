@@ -38,6 +38,8 @@ export enum class SourceType {
     kRemote,
 };
 
+export String ToString(SourceType source_type);
+
 export class PhysicalSource final : public PhysicalOperator {
 public:
     explicit PhysicalSource(u64 id,

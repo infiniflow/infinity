@@ -269,7 +269,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
         case IndexType::kBMP: {
             if (memory_bmp_index_.get() == nullptr) {
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                memory_bmp_index_ = MakeShared<BMPIndexInMem>(begin_row_id, index_base.get(), column_def.get());
+                memory_bmp_index_ = MakeShared<BMPIndexInMem>(begin_row_id, index_base.get(), column_def.get(), this);
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
             memory_bmp_index_->AddDocs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
@@ -382,7 +382,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
             if (memory_bmp_index_.get() == nullptr) {
                 return nullptr;
             }
-            chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager_);
+            chunk_index_entry = memory_bmp_index_->Dump(this, buffer_manager_, dump_size);
             chunk_index_entry->SaveIndexFile();
             std::unique_lock lck(rw_locker_);
             chunk_index_entries_.push_back(chunk_index_entry);
@@ -542,7 +542,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kBMP: {
-            memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base, column_def.get());
+            memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base, column_def.get(), this);
 
             memory_bmp_index_->AddDocs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_);
             dumped_memindex_entry = MemIndexDump();
@@ -873,7 +873,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     bool opt_success = false;
     DeferFn defer_fn([&] {
         if (!opt_success) {
-            LOG_WARN(fmt::format("Index {} segment {} optimize fail or skip.", index_name, segment_id_));
+            LOG_WARN(fmt::format("Index {} segment {} optimize fail.", index_name, segment_id_));
             ResetOptimizing();
         }
     });
@@ -897,6 +897,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             }
         }
         if (old_chunks.size() <= 1) { // TODO
+            opt_success = true;
             return nullptr;
         }
     }
@@ -926,7 +927,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             break;
         }
         case IndexType::kBMP: {
-            auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base, column_def.get());
+            auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base, column_def.get(), this);
             AbstractBMP abstract_bmp = memory_bmp_index->get();
 
             std::visit(
@@ -990,6 +991,8 @@ BaseMemIndex *SegmentIndexEntry::GetMemIndex() const {
         return static_cast<BaseMemIndex *>(memory_ivf_index_.get());
     } else if (memory_indexer_.get() != nullptr) {
         return static_cast<BaseMemIndex *>(memory_indexer_.get());
+    } else if (memory_bmp_index_.get() != nullptr) {
+        return static_cast<BaseMemIndex *>(memory_bmp_index_.get());
     }
     return nullptr;
 }

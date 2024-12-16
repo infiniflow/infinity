@@ -39,6 +39,8 @@ export enum class SinkType {
     kResult,
 };
 
+export String ToString(SinkType sink_type);
+
 export class PhysicalSink final : public PhysicalOperator {
 public:
     explicit PhysicalSink(u64 id, SinkType sink_type, SharedPtr<Vector<String>> names, SharedPtr<Vector<SharedPtr<DataType>>> types, SharedPtr<Vector<LoadMeta>> load_metas)

@@ -566,7 +566,7 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
         for (SizeT task_id = 0; task_id < tasks.size(); ++task_id) {
             FragmentTask *task = tasks[task_id].get();
 
-            // build the input and output state of each opeartor
+            // build the input and output state of each operator
             UniquePtr<OperatorState> operator_state = MakeTaskState(operator_id, fragment_operators, task, fragment_context.get());
 
             // Connect the input, output state. Connect fragment to its parent if needed

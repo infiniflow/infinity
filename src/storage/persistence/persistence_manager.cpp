@@ -201,6 +201,9 @@ PersistWriteResult PersistenceManager::CurrentObjFinalize(bool validate) {
 
 void PersistenceManager::CheckValid() {
     for (auto &[local_path, obj_addr] : local_path_obj_) {
+        if (obj_addr.obj_key_ == ObjAddr::KeyEmpty) {
+            continue;
+        }
         ObjStat *obj_stat = objects_->GetNoCount(obj_addr.obj_key_);
         if (obj_stat == nullptr) {
             String error_message = fmt::format("CurrentObjFinalize Failed to find object for local path {}", local_path);

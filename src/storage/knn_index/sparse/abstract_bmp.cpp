@@ -25,11 +25,35 @@ import sparse_util;
 import segment_iter;
 import segment_entry;
 import infinity_exception;
+import third_party;
+import logger;
 
 namespace infinity {
 
-BMPIndexInMem::BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
-    : begin_row_id_(begin_row_id), bmp_(InitAbstractIndex(index_base, column_def)) {
+MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
+    auto *table_index_entry = segment_index_entry_->table_index_entry();
+    SharedPtr<String> index_name = table_index_entry->GetIndexName();
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    SharedPtr<String> table_name = table_entry->GetTableName();
+    SharedPtr<String> db_name = table_entry->GetDBName();
+
+    auto [mem_used, row_cnt] = std::visit(
+        [](auto &&index) -> Pair<SizeT, SizeT> {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return {};
+            } else {
+                return {index->MemoryUsage(), index->DocNum()};
+            }
+        },
+        bmp_);
+    return MemIndexTracerInfo(index_name, table_name, db_name, mem_used, row_cnt);
+}
+
+TableIndexEntry *BMPIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
+
+BMPIndexInMem::BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry)
+    : begin_row_id_(begin_row_id), bmp_(InitAbstractIndex(index_base, column_def)), segment_index_entry_(segment_index_entry) {
     const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
     const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
     SizeT term_num = sparse_info->Dimension();
@@ -68,14 +92,16 @@ BMPIndexInMem::~BMPIndexInMem() {
         return;
     }
     std::visit(
-        [](auto &&index) {
+        [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return;
             } else {
+                SizeT mem_used = index->MemoryUsage();
                 if (index != nullptr) {
                     delete index;
                 }
+                DecreaseMemoryUsageBase(mem_used);
             }
         },
         bmp_);
@@ -94,6 +120,7 @@ SizeT BMPIndexInMem::GetRowCount() const {
         bmp_);
 }
 
+// realtime insert, trace this
 void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count) {
     std::visit(
         [&](auto &&index) {
@@ -103,9 +130,12 @@ void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_e
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
-
+                SizeT mem_before = index->MemoryUsage();
                 MemIndexInserterIter<SparseRefT> iter(block_offset, block_column_entry, buffer_mgr, row_offset, row_count);
                 index->AddDocs(std::move(iter));
+                SizeT mem_after = index->MemoryUsage();
+                IncreaseMemoryUsageBase(mem_after - mem_before);
+                LOG_INFO(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
             }
         },
         bmp_);
@@ -133,7 +163,7 @@ void BMPIndexInMem::AddDocs(const SegmentEntry *segment_entry, BufferManager *bu
         bmp_);
 }
 
-SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const {
+SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size) {
     if (!own_memory_) {
         UnrecoverableError("BMPIndexInMem::Dump() called with own_memory_ = false.");
     }
@@ -147,6 +177,9 @@ SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_
             } else {
                 row_count = index->DocNum();
                 index_size = index->GetSizeInBytes();
+                if (dump_size != nullptr) {
+                    *dump_size = index->MemoryUsage();
+                }
             }
         },
         bmp_);

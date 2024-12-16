@@ -53,7 +53,7 @@ void TermDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&colum
     column_length_reader_ = std::move(column_length_reader);
     avg_column_len_ = column_length_reader_->GetAvgColumnLength();
     total_df_ = column_length_reader_->GetTotalDF();
-    const float smooth_idf = std::log(1.0F + (column_length_reader_->GetTotalDF() - doc_freq_ + 0.5F) / (doc_freq_ + 0.5F));
+    const float smooth_idf = std::log1p((column_length_reader_->GetTotalDF() - doc_freq_ + 0.5F) / (doc_freq_ + 0.5F));
     bm25_common_score_ = weight_ * smooth_idf * (k1 + 1.0F);
     bm25_score_upper_bound_ = bm25_common_score_ / (1.0F + k1 * b / avg_column_len_);
     f1 = k1 * (1.0F - b);

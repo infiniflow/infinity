@@ -29,7 +29,7 @@ struct BlockData<DataType, BMPCompressType::kCompressed> {
 public:
     void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
 
-    void AddBlock(BMPBlockID block_id, DataType max_score);
+    void AddBlock(BMPBlockID block_id, DataType max_score, SizeT &mem_usage);
 
     void Prefetch() const;
 
@@ -48,7 +48,7 @@ public:
     // template <bool UseSIMD = false>
     void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
 
-    void AddBlock(BMPBlockID block_id, DataType max_score);
+    void AddBlock(BMPBlockID block_id, DataType max_score, SizeT &mem_usage);
 
     void Prefetch() const;
 

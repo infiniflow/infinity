@@ -36,26 +36,26 @@ Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 query TTIR rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs"', 'topn=3;block_max=compare') USING INDEXES ('ft_index');
 ----
-Anarchism 30-APR-2012 03:25:17.000 6 46.196758
+Anarchism 30-APR-2012 03:25:17.000 6 20.753590
 
 # only phrase
 query TTIR rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs"', 'topn=3;block_max=compare');
 ----
-Anarchism 30-APR-2012 03:25:17.000 6 46.196758
+Anarchism 30-APR-2012 03:25:17.000 6 20.753590
 
 # phrase and term
 query TTIR rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs" harmful', 'topn=3');
 ----
 Anarchism 30-APR-2012 03:25:17.000 0 22.299635
-Anarchism 30-APR-2012 03:25:17.000 6 46.196758
+Anarchism 30-APR-2012 03:25:17.000 6 20.753590
 
 # phrase and term
 query TTIR rowsort
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs" harmful', 'topn=3;threshold=40');
+SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs" harmful', 'topn=3;threshold=21.5');
 ----
-Anarchism 30-APR-2012 03:25:17.000 6 46.196758
+Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 
 # copy data from csv file
 query I

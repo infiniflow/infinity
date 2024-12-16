@@ -36,7 +36,7 @@ public:
     BMPIvt(SizeT term_num) : postings_(term_num) {}
 
     template <typename IdxType>
-    void AddBlock(BMPBlockID block_id, const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &tail_terms);
+    void AddBlock(BMPBlockID block_id, const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &tail_terms, SizeT &mem_usage);
 
     void Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores);
 
@@ -86,7 +86,7 @@ public:
 
     BlockFwd(SizeT block_size) : block_size_(block_size), tail_fwd_(block_size) {}
 
-    Optional<TailFwd<DataType, IdxType>> AddDoc(const SparseVecRef<DataType, IdxType> &doc);
+    Optional<TailFwd<DataType, IdxType>> AddDoc(const SparseVecRef<DataType, IdxType> &doc, SizeT &mem_usage);
 
     Vector<Pair<Vector<IdxType>, Vector<DataType>>> GetFwd(SizeT doc_num, SizeT term_num) const;
 
@@ -151,6 +151,8 @@ public:
 
     SizeT GetSizeInBytes() const;
 
+    inline SizeT MemoryUsage() const { return mem_usage_.load(); }
+
 private:
     void WriteAdv(char *&p) const;
 
@@ -160,6 +162,7 @@ private:
     BMPIvt<DataType, CompressType> bm_ivt_;
     BlockFwd<DataType, IdxType> block_fwd_;
     Vector<BMPDocID> doc_ids_;
+    Atomic<SizeT> mem_usage_ = 0;
 
     mutable std::shared_mutex mtx_;
 };

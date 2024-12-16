@@ -14,9 +14,9 @@
 
 module;
 
+#include "common/simd/simd_common_intrin_include.h"
 #include <algorithm>
 #include <vector>
-#include "common/simd/simd_common_intrin_include.h"
 
 module bmp_alg;
 
@@ -25,12 +25,15 @@ import third_party;
 import serialize;
 import segment_iter;
 import bp_reordering;
+import bmp_blockterms;
 
 namespace infinity {
 
 template <typename DataType, BMPCompressType CompressType>
 template <typename IdxType>
-void BMPIvt<DataType, CompressType>::AddBlock(BMPBlockID block_id, const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &tail_terms) {
+void BMPIvt<DataType, CompressType>::AddBlock(BMPBlockID block_id,
+                                              const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &tail_terms,
+                                              SizeT &mem_usage) {
     HashMap<IdxType, DataType> max_scores;
     for (const auto &[indices, data] : tail_terms) {
         SizeT block_size = indices.size();
@@ -41,7 +44,7 @@ void BMPIvt<DataType, CompressType>::AddBlock(BMPBlockID block_id, const Vector<
         }
     }
     for (const auto &[term_id, score] : max_scores) {
-        postings_[term_id].data_.AddBlock(block_id, score);
+        postings_[term_id].data_.AddBlock(block_id, score, mem_usage);
     }
 }
 
@@ -144,7 +147,7 @@ template class TailFwd<f64, i16>;
 template class TailFwd<f64, i8>;
 
 template <typename DataType, typename IdxType>
-Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
+Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc, SizeT &mem_usage) {
     SizeT tail_size = tail_fwd_.AddDoc(doc);
     if (tail_size < block_size_) {
         return None;
@@ -154,6 +157,7 @@ Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const S
 
     Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms = tail_fwd1.ToBlockFwd();
     block_terms_list_.emplace_back(block_terms);
+    mem_usage += block_terms_list_.back().GetSizeInBytes();
     return tail_fwd1;
 }
 
@@ -242,14 +246,17 @@ void BMPAlg<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType
         lock = std::unique_lock(mtx_);
     }
 
+    SizeT mem_usage = 0;
     doc_ids_.push_back(doc_id);
-    Optional<TailFwd<DataType, IdxType>> tail_fwd = block_fwd_.AddDoc(doc);
+    Optional<TailFwd<DataType, IdxType>> tail_fwd = block_fwd_.AddDoc(doc, mem_usage);
     if (!tail_fwd.has_value()) {
+        mem_usage_.fetch_add(sizeof(BMPDocID) + mem_usage);
         return;
     }
     BMPBlockID block_id = block_fwd_.block_num() - 1;
     const auto &tail_terms = tail_fwd->GetTailTerms();
-    bm_ivt_.AddBlock(block_id, tail_terms);
+    bm_ivt_.AddBlock(block_id, tail_terms, mem_usage);
+    mem_usage_.fetch_add(sizeof(BMPDocID) + mem_usage);
 }
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
