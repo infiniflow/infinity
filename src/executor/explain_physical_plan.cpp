@@ -239,11 +239,11 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
             break;
         }
         case PhysicalOperatorType::kSource: {
-//            Explain((PhysicalSource *)op, result, intent_size);
+            Explain((PhysicalSource *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kSink: {
-//            Explain((PhysicalSink *)op, result, intent_size);
+            Explain((PhysicalSink *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kInvalid: {

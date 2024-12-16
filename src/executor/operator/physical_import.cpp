@@ -821,8 +821,12 @@ void PhysicalImport::CSVRowHandler(void *context) {
             auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
             column_vector.AppendByConstantExpr(const_expr);
         } else {
-            Status status = Status::ImportFileFormatError(
-                fmt::format("No value in column {} in CSV of row number: {}", column_def->name_, parser_context->row_count_));
+            Status status =
+                Status::ImportFileFormatError(fmt::format("No value in column {} index {} in CSV of row number: {}, current row has column count: {}",
+                                                          column_def->name_,
+                                                          column_idx,
+                                                          parser_context->row_count_,
+                                                          column_count));
             RecoverableError(status);
         }
     }

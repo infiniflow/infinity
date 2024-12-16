@@ -152,9 +152,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             String cmd = set_command->value_str();
                             ResultCacheManager *cache_mgr = query_context->storage()->GetResultCacheManagerPtr();
                             const String &result_cache_status = config->ResultCache();
+
                             if (result_cache_status == "off" && cmd != "on") {
-                                Status status = Status::InvalidCommand(fmt::format("Result cache manager is off"));
-                                RecoverableError(status);
+                                return true;
                             }
                             if (cmd == "on") {
                                 config->SetCacheResult("on");
