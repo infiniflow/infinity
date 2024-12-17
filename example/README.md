@@ -28,7 +28,7 @@ We provide several SHELL scripts in the **/example/http** directory, and you nee
 sudo apt install curl
 ```
 
-The HTTP API only works for the server version of Infinity. Once the Infinity server is started, users can run these scripts using commands similar to the following
+The HTTP APIs work only with the Infinity server. Ensure that an Infinity server is running properly before executing these scripts:
 
 ```shell
 bash http/create_list_show_database.sh
