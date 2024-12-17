@@ -15,9 +15,10 @@
 module;
 #include <cassert>
 import stl;
+import infinity_exception;
+import third_party;
 module fst;
 import :bytes;
-import :error;
 import :node;
 import :registry;
 import :writer;
@@ -89,19 +90,29 @@ CompiledAddr FstBuilder::Compile(BuilderNode &node) {
     return last_addr_;
 }
 
+String FormatBytes(u8 *bs_data, SizeT bs_len) {
+    String output = "[";
+    for (SizeT i = 0; i < bs_len; i++) {
+        output += fmt::format("{:02X}", bs_data[i]);
+    }
+    output += "]";
+    return output;
+}
+
 void FstBuilder::CheckLastKey(u8 *bs_ptr, SizeT bs_len, bool check_dupe) {
     if (last_.empty())
         return;
     if (check_dupe && last_.size() == bs_len && std::memcmp(last_.data(), bs_ptr, bs_len) == 0)
-        throw FstError::DuplicatedKey(bs_ptr, bs_len);
+        UnrecoverableError(fmt::format("FST duplicated key {}", FormatBytes(bs_ptr, bs_len)));
     SizeT min_len = std::min(static_cast<SizeT>(last_.size()), bs_len);
     for (SizeT i = 0; i < min_len; i++) {
         if (last_[i] > bs_ptr[i]) {
-            throw FstError::OutOfOrder(last_.data(), last_.size(), bs_ptr, bs_len);
+            UnrecoverableError(
+                fmt::format("Out of order key, prev {}, got {}", FormatBytes(last_.data(), last_.size()), FormatBytes(bs_ptr, bs_len)));
         }
     }
     if (bs_len < min_len)
-        throw FstError::OutOfOrder(last_.data(), last_.size(), bs_ptr, bs_len);
+        UnrecoverableError(fmt::format("Out of order key, prev {}, got {}", FormatBytes(last_.data(), last_.size()), FormatBytes(bs_ptr, bs_len)));
     last_.clear();
     last_.insert(last_.end(), bs_ptr, bs_ptr + bs_len);
 }

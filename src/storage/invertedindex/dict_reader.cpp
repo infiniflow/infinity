@@ -35,7 +35,11 @@ DictionaryReader::DictionaryReader(const String &dict_path, const PostingFormatO
     }
     // fst_root_addr + addr_offset(21) == fst_len
     SizeT fst_root_addr = ReadU64LE(data_ptr_ + data_len_ - 4 - 8);
-    SizeT fst_len = fst_root_addr + 21;
+    SizeT fst_len;
+    if (fst_root_addr == 0UL)
+        fst_len = 36;
+    else
+        fst_len = fst_root_addr + 21;
     u8 *fst_data = data_ptr_ + (data_len_ - fst_len);
     fst_ = MakeUnique<Fst>(fst_data, fst_len);
     s_ = MakeUnique<FstStream>(*fst_);

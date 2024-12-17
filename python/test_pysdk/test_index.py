@@ -657,8 +657,9 @@ class TestInfinity:
             "test_insert_data_fulltext_index_search" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.parametrize("offline", [False, True])
     @pytest.mark.parametrize("file_format", ["csv"])
-    def test_empty_fulltext_index(self, file_format, suffix):
+    def test_empty_fulltext_index(self, file_format, suffix, offline):
         # prepare data for insert
         column_names = ["doctitle", "docdate", "body"]
         df = pandas.read_csv(os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format,
@@ -676,6 +677,16 @@ class TestInfinity:
             "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "body2": {"type": "varchar", "default":""}
         }, ConflictType.Error)
 
+        if not offline:
+            res = table_obj.create_index("body_index",
+                                        index.IndexInfo("body",
+                                                        index.IndexType.FullText))
+            assert res.error_code == ErrorCode.OK
+            res = table_obj.create_index("body2_index",
+                                        index.IndexInfo("body2",
+                                                        index.IndexType.FullText))
+            assert res.error_code == ErrorCode.OK
+
         # Create 99*300/8192 = 3.6 BlockEntry to test MemIndexRecover and OptimizeIndex
         for it in range(300):
             value = []
@@ -689,16 +700,21 @@ class TestInfinity:
                 value.append({"doctitle": data["doctitle"][i],
                               "docdate": data["docdate"][i], "body": ""})
             table_obj.insert(value)
-        time.sleep(5)
 
-        res = table_obj.create_index("body_index",
-                                     index.IndexInfo("body",
-                                                     index.IndexType.FullText))
-        assert res.error_code == ErrorCode.OK
-        res = table_obj.create_index("body2_index",
-                                     index.IndexInfo("body2",
-                                                     index.IndexType.FullText))
-        assert res.error_code == ErrorCode.OK
+        time.sleep(5)
+        if offline:
+            res = table_obj.create_index("body_index",
+                                        index.IndexInfo("body",
+                                                        index.IndexType.FullText))
+            assert res.error_code == ErrorCode.OK
+            res = table_obj.create_index("body2_index",
+                                        index.IndexInfo("body2",
+                                                        index.IndexType.FullText))
+            assert res.error_code == ErrorCode.OK
+        else:
+            table_obj.optimize("body_index", {})
+            table_obj.optimize("body2_index", {})
+            time.sleep(5)
 
         res, extra_result = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
             "body^5", "harmful chemical", 3).to_pl()

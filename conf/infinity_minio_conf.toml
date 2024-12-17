@@ -32,7 +32,7 @@ cleanup_interval         = "60s"
 compact_interval         = "120s"
 storage_type             = "minio"
 # dump memory index entry when it reachs the capacity
-mem_index_capacity       = 1048576
+mem_index_capacity       = 65536
 
 [storage.object_storage]
 url                      = "127.0.0.1:9005"

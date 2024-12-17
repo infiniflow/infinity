@@ -26,7 +26,7 @@ optimize_interval        = "1day"  # Changed to "1day"
 cleanup_interval         = "60s"
 compact_interval         = "120s"
 
-mem_index_capacity       = 1048576
+mem_index_capacity       = 8192
 
 [buffer]
 buffer_manager_size      = "4GB"

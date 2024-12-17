@@ -40,6 +40,35 @@ protected:
     }
 };
 
+TEST_F(FstTest, BuildMemEmpty) {
+    Vector<u8> buffer;
+    BufferWriter wtr(buffer);
+    FstBuilder builder(wtr);
+    builder.Finish();
+    u64 written = builder.BytesWritten();
+    EXPECT_EQ(written, 32); // written doesn't include the checksum
+    EXPECT_EQ(buffer.size(), 36);
+
+    Fst f(buffer.data(), buffer.size());
+    f.Verify();
+    EXPECT_EQ(f.IsEmpty(), true);
+    EXPECT_EQ(f.Len(), 0);
+    EXPECT_EQ(f.Size(), 36);
+    EXPECT_EQ(f.RootAddr(), 0UL);
+}
+
+TEST_F(FstTest, BuildFileEmpty) {
+    String fst_path = String(GetFullTmpDir()) + "/empty.fst";
+    std::ofstream ofs(fst_path, std::ios::binary | std::ios::trunc);
+    OstreamWriter wtr(ofs);
+    FstBuilder builder(wtr);
+    builder.Finish();
+    u64 written = builder.BytesWritten();
+    ofs.close();
+    EXPECT_EQ(written, 32); // written doesn't include the checksum
+    EXPECT_EQ(std::filesystem::file_size(fst_path), 36);
+}
+
 TEST_F(FstTest, BuildMem) {
     Vector<u8> buffer;
     BufferWriter wtr(buffer);
@@ -77,6 +106,9 @@ TEST_F(FstTest, Get) {
 
     Fst f(buffer.data(), buffer.size());
     f.Verify();
+    EXPECT_EQ(f.IsEmpty(), false);
+    EXPECT_EQ(f.Len(), months.size());
+    EXPECT_GT(f.Size(), 36);
     u64 val;
     for (auto &month : months) {
         bool found = f.Get((u8 *)month.first.c_str(), month.first.length(), val);
@@ -96,6 +128,9 @@ TEST_F(FstTest, Iterate) {
 
     Fst f(buffer.data(), buffer.size());
     f.Verify();
+    EXPECT_EQ(f.IsEmpty(), false);
+    EXPECT_EQ(f.Len(), months.size());
+    EXPECT_GT(f.Size(), 36);
     FstStream s(f);
     Vector<u8> key;
     u64 val;

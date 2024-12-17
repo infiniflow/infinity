@@ -108,7 +108,7 @@ export {
     constexpr SizeT MAX_OPTIMIZE_INTERVAL_SEC = 60 * 60 * 24 * 30;        // 1 month
 
     constexpr SizeT MIN_MEMINDEX_CAPACITY = DEFAULT_BLOCK_CAPACITY;           // 1 Block
-    constexpr SizeT DEFAULT_MEMINDEX_CAPACITY = 128 * DEFAULT_BLOCK_CAPACITY; // 128 * 8192 = 1M rows
+    constexpr SizeT DEFAULT_MEMINDEX_CAPACITY = 8 * DEFAULT_BLOCK_CAPACITY;   // 8 * 8192 = 65536 rows
     constexpr SizeT MAX_MEMINDEX_CAPACITY = DEFAULT_SEGMENT_CAPACITY;         // 1 Segment
 
     constexpr i64 MIN_WAL_FILE_SIZE_THRESHOLD = 1024;                                    // 1KB

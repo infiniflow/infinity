@@ -914,7 +914,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
                 Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = table_index_entry->GetIndexBySegmentSnapshot(this, txn);
                 for (auto &[segment_id, segment_index_entry] : index_by_segment) {
-                    if (!segment_index_entry->TrySetOptimizing()) {
+                    if (!segment_index_entry->TrySetOptimizing(txn)) {
                         LOG_INFO(fmt::format("Index {} segment {} is optimizing, skip optimize.", index_name, segment_id));
                         continue;
                     }

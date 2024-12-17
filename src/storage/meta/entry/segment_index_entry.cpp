@@ -697,8 +697,6 @@ void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<
         ss << old_chunk->chunk_id_ << ", ";
     }
     LOG_INFO(ss.str());
-
-    ResetOptimizing();
 }
 
 void SegmentIndexEntry::OptIndex(IndexBase *index_base,
@@ -866,7 +864,8 @@ void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
 
 ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry) {
     const auto &index_name = *table_index_entry_->GetIndexName();
-    if (!TrySetOptimizing()) {
+    Txn *txn = txn_table_store->GetTxn();
+    if (!TrySetOptimizing(txn)) {
         LOG_INFO(fmt::format("Index {} segment {} is optimizing, skip optimize.", index_name, segment_id_));
         return nullptr;
     }
@@ -878,7 +877,6 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
         }
     });
 
-    Txn *txn = txn_table_store->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
     const IndexBase *index_base = table_index_entry_->index_base();
     SharedPtr<ColumnDef> column_def = table_index_entry_->column_def();
@@ -1225,15 +1223,20 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     return segment_index_entry;
 }
 
-bool SegmentIndexEntry::TrySetOptimizing() {
+bool SegmentIndexEntry::TrySetOptimizing(Txn *txn) {
     bool expected = false;
-    return optimizing_.compare_exchange_strong(expected, true);
+    bool success = optimizing_.compare_exchange_strong(expected, true);
+    if (!success) {
+        return false;
+    }
+    TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
+    TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
+    TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_);
+    txn_index_store->AddSegmentOptimizing(this);
+    return true;
 }
 
-void SegmentIndexEntry::ResetOptimizing() {
-    bool expected = true;
-    optimizing_.compare_exchange_strong(expected, false);
-}
+void SegmentIndexEntry::ResetOptimizing() { optimizing_.store(false); }
 
 Pair<u64, u32> SegmentIndexEntry::GetFulltextColumnLenInfo() {
     std::shared_lock lock(rw_locker_);

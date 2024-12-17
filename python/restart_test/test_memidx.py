@@ -729,3 +729,28 @@ class TestMemIdx:
             assert data_dict["c1"] == [1, 2]
 
         part2()
+
+    def test_optimize_empty_index(self, infinity_runner: InfinityRunner):
+        infinity_runner.clear()
+        config = "test/data/config/restart_test/test_memidx/6.toml"
+        uri = common_values.TEST_LOCAL_HOST
+
+        table_name = "t1"
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+
+        @decorator
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, ConflictType.Ignore)
+            table_obj = db_obj.create_table(table_name, {"c1": {"type": "int"}, "c2": {"type": "varchar"}})
+            table_obj.create_index("idx1", index.IndexInfo("c2", index.IndexType.FullText))
+
+            insert_n = 8192*3
+            for i in range(insert_n):
+                table_obj.insert([{"c1": i, "c2": ""}])
+
+            time.sleep(3)
+
+            db_obj.drop_table(table_name)
+
+        part1()

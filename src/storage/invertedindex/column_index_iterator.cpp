@@ -53,8 +53,12 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
 }
 
 ColumnIndexIterator::~ColumnIndexIterator() {
-    ByteSlice::DestroySlice(doc_list_slice_);
-    ByteSlice::DestroySlice(pos_list_slice_);
+    if (doc_list_slice_ != nullptr) {
+        ByteSlice::DestroySlice(doc_list_slice_);
+    }
+    if (pos_list_slice_ != nullptr) {
+        ByteSlice::DestroySlice(pos_list_slice_);
+    }
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;

@@ -28,6 +28,9 @@ ByteSlice *ByteSlice::NewSlice(u8 *data, SizeT data_size) {
 }
 
 void ByteSlice::DestroySlice(ByteSlice *slice) {
+    if (slice == nullptr) {
+        return;
+    }
     u8 *mem = (u8 *)slice;
     if (slice->owned_) {
         delete[] mem;
