@@ -54,7 +54,7 @@ try:
                 }]
         )
 
-    table_instance.create_index("index1", infinity.index.IndexInfo("id", infinity.index.IndexType.Secondary))
+    table_instance.create_index("index1", infinity.index.IndexInfo("id", infinity.index.IndexType.Secondary), infinity.common.ConflictType.Ignore, "secondary_index1")
     res, extra_result = table_instance.filter("id='ID_1'").output(["*"]).to_pl()
     print(res)
     if extra_result is not None:
