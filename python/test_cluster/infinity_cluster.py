@@ -251,6 +251,7 @@ class InfinityCluster:
 
         try:
             self.minio_container = docker_client.containers.get(container_name)
+            print(self.minio_container)
             self.minio_container.start()
             self.logger.debug(f"Minio container {container_name} already exists.")
         except docker.errors.NotFound:
