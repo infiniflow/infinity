@@ -8,7 +8,7 @@ The Python scripts in the current directory provides the examples of the infinit
 pip install infinity-sdk==0.5.0.dev7
 ```
 
-If you are using the embedded version of infinity, you need to use the following command to install it
+To use Infinity locally as a Python module, install the Infinity Embedded SDK:
 
 ```shell
 pip install infinity-embedded-sdk==0.5.0.dev7
