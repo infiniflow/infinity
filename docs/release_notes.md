@@ -9,7 +9,7 @@ Key features, improvements and bug fixes in the latest releases.
 
 ## v0.5.0
 
-Released on December 18, 2004.
+Released on December 18, 2024.
 
 ### New features
 

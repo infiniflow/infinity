@@ -1799,7 +1799,7 @@ curl --request GET \
         [
             "body"
         ],
-        "filter": "score >= 4.0",
+        "filter": "score >= 4.0 and name = '"'Toby'"'",
         "search":
         [
             {
@@ -1882,7 +1882,7 @@ curl --request GET \
       where each 'K' represents a parameter name and 'V' represents its value
     - Available parameters in 'extra_options':
       - **'minimum_should_match'**: specifies how many clauses in the 'matching_text' should be satisfied at least.
-        It can be in the following format:
+        It can be in the following formats:
         - Positive integer `N`: at least `N` clauses should be satisfied.
         - Negative integer `-N`: at least (total clause count - `N`) clauses should be satisfied.
         - Positive Percentage `N%`: at least `⌊total clause count * N%⌋` clauses should be satisfied.
