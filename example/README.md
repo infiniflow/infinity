@@ -14,7 +14,7 @@ To use Infinity locally as a Python module, install the Infinity Embedded SDK:
 pip install infinity-embedded-sdk==0.5.0.dev7
 ```
 
-Once the installation of the SDK is completed, you can use commands similar to the following to run these examples:
+Once the installation completes, run some simple examples:
 
 ```shell
 python simple_example.py
