@@ -1403,6 +1403,7 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
   - `csv`
   - `json`
   - `jsonl`
+  - `parquet`
 
 #### Returns
 
@@ -1426,6 +1427,12 @@ table_object.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file
 
 ```python
 table_object.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "jsonl"})
+```
+
+##### Import a parquet file
+
+```python
+table_object.import_data(os.getcwd() + "/your_file.parquet", {"file_type": "parquet"})
 ```
 
 ---
@@ -1460,6 +1467,7 @@ Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2
   The type of the exported file. Supported file types include:
   - `csv`
   - `jsonl`
+  - `parquet`
   
 - **offset**: `int`, *Optional*  
   Index specifying the starting row for export. Usually used in conjunction with `limit`. If not specified, the file export starts from the first row. 
@@ -1496,6 +1504,12 @@ table_object.export_data(os.getcwd() + "/export_data.csv", {"header": True, "fil
 
 ```python
 table_object.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
+```
+
+##### Export your table to a parquet file
+
+```python
+table_object.export_data(os.getcwd() + "/export_data.parquet", {"file_type": "parquet")
 ```
 
 ---
