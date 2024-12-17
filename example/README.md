@@ -22,7 +22,7 @@ python simple_example.py
 
 ## HTTP examples
 
-The SHELL script in the HTTP directory is the examples of Infinity HTTP API. Users need to install `curl` to run these scripts. For Debian/Ubuntu users, they can use the following command to install `curl`:
+We provide several SHELL scripts in the **/example/http** directory, and you need to install `curl` to run these scripts. For Debian or Ubuntu users, use the following command:
 
 ```shell
 sudo apt install curl
