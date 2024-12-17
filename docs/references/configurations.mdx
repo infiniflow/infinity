@@ -146,7 +146,7 @@ compact_interval         = "120s"
 # When the number of rows in the index exceeds this threshold,
 # the system performs a flush operation on that index.
 # Range: [8192, 8388608]
-mem_index_capacity       = 1048576
+mem_index_capacity       = 65536
 # The type of storage to use. Available options:
 # - `"local"`: (default)
 # - `"minio"`: If you set `server_mode` to `"admin"` and `storage_type` to `"minio"`, the node will start as a cluster node in `ADMIN` mode.
