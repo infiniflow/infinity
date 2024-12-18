@@ -33,13 +33,6 @@ def is_port_in_use(port: int) -> bool:
         return s.connect_ex(("localhost", port)) == 0
 
 
-class MinioParams:
-    def __init__(self, minio_dir: str, minio_port: int, minio_console_port: int):
-        self.minio_dir = minio_dir
-        self.minio_port = minio_port
-        self.minio_console_port = minio_console_port
-
-
 class BaseInfinityRunner:
 
     def __init__(
@@ -161,14 +154,13 @@ class InfinityRunner(BaseInfinityRunner):
 
 class InfinityCluster:
     def __init__(
-        self, executable_path: str, *, minio_params: MinioParams, test_name: str = None
+        self, executable_path: str, *, test_name: str = None
     ):
         self.executable_path = executable_path
         self.runners: dict[str, InfinityRunner] = {}
         self.leader_runner: InfinityRunner | None = None
         self.leader_name = None
         self.logger_name = test_name
-        self.minio_params = minio_params
 
     def _log_filename(self):
         if self.logger_name is None:
@@ -190,7 +182,6 @@ class InfinityCluster:
 
     def __enter__(self):
         self.init_logger(self.logger_name)
-        self.add_minio(self.minio_params)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -218,9 +209,6 @@ class InfinityCluster:
         if os.path.exists(log_file):
             os.remove(log_file)
 
-        # if self.minio_container is not None:
-        #     self.minio_container.remove(force=True, v=True)
-
     def add_node(self, node_name: str, config_path: str, init=True):
         runner = InfinityRunner(
             node_name, self.executable_path, config_path, init, self.logger
@@ -241,33 +229,6 @@ class InfinityCluster:
         if node_name in self.runners:
             raise ValueError(f"Node {node_name} already exists in the cluster.")
         self.runners[node_name] = runner
-
-    def add_minio(self, minio_params: MinioParams):
-        minio_image_name = "quay.io/minio/minio"
-
-        minio_cmd = f'server /data --address ":{minio_params.minio_port}" --console-address ":{minio_params.minio_console_port}"'
-        docker_client = docker.from_env()
-        container_name = "minio_host"
-
-        try:
-            self.minio_container = docker_client.containers.get(container_name)
-            print(self.minio_container)
-            self.minio_container.start()
-            self.logger.debug(f"Minio container {container_name} already exists.")
-        except docker.errors.NotFound:
-            self.minio_container = docker_client.containers.run(
-                image=minio_image_name,
-                name=container_name,
-                detach=True,
-                environment=[
-                    "MINIO_ROOT_PASSWORD=minioadmin",
-                    "MINIO_ROOT_USER=minioadmin",
-                ],
-                volumes=[f"{minio_params.minio_dir}:/data"],
-                command=minio_cmd,
-                network="host",
-            )
-            self.logger.debug(f"Minio container {container_name} created.")
 
     def set_standalone(self, node_name: str):
         if self.leader_runner is not None and self.leader_name == node_name:
