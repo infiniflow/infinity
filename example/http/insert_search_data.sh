@@ -26,6 +26,10 @@ curl --request POST \
                   "type": "integer"
              },
              {
+                  "name": "name",
+                  "type": "varchar"
+             },
+             {
                   "name": "body",
                   "type": "varchar"
              },
@@ -58,6 +62,7 @@ curl --request POST \
      [
          {
              "num": 1,
+             "name": "Tom",
              "body": "unnecessary and harmful",
              "vec": [1.0, 1.2, 0.8, 0.9],
              "sparse_column": {"10":1.1, "20":2.2, "30": 3.3},
@@ -66,6 +71,7 @@ curl --request POST \
          },
          {
              "num": 2,
+             "name": "Jerry",
              "body": "Office for Harmful Blooms",
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column": {"40":4.4, "50":5.5, "60": 6.6},
@@ -74,6 +80,7 @@ curl --request POST \
          },
          {
              "num": 3,
+             "name": "Mark",
              "body": "A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
              "vec": [4.0, 4.2, 4.3, 4.2],
              "sparse_column":  {"70":7.7, "80":8.8, "90": 9.9},
@@ -82,6 +89,7 @@ curl --request POST \
          },
          {
              "num": 4,
+             "name": "William",
              "body": "The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.",
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
@@ -102,6 +110,36 @@ curl --request GET \
          [
              "*"
          ]
+     } '
+
+# show all rows of 'tbl1' filter by name='Tom'
+echo -e '\n\n-- select all rows of tbl1 filter by name=Tom'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "*"
+         ],
+         "filter": "name = '"'Tom'"'"
+     } '
+
+# show all rows of 'tbl1' filter by name='Tom'
+echo -e '\n\n-- select all rows of tbl1 filter by name=Tom'
+curl --request GET \
+     --url http://localhost:23820/databases/default_db/tables/tbl1/docs \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data '
+     {
+         "output":
+         [
+             "*"
+         ],
+         "filter": "name = '\''Tom'\'' and num > 0"
      } '
 
 # select num and year of 'tbl1' and order by num descending, year ascending
