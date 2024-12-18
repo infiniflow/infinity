@@ -17,7 +17,7 @@ Released on December 18, 2024.
 - Implements 8-bit scalar quantization and product quantization in the IVF index.
 - Supports using Hamming distance as metric when matching/searching binary vectors.
 - Implements query result caching and pagination.
-- Supports specifying comments when creating database or table.
+- Supports specifying comments when creating database or index.
 - Supports regular expressions (regex), including md5，substring, lower, upper, ltrim, rtrim, trim, char_posiition, sqrt, round, ceil, floor, IN, isnan, isinf, and isfinite
 - Enhances the search performance for full-text searches with multiple terms/clauses.
 - Supports using `MinimumShouldMatch` as a full-text filter.
