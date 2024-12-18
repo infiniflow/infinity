@@ -248,7 +248,7 @@ nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
         std::shared_lock r_lock(rw_locker_);
         for (const auto &[segment_id, index_entry] : this->index_by_segment_) {
-            if (index_entry->commit_ts_ <= max_commit_ts && !index_entry->deleted_) {
+            if (!index_entry->CheckDeprecate(max_commit_ts)) {
                 segment_index_entry_candidates.push_back(index_entry);
             }
         }
