@@ -482,22 +482,20 @@ void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {
     Vector<SegmentID> segment_ids;
     {
         std::shared_lock r_lock(rw_locker_);
-        for (auto iter = index_by_segment_.begin(); iter != index_by_segment_.end();) {
-            auto &[segment_id, segment_index_entry] = *iter;
+        for (auto &[segment_id, segment_index_entry] : index_by_segment_) {
             if (segment_index_entry->CheckDeprecate(visible_ts)) {
-                scanner->AddEntry(std::move(segment_index_entry));
                 segment_ids.push_back(segment_id);
-                ++iter;
             } else {
                 segment_index_entry->PickCleanup(scanner);
-                ++iter;
             }
         }
     }
     if (!segment_ids.empty()) {
         std::unique_lock w_lock(rw_locker_);
         for (auto segment_id : segment_ids) {
-            index_by_segment_.erase(segment_id);
+            auto iter = index_by_segment_.find(segment_id);
+            scanner->AddEntry(std::move(iter->second));
+            index_by_segment_.erase(iter);
         }
     }
 }
