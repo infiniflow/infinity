@@ -140,7 +140,7 @@ infinity_object.disconnect()
 ### create_database
 
 ```python
-infinity_object.create_database(db_name, conflict_type = ConflictType.Error)
+infinity_object.create_database(db_name, conflict_type = ConflictType.Error, comment = None)
 ```
 
 Creates a database with a specified name.
@@ -176,6 +176,10 @@ from infinity.common import ConflictType
 If `ConflictType` is not set, it defaults to `Error`.
 :::
 
+##### comment: `str`, *Optional*
+
+Additional comment for the database to create.
+
 #### Returns
 
 - Success: An `infinity.local_infinity.db.LocalDatabase` object in embedded mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
@@ -194,14 +198,14 @@ infinity_object.create_database("my_database")
 ```python
 # Create a database named 'my_database':
 # If the specified database already exists, raise an error (same as above). 
-infinity_object.create_database("my_database", infinity.common.ConflictType.Error)
+infinity_object.create_database("my_database", infinity.common.ConflictType.Error, comment="Database One")
 ```
 
 ```python
 from infinity.common import ConflictType
 # Create a database named 'my_database':
 # If the specified database already exists, silently ignore the operation and proceed. 
-infinity_object.create_database("my_database", ConflictType.Ignore)
+infinity_object.create_database("my_database", ConflictType.Ignore, comment="Database One")
 ```
 
 ---
@@ -856,7 +860,7 @@ res = db_object.show_table('my_table')
 ### create_index
 
 ```python
-table_object.create_index(index_name, index_info, conflict_type = ConflictType.Error)
+table_object.create_index(index_name, index_info, conflict_type = ConflictType.Error, comment = None)
 ```
 
 Creates an index on a specified column.
@@ -968,6 +972,10 @@ from infinity.common import ConflictType
 If `ConflictType` is not set, it defaults to `Error`.
 :::
 
+##### comment: `str`, *Optional*
+
+Additional comment for the index to create.
+
 #### Returns
 
 A structure containing these attributes:
@@ -991,7 +999,7 @@ table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector
 # - "ef_construction": "50",
 # - "encode": "plain"
 # Only the "metric" parameter (required) is explicitly set to L2 distance. 
-table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}))
+table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}), comment="Index One")
 ```
 
 ```python {1}
@@ -1028,7 +1036,7 @@ table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "multiv
 # - "ef_construction": "50",
 # - "encode": "plain"
 # Only the "metric" parameter (required) is explicitly set to L2 distance. 
-table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}))
+table_object.create_index("my_index", IndexInfo("c1", IndexType.Hnsw, {"metric": "l2"}))
 ```
 
 ##### Create a full-text index
