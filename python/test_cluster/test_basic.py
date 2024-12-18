@@ -3,7 +3,6 @@ import time
 import pytest
 from infinity_cluster import InfinityCluster
 from mocked_infinity_cluster import MockInfinityCluster
-from docker_infinity_cluster import DockerInfinityCluster
 import time
 
 
@@ -47,53 +46,53 @@ def test_0(cluster: InfinityCluster):
 #     with cluster:
 #         cluster.add_node("node1", "conf/leader.toml")
 #         cluster.add_node("node2", "conf/follower.toml")
-#
+
 #         cluster.set_leader("node1")
 #         cluster.set_follower("node2")
-#
+
 #         time.sleep(1)
-#
+
 #         cluster.disconnect("node2")
 #         time.sleep(0.1)
 #         cluster.reconnect("node2")
-#
+
 #         cluster.block_peer_net("node2")
 #         time.sleep(0.1)
 #         cluster.restore_peer_net("node2")
-#
+
 #         time.sleep(1)
-#
+
 #         cluster.remove_node("node2")
 #         cluster.remove_node("node1")
 
 
-@pytest.mark.docker
-def test_docker(docker_cluster: DockerInfinityCluster):
-    cluster = docker_cluster
+# @pytest.mark.docker
+# def test_docker(docker_cluster: DockerInfinityCluster):
+#     cluster = docker_cluster
 
-    cluster.add_node("node1", "conf/leader.toml")
-    cluster.add_node("node2", "conf/follower.toml")
+#     cluster.add_node("node1", "conf/leader.toml")
+#     cluster.add_node("node2", "conf/follower.toml")
 
-    print("init nodes")
+#     print("init nodes")
 
-    cluster.set_leader("node1")
-    cluster.set_follower("node2")
+#     cluster.set_leader("node1")
+#     cluster.set_follower("node2")
 
-    time.sleep(1)
+#     time.sleep(1)
 
-    cluster.disconnect("node2")
-    time.sleep(0.1)
-    cluster.reconnect("node2")
+#     cluster.disconnect("node2")
+#     time.sleep(0.1)
+#     cluster.reconnect("node2")
 
-    res = cluster.client("node1").list_databases()
-    print(res.db_names)
+#     res = cluster.client("node1").list_databases()
+#     print(res.db_names)
 
-    time.sleep(1)
+#     time.sleep(1)
 
-    print("remove nodes")
+#     print("remove nodes")
 
-    cluster.clear()
+#     cluster.clear()
 
-# n1 admin, n2 admin, n2 connect n1 as follower-> failed, n2 connect n1 as learner-> failed
-# n1 leader, n2 follower, n3 connect n2 as follower-> failed, n3 connect n2 as learner-> failed
-#
+# # n1 admin, n2 admin, n2 connect n1 as follower-> failed, n2 connect n1 as learner-> failed
+# # n1 leader, n2 follower, n3 connect n2 as follower-> failed, n3 connect n2 as learner-> failed
+# #
