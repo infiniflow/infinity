@@ -317,6 +317,36 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
     return query_result;
 }
 
+void QueryContext::CreateQueryProfiler() {
+    if (InfinityContext::instance().storage()->catalog()->GetProfile()) {
+        query_profiler_ = MakeShared<QueryProfiler>(true);
+    }
+}
+
+void QueryContext::RecordQueryProfiler(const StatementType &type) {
+    if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
+        GetTxn()->GetCatalog()->AppendProfileRecord(query_profiler_);
+    }
+}
+
+void QueryContext::StartProfile(QueryPhase phase) {
+    if (query_profiler_) {
+        query_profiler_->StartPhase(phase);
+    }
+}
+
+void QueryContext::StopProfile(QueryPhase phase) {
+    if (query_profiler_) {
+        query_profiler_->StopPhase(phase);
+    }
+}
+
+void QueryContext::StopProfile() {
+    if (query_profiler_) {
+        query_profiler_->Stop();
+    }
+}
+
 bool QueryContext::ExecuteBGStatement(BaseStatement *base_statement, BGQueryState &state) {
     QueryResult query_result;
     try {

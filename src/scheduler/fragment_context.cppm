@@ -28,6 +28,7 @@ import create_index_data;
 import logger;
 import third_party;
 import compact_state_data;
+import infinity_context;
 
 export module fragment_context;
 
@@ -110,7 +111,7 @@ public:
     inline void IncreaseTask() { unfinished_task_n_.fetch_add(1); }
 
     inline void FlushProfiler(TaskProfiler &profiler) {
-        if (!query_context_->is_enable_profiling()) {
+        if (!InfinityContext::instance().storage()->catalog()->GetProfile()) {
             return;
         }
         query_context_->FlushProfiler(std::move(profiler));

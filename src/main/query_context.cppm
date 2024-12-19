@@ -80,8 +80,6 @@ public:
 
     [[nodiscard]] inline u64 cpu_number_limit() const { return cpu_number_limit_; }
 
-    [[nodiscard]] inline bool is_enable_profiling() const { return session_ptr_->GetProfile(); }
-
     [[nodiscard]] inline u64 memory_size_limit() const { return memory_size_limit_; }
 
     [[nodiscard]] inline u64 query_id() const { return query_id_; }
@@ -139,34 +137,12 @@ private:
     QueryResult HandleAdminStatement(const AdminStatement* admin_statement);
 
 private:
-    inline void CreateQueryProfiler() {
-        if (is_enable_profiling()) {
-            query_profiler_ = MakeShared<QueryProfiler>(true);
-        }
-    }
 
-    inline void RecordQueryProfiler(const StatementType &type) {
-        if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
-            GetTxn()->GetCatalog()->AppendProfileRecord(query_profiler_);
-        }
-    }
-
-    inline void StartProfile(QueryPhase phase) {
-        if(query_profiler_) {
-            query_profiler_->StartPhase(phase);
-        }
-    }
-    inline void StopProfile(QueryPhase phase) {
-        if(query_profiler_) {
-            query_profiler_->StopPhase(phase);
-        }
-    }
-
-    inline void StopProfile() {
-        if(query_profiler_) {
-            query_profiler_->Stop();
-        }
-    }
+    void CreateQueryProfiler();
+    void RecordQueryProfiler(const StatementType &type);
+    void StartProfile(QueryPhase phase);
+    void StopProfile(QueryPhase phase);
+    void StopProfile();
 
 private:
     // Parser

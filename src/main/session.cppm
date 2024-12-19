@@ -60,10 +60,6 @@ public:
 
     String ConnectedTimeToStr() const { return std::asctime(std::localtime(&connected_time_)); }
 
-    void SetProfile(bool flag) { enable_profile_ = flag; }
-
-    [[nodiscard]] bool GetProfile() const { return enable_profile_; }
-
 protected:
     std::time_t connected_time_;
 
@@ -81,8 +77,6 @@ protected:
 
     u64 committed_txn_count_{0};
     u64 rollbacked_txn_count_{0};
-
-    bool enable_profile_{false};
 };
 
 export class LocalSession : public BaseSession {

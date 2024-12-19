@@ -257,7 +257,7 @@ public:
 
     const QueryProfiler *GetProfileRecord(SizeT index) { return history_.GetElement(index); }
 
-    const Vector<SharedPtr<QueryProfiler>> GetProfileRecords() { return history_.GetElements(); }
+    Vector<SharedPtr<QueryProfiler>> GetProfileRecords() { return history_.GetElements(); }
 
     void ResizeProfileHistory(SizeT new_size) { history_.Resize(new_size); }
 
@@ -268,6 +268,9 @@ public:
     const SharedPtr<String> &CatalogDir() const { return catalog_dir_; }
 
     TransactionID next_txn_id() const { return next_txn_id_; }
+
+    void SetProfile(bool flag) { enable_profile_ = flag; }
+    [[nodiscard]] bool GetProfile() const { return enable_profile_; }
 
 public:
     SharedPtr<String> catalog_dir_{};
@@ -286,6 +289,7 @@ public:
     HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
+    atomic_bool enable_profile_{false};
 
 private:
 
