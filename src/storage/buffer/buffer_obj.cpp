@@ -281,7 +281,6 @@ void BufferObj::ToMmap() {
         case BufferStatus::kUnloaded: {
             buffer_mgr_->RemoveFromGCQueue(this);
             file_worker_->FreeInMemory();
-            status_ = BufferStatus::kFreed;
             buffer_mgr_->FreeUnloadBuffer(this);
             status_ = BufferStatus::kFreed;
             type_ = BufferType::kMmap;
@@ -318,29 +317,24 @@ void BufferObj::GetMutPointer() {
 
 void BufferObj::UnloadInner() {
     std::unique_lock<std::mutex> locker(w_locker_);
-    switch (status_) {
-        case BufferStatus::kLoaded: {
-            --rc_;
-            if (rc_ == 0) {
-                if (type_ == BufferType::kToMmap) {
-                    buffer_mgr_->FreeUnloadBuffer(this);
-                    type_ = BufferType::kMmap;
-                }
-                if (type_ != BufferType::kMmap) {
-                    buffer_mgr_->PushGCQueue(this);
-                    status_ = BufferStatus::kUnloaded;
-                }
-            }
-            break;
-        }
-        default: {
-            String error_message = fmt::format("Calling with invalid buffer status: {}", BufferStatusToString(status_));
-            UnrecoverableError(error_message);
-        }
+    if (status_ != BufferStatus::kLoaded) {
+        String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
+        UnrecoverableError(error_message);
     }
-    if (type_ == BufferType::kMmap) {
-        file_worker_->Munmap();
-        status_ = BufferStatus::kFreed;
+    --rc_;
+    if (rc_ == 0) {
+        if (type_ == BufferType::kToMmap) {
+            file_worker_->FreeInMemory();
+            buffer_mgr_->FreeUnloadBuffer(this);
+            status_ = BufferStatus::kFreed;
+            type_ = BufferType::kMmap;
+        } else if (type_ == BufferType::kMmap) {
+            file_worker_->Munmap();
+            status_ = BufferStatus::kFreed;
+        } else {
+            buffer_mgr_->PushGCQueue(this);
+            status_ = BufferStatus::kUnloaded;
+        }
     }
 }
 

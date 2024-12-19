@@ -135,7 +135,9 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
             cache_column_id = std::numeric_limits<ColumnID>::max();
         }
         if (column_id != cache_column_id) {
+            // LOG_TRACE(fmt::format("Get column vector from segment_id: {}, block_id: {}, column_id: {}", segment_id, block_id, column_id));
             cache_column_vector = cache_block_entry->GetConstColumnVector(buffer_mgr, column_id);
+            cache_column_id = column_id;
         }
         auto val_for_update = cache_column_vector.GetValue(block_offset);
         output_data_blocks[output_block_id]->column_vectors[output_column_id]->SetValue(output_row_id, val_for_update);
