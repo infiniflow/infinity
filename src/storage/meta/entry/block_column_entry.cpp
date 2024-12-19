@@ -268,6 +268,16 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
     }
 }
 
+void BlockColumnEntry::FlushColumnCheck(TxnTimeStamp checkpoint_ts) {
+    if (deleted_) {
+        return;
+    }
+    if (!block_entry_->CheckFlush(checkpoint_ts)) {
+        return;
+    }
+    this->FlushColumn(checkpoint_ts);
+}
+
 void BlockColumnEntry::FlushColumn(TxnTimeStamp checkpoint_ts) {
     if (deleted_) {
         return;

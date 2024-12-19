@@ -447,6 +447,14 @@ void BlockEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *
     }
 }
 
+bool BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts) const {
+    // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
+    if (this->max_row_ts_ != 0 && (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)) {
+        return false;
+    }
+    return true;
+}
+
 void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count) {
     SizeT column_count = this->columns_.size();
     SizeT column_idx = 0;
@@ -459,8 +467,7 @@ void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_cou
 }
 
 bool BlockEntry::FlushVersionNoLock(TxnTimeStamp checkpoint_ts) {
-    // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
-    if (this->max_row_ts_ != 0 && (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)) {
+    if (!this->CheckFlush(checkpoint_ts)) {
         return false;
     }
 

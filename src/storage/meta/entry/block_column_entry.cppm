@@ -120,6 +120,8 @@ public:
 public:
     static void Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count);
 
+    void FlushColumnCheck(TxnTimeStamp checkpoint_ts);
+
     void FlushColumn(TxnTimeStamp checkpoint_ts);
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
