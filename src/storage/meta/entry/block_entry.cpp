@@ -402,8 +402,14 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
     this->using_txn_id_ = 0;
 
-    if (min_row_ts_ == 0 || min_row_ts_ > max_row_ts_) {
+    if (min_row_ts_ > max_row_ts_) {
         UnrecoverableError(fmt::format("BlockEntry::CommitBlock invalid ts, min_row_ts_: {}, max_row_ts_: {}", min_row_ts_, max_row_ts_));
+    }
+    if (min_row_ts_ == 0) {
+        min_row_ts_ = commit_ts;
+    }
+    if (max_row_ts_ == 0) {
+        max_row_ts_ = commit_ts;
     }
 
     if (!this->Committed()) {
