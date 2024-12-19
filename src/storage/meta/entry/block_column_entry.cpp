@@ -151,6 +151,11 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     }
     column_entry->last_chunk_offset_ = last_chunk_offset;
 
+    if (block_entry->row_count() >= block_entry->row_capacity()) {
+        column_entry->ToMmap();
+        LOG_TRACE(fmt::format("Column {} to mmap success", column_entry->encode()));
+    }
+
     return column_entry;
 }
 
@@ -375,6 +380,13 @@ SizeT BlockColumnEntry::GetStorageSize() const {
     }
 
     return result;
+}
+
+void BlockColumnEntry::ToMmap() {
+    buffer_->ToMmap();
+    for (auto *outline_buffer : outline_buffers_) {
+        outline_buffer->ToMmap();
+    }
 }
 
 } // namespace infinity

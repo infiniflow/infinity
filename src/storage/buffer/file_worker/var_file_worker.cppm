@@ -55,6 +55,10 @@ protected:
 
     void ReadFromFileImpl(SizeT file_size) override;
 
+    bool ReadFromMmapImpl(const void *ptr, SizeT size) override;
+
+    void FreeFromMmapImpl() override;
+
 private:
     SizeT buffer_size_ = 0;
     BufferObj *buffer_obj_ = nullptr;

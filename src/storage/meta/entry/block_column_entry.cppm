@@ -133,6 +133,9 @@ public:
     void FillWithDefaultValue(SizeT row_count, const Value *default_value, BufferManager *buffer_mgr);
 
     SizeT GetStorageSize() const;
+
+    void ToMmap();
+
 private:
     const BlockEntry *block_entry_{nullptr};
     ColumnID column_id_{};

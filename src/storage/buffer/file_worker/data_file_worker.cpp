@@ -24,6 +24,7 @@ import third_party;
 import status;
 import logger;
 import persistence_manager;
+import serialize;
 
 namespace infinity {
 
@@ -146,5 +147,25 @@ void DataFileWorker::ReadFromFileImpl(SizeT file_size) {
         RecoverableError(status);
     }
 }
+
+bool DataFileWorker::ReadFromMmapImpl(const void *p, SizeT file_size) {
+    const char *ptr = static_cast<const char *>(p);
+    u64 magic_number = ReadBufAdv<u64>(ptr);
+    if (magic_number != 0x00dd3344) {
+        Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", magic_number));
+        RecoverableError(status);
+    }
+    u64 buffer_size = ReadBufAdv<u64>(ptr);
+    if (file_size != buffer_size + 3 * sizeof(u64)) {
+        Status status = Status::DataIOError(fmt::format("File size: {} isn't matched with {}.", file_size, buffer_size + 3 * sizeof(u64)));
+        RecoverableError(status);
+    }
+    mmap_data_ = const_cast<u8 *>(reinterpret_cast<const u8 *>(ptr));
+    ptr += buffer_size;
+    [[maybe_unused]] u64 checksum = ReadBufAdv<u64>(ptr);
+    return true;
+}
+
+void DataFileWorker::FreeFromMmapImpl() {}
 
 } // namespace infinity

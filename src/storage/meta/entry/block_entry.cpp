@@ -455,6 +455,16 @@ bool BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts) const {
     return true;
 }
 
+bool BlockEntry::TryToMmap() {
+    if (block_row_count_ < row_capacity_) {
+        return false;
+    }
+    for (auto &column : columns_) {
+        column->ToMmap();
+    }
+    return true;
+}
+
 void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count) {
     SizeT column_count = this->columns_.size();
     SizeT column_idx = 0;
@@ -506,6 +516,10 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
                               this->segment_entry_->segment_id(),
                               this->block_id_,
                               this->checkpoint_row_count_));
+
+        if (TryToMmap()) {
+            LOG_INFO(fmt::format("Block {} to mmap success", encode()));
+        }
     }
 }
 

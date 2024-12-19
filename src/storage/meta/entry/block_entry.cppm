@@ -202,6 +202,8 @@ public:
 
     bool CheckFlush(TxnTimeStamp ts) const;
 
+    bool TryToMmap();
+
 private:
     void FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count);
 
