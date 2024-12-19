@@ -232,7 +232,7 @@ bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts
 
 void BlockEntry::CheckRowsVisible(Vector<u32> &segment_offsets, TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
-    if (min_row_ts_ > check_ts)
+    if (commit_ts_ > check_ts)
         return;
 
     Vector<u32> segment_offsets2;
@@ -252,7 +252,7 @@ void BlockEntry::CheckRowsVisible(Vector<u32> &segment_offsets, TxnTimeStamp che
 // Similar to SetDeleteBitmask but faster
 void BlockEntry::CheckRowsVisible(Bitmask &segment_offsets, TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
-    if (min_row_ts_ > check_ts)
+    if (commit_ts_ > check_ts)
         return;
 
     auto block_version_handle = this->version_buffer_object_->Load();
@@ -339,6 +339,12 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
     auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
     block_version->Append(commit_ts, this->block_row_count_);
 
+    if (min_row_ts_ > commit_ts || max_row_ts_ > commit_ts) {
+        UnrecoverableError(fmt::format("BlockEntry::AppendData min_row_ts_ > commit_ts, min_row_ts_: {}, commit_ts: {}", min_row_ts_, commit_ts));
+    }
+    min_row_ts_ = commit_ts;
+    max_row_ts_ = commit_ts;
+
     return actual_copied;
 }
 
@@ -364,6 +370,12 @@ SizeT BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const
     }
 
     LOG_TRACE(fmt::format("Segment {} Block {} has deleted {} rows", segment_id, block_id, rows.size()));
+
+    if (max_row_ts_ != UNCOMMIT_TS && max_row_ts_ > commit_ts) {
+        UnrecoverableError(fmt::format("BlockEntry::DeleteData max_row_ts_ > commit_ts, max_row_ts_: {}, commit_ts: {}", max_row_ts_, commit_ts));
+    }
+    max_row_ts_ = commit_ts;
+
     return delete_row_n;
 }
 
@@ -373,7 +385,10 @@ void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts, WalBlockInfo *block_info)
     auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
     block_version->Append(commit_ts, this->block_row_count_);
 
-    FlushVersionNoLock(commit_ts);
+    min_row_ts_ = commit_ts;
+    max_row_ts_ = commit_ts;
+
+    FlushVersionNoLock(commit_ts, false);
     auto *pm = InfinityContext::instance().persistence_manager();
     block_info->addr_serializer_.InitializeValid(pm);
 }
@@ -387,12 +402,10 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     }
     this->using_txn_id_ = 0;
 
-    min_row_ts_ = std::min(min_row_ts_, commit_ts);
-    if (commit_ts < max_row_ts_) {
-        String error_message = fmt::format("BlockEntry commit_ts {} is less than max_row_ts_ {}", commit_ts, max_row_ts_);
-        UnrecoverableError(error_message);
+    if (min_row_ts_ == 0 || min_row_ts_ > max_row_ts_) {
+        UnrecoverableError(fmt::format("BlockEntry::CommitBlock invalid ts, min_row_ts_: {}, max_row_ts_: {}", min_row_ts_, max_row_ts_));
     }
-    max_row_ts_ = commit_ts;
+
     if (!this->Committed()) {
         this->Commit(commit_ts);
         for (auto &column : columns_) {
@@ -447,16 +460,23 @@ void BlockEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *
     }
 }
 
-bool BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts) const {
+void BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts, bool &flush_column, bool &flush_version, bool check_commit) const {
     // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
-    if (this->max_row_ts_ != 0 && (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)) {
-        return false;
+    flush_column = false;
+    flush_version = false;
+    if (check_commit && commit_ts_ > checkpoint_ts) {
+        return;
     }
-    return true;
+    if (checkpoint_ts_ < max_row_ts_) {
+        flush_version = true;
+    }
+    if (checkpoint_ts_ < min_row_ts_) {
+        flush_column = true;
+    }
 }
 
 bool BlockEntry::TryToMmap() {
-    if (block_row_count_ < row_capacity_) {
+    if (checkpoint_row_count_ < row_capacity_) {
         return false;
     }
     for (auto &column : columns_) {
@@ -476,13 +496,14 @@ void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_cou
     }
 }
 
-bool BlockEntry::FlushVersionNoLock(TxnTimeStamp checkpoint_ts) {
-    if (!this->CheckFlush(checkpoint_ts)) {
-        return false;
+bool BlockEntry::FlushVersionNoLock(TxnTimeStamp checkpoint_ts, bool check_commit) {
+    bool flush_column = false;
+    bool flush_version = false;
+    CheckFlush(checkpoint_ts, flush_column, flush_version, check_commit);
+    if (flush_version) {
+        version_buffer_object_->Save(VersionFileWorkerSaveCtx(checkpoint_ts));
     }
-
-    version_buffer_object_->Save(VersionFileWorkerSaveCtx(checkpoint_ts));
-    return true;
+    return flush_column;
 }
 
 void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
@@ -518,7 +539,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
                               this->checkpoint_row_count_));
 
         if (TryToMmap()) {
-            LOG_INFO(fmt::format("Block {} to mmap success", encode()));
+            LOG_INFO(fmt::format("Block {} to mmap success, checkpoint_ts {}", encode(), checkpoint_ts));
         }
     }
 }
@@ -573,7 +594,7 @@ nlohmann::json BlockEntry::Serialize(TxnTimeStamp max_commit_ts) {
     for (const auto &block_column_entry : this->columns_) {
         json_res["columns"].emplace_back(block_column_entry->Serialize());
     }
-    json_res["min_row_ts"] = this->min_row_ts_;
+    json_res["min_row_ts"] = std::min(this->min_row_ts_, max_commit_ts);
     json_res["max_row_ts"] = std::min(this->max_row_ts_, max_commit_ts);
     json_res["version_file"] = this->VersionFilePath();
 

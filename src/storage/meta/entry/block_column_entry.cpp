@@ -277,7 +277,10 @@ void BlockColumnEntry::FlushColumnCheck(TxnTimeStamp checkpoint_ts) {
     if (deleted_) {
         return;
     }
-    if (!block_entry_->CheckFlush(checkpoint_ts)) {
+    bool flush_column = false;
+    bool flush_version = false;
+    block_entry_->CheckFlush(checkpoint_ts, flush_column, flush_version);
+    if (!flush_column) {
         return;
     }
     this->FlushColumn(checkpoint_ts);
