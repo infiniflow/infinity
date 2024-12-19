@@ -325,7 +325,7 @@ void QueryContext::CreateQueryProfiler() {
 
 void QueryContext::RecordQueryProfiler(const StatementType &type) {
     if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
-        GetTxn()->GetCatalog()->AppendProfileRecord(query_profiler_);
+        InfinityContext::instance().storage()->catalog()->AppendProfileRecord(query_profiler_);
     }
 }
 

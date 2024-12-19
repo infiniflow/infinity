@@ -221,7 +221,7 @@ private:
 
 export class TxnStore {
 public:
-    TxnStore(Txn *txn, Catalog *catalog);
+    explicit TxnStore(Txn *txn);
 
     void AddDBStore(DBEntry *db_entry);
 
@@ -253,8 +253,6 @@ public:
 
     bool ReadOnly() const;
 
-    Catalog *GetCatalog() const { return catalog_; }
-
     std::mutex mtx_{};
 
     void RevertTableStatus();
@@ -266,7 +264,6 @@ public:
 private:
     // Txn store
     Txn *txn_{}; // TODO: remove this
-    Catalog *catalog_{};
     int ptr_seq_n_{};
     HashMap<DBEntry *, int> txn_dbs_{};
     HashMap<TableEntry *, int> txn_tables_{};

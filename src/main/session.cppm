@@ -44,8 +44,6 @@ public:
     [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
     inline void SetTxn(Txn *txn) { txn_ = txn; }
 
-    const QueryProfiler *GetProfileRecord(SizeT index) { return txn_->GetCatalog()->GetProfileRecord(index); }
-
     void IncreaseQueryCount() { ++query_count_; }
 
     [[nodiscard]] u64 query_count() const { return query_count_; }

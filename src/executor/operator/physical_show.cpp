@@ -1785,9 +1785,8 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto txn = query_context->GetTxn();
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto catalog = txn->GetCatalog();
+    auto catalog = query_context->storage()->catalog();
 
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -5882,7 +5881,7 @@ void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperato
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    auto catalog = query_context->GetTxn()->GetCatalog();
+    auto catalog = query_context->storage()->catalog();
     Vector<CatalogDeltaOpBrief> delta_log_brief_array = catalog->GetDeltaLogBriefs();
 
     for (const auto &delta_op_brief : delta_log_brief_array) {
