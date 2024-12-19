@@ -52,14 +52,15 @@ class SecondaryIndexInMemT final : public SecondaryIndexInMem {
 protected:
     u32 GetRowCountNoLock() const override { return in_mem_secondary_index_.size(); }
     u32 MemoryCostOfEachRow() const override { return map_memory_bloat_factor * (sizeof(KeyType) + sizeof(u32)); }
+    u32 MemoryCostOfThis() const override { return sizeof(*this); }
 
 public:
     SecondaryIndexInMemT(SegmentIndexEntry *segment_index_entry, const RowID begin_row_id)
         : SecondaryIndexInMem(segment_index_entry), begin_row_id_(begin_row_id) {
-        IncreaseMemoryUsageBase(sizeof(*this));
+        IncreaseMemoryUsageBase(MemoryCostOfThis());
     }
     ~SecondaryIndexInMemT() override {
-        DecreaseMemoryUsageBase(sizeof(*this) + GetRowCount() * MemoryCostOfEachRow());
+        DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow());
     }
     u32 GetRowCount() const override {
         std::shared_lock lock(map_mutex_);
@@ -138,7 +139,7 @@ MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
     SharedPtr<String> table_name = table_entry->GetTableName();
     SharedPtr<String> db_name = table_entry->GetDBName();
     const auto row_cnt = GetRowCount();
-    const auto mem = row_cnt * MemoryCostOfEachRow();
+    const auto mem = MemoryCostOfThis() + row_cnt * MemoryCostOfEachRow();
     return MemIndexTracerInfo(std::move(index_name), std::move(table_name), std::move(db_name), mem, row_cnt);
 }
 

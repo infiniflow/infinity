@@ -41,6 +41,8 @@ protected:
 
     virtual u32 MemoryCostOfEachRow() const = 0;
 
+    virtual u32 MemoryCostOfThis() const = 0;
+
 public:
     virtual ~SecondaryIndexInMem() = default;
 
