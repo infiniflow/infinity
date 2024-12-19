@@ -165,19 +165,19 @@ String FileWorker::ChooseFileDir(bool spill) const {
 Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathInner(bool from_spill) {
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
     Optional<DeferFn<std::function<void()>>> defer_fn;
-    PersistResultHandler handler;
     String read_path;
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
-        handler = PersistResultHandler(persistence_manager_);
         PersistReadResult result = persistence_manager_->GetObjCache(read_path);
         defer_fn.emplace(([=, this]() {
             if (use_object_cache && obj_addr_.Valid()) {
                 String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
                 PersistWriteResult res = persistence_manager_->PutObjCache(read_path);
+                PersistResultHandler handler = PersistResultHandler(persistence_manager_);
                 handler.HandleWriteResult(res);
             }
         }));
+        PersistResultHandler handler = PersistResultHandler(persistence_manager_);
         obj_addr_ = handler.HandleReadResult(result);
         if (!obj_addr_.Valid()) {
             String error_message = fmt::format("Failed to find object for local path {}", read_path);

@@ -283,12 +283,12 @@ void BufferObj::ToMmap() {
             file_worker_->FreeInMemory();
             status_ = BufferStatus::kFreed;
             buffer_mgr_->FreeUnloadBuffer(this);
+            status_ = BufferStatus::kFreed;
             type_ = BufferType::kMmap;
             break;
 
         }
         case BufferStatus::kFreed: {
-            buffer_mgr_->FreeUnloadBuffer(this);
             type_ = BufferType::kMmap;
             break;
         }
