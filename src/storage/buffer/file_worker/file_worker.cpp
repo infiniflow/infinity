@@ -109,29 +109,8 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {
+    auto [defer_fn, read_path] = GetFilePathInner(from_spill);
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
-    PersistResultHandler handler;
-    if (use_object_cache) {
-        handler = PersistResultHandler(persistence_manager_);
-    }
-    String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
-    Optional<DeferFn<std::function<void()>>> defer_fn;
-    if (use_object_cache) {
-        PersistReadResult result = persistence_manager_->GetObjCache(read_path);
-        defer_fn.emplace(([&]() {
-            if (use_object_cache && obj_addr_.Valid()) {
-                String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
-                PersistWriteResult res = persistence_manager_->PutObjCache(read_path);
-                handler.HandleWriteResult(res);
-            }
-        }));
-        obj_addr_ = handler.HandleReadResult(result);
-        if (!obj_addr_.Valid()) {
-            String error_message = fmt::format("Failed to find object for local path {}", read_path);
-            UnrecoverableError(error_message);
-        }
-        read_path = persistence_manager_->GetObjPath(obj_addr_.obj_key_);
-    }
     SizeT file_size = 0;
     auto [file_handle, status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
     if (!status.ok()) {
@@ -183,6 +162,33 @@ String FileWorker::ChooseFileDir(bool spill) const {
                  : (Path(*data_dir_) / *file_dir_);
 }
 
+Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathInner(bool from_spill) {
+    bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
+    Optional<DeferFn<std::function<void()>>> defer_fn;
+    PersistResultHandler handler;
+    String read_path;
+    read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+    if (use_object_cache) {
+        handler = PersistResultHandler(persistence_manager_);
+        PersistReadResult result = persistence_manager_->GetObjCache(read_path);
+        defer_fn.emplace(([=, this]() {
+            if (use_object_cache && obj_addr_.Valid()) {
+                String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+                PersistWriteResult res = persistence_manager_->PutObjCache(read_path);
+                handler.HandleWriteResult(res);
+            }
+        }));
+        obj_addr_ = handler.HandleReadResult(result);
+        if (!obj_addr_.Valid()) {
+            String error_message = fmt::format("Failed to find object for local path {}", read_path);
+            UnrecoverableError(error_message);
+        }
+        read_path = persistence_manager_->GetObjPath(obj_addr_.obj_key_);
+    }
+    return {std::move(defer_fn), std::move(read_path)};
+}
+
+
 void FileWorker::CleanupFile() const {
     if (persistence_manager_ != nullptr) {
         PersistResultHandler handler(persistence_manager_);
@@ -209,4 +215,29 @@ void FileWorker::CleanupTempFile() const {
         UnrecoverableError(error_message);
     }
 }
+
+void FileWorker::Mmap() {
+    if (mmap_addr_ != nullptr || mmap_data_ != nullptr) {
+        UnrecoverableError("Mmap already exists");
+    }
+    auto [defer_fn, read_path] = GetFilePathInner(false);
+    bool use_object_cache = persistence_manager_ != nullptr;
+    SizeT file_size = VirtualStore::GetFileSize(read_path);
+    VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
+    if (use_object_cache) {
+        const void *ptr = mmap_addr_ + obj_addr_.part_offset_;
+        this->ReadFromMmapImpl(ptr, obj_addr_.part_size_);
+    } else {
+        const void *ptr = mmap_addr_;
+        this->ReadFromMmapImpl(ptr, file_size);
+    }
+}
+
+void FileWorker::Munmap() {
+    auto [defer_fn, read_path] = GetFilePathInner(false);
+    VirtualStore::MunmapFile(read_path);
+    mmap_addr_ = nullptr;
+    mmap_data_ = nullptr;
+}
+
 } // namespace infinity

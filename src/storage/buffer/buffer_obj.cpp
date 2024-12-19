@@ -70,6 +70,26 @@ void BufferObj::UpdateFileWorkerInfo(UniquePtr<FileWorker> new_file_worker) {
 BufferHandle BufferObj::Load() {
     buffer_mgr_->AddRequestCount();
     std::unique_lock<std::mutex> locker(w_locker_);
+    if (type_ == BufferType::kMmap) {
+        switch (status_) {
+            case BufferStatus::kLoaded: {
+                break;
+            }
+            case BufferStatus::kFreed:
+            case BufferStatus::kNew: {
+                file_worker_->Mmap();
+                break;
+            }
+            default: {
+                String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
+                UnrecoverableError(error_message);
+            }
+        }
+        status_ = BufferStatus::kLoaded;
+        ++rc_;
+        void *data = file_worker_->GetMmapData();
+        return BufferHandle(this, data);
+    }
     switch (status_) {
         case BufferStatus::kLoaded: {
             break;
@@ -144,6 +164,10 @@ bool BufferObj::Free() {
             buffer_mgr_->AddTemp(this);
             break;
         }
+        default: {
+            String error_message = fmt::format("Invalid buffer type: {}", BufferTypeToString(type_));
+            UnrecoverableError(error_message);
+        }
     }
     file_worker_->FreeInMemory();
     status_ = BufferStatus::kFreed;
@@ -180,6 +204,8 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
         buffer_mgr_->MoveTemp(this);
         file_worker_->MoveFile();
         type_ = BufferType::kPersistent;
+    } else if (type_ == BufferType::kMmap) {
+        UnrecoverableError("Invalid buffer type");
     }
     return write;
 }
@@ -241,6 +267,38 @@ void BufferObj::CleanupTempFile() const {
     file_worker_->CleanupTempFile();
 }
 
+void BufferObj::ToMmap() {
+    std::unique_lock<std::mutex> locker(w_locker_);
+    if (type_ != BufferType::kPersistent) {
+        String error_message = fmt::format("Invalid buffer type: {}", BufferTypeToString(type_));
+        UnrecoverableError(error_message);
+    }
+    switch (status_) {
+        case BufferStatus::kLoaded: {
+            type_ = BufferType::kToMmap;
+            break;
+        }
+        case BufferStatus::kUnloaded: {
+            buffer_mgr_->RemoveFromGCQueue(this);
+            file_worker_->FreeInMemory();
+            status_ = BufferStatus::kFreed;
+            buffer_mgr_->FreeUnloadBuffer(this);
+            type_ = BufferType::kMmap;
+            break;
+
+        }
+        case BufferStatus::kFreed: {
+            buffer_mgr_->FreeUnloadBuffer(this);
+            type_ = BufferType::kMmap;
+            break;
+        }
+        default: {
+            String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
+            UnrecoverableError(error_message);
+        }
+    }
+}
+
 void BufferObj::LoadInner() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (status_ != BufferStatus::kLoaded) {
@@ -264,8 +322,14 @@ void BufferObj::UnloadInner() {
         case BufferStatus::kLoaded: {
             --rc_;
             if (rc_ == 0) {
-                buffer_mgr_->PushGCQueue(this);
-                status_ = BufferStatus::kUnloaded;
+                if (type_ == BufferType::kToMmap) {
+                    buffer_mgr_->FreeUnloadBuffer(this);
+                    type_ = BufferType::kMmap;
+                }
+                if (type_ != BufferType::kMmap) {
+                    buffer_mgr_->PushGCQueue(this);
+                    status_ = BufferStatus::kUnloaded;
+                }
             }
             break;
         }
@@ -273,6 +337,10 @@ void BufferObj::UnloadInner() {
             String error_message = fmt::format("Calling with invalid buffer status: {}", BufferStatusToString(status_));
             UnrecoverableError(error_message);
         }
+    }
+    if (type_ == BufferType::kMmap) {
+        file_worker_->Munmap();
+        status_ = BufferStatus::kFreed;
     }
 }
 
