@@ -243,7 +243,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
         case IndexType::kSecondary: {
             if (memory_secondary_index_.get() == nullptr) {
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, begin_row_id);
+                memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, this, begin_row_id);
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_idx);
             memory_secondary_index_->InsertBlockData(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
@@ -506,7 +506,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kSecondary: {
-            memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id);
+            memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, this, base_row_id);
             u64 column_id = column_def->id();
             SizeT column_idx = table_entry->GetColumnIdxByID(column_id);
             auto block_entry_iter = BlockEntryIter(segment_entry);
@@ -989,6 +989,8 @@ BaseMemIndex *SegmentIndexEntry::GetMemIndex() const {
         return static_cast<BaseMemIndex *>(memory_ivf_index_.get());
     } else if (memory_indexer_.get() != nullptr) {
         return static_cast<BaseMemIndex *>(memory_indexer_.get());
+    } else if (memory_secondary_index_.get() != nullptr) {
+        return static_cast<BaseMemIndex *>(memory_secondary_index_.get());
     } else if (memory_bmp_index_.get() != nullptr) {
         return static_cast<BaseMemIndex *>(memory_bmp_index_.get());
     }
