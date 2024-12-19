@@ -1155,8 +1155,8 @@ ChunkIndexEntry *SegmentIndexEntry::GetChunkIndexEntry(ChunkID chunk_id) {
 }
 
 nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
-    if (this->deleted_) {
-        String error_message = "Segment Column index entry can't be deleted.";
+    if (CheckDeprecate(max_commit_ts)) {
+        String error_message = fmt::format("Segment Column index entry deprecate_ts: {}, commit_ts: {}.", deprecate_ts_.load(), max_commit_ts);
         UnrecoverableError(error_message);
     }
 
