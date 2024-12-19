@@ -277,7 +277,7 @@ private:
     Atomic<TxnTimeStamp> deprecate_ts_ = UNCOMMIT_TS;
 
 public:
-    bool TrySetOptimizing();
+    bool TrySetOptimizing(Txn *txn);
 
     void ResetOptimizing();
 

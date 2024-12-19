@@ -71,6 +71,10 @@ public:
 
     void Rollback(TxnTimeStamp abort_ts);
 
+    void AddSegmentOptimizing(SegmentIndexEntry *segment_index_entry);
+
+    bool TryRevert();
+
 public:
     TableIndexEntry *const table_index_entry_{};
 
@@ -78,6 +82,12 @@ public:
     HashMap<String, ChunkIndexEntry *> chunk_index_entries_{};
 
     Vector<Tuple<SegmentIndexEntry *, ChunkIndexEntry *, Vector<ChunkIndexEntry *>>> optimize_data_;
+
+    enum struct TxnStoreStatus {
+        kNone,
+        kOptimizing,
+    };
+    TxnStoreStatus status_{TxnStoreStatus::kNone};
 };
 
 export struct TxnCompactStore {

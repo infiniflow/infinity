@@ -17,7 +17,6 @@ module;
 import stl;
 export module fst:build;
 import :bytes;
-import :error;
 import :node;
 import :registry;
 import :writer;

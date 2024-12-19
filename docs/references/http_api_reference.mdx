@@ -1799,7 +1799,7 @@ curl --request GET \
         [
             "body"
         ],
-        "filter": "score >= 4.0",
+        "filter": "score >= 4.0 and name = '"'Toby'"'",
         "search":
         [
             {
@@ -1882,7 +1882,7 @@ curl --request GET \
       where each 'K' represents a parameter name and 'V' represents its value
     - Available parameters in 'extra_options':
       - **'minimum_should_match'**: specifies how many clauses in the 'matching_text' should be satisfied at least.
-        It can be in the following format:
+        It can be in the following formats:
         - Positive integer `N`: at least `N` clauses should be satisfied.
         - Negative integer `-N`: at least (total clause count - `N`) clauses should be satisfied.
         - Positive Percentage `N%`: at least `⌊total clause count * N%⌋` clauses should be satisfied.
@@ -2399,7 +2399,7 @@ The response includes a JSON object like the following:
     "log_filename":"infinity.log",
     "log_level":"Info",
     "log_to_stdout":"False",
-    "mem_index_capacity":"1048576",
+    "mem_index_capacity":"65536",
     "optimize_interval":"10",
     "postgres_port":"5432",
     "resource_dir":"/var/infinity/resource",
@@ -3663,7 +3663,7 @@ The response includes a JSON object like the following:
     "log_filename":"infinity.log",
     "log_level":"Debug",
     "log_to_stdout":"true",
-    "mem_index_capacity":"1048576",
+    "mem_index_capacity":"65536",
     "optimize_interval":"10",
     "peer_server_connection_pool_size":"64",
     "postgres_port":"5433",

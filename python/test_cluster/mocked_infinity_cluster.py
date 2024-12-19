@@ -10,7 +10,6 @@ import tomli_w
 from infinity_cluster import (
     InfinityRunner,
     InfinityCluster,
-    MinioParams,
     convert_request_to_curl,
 )
 import os
@@ -146,14 +145,11 @@ class MockInfinityCluster(InfinityCluster):
         self,
         executable_path: str,
         *,
-        minio_params: MinioParams = None,
         test_name: str = None,
         use_sudo: bool = False,
     ):
         self.use_sudo = use_sudo
-        super().__init__(
-            executable_path, minio_params=minio_params, test_name=test_name
-        )
+        super().__init__(executable_path, test_name=test_name)
         self.ns_prefix = "ns"
         self.bridge_name = "br0"
         self.mock_ip_prefix = "17.0.0."

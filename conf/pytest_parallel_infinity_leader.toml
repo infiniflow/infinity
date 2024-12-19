@@ -35,7 +35,7 @@ cleanup_interval         = "60s"
 compact_interval         = "120s"
 
 # dump memory index entry when it reachs the capacity
-mem_index_capacity       = 1048576
+mem_index_capacity       = 8192
 
 storage_type             = "minio"
 

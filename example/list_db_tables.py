@@ -27,9 +27,9 @@ try:
     #  Use infinity module to connect a remote server
     infinity_instance = infinity.connect(infinity.common.NetworkAddress("127.0.0.1", 23817))
 
-    infinity_instance.create_database("db1", infinity.common.ConflictType.Ignore)
-    infinity_instance.create_database("db2", infinity.common.ConflictType.Ignore)
-    infinity_instance.create_database("db3", infinity.common.ConflictType.Ignore)
+    infinity_instance.create_database("db1", infinity.common.ConflictType.Ignore, "database1")
+    infinity_instance.create_database("db2", infinity.common.ConflictType.Ignore, "database2")
+    infinity_instance.create_database("db3", infinity.common.ConflictType.Ignore, "database3")
 
     res = infinity_instance.list_databases()
     print(res.db_names)

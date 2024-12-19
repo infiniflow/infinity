@@ -13,10 +13,11 @@
 // limitations under the License.
 
 module;
+import infinity_exception;
+import third_party;
 export module fst:fst;
 import stl;
 import crc;
-import :error;
 import :bytes;
 import :node;
 
@@ -62,11 +63,11 @@ public:
     /// fst, then an error is returned.
     Fst(u8 *data_ptr, SizeT data_len) : data_ptr_(data_ptr), data_len_(data_len) {
         if (data_len < 36) {
-            throw FstError::Format(data_len);
+            UnrecoverableError(fmt::format("FST invalid fst size, data_len {}", data_len));
         }
         u64 version = ReadU64LE(data_ptr);
         if (version != VERSION) {
-            throw FstError::Version(VERSION, version);
+            UnrecoverableError(fmt::format("FST version mismatch, expected {}, got {}", VERSION, version));
         }
         u64 ty = ReadU64LE(data_ptr + 8);
         SizeT end;
@@ -100,8 +101,8 @@ public:
         SizeT empty_total, addr_offset;
         empty_total = 36;
         addr_offset = 21;
-        if ((root_addr == EMPTY_ADDRESS && data_len != empty_total) && root_addr + addr_offset != data_len) {
-            throw FstError::Format(data_len);
+        if ((root_addr == EMPTY_ADDRESS && data_len != empty_total) || (root_addr != EMPTY_ADDRESS && root_addr + addr_offset != data_len)) {
+            UnrecoverableError(fmt::format("FST invalid fst size, root_addr{}, data_len {}", root_addr, data_len));
         }
         meta_.version_ = version;
         meta_.root_addr_ = root_addr;
@@ -132,13 +133,13 @@ public:
     ///    performed by this procedure.
     void Verify() {
         if (!meta_.checksum_.has_value()) {
-            throw FstError::ChecksumMissing();
+            UnrecoverableError("FST checksum is missing");
         }
         u32 expected = meta_.checksum_.value();
         u32 sum = CRC32IEEE::makeCRC(data_ptr_, data_len_ - 4);
         u32 got = ((sum >> 15) | (sum << 17)) + 0xa282ead8ul;
         if (expected != got) {
-            throw FstError::ChecksumMismatch(expected, got);
+            UnrecoverableError(fmt::format("FST checksum mismatch, expected {}, got {}is missing", expected, got));
         }
     }
 

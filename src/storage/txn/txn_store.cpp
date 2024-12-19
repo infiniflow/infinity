@@ -121,12 +121,29 @@ void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
 
 void TxnIndexStore::Rollback(TxnTimeStamp abort_ts) {
     for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
-        segment_index_entry->ResetOptimizing();
         for (ChunkIndexEntry *old_chunk : old_chunks) {
             old_chunk->DeprecateChunk(abort_ts);
         }
     }
 }
+
+void TxnIndexStore::AddSegmentOptimizing(SegmentIndexEntry *segment_index_entry) {
+    status_ = TxnStoreStatus::kOptimizing;
+    index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
+}
+
+
+bool TxnIndexStore::TryRevert() {
+    if (status_ == TxnStoreStatus::kNone) {
+        return false;
+    }
+    for (auto &[segment_id, segment_index_entry] : index_entry_map_) {
+        segment_index_entry->ResetOptimizing();
+    }
+    status_ = TxnStoreStatus::kNone;
+    return true;
+}
+
 
 ///-----------------------------------------------------------------------------
 
@@ -531,6 +548,9 @@ void TxnTableStore::TryRevert() {
     if (added_txn_num_) {
         added_txn_num_ = false;
         table_entry_->DecWriteTxnNum();
+    }
+    for (const auto &[index_name, index_store] : txn_indexes_store_) {
+        index_store->TryRevert();
     }
 }
 
