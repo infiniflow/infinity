@@ -235,6 +235,7 @@ void FileWorker::Mmap() {
 
 void FileWorker::Munmap() {
     auto [defer_fn, read_path] = GetFilePathInner(false);
+    this->FreeFromMmapImpl();
     VirtualStore::MunmapFile(read_path);
     mmap_addr_ = nullptr;
     mmap_data_ = nullptr;
