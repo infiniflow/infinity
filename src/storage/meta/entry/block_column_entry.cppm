@@ -120,6 +120,8 @@ public:
 public:
     static void Flush(BlockColumnEntry *block_column_entry, SizeT start_row_count, SizeT checkpoint_row_count);
 
+    void FlushColumnCheck(TxnTimeStamp checkpoint_ts);
+
     void FlushColumn(TxnTimeStamp checkpoint_ts);
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
@@ -131,6 +133,9 @@ public:
     void FillWithDefaultValue(SizeT row_count, const Value *default_value, BufferManager *buffer_mgr);
 
     SizeT GetStorageSize() const;
+
+    void ToMmap();
+
 private:
     const BlockEntry *block_entry_{nullptr};
     ColumnID column_id_{};

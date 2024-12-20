@@ -38,6 +38,8 @@ export enum class BufferType {
     kPersistent,
     kEphemeral,
     kTemp,
+    kToMmap,
+    kMmap,
 };
 
 export struct BufferObjectInfo {
@@ -60,8 +62,6 @@ export String BufferStatusToString(BufferStatus status) {
             return "New";
         case BufferStatus::kClean:
             return "Clean";
-        default:
-            return "Invalid";
     }
 }
 
@@ -73,6 +73,10 @@ export String BufferTypeToString(BufferType buffer_type) {
             return "Ephemeral";
         case BufferType::kTemp:
             return "Temporary";
+        case BufferType::kToMmap:
+            return "ToMmap";
+        case BufferType::kMmap:
+            return "Mmap";
     }
 }
 
@@ -103,6 +107,8 @@ public:
     void CleanupFile() const;
 
     void CleanupTempFile() const;
+
+    void ToMmap();
 
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 

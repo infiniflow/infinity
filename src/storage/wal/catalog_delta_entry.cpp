@@ -1006,12 +1006,14 @@ void AddChunkIndexEntryOp::Merge(CatalogDeltaOperation &other) {
 
 void AddColumnEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
     LOG_TRACE(fmt::format("ColumnEntry {} flush to disk", column_entry_->column_id()));
-    column_entry_->FlushColumn(max_commit_ts);
+    column_entry_->FlushColumnCheck(max_commit_ts);
 }
 
 void AddBlockEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) {
     LOG_TRACE(fmt::format("BlockEntry {} flush to disk", block_entry_->block_id()));
     block_entry_->Flush(max_commit_ts);
+    checkpoint_ts_ = block_entry_->checkpoint_ts();
+    checkpoint_row_count_ = block_entry_->checkpoint_row_count();
 }
 
 void AddSegmentIndexEntryOp::FlushDataToDisk(TxnTimeStamp max_commit_ts) { segment_index_entry_->Flush(max_commit_ts); }

@@ -36,7 +36,11 @@ public:
 
     // this is called by VarFileWorker
     VarBuffer(BufferObj *buffer_obj, UniquePtr<char[]> buffer, SizeT size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
-        buffers_.push_back(std::move(buffer));
+        std::get<Vector<UniquePtr<char[]>>>(buffers_).push_back(std::move(buffer));
+    }
+
+    VarBuffer(BufferObj *buffer_obj, const char *buffer, SizeT size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
+        buffers_ = buffer;
     }
 
 public:
@@ -55,7 +59,7 @@ public:
 private:
     mutable std::shared_mutex mtx_;
 
-    Vector<UniquePtr<char[]>> buffers_;
+    std::variant<Vector<UniquePtr<char[]>>, const char *> buffers_;
     Vector<SizeT> buffer_size_prefix_sum_ = {0};
 
     BufferObj *buffer_obj_ = nullptr;
