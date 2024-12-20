@@ -60,18 +60,18 @@ import defer_op;
 namespace infinity {
 
 Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<String> txn_text)
-    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id),
-      begin_ts_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), txn_text_(std::move(txn_text)) {
-    catalog_ = txn_store_.GetCatalog();
+    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this), txn_id_(txn_id), begin_ts_(begin_ts), wal_entry_(MakeShared<WalEntry>()),
+      txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), txn_text_(std::move(txn_text)) {
+    catalog_ = InfinityContext::instance().storage()->catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Txn");
 #endif
 }
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts)
-    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this, InfinityContext::instance().storage()->catalog()), txn_id_(txn_id),
-      begin_ts_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
-    catalog_ = txn_store_.GetCatalog();
+    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this), txn_id_(txn_id), begin_ts_(begin_ts), wal_entry_(MakeShared<WalEntry>()),
+      txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
+    catalog_ = InfinityContext::instance().storage()->catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Txn");
 #endif

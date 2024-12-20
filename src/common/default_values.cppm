@@ -309,7 +309,6 @@ export {
     constexpr std::string_view CONNECTED_TS_VAR_NAME = "connected_timestamp";                // session
     constexpr std::string_view CATALOG_VERSION_VAR_NAME = "catalog_version";                 // global
     constexpr std::string_view ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";         // global
-    constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "enable_profile";                   // session
     constexpr std::string_view PROFILE_RECORD_CAPACITY_VAR_NAME = "profile_record_capacity"; // session
     constexpr std::string_view BG_TASK_COUNT_VAR_NAME = "bg_task_count";                     // global
     constexpr std::string_view RUNNING_BG_TASK_VAR_NAME = "running_bg_task";                 // global
@@ -317,10 +316,11 @@ export {
     constexpr std::string_view SYSTEM_MEMORY_USAGE_VAR_NAME = "system_memory_usage";         // global
     constexpr std::string_view OPEN_FILE_COUNT_VAR_NAME = "open_file_count";                 // global
     constexpr std::string_view CPU_USAGE_VAR_NAME = "cpu_usage";                             // global
-    constexpr std::string_view FOLLOWER_NUMBER_VAR_NAME = "follower_number";                          // global
+    constexpr std::string_view FOLLOWER_NUMBER_VAR_NAME = "follower_number";                 // global
     constexpr std::string_view CACHE_RESULT_NUM_VAR_NAME = "cache_result_num";               // global
-    constexpr std::string_view MEMORY_CACHE_MISS_VAR_NAME = "memory_cache_miss";                      // global
-    constexpr std::string_view DISK_CACHE_MISS_VAR_NAME = "disk_cache_miss";                          // global
+    constexpr std::string_view MEMORY_CACHE_MISS_VAR_NAME = "memory_cache_miss";             // global
+    constexpr std::string_view DISK_CACHE_MISS_VAR_NAME = "disk_cache_miss";                 // global
+    constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "profile";                          // global
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;

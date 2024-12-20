@@ -1785,9 +1785,8 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
 }
 
 void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto txn = query_context->GetTxn();
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
-    auto catalog = txn->GetCatalog();
+    auto catalog = query_context->storage()->catalog();
 
     // create data block for output state
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -3798,26 +3797,6 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
-        case SessionVariable::kEnableProfile: {
-            Vector<SharedPtr<ColumnDef>> output_column_defs = {
-                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
-            };
-
-            SharedPtr<TableDef> table_def =
-                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
-            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
-
-            Vector<SharedPtr<DataType>> output_column_types{
-                bool_type,
-            };
-
-            output_block_ptr->Init(output_column_types);
-
-            Value value = Value::MakeBool(query_context->is_enable_profiling());
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-            break;
-        }
         default: {
             operator_state->status_ = Status::NoSysVar(*object_name_);
             RecoverableError(operator_state->status_);
@@ -3927,29 +3906,6 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
                 {
                     // option description
                     Value value = Value::MakeVarchar("Connected timestamp of this session");
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
-                }
-                break;
-            }
-            case SessionVariable::kEnableProfile: {
-                {
-                    // option name
-                    Value value = Value::MakeVarchar(var_name);
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
-                }
-                {
-                    // option value
-                    bool enable_profile = query_context->is_enable_profiling();
-                    String enable_profile_condition = enable_profile ? "true" : "false";
-                    Value value = Value::MakeVarchar(enable_profile_condition);
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
-                }
-                {
-                    // option description
-                    Value value = Value::MakeVarchar("Enable profile");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }
@@ -4556,6 +4512,26 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
                 operator_state->status_ = Status::NotSupport(fmt::format("follower_number isn't supported in non-leader node of cluster deployment"));
                 RecoverableError(operator_state->status_);
             }
+            break;
+        }
+        case GlobalVariable::kEnableProfile: {
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def =
+                TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), nullptr, output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                bool_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+
+            Value value = Value::MakeBool(InfinityContext::instance().storage()->catalog()->GetProfile());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
         }
         case GlobalVariable::kCleanupTrace: {
@@ -5212,6 +5188,29 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                         }
                     }
+                }
+                break;
+            }
+            case GlobalVariable::kEnableProfile: {
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    bool enable_profile = InfinityContext::instance().storage()->catalog()->GetProfile();
+                    String enable_profile_condition = enable_profile ? "true" : "false";
+                    Value value = Value::MakeVarchar(enable_profile_condition);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("Enable profile");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }
                 break;
             }
@@ -5882,7 +5881,7 @@ void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperato
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    auto catalog = query_context->GetTxn()->GetCatalog();
+    auto catalog = query_context->storage()->catalog();
     Vector<CatalogDeltaOpBrief> delta_log_brief_array = catalog->GetDeltaLogBriefs();
 
     for (const auto &delta_op_brief : delta_log_brief_array) {

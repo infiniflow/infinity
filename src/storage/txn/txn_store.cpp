@@ -554,7 +554,7 @@ void TxnTableStore::TryRevert() {
     }
 }
 
-TxnStore::TxnStore(Txn *txn, Catalog *catalog) : txn_(txn), catalog_(catalog) {}
+TxnStore::TxnStore(Txn *txn) : txn_(txn) {}
 
 void TxnStore::AddDBStore(DBEntry *db_entry) { txn_dbs_.emplace(db_entry, ptr_seq_n_++); }
 
@@ -721,9 +721,11 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         Catalog::RemoveTableEntry(table_entry, txn_id);
     }
 
+    Catalog* catalog_ptr = InfinityContext::instance().storage()->catalog();
     for (auto [db_entry, ptr_seq_n] : txn_dbs_) {
         db_entry->Cleanup();
-        catalog_->RemoveDBEntry(db_entry, txn_id);
+
+        catalog_ptr->RemoveDBEntry(db_entry, txn_id);
     }
 }
 

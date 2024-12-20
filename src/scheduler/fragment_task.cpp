@@ -35,6 +35,7 @@ import defer_op;
 import fragment_context;
 import status;
 import parser_assert;
+import infinity_context;
 
 namespace infinity {
 
@@ -71,7 +72,7 @@ void FragmentTask::OnExecute() {
         // No source error
         Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
-        bool enable_profiler = query_context->is_enable_profiling();
+        bool enable_profiler = InfinityContext::instance().storage()->catalog()->GetProfile();
         TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
         HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
         profiler.Begin();

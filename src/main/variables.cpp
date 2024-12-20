@@ -50,12 +50,12 @@ void VarUtil::InitVariablesMap() {
     global_name_map_[CACHE_RESULT_NUM_VAR_NAME.data()] = GlobalVariable::kCacheResultNum;
     global_name_map_[MEMORY_CACHE_MISS_VAR_NAME.data()] = GlobalVariable::kMemoryCacheMiss;
     global_name_map_[DISK_CACHE_MISS_VAR_NAME.data()] = GlobalVariable::kDiskCacheMiss;
+    global_name_map_[ENABLE_PROFILE_VAR_NAME.data()] = GlobalVariable::kEnableProfile;
 
     session_name_map_[QUERY_COUNT_VAR_NAME.data()] = SessionVariable::kQueryCount;
     session_name_map_[TOTAL_COMMIT_COUNT_VAR_NAME.data()] = SessionVariable::kTotalCommitCount;
     session_name_map_[TOTAL_ROLLBACK_COUNT_VAR_NAME.data()] = SessionVariable::kTotalRollbackCount;
     session_name_map_[CONNECTED_TS_VAR_NAME.data()] = SessionVariable::kConnectedTime;
-    session_name_map_["profile"] = SessionVariable::kEnableProfile;
 }
 
 HashMap<String, GlobalVariable> VarUtil::global_name_map_;

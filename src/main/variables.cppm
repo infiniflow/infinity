@@ -51,6 +51,7 @@ export enum class GlobalVariable {
     kCacheResultNum,            // global
     kMemoryCacheMiss,           // global
     kDiskCacheMiss,             // global
+    kEnableProfile,             // global
     kInvalid,
 };
 
@@ -59,7 +60,6 @@ export enum class SessionVariable {
     kTotalCommitCount,          // session
     kTotalRollbackCount,        // session
     kConnectedTime,             // session
-    kEnableProfile,             // session
 
     kInvalid,
 };
