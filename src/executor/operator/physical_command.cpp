@@ -68,14 +68,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 case SetScope::kSession: {
                     SessionVariable session_var = VarUtil::GetSessionVarByName(set_command->var_name());
                     switch(session_var) {
-                        case SessionVariable::kEnableProfile: {
-                            if (set_command->value_type() != SetVarType::kBool) {
-                                Status status = Status::DataTypeMismatch("Boolean", set_command->value_type_str());
-                                RecoverableError(status);
-                            }
-                            query_context->current_session()->SetProfile(set_command->value_bool());
-                            return true;
-                        }
                         case SessionVariable::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("Unknown session variable: {}", set_command->var_name()));
                             RecoverableError(status);
@@ -90,6 +82,14 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 case SetScope::kGlobal: {
                     GlobalVariable global_var = VarUtil::GetGlobalVarByName(set_command->var_name());
                     switch(global_var) {
+                        case GlobalVariable::kEnableProfile: {
+                            if (set_command->value_type() != SetVarType::kBool) {
+                                Status status = Status::DataTypeMismatch("Boolean", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
+                            InfinityContext::instance().storage()->catalog()->SetProfile(set_command->value_bool());
+                            return true;
+                        }
                         case GlobalVariable::kProfileRecordCapacity: {
                             if (set_command->value_type() != SetVarType::kInteger) {
                                 Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
@@ -346,7 +346,8 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kExport: {
             ExportCmd *export_command = (ExportCmd *)(command_info_.get());
-            auto profiler_record = query_context->current_session()->GetProfileRecord(export_command->file_no());
+
+            auto profiler_record = InfinityContext::instance().storage()->catalog()->GetProfileRecord(export_command->file_no());
             if (profiler_record == nullptr) {
                 Status status = Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no()));
                 RecoverableError(status);

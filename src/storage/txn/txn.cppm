@@ -181,8 +181,6 @@ public:
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
-    Catalog *GetCatalog() { return catalog_; }
-
     inline TransactionID TxnID() const { return txn_id_; }
 
     TxnTimeStamp CommitTS() const;
