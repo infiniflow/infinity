@@ -319,7 +319,9 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
 
 void QueryContext::CreateQueryProfiler() {
     if (InfinityContext::instance().storage()->catalog()->GetProfile()) {
-        query_profiler_ = MakeShared<QueryProfiler>(true);
+        if(query_profiler_ == nullptr) {
+            query_profiler_ = MakeShared<QueryProfiler>(true);
+        }
     }
 }
 

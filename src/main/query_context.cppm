@@ -133,12 +133,13 @@ public:
         }
     }
 
+    void CreateQueryProfiler();
+
 private:
     QueryResult HandleAdminStatement(const AdminStatement* admin_statement);
 
 private:
 
-    void CreateQueryProfiler();
     void RecordQueryProfiler(const StatementType &type);
     void StartProfile(QueryPhase phase);
     void StopProfile(QueryPhase phase);

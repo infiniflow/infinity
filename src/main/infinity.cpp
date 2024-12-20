@@ -97,7 +97,8 @@ std::variant<UniquePtr<QueryContext>, QueryResult> Infinity::GetQueryContext(boo
     if (std::holds_alternative<QueryResult>(result)) {                                                                                               \
         return std::get<QueryResult>(result);                                                                                                        \
     }                                                                                                                                                \
-    query_context_ptr = std::move(std::get<UniquePtr<QueryContext>>(result));
+    query_context_ptr = std::move(std::get<UniquePtr<QueryContext>>(result));                                                                        \
+    query_context_ptr->CreateQueryProfiler();
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
 
