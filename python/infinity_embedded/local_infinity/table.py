@@ -424,6 +424,19 @@ class LocalTable():
             columns = [columns]
         return self._conn.drop_columns(db_name=self._db_name, table_name=self._table_name, column_names=columns)
 
+    def _to_string(self, query: Query):
+        # columns: Optional[List[WrapParsedExpr]],
+        # highlight: Optional[List[WrapParsedExpr]],
+        # search: Optional[WrapSearchExpr],
+        # filter: Optional[WrapParsedExpr],
+        # group_by: Optional[List[WrapParsedExpr]],
+        # limit: Optional[WrapParsedExpr],
+        # offset: Optional[WrapParsedExpr],
+        # sort: Optional[List[WrapOrderByExpr]],
+        # total_hits_count: Optional[bool]
+
+        return ""
+
     def _execute_query(self, query: Query):
         # execute the query
         highlight = []

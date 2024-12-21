@@ -506,6 +506,20 @@ class InfinityThriftQueryBuilder(ABC):
         self._sort = sort_list
         return self
 
+    def to_string(self) -> str:
+        query = Query(
+            columns=self._columns,
+            highlight=self._highlight,
+            search=self._search,
+            filter=self._filter,
+            groupby=self._groupby,
+            limit=self._limit,
+            offset=self._offset,
+            sort=self._sort,
+            total_hits_count=self._total_hits_count,
+        )
+        return self._table._to_string(query)
+
     def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any], {}]:
         query = Query(
             columns=self._columns,
