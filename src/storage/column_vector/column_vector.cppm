@@ -135,12 +135,12 @@ public:
     ColumnVector &operator=(ColumnVector &&right) noexcept {
         if (this != &right) {
             data_type_size_ = right.data_type_size_;
-            std::swap(buffer_, right.buffer_);
-            std::swap(nulls_ptr_, right.nulls_ptr_);
+            buffer_ = std::move(right.buffer_);
+            nulls_ptr_ = std::move(right.nulls_ptr_);
             initialized = right.initialized;
             vector_type_ = right.vector_type_;
-            std::swap(data_type_, right.data_type_);
-            std::swap(data_ptr_, right.data_ptr_);
+            data_type_ = std::move(right.data_type_);
+            data_ptr_ = std::exchange(right.data_ptr_, nullptr);
             capacity_ = right.capacity_;
             tail_index_ = right.tail_index_;
         }

@@ -151,6 +151,11 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     }
     column_entry->last_chunk_offset_ = last_chunk_offset;
 
+    if (block_entry->row_count() >= block_entry->row_capacity()) {
+        column_entry->ToMmap();
+        LOG_TRACE(fmt::format("Column {} to mmap success", column_entry->encode()));
+    }
+
     return column_entry;
 }
 
@@ -268,6 +273,19 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
     }
 }
 
+void BlockColumnEntry::FlushColumnCheck(TxnTimeStamp checkpoint_ts) {
+    if (deleted_) {
+        return;
+    }
+    bool flush_column = false;
+    bool flush_version = false;
+    block_entry_->CheckFlush(checkpoint_ts, flush_column, flush_version);
+    if (!flush_column) {
+        return;
+    }
+    this->FlushColumn(checkpoint_ts);
+}
+
 void BlockColumnEntry::FlushColumn(TxnTimeStamp checkpoint_ts) {
     if (deleted_) {
         return;
@@ -365,6 +383,13 @@ SizeT BlockColumnEntry::GetStorageSize() const {
     }
 
     return result;
+}
+
+void BlockColumnEntry::ToMmap() {
+    buffer_->ToMmap();
+    for (auto *outline_buffer : outline_buffers_) {
+        outline_buffer->ToMmap();
+    }
 }
 
 } // namespace infinity

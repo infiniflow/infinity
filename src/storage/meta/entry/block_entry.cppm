@@ -199,10 +199,15 @@ public:
     inline void IncreaseRowCount(SizeT increased_row_count) { block_row_count_ += increased_row_count; }
 
     SizeT GetStorageSize() const;
+
+    void CheckFlush(TxnTimeStamp ts, bool &flush_column, bool &flush_version, bool check_commit = true) const;
+
+    bool TryToMmap();
+
 private:
     void FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count);
 
-    bool FlushVersionNoLock(TxnTimeStamp checkpoint_ts);
+    bool FlushVersionNoLock(TxnTimeStamp checkpoint_ts, bool check_commit = true);
 
 protected:
     mutable std::shared_mutex rw_locker_{};
@@ -219,8 +224,8 @@ protected:
     // check if a value must not exist in the block
     SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
 
-    TxnTimeStamp min_row_ts_{UNCOMMIT_TS}; // Indicate the commit_ts which create this BlockEntry
-    TxnTimeStamp max_row_ts_{0};           // Indicate the max commit_ts which create/update/delete data inside this BlockEntry
+    TxnTimeStamp min_row_ts_{}; // Indicate the commit_ts last append
+    TxnTimeStamp max_row_ts_{}; // Indicate the commit_ts last append/update/delete
     TxnTimeStamp checkpoint_ts_{0};        // replay not set
 
     TransactionID using_txn_id_{0}; // Temporarily used to lock the modification to block entry.

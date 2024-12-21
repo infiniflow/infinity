@@ -114,4 +114,24 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size) {
     data_ = static_cast<void *>(var_buffer);
 }
 
+bool VarFileWorker::ReadFromMmapImpl(const void *ptr, SizeT file_size) {
+    if (file_size < buffer_size_) {
+        String error_message = fmt::format("File size {} is smaller than buffer size {}.", file_size, buffer_size_);
+        UnrecoverableError(error_message);
+    }
+    auto *var_buffer = new VarBuffer(buffer_obj_, static_cast<const char *>(ptr), buffer_size_);
+    mmap_data_ = reinterpret_cast<u8 *>(var_buffer);
+    return true;
+}
+
+void VarFileWorker::FreeFromMmapImpl() {
+    if (mmap_data_ == nullptr) {
+        String error_message = "Data is already freed.";
+        UnrecoverableError(error_message);
+    }
+    auto *var_buffer = reinterpret_cast<VarBuffer *>(mmap_data_);
+    delete var_buffer;
+    mmap_data_ = nullptr;
+}
+
 } // namespace infinity

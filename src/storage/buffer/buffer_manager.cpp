@@ -273,6 +273,14 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
     }
 }
 
+void BufferManager::FreeUnloadBuffer(BufferObj *buffer_obj) {
+    SizeT buffer_size = buffer_obj->GetBufferSize();
+    [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_size);
+    if (memory_size < buffer_size) {
+        UnrecoverableError(fmt::format("BufferManager::FreeUnloadBuffer: memory_size < buffer_size: {} < {}", memory_size, buffer_size));
+    }
+}
+
 void BufferManager::AddTemp(BufferObj *buffer_obj) {
     std::unique_lock lock(temp_locker_);
     auto [iter, insert_ok] = temp_set_.emplace(buffer_obj);

@@ -30,8 +30,12 @@ import infinity_context;
 namespace infinity {
 
 SizeT VarBuffer::Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success_p) {
+    if (std::holds_alternative<const char *>(buffers_)) {
+        UnrecoverableError("Cannot append to a const buffer");
+    }
+    auto &buffers = std::get<Vector<UniquePtr<char[]>>>(buffers_);
     std::unique_lock lock(mtx_);
-    buffers_.push_back(std::move(buffer));
+    buffers.push_back(std::move(buffer));
     SizeT offset = buffer_size_prefix_sum_.back();
     buffer_size_prefix_sum_.push_back(offset + size);
 
@@ -55,6 +59,11 @@ const char *VarBuffer::Get(SizeT offset, SizeT size) const {
     if (size == 0) {
         return nullptr;
     }
+    if (std::holds_alternative<const char *>(buffers_)) {
+        const auto *buffer = std::get<const char *>(buffers_);
+        return buffer + offset;
+    }
+    auto &buffers = std::get<Vector<UniquePtr<char[]>>>(buffers_);
     std::shared_lock lock(mtx_);
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
     auto it = std::upper_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
@@ -73,14 +82,21 @@ const char *VarBuffer::Get(SizeT offset, SizeT size) const {
             fmt::format("offset {} and size {} is out of range [{}, {})", offset, size, buffer_size_prefix_sum_[i], buffer_size_prefix_sum_[i + 1]);
         UnrecoverableError(error_msg);
     }
-    return buffers_[i].get() + offset_in_buffer;
+    return buffers[i].get() + offset_in_buffer;
 }
 
 SizeT VarBuffer::Write(char *ptr) const {
+    if (std::holds_alternative<const char *>(buffers_)) {
+        UnrecoverableError("Cannot write to a const buffer");
+        // const auto *buffer = std::get<const char *>(buffers_);
+        // std::memcpy(ptr, buffer, buffer_size_prefix_sum_.back());
+        // return buffer_size_prefix_sum_.back();
+    }
+    auto &buffers = std::get<Vector<UniquePtr<char[]>>>(buffers_);
     std::shared_lock lock(mtx_);
     char *start = ptr;
-    for (SizeT i = 0; i < buffers_.size(); ++i) {
-        const auto &buffer = buffers_[i];
+    for (SizeT i = 0; i < buffers.size(); ++i) {
+        const auto &buffer = buffers[i];
         SizeT buffer_size = buffer_size_prefix_sum_[i + 1] - buffer_size_prefix_sum_[i];
         std::memcpy(ptr, buffer.get(), buffer_size);
         ptr += buffer_size;
