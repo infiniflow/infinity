@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import json
 import functools
 import inspect
 from typing import Optional, Union, List, Any
@@ -30,6 +32,8 @@ from infinity.remote_thrift.utils import (
     check_valid_name,
     get_remote_constant_expr_from_python_value,
     get_ordinary_info,
+    parsed_expression_to_string,
+    search_to_string
 )
 from infinity.table import ExplainType
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN, SortType
@@ -409,6 +413,9 @@ class RemoteTable():
         self.query_builder.option(option_kv)
         return self
 
+    def to_string(self):
+        return self.query_builder.to_string()
+
     def to_result(self):
         return self.query_builder.to_result()
 
@@ -445,6 +452,44 @@ class RemoteTable():
 
     def compact(self):
         return self._conn.compact(db_name=self._db_name, table_name=self._table_name)
+
+    def _to_string(self, query: Query):
+        # columns: Optional[List[ParsedExpr]],
+        # highlight: Optional[List[ParsedExpr]],
+        # search: Optional[SearchExpr],
+        # filter: Optional[ParsedExpr],
+        # groupby: Optional[List[ParsedExpr]],
+        # limit: Optional[ParsedExpr],
+        # offset: Optional[ParsedExpr],
+        # sort: Optional[List[OrderByExpr]],
+        # total_hits_count: Optional[bool]
+        res = {"db": self._db_name, "table": self._table_name}
+        if query.columns:
+            res["columns"] = []
+            for column in query.columns:
+                res["columns"].append(parsed_expression_to_string(column))
+
+        if query.highlight:
+            res["highlights"] = []
+            for highlight in query.highlight:
+                res["highlights"].append(parsed_expression_to_string(highlight))
+
+        if query.search:
+            res["search"] = search_to_string(query.search)
+
+        if query.filter:
+            res["filter"] = parsed_expression_to_string(query.filter)
+
+        if query.limit:
+            res["limit"] = parsed_expression_to_string(query.limit)
+
+        if query.offset:
+            res["offset"] = parsed_expression_to_string(query.offset)
+
+        if query.offset:
+            res["offset"] = parsed_expression_to_string(query.offset)
+
+        return json.dumps(res)
 
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
 
