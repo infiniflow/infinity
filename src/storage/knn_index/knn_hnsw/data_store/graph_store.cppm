@@ -22,6 +22,8 @@ export module graph_store;
 import stl;
 import hnsw_common;
 import local_file_handle;
+import data_store_util;
+import serialize;
 
 namespace infinity {
 
@@ -91,6 +93,17 @@ public:
         return meta;
     }
 
+    static GraphStoreMeta LoadFromPtr(const char *&ptr) {
+        SizeT Mmax0 = ReadBufAdv<SizeT>(ptr);
+        SizeT Mmax = ReadBufAdv<SizeT>(ptr);
+        GraphStoreMeta meta(Mmax0, Mmax);
+        i32 max_layer = ReadBufAdv<i32>(ptr);
+        VertexType enterpoint = ReadBufAdv<VertexType>(ptr);
+        meta.max_layer_ = max_layer;
+        meta.enterpoint_ = enterpoint;
+        return meta;
+    }
+
     SizeT Mmax0() const { return Mmax0_; }
     SizeT Mmax() const { return Mmax_; }
     SizeT level0_size() const { return level0_size_; }
@@ -133,25 +146,15 @@ public:
     }
 };
 
-export class GraphStoreInner {
-private:
-    GraphStoreInner(SizeT max_vertex, const GraphStoreMeta &meta, SizeT loaded_vertex_n)
-        : graph_(MakeUnique<char[]>(max_vertex * meta.level0_size())), loaded_vertex_n_(loaded_vertex_n) {}
-
+template <bool OwnMem>
+class GraphStoreInnerBase {
 public:
-    GraphStoreInner() = default;
+    GraphStoreInnerBase() = default;
 
     void Free(SizeT current_vertex_num, const GraphStoreMeta &meta) {
         for (VertexType vertex_i = loaded_vertex_n_; vertex_i < VertexType(current_vertex_num); ++vertex_i) {
             delete[] GetLevel0(vertex_i, meta)->layers_p_;
         }
-    }
-
-    static GraphStoreInner Make(SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
-        GraphStoreInner graph_store(max_vertex, meta, 0);
-        std::fill(graph_store.graph_.get(), graph_store.graph_.get() + max_vertex * meta.level0_size(), 0);
-        mem_usage += max_vertex * meta.level0_size();
-        return graph_store;
     }
 
     SizeT GetSizeInBytes(SizeT cur_vertex_n, const GraphStoreMeta &meta) const {
@@ -182,49 +185,6 @@ public:
         }
     }
 
-    static GraphStoreInner Load(LocalFileHandle &file_handle, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
-        assert(cur_vertex_n <= max_vertex);
-
-        SizeT layer_sum;
-        file_handle.Read(&layer_sum, sizeof(layer_sum));
-
-        GraphStoreInner graph_store(max_vertex, meta, cur_vertex_n);
-        file_handle.Read(graph_store.graph_.get(), cur_vertex_n * meta.level0_size());
-
-        auto loaded_layers = MakeUnique<char[]>(meta.levelx_size() * layer_sum);
-        char *loaded_layers_p = loaded_layers.get();
-        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
-            VertexL0 *v = graph_store.GetLevel0(vertex_i, meta);
-            if (v->layer_n_) {
-                file_handle.Read(loaded_layers_p, meta.levelx_size() * v->layer_n_);
-                v->layers_p_ = loaded_layers_p;
-                loaded_layers_p += meta.levelx_size() * v->layer_n_;
-            } else {
-                v->layers_p_ = nullptr;
-            }
-        }
-        graph_store.loaded_layers_ = std::move(loaded_layers);
-
-        mem_usage += max_vertex * meta.level0_size() + layer_sum * meta.levelx_size();
-        return graph_store;
-    }
-
-    void AddVertex(VertexType vertex_i, i32 layer_n, const GraphStoreMeta &meta, SizeT &mem_usage) {
-        VertexL0 *v = GetLevel0(vertex_i, meta);
-        v->neighbor_n_ = 0;
-        v->layer_n_ = layer_n;
-        if (layer_n) {
-            v->layers_p_ = new char[meta.levelx_size() * layer_n];
-            mem_usage += meta.levelx_size() * layer_n;
-
-            for (i32 layer_i = 1; layer_i <= layer_n; ++layer_i) {
-                GetLevelX(v->layers_p_, layer_i, meta)->neighbor_n_ = 0;
-            }
-        } else {
-            v->layers_p_ = nullptr;
-        }
-    }
-
     Pair<const VertexType *, VertexListSize> GetNeighbors(VertexType vertex_i, i32 layer_i, const GraphStoreMeta &meta) const {
         const VertexL0 *v = GetLevel0(vertex_i, meta);
         if (layer_i == 0) {
@@ -233,36 +193,20 @@ public:
         const VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
         return {vx->neighbors_, vx->neighbor_n_};
     }
-    Pair<VertexType *, VertexListSize *> GetNeighborsMut(VertexType vertex_i, i32 layer_i, const GraphStoreMeta &meta) {
-        VertexL0 *v = GetLevel0(vertex_i, meta);
-        if (layer_i == 0) {
-            return {v->neighbors_, &v->neighbor_n_};
-        }
-        VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
-        return {vx->neighbors_, &vx->neighbor_n_};
-    }
 
-private:
+protected:
     const VertexL0 *GetLevel0(VertexType vertex_i, const GraphStoreMeta &meta) const {
         return reinterpret_cast<const VertexL0 *>(graph_.get() + vertex_i * meta.level0_size());
-    }
-    VertexL0 *GetLevel0(VertexType vertex_i, const GraphStoreMeta &meta) {
-        return reinterpret_cast<VertexL0 *>(graph_.get() + vertex_i * meta.level0_size());
     }
 
     const VertexLX *GetLevelX(const char *layer_p, i32 layer_i, const GraphStoreMeta &meta) const {
         assert(layer_i > 0);
         return reinterpret_cast<const VertexLX *>(layer_p + (layer_i - 1) * meta.levelx_size());
     }
-    VertexLX *GetLevelX(char *layer_p, i32 layer_i, const GraphStoreMeta &meta) {
-        assert(layer_i > 0);
-        return reinterpret_cast<VertexLX *>(layer_p + (layer_i - 1) * meta.levelx_size());
-    }
 
-private:
-    UniquePtr<char[]> graph_;
+protected:
+    ArrayPtr<char, OwnMem> graph_;
     SizeT loaded_vertex_n_;
-    UniquePtr<char[]> loaded_layers_;
 
     //---------------------------------------------- Following is the tmp debug function. ----------------------------------------------
 
@@ -333,6 +277,121 @@ public:
                 os << std::endl;
             }
         }
+    }
+};
+
+export template <bool OwnMem>
+class GraphStoreInner : public GraphStoreInnerBase<OwnMem> {
+private:
+    GraphStoreInner(SizeT max_vertex, const GraphStoreMeta &meta, SizeT loaded_vertex_n) {
+        this->graph_ = MakeUnique<char[]>(max_vertex * meta.level0_size());
+        this->loaded_vertex_n_ = loaded_vertex_n;
+    }
+
+public:
+    GraphStoreInner() = default;
+
+    static GraphStoreInner Make(SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
+        GraphStoreInner graph_store(max_vertex, meta, 0);
+        std::fill(graph_store.graph_.get(), graph_store.graph_.get() + max_vertex * meta.level0_size(), 0);
+        mem_usage += max_vertex * meta.level0_size();
+        return graph_store;
+    }
+
+    static GraphStoreInner Load(LocalFileHandle &file_handle, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
+        assert(cur_vertex_n <= max_vertex);
+
+        SizeT layer_sum;
+        file_handle.Read(&layer_sum, sizeof(layer_sum));
+
+        GraphStoreInner graph_store(max_vertex, meta, cur_vertex_n);
+        file_handle.Read(graph_store.graph_.get(), cur_vertex_n * meta.level0_size());
+
+        auto loaded_layers = MakeUnique<char[]>(meta.levelx_size() * layer_sum);
+        char *loaded_layers_p = loaded_layers.get();
+        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
+            VertexL0 *v = graph_store.GetLevel0(vertex_i, meta);
+            if (v->layer_n_) {
+                file_handle.Read(loaded_layers_p, meta.levelx_size() * v->layer_n_);
+                v->layers_p_ = loaded_layers_p;
+                loaded_layers_p += meta.levelx_size() * v->layer_n_;
+            } else {
+                v->layers_p_ = nullptr;
+            }
+        }
+        graph_store.loaded_layers_ = std::move(loaded_layers);
+
+        mem_usage += max_vertex * meta.level0_size() + layer_sum * meta.levelx_size();
+        return graph_store;
+    }
+
+    void AddVertex(VertexType vertex_i, i32 layer_n, const GraphStoreMeta &meta, SizeT &mem_usage) {
+        VertexL0 *v = GetLevel0(vertex_i, meta);
+        v->neighbor_n_ = 0;
+        v->layer_n_ = layer_n;
+        if (layer_n) {
+            v->layers_p_ = new char[meta.levelx_size() * layer_n];
+            mem_usage += meta.levelx_size() * layer_n;
+
+            for (i32 layer_i = 1; layer_i <= layer_n; ++layer_i) {
+                GetLevelX(v->layers_p_, layer_i, meta)->neighbor_n_ = 0;
+            }
+        } else {
+            v->layers_p_ = nullptr;
+        }
+    }
+
+    Pair<VertexType *, VertexListSize *> GetNeighborsMut(VertexType vertex_i, i32 layer_i, const GraphStoreMeta &meta) {
+        VertexL0 *v = GetLevel0(vertex_i, meta);
+        if (layer_i == 0) {
+            return {v->neighbors_, &v->neighbor_n_};
+        }
+        VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
+        return {vx->neighbors_, &vx->neighbor_n_};
+    }
+
+private:
+    VertexL0 *GetLevel0(VertexType vertex_i, const GraphStoreMeta &meta) {
+        return reinterpret_cast<VertexL0 *>(this->graph_.get() + vertex_i * meta.level0_size());
+    }
+    VertexLX *GetLevelX(char *layer_p, i32 layer_i, const GraphStoreMeta &meta) {
+        assert(layer_i > 0);
+        return reinterpret_cast<VertexLX *>(layer_p + (layer_i - 1) * meta.levelx_size());
+    }
+
+private:
+    ArrayPtr<char, OwnMem> loaded_layers_;
+};
+
+export template <>
+class GraphStoreInner<false> : public GraphStoreInnerBase<false> {
+public:
+    GraphStoreInner() = default;
+
+    GraphStoreInner(SizeT loaded_vertex_n, const char *ptr) {
+        this->graph_ = ptr;
+        this->loaded_vertex_n_ = loaded_vertex_n;
+    }
+
+    static GraphStoreInner LoadFromPtr(const char *&ptr, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta) {
+        assert(cur_vertex_n <= max_vertex);
+
+        [[maybe_unused]] SizeT layer_sum = ReadBufAdv<SizeT>(ptr);
+
+        GraphStoreInner graph_store(cur_vertex_n, ptr);
+        ptr += cur_vertex_n * meta.level0_size();
+
+        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
+            auto *v = const_cast<VertexL0 *>(graph_store.GetLevel0(vertex_i, meta));
+            if (v->layer_n_) {
+                v->layers_p_ = const_cast<char *>(ptr);
+                ptr += meta.levelx_size() * v->layer_n_;
+            } else {
+                v->layers_p_ = nullptr;
+            }
+        }
+
+        return graph_store;
     }
 };
 
