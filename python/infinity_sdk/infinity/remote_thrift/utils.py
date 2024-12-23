@@ -28,6 +28,158 @@ from infinity.common import InfinityException, SparseVector
 from infinity.errors import ErrorCode
 
 
+def parsed_expression_to_string(expr: ttypes.ParsedExpr) -> str:
+    if expr is None:
+        return str()
+
+    expr_type = expr.type
+    if expr_type.constant_expr:
+        match expr_type.constant_expr.literal_type:
+            case ttypes.LiteralType.Boolean:
+                return str(expr_type.constant_expr.bool_value)
+            case ttypes.LiteralType.Int64:
+                return str(expr_type.i64_value)
+            case ttypes.LiteralType.Double:
+                return str(expr_type.f64_value)
+            case ttypes.LiteralType.String:
+                return expr_type.str_value
+            case ttypes.LiteralType.IntegerArray:
+                return str(expr_type.i64_array_value)
+            case ttypes.LiteralType.DoubleArray:
+                return str(expr_type.f64_array_value)
+            case ttypes.LiteralType.IntegerTensor:
+                return str(expr_type.i64_tensor_value)
+            case ttypes.LiteralType.DoubleTensor:
+                return str(expr_type.f64_tensor_value)
+            case ttypes.LiteralType.IntegerTensorArray:
+                return str(expr_type.i64_tensor_array)
+            case ttypes.LiteralType.DoubleTensorArray:
+                return str(expr_type.f64_tensor_array)
+            case ttypes.LiteralType.SparseIntegerArray:
+                return str(expr_type.i64_array_idx)
+
+    if expr_type.column_expr:
+        if expr_type.column_expr.column_name:
+            return str(".".join(expr_type.column_expr.column_name))
+        if expr_type.column_expr.star:
+            return "*"
+
+    if expr_type.function_expr:
+        function_name = expr_type.function_expr.function_name
+        arguments_str = str
+        for index, argument in enumerate(expr_type.function_expr.arguments):
+            arg_str = parsed_expression_to_string(argument)
+            if index == 0:
+                arguments_str = arg_str
+            else:
+                arguments_str = f"{arguments_str}, {arg_str}"
+        return f"{function_name}({arguments_str})"
+
+    if expr_type.between_expr:
+        value_str = parsed_expression_to_string(expr_type.between_expr.value)
+        upper_bound_str = parsed_expression_to_string(expr_type.between_expr.upper_bound)
+        lower_bound_str = parsed_expression_to_string(expr_type.between_expr.lower_bound)
+        return f"between(f{value_str}, f{upper_bound_str}, f{lower_bound_str})"
+
+    if expr_type.knn_expr:
+        column_expr_str = parsed_expression_to_string(expr_type.knn_expr.column_expr)
+        return f"match_dense(column=f{column_expr_str}, top={expr_type.knn_expr.topn})"
+
+    if expr_type.match_sparse_expr:
+        column_expr_str = parsed_expression_to_string(expr_type.match_sparse_expr.column_expr)
+        return f"match_sparse(column=f{column_expr_str}, top={expr_type.match_sparse_expr.topn})"
+
+    if expr_type.match_tensor_expr:
+        column_expr_str = parsed_expression_to_string(expr_type.match_tensor_expr.column_expr)
+        return f"match_tensor(column=f{column_expr_str}, top={expr_type.match_tensor_expr.topn})"
+
+    if expr_type.match_expr:
+        column_expr_str = parsed_expression_to_string(expr_type.match_expr.column_expr)
+        return f"match_text(column=f{column_expr_str}, top={expr_type.match_expr.topn})"
+
+    if expr_type.fusion_expr:
+        return f"fusion(method={expr_type.fusion_expr.method}, options={expr_type.fusion_expr.options_text})"
+
+    if expr_type.search_expr:
+        return f"search()"
+
+    if expr_type.in_expr:
+        arguments_str = str
+        for index, argument in enumerate(expr_type.in_expr.arguments):
+            arg_str = parsed_expression_to_string(argument)
+            if index == 0:
+                arguments_str = arg_str
+            else:
+                arguments_str = f"{arguments_str}, {arg_str}"
+
+        left_expr_str = parsed_expression_to_string(expr_type.in_expr.left_operand)
+        if expr_type.in_expr.in_type:
+            return f"{left_expr_str} IN (f{arguments_str})"
+        else:
+            return f"{left_expr_str} NOT IN (f{arguments_str})"
+
+    return ""
+
+def search_to_string(search_expr: ttypes.SearchExpr) -> str:
+    if search_expr.match_exprs:
+        match_exprs_str = str
+        for index, match_expr in enumerate(search_expr.match_exprs):
+            match_expr_str = parsed_expression_to_string(match_expr)
+            if index == 0:
+                match_exprs_str = match_expr_str
+            else:
+                match_exprs_str = f"{match_exprs_str}, {match_expr_str}"
+
+        return match_exprs_str
+
+    if search_expr.fusion_exprs:
+        fusion_exprs_str = str
+        for index, fusion_expr in enumerate(search_expr.fusion_exprs):
+            fusion_expr_str = parsed_expression_to_string(fusion_expr)
+            if index == 0:
+                fusion_exprs_str = fusion_expr_str
+            else:
+                fusion_exprs_str = f"{fusion_exprs_str}, {fusion_expr_str}"
+
+        return fusion_exprs_str
+
+
+    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid search expression")
+
+
+def fusion_to_string(fusion_expr: ttypes.FusionExpr) -> str:
+    # 1: string method,
+    # 2: string options_text,
+    # 3: optional MatchTensorExpr optional_match_tensor_expr,
+    match_tensor_expr_str = None
+    if fusion_expr.optional_match_tensor_expr:
+        column_expr_str = parsed_expression_to_string(fusion_expr.optional_match_tensor_expr.column_expr)
+        match_tensor_expr_str = f"match_tensor(column={column_expr_str}, top={fusion_expr.optional_match_tensor_expr.topn})"
+
+    if match_tensor_expr_str:
+        return f"fusion(name={fusion_expr.method}, options={fusion_expr.options_text}, optional_match_tensor={match_tensor_expr_str})"
+    else:
+        return f"fusion(name={fusion_expr.method}, options={fusion_expr.options_text})"
+
+def generic_match_to_string(generic_match_expr: ttypes.GenericMatchExpr) -> str:
+
+    if generic_match_expr.match_vector_expr:
+        column_expr_str = parsed_expression_to_string(generic_match_expr.match_vector_expr.column_expr)
+        return f"match_dense(column={column_expr_str}, top={generic_match_expr.match_vector_expr.topn})"
+
+    if generic_match_expr.match_sparse_expr:
+        column_expr_str = parsed_expression_to_string(generic_match_expr.match_sparse_expr.column_expr)
+        return f"match_sparse(column={column_expr_str}, top={generic_match_expr.match_sparse_expr.topn})"
+
+    if generic_match_expr.match_tensor_expr:
+        column_expr_str = parsed_expression_to_string(generic_match_expr.match_tensor_expr.column_expr)
+        return f"match_tensor(column={column_expr_str}, top={generic_match_expr.match_tensor_expr.topn})"
+
+    if generic_match_expr.match_text_expr:
+        column_expr_str = parsed_expression_to_string(generic_match_expr.match_text_expr.column_expr)
+        return f"match_text(column={column_expr_str}, top={generic_match_expr.match_text_expr.topn})"
+
+
 def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
     if isinstance(cons, exp.Binary):
         parsed_expr = ttypes.ParsedExpr()
