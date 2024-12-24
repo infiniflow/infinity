@@ -147,14 +147,15 @@ inline TermList GetTermListFromAnalyzer(const std::string &analyzer_name, Analyz
 }
 
 inline std::string GetAnalyzerName(const std::string &field, const std::map<std::string, std::string> &field2analyzer) {
-    std::string analyzer_name = "standard";
     if (!field.empty()) {
         if (const auto it = field2analyzer.find(field); it != field2analyzer.end()) {
-            analyzer_name = it->second;
+            return it->second;
         }
     }
-    return analyzer_name;
+    return "standard";
 }
+
+inline static const auto keyword_analyzer_name_int = AnalyzerPool::AnalyzerNameToInt(AnalyzerPool::KEYWORD.data());
 
 std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, const std::string *default_field_ptr) const {
     std::istringstream iss(query);
@@ -166,7 +167,8 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     }
     const auto &default_field = *default_field_ptr;
     const auto default_analyzer_name = GetAnalyzerName(default_field, field2analyzer_);
-    if (default_analyzer_name != "keyword" && operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax) {
+    if (const auto default_analyzer_name_int = AnalyzerPool::AnalyzerNameToInt(default_analyzer_name.c_str());
+        default_analyzer_name_int != keyword_analyzer_name_int && operator_option_ == FulltextQueryOperatorOption::kInfinitySyntax) {
         // use parser
         std::unique_ptr<QueryNode> result;
         const auto scanner = std::make_unique<SearchScannerInfinitySyntax>(&iss);
@@ -185,14 +187,14 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
         if (terms.empty()) {
             return nullptr;
         }
-        if (terms.size() == 1 && default_analyzer_name != "keyword") {
+        if (terms.size() == 1 && default_analyzer_name_int != keyword_analyzer_name_int) {
             auto q = std::make_unique<TermQueryNode>();
             q->term_ = terms.front().text_;
             q->column_ = default_field;
             return q;
         }
         std::unique_ptr<MultiQueryNode> multi_query;
-        if (default_analyzer_name == "keyword") {
+        if (default_analyzer_name_int == keyword_analyzer_name_int) {
             multi_query = std::make_unique<KeywordQueryNode>();
         } else if (operator_option_ == FulltextQueryOperatorOption::kOr) {
             multi_query = std::make_unique<OrQueryNode>();
@@ -226,7 +228,7 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, const std::stri
     if (terms.empty()) {
         return nullptr;
     }
-    if (analyzer_name == "keyword") {
+    if (AnalyzerPool::AnalyzerNameToInt(analyzer_name.c_str()) == keyword_analyzer_name_int) {
         auto result = std::make_unique<KeywordQueryNode>();
         for (const auto &term : terms) {
             auto subquery = std::make_unique<TermQueryNode>();
