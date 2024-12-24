@@ -65,7 +65,8 @@ size_t zsv_strwhite(unsigned char *s, size_t len, unsigned int flags);
  */
 ZSV_EXPORT
 size_t zsv_strencode(unsigned char *s, size_t n, unsigned char replace,
-                     int (*malformed_handler)(void *, const unsigned char *s, size_t n, size_t offset), void *handler_ctx);
+                     int (*malformed_handler)(void *, const unsigned char *s, size_t n, size_t offset),
+                     void *handler_ctx);
 
 size_t zsv_strip_trailing_zeros(const char *s, size_t len);
 
@@ -73,19 +74,19 @@ size_t zsv_strip_trailing_zeros(const char *s, size_t len);
  * Trim trailing whitespace
  * Returns the input string and new length
  */
-const unsigned char *zsv_strtrim_right(const char unsigned * restrict s, size_t *lenp);
+const unsigned char *zsv_strtrim_right(const char unsigned *restrict s, size_t *lenp);
 
 /**
  * Trim leading whitespace
  * Returns the pointer to the new string start and new length
  */
-const unsigned char *zsv_strtrim_left(const char unsigned * restrict s, size_t *lenp);
+const unsigned char *zsv_strtrim_left(const char unsigned *restrict s, size_t *lenp);
 
 /**
  * Trim leading and trailing whitespace
   Returns the pointer to the new string start and new length
  */
-const unsigned char *zsv_strtrim(const char unsigned * restrict s, size_t *lenp);
+const unsigned char *zsv_strtrim(const char unsigned *restrict s, size_t *lenp);
 
 /**
  * zsv_strunescape_backslash(): convert consecutive white to single space
@@ -119,11 +120,21 @@ size_t zsv_strnext_is_sign(const unsigned char *s, size_t len);
 size_t zsv_strnext_is_currency(const unsigned char *s, size_t len);
 
 /*
+ * Convert a string to a double. must convert entire string, else returns error
+ * @param s     string to convert
+ * @param d     pointer to converted value, on success
+ *
+ * @returns     0 on success, non-zero on error
+ */
+int zsv_strtod_exact(const char *s, double *d);
+
+/*
  * `zsv_get_cell_trimmed` is equivalent to `zsv_get_cell`, except that it
+ * @param s     string to convert
+ * @param len   length of input string
  * returns a value with leading and trailing whitespace removed
  */
 #include <zsv.h>
 struct zsv_cell zsv_get_cell_trimmed(zsv_parser parser, size_t index);
-
 
 #endif

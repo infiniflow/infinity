@@ -15,26 +15,23 @@ size_t zsv_jq_fwrite1(void *restrict FILE_ptr, const void *restrict buff, size_t
 
 struct jv_to_json_ctx {
   size_t (*write1)(void *restrict ctx, const void *restrict buff, size_t len); // e.g. zsv_jq_fwrite1
-  void *ctx; // e.g. FILE *
-  int flags; // passed on to jv_dumpf / jv_dump_string
+  void *ctx;                                                                   // e.g. FILE *
+  int flags;                                                                   // passed on to jv_dumpf / jv_dump_string
 };
 
 void jv_to_json_w_ctx(jv value, void *jv_to_json_ctx);
 
-typedef struct zsv_jq_data * zsv_jq_handle;
+typedef struct zsv_jq_data *zsv_jq_handle;
 
-zsv_jq_handle zsv_jq_new(const unsigned char *filter,
-                       void (*func)(jv, void *), void *ctx,
-                       enum zsv_jq_status *statusp);
+zsv_jq_handle zsv_jq_new(const unsigned char *filter, void (*func)(jv, void *), void *ctx, enum zsv_jq_status *statusp);
 
 // for streaming parsing
-zsv_jq_handle zsv_jq_new_stream(const unsigned char *filter,
-                              void (*func)(jv, void *), void *ctx,
-                              enum zsv_jq_status *statusp);
+zsv_jq_handle zsv_jq_new_stream(const unsigned char *filter, void (*func)(jv, void *), void *ctx,
+                                enum zsv_jq_status *statusp);
 
 enum zsv_jq_status zsv_jq_parse_file(zsv_jq_handle h, FILE *f);
 
-enum zsv_jq_status zsv_jq_parse(zsv_jq_handle restrict h, const void * restrict s, size_t len);
+enum zsv_jq_status zsv_jq_parse(zsv_jq_handle restrict h, const void *restrict s, size_t len);
 
 size_t zsv_jq_write(const char *s, size_t n, size_t m, zsv_jq_handle h);
 
