@@ -45,7 +45,7 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
                                SharedPtr<String> file_name,
                                SharedPtr<IndexBase> index_base,
                                SharedPtr<ColumnDef> column_def,
-                               PersistenceManager* persistence_manager,
+                               PersistenceManager *persistence_manager,
                                SizeT index_size)
     : IndexFileWorker(std::move(data_dir),
                       std::move(temp_dir),
@@ -113,7 +113,12 @@ bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                index->Save(*file_handle_);
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    index->Save(*file_handle_);
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
             }
         },
         *hnsw_index);
@@ -134,7 +139,11 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {
                 UnrecoverableError("Invalid index type.");
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                index = IndexT::Load(*file_handle_).release();
+                if constexpr (IndexT::kOwnMem) {
+                    index = IndexT::Load(*file_handle_).release();
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
             }
         },
         *hnsw_index);
@@ -144,7 +153,7 @@ bool HnswFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
     if (mmap_data_ != nullptr) {
         UnrecoverableError("Mmap data is already allocated.");
     }
-    mmap_data_ = reinterpret_cast<u8 *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get())));
+    mmap_data_ = reinterpret_cast<u8 *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get(), false)));
     auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(mmap_data_);
     std::visit(
         [&](auto &&index) {
@@ -152,8 +161,13 @@ bool HnswFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                // using IndexT = std::decay_t<decltype(*index)>;
-                // index = IndexT::LoadFromPtr(static_cast<const char *>(ptr), size).release();
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (!IndexT::kOwnMem) {
+                    const auto *p = static_cast<const char *>(ptr);
+                    index = IndexT::LoadFromPtr(p, size).release();
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
             }
         },
         *hnsw_index);

@@ -94,7 +94,7 @@ public:
 
 public:
     // called by ObjectHandle when load first time for that ObjectHandle
-    BufferHandle Load();
+    BufferHandle Load(bool no_mmap = false);
 
     // called by BufferMgr in GC process.
     bool Free();
