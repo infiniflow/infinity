@@ -47,6 +47,7 @@ import having_binder;
 import order_binder;
 import project_binder;
 import limit_binder;
+import unnest_binder;
 import subquery_table_ref;
 import cross_product_table_ref;
 
@@ -241,14 +242,10 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
     // 13. unnest list
     if (statement.unnest_expr_list_ != nullptr) {
+        auto unnest_binder = MakeShared<UnnestBinder>(query_context_ptr_);
         for (auto *unnest_expr : *statement.unnest_expr_list_) {
-            const String &column_name = unnest_expr->GetName();
-            if (!(bind_context_ptr_->project_index_by_name_.contains(column_name))) {
-                Status status = Status::InvalidColumnName(fmt::format("Unnest column: {} not found in select list", column_name));
-                RecoverableError(status);
-            }
-            SizeT column_id = bind_context_ptr_->project_index_by_name_[column_name];
-            bound_select_statement->unnest_columns_.emplace_back(column_id);
+            SharedPtr<BaseExpression> bound_unnest_expr = unnest_binder->Bind(*unnest_expr, this->bind_context_ptr_.get(), 0, true);
+            bound_select_statement->unnest_expressions_.emplace_back(bound_unnest_expr);
         }
     }
 

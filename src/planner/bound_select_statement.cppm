@@ -106,7 +106,7 @@ public:
     Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns_{};
 
     // Unnest columns
-    Vector<SizeT> unnest_columns_{};
+    Vector<SharedPtr<BaseExpression>> unnest_expressions_{};
 
     // Order by expression list
     Vector<SharedPtr<BaseExpression>> order_by_expressions_{};
