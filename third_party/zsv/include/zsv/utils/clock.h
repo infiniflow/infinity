@@ -12,20 +12,12 @@
 #include <time.h>
 #include <stdio.h>
 
-void zsv_clocks_begin();
-void zsv_clocks_end();
+void zsv_clocks_begin(void);
+void zsv_clocks_end(void);
 
-size_t
-zsv_fread_clock(void *restrict ptr, size_t size, size_t nitems,
-                FILE *restrict stream);
-
-size_t
-zsv_fwrite_clock(const void *restrict ptr, size_t size, size_t nitems,
-                 FILE *restrict stream);
-
-int
-zsv_fflush_clock(FILE *stream);
-
+size_t zsv_fread_clock(void *restrict ptr, size_t size, size_t nitems, FILE *restrict stream);
+size_t zsv_fwrite_clock(const void *restrict ptr, size_t size, size_t nitems, FILE *restrict stream);
+int zsv_fflush_clock(FILE *stream);
 
 #if USE_CLOCK
 

@@ -12,11 +12,11 @@
 #include <stdio.h>
 
 #ifndef LINEEND
-# if defined(WIN32) || defined(_WIN64) || defined(_WIN32)
-#  define LINEEND "\r\n"
-# else
-#  define LINEEND "\n"
-# endif
+#if defined(WIN32) || defined(_WIN64) || defined(_WIN32)
+#define LINEEND "\r\n"
+#else
+#define LINEEND "\n"
+#endif
 #endif // LINEEND
 /**
  * Get a temp file name. The returned value, if any, will have been allocated
@@ -32,7 +32,7 @@ char *zsv_get_temp_filename(const char *prefix);
  * @param filename
  * @returns: true  (1) if file exists
  */
-int zsv_file_exists(const char* filename);
+int zsv_file_exists(const char *filename);
 
 /**
  * Check if a file exists and is readable (with fopen + "rb")

@@ -12,11 +12,11 @@
 void zsv_perror(const char *);
 
 #ifndef _WIN32
-# define zsv_replace_file(src, dest) (rename((const char *)src, (const char *)dest))
+#define zsv_replace_file(src, dest) (rename((const char *)src, (const char *)dest))
 
 #else
 
-# include <windows.h>
+#include <windows.h>
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
@@ -28,8 +28,8 @@ int zsv_replace_file(const void *src, const void *dest);
 
 /**
  * Windows does not have perror(), so we define our own printLastError()
+void zsv_win_printLastError(const char *prefix);
  */
-void zsv_win_printLastError();
 
 #endif
 

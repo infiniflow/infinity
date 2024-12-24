@@ -9,14 +9,10 @@
 #ifndef ZSV_ARG_H
 #define ZSV_ARG_H
 
-#define ZSV_OPTS_SIZE_MAX 16
-
 #include <zsv/common.h>
 
 /* havearg(): case-insensitive partial arg matching */
-char havearg(const char *arg,
-             const char *form1, size_t min_len1,
-             const char *form2, size_t min_len2);
+char havearg(const char *arg, const char *form1, size_t min_len1, const char *form2, size_t min_len2);
 
 /**
  * set or get default parser options
@@ -27,7 +23,7 @@ struct zsv_opts zsv_get_default_opts(void);
 
 void zsv_clear_default_opts(void);
 
-#  ifdef ZSV_EXTRAS
+#ifdef ZSV_EXTRAS
 
 /**
  * set the default option progress callback (e.g. from wasm where `struct zsv_opts`
@@ -36,7 +32,8 @@ void zsv_clear_default_opts(void);
  * @param ctx pointer passed to callback
  * @param frequency number of rows to parse between progress calls
  */
-void zsv_set_default_progress_callback(zsv_progress_callback cb, void *ctx, size_t rows_interval, unsigned int seconds_interval);
+void zsv_set_default_progress_callback(zsv_progress_callback cb, void *ctx, size_t rows_interval,
+                                       unsigned int seconds_interval);
 
 /**
  * set the default option completed callback (e.g. from wasm where `struct zsv_opts`
@@ -46,7 +43,7 @@ void zsv_set_default_progress_callback(zsv_progress_callback cb, void *ctx, size
  */
 void zsv_set_default_completed_callback(zsv_completed_callback cb, void *ctx);
 
-#  endif
+#endif
 
 /**
  * Convert common command-line arguments to zsv_opts
@@ -69,18 +66,10 @@ void zsv_set_default_completed_callback(zsv_completed_callback cb, void *ctx);
  * @param  argv_out  array of unprocessed arg values. Must be allocated by caller
  *                   with size of at least argc * sizeof(*argv)
  * @param  opts_out  options, updated to reflect any processed args
- * @param  opts_used optional; if provided:
- *                   - must point to >= ZSV_OPTS_SIZE_MAX bytes of storage
- *                   - all used options will be returned in this string
- *                   e.g. if -R and -q are used, then opts_used will be set to:
- *                     "     q R   "
  * @return           zero on success, non-zero on error
  */
-enum zsv_status zsv_args_to_opts(int argc, const char *argv[],
-                                 int *argc_out, const char **argv_out,
-                                 struct zsv_opts *opts_out,
-                                 char *opts_used
-                                 );
+enum zsv_status zsv_args_to_opts(int argc, const char *argv[], int *argc_out, const char **argv_out,
+                                 struct zsv_opts *opts_out);
 
 /**
  * Fetch the next arg, if it exists, else print an error message

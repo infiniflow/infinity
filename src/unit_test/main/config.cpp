@@ -40,7 +40,7 @@ TEST_F(ConfigTest, test1) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.5.0");
+    EXPECT_EQ(config.Version(), "0.5.2");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), 8);
     EXPECT_EQ(config.CPULimit(), std::thread::hardware_concurrency());
@@ -88,7 +88,7 @@ TEST_F(ConfigTest, test2) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.5.0");
+    EXPECT_EQ(config.Version(), "0.5.2");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -8);
 
@@ -210,7 +210,7 @@ TEST_F(ConfigTest, TestValidValues) {
     auto status = config.Init(path, nullptr);
     ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.5.0");
+    EXPECT_EQ(config.Version(), "0.5.2");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -8);
     EXPECT_EQ(config.CPULimit(), 2);
