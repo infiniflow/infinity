@@ -77,30 +77,14 @@ HnswIndexInMem::HnswIndexInMem(RowID begin_row_id,
             using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
-                hnsw_ = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+                if constexpr (IndexT::kOwnMem) {
+                    index = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+                } else {
+                    UnrecoverableError("HnswIndexInMem::HnswIndexInMem: index does not own memory");
+                }
             }
         },
         hnsw_);
-}
-
-AbstractHnsw HnswIndexInMem::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
-    const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
-    const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
-
-    switch (embedding_info->Type()) {
-        case EmbeddingDataType::kElemFloat: {
-            return InitAbstractIndex<float>(index_hnsw);
-        }
-        case EmbeddingDataType::kElemUInt8: {
-            return InitAbstractIndex<u8>(index_hnsw);
-        }
-        case EmbeddingDataType::kElemInt8: {
-            return InitAbstractIndex<i8>(index_hnsw);
-        }
-        default: {
-            return nullptr;
-        }
-    }
 }
 
 HnswIndexInMem::~HnswIndexInMem() {
@@ -146,27 +130,33 @@ void HnswIndexInMem::InsertVecs(SizeT block_offset,
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
-            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return;
+            } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                using DataType = typename IndexT::DataType;
-                SizeT mem_usage{};
-                switch (const auto &column_data_type = block_column_entry->column_type(); column_data_type->type()) {
-                    case LogicalType::kEmbedding: {
-                        MemIndexInserterIter<DataType> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
-                        InsertVecs(index, std::move(iter), config, mem_usage);
-                        break;
+                if constexpr (IndexT::kOwnMem) {
+                    using DataType = typename IndexT::DataType;
+                    SizeT mem_usage{};
+                    switch (const auto &column_data_type = block_column_entry->column_type(); column_data_type->type()) {
+                        case LogicalType::kEmbedding: {
+                            MemIndexInserterIter<DataType> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+                            InsertVecs(index, std::move(iter), config, mem_usage);
+                            break;
+                        }
+                        case LogicalType::kMultiVector: {
+                            MemIndexInserterIter<MultiVectorRef<DataType>> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+                            InsertVecs(index, std::move(iter), config, mem_usage);
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                            break;
+                        }
                     }
-                    case LogicalType::kMultiVector: {
-                        MemIndexInserterIter<MultiVectorRef<DataType>> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
-                        InsertVecs(index, std::move(iter), config, mem_usage);
-                        break;
-                    }
-                    default: {
-                        UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
-                        break;
-                    }
+                    this->IncreaseMemoryUsageBase(mem_usage);
+                } else {
+                    UnrecoverableError("HnswIndexInMem::InsertVecs: index does not own memory");
                 }
-                this->IncreaseMemoryUsageBase(mem_usage);
             }
         },
         hnsw_);
@@ -183,38 +173,42 @@ void HnswIndexInMem::InsertVecs(const SegmentEntry *segment_entry,
             using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
-                using DataType = typename IndexT::DataType;
+                if constexpr (!IndexT::kOwnMem) {
+                    UnrecoverableError("HnswIndexInMem::InsertVecs: index does not own memory");
+                } else {
+                    using DataType = typename IndexT::DataType;
 
-                SizeT mem_usage{};
-                switch (const auto &column_data_type = segment_entry->GetTableEntry()->GetColumnDefByID(column_id)->type();
-                        column_data_type->type()) {
-                    case LogicalType::kEmbedding: {
-                        if (check_ts) {
-                            OneColumnIterator<DataType> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-                            InsertVecs(index, std::move(iter), config, mem_usage);
-                        } else {
-                            OneColumnIterator<DataType, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-                            InsertVecs(index, std::move(iter), config, mem_usage);
+                    SizeT mem_usage{};
+                    switch (const auto &column_data_type = segment_entry->GetTableEntry()->GetColumnDefByID(column_id)->type();
+                            column_data_type->type()) {
+                        case LogicalType::kEmbedding: {
+                            if (check_ts) {
+                                OneColumnIterator<DataType> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                                InsertVecs(index, std::move(iter), config, mem_usage);
+                            } else {
+                                OneColumnIterator<DataType, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                                InsertVecs(index, std::move(iter), config, mem_usage);
+                            }
+                            break;
                         }
-                        break;
-                    }
-                    case LogicalType::kMultiVector: {
-                        const auto ele_size = column_data_type->type_info()->Size();
-                        if (check_ts) {
-                            OneColumnIterator<MultiVectorRef<DataType>> iter(segment_entry, buffer_mgr, column_id, begin_ts, ele_size);
-                            InsertVecs(index, std::move(iter), config, mem_usage);
-                        } else {
-                            OneColumnIterator<MultiVectorRef<DataType>, false> iter(segment_entry, buffer_mgr, column_id, begin_ts, ele_size);
-                            InsertVecs(index, std::move(iter), config, mem_usage);
+                        case LogicalType::kMultiVector: {
+                            const auto ele_size = column_data_type->type_info()->Size();
+                            if (check_ts) {
+                                OneColumnIterator<MultiVectorRef<DataType>> iter(segment_entry, buffer_mgr, column_id, begin_ts, ele_size);
+                                InsertVecs(index, std::move(iter), config, mem_usage);
+                            } else {
+                                OneColumnIterator<MultiVectorRef<DataType>, false> iter(segment_entry, buffer_mgr, column_id, begin_ts, ele_size);
+                                InsertVecs(index, std::move(iter), config, mem_usage);
+                            }
+                            break;
                         }
-                        break;
+                        default: {
+                            UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                            break;
+                        }
                     }
-                    default: {
-                        UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
-                        break;
-                    }
+                    this->IncreaseMemoryUsageBase(mem_usage);
                 }
-                this->IncreaseMemoryUsageBase(mem_usage);
             }
         },
         hnsw_);
@@ -231,9 +225,14 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Dump(SegmentIndexEntry *segment_index
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return;
             } else {
-                row_count = index->GetVecNum();
-                index_size = index->GetSizeInBytes();
-                dump_size = index->mem_usage();
+                using IndexT = typename std::remove_pointer_t<T>;
+                if constexpr (IndexT::kOwnMem) {
+                    row_count = index->GetVecNum();
+                    index_size = index->GetSizeInBytes();
+                    dump_size = index->mem_usage();
+                } else {
+                    UnrecoverableError("HnswIndexInMem::Dump: index does not own memory");
+                }
             }
         },
         hnsw_);

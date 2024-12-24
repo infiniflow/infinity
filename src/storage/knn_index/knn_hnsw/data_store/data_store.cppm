@@ -93,6 +93,22 @@ public:
         }
     }
 
+    void Save(LocalFileHandle &file_handle) const {
+        SizeT cur_vec_num = this->cur_vec_num();
+        auto [chunk_num, last_chunk_size] = this->ChunkInfo(cur_vec_num);
+
+        file_handle.Append(&this->chunk_size_, sizeof(this->chunk_size_));
+        file_handle.Append(&this->max_chunk_n_, sizeof(this->max_chunk_n_));
+
+        file_handle.Append(&cur_vec_num, sizeof(cur_vec_num));
+        this->vec_store_meta_.Save(file_handle);
+        this->graph_store_meta_.Save(file_handle, cur_vec_num);
+        for (SizeT i = 0; i < chunk_num; ++i) {
+            SizeT chunk_size = (i < chunk_num - 1) ? this->chunk_size_ : last_chunk_size;
+            this->inners_[i].Save(file_handle, chunk_size, this->vec_store_meta_, this->graph_store_meta_);
+        }
+    }
+
     void SetGraph(GraphStoreMeta &&graph_meta, Vector<GraphStoreInner<OwnMem>> &&graph_inners) {
         graph_store_meta_ = std::move(graph_meta);
         for (SizeT i = 0; i < graph_inners.size(); ++i) {
@@ -274,22 +290,6 @@ public:
         return ret;
     }
 
-    void Save(LocalFileHandle &file_handle) {
-        SizeT cur_vec_num = this->cur_vec_num();
-        auto [chunk_num, last_chunk_size] = this->ChunkInfo(cur_vec_num);
-
-        file_handle.Append(&this->chunk_size_, sizeof(this->chunk_size_));
-        file_handle.Append(&this->max_chunk_n_, sizeof(this->max_chunk_n_));
-
-        file_handle.Append(&cur_vec_num, sizeof(cur_vec_num));
-        this->vec_store_meta_.Save(file_handle);
-        this->graph_store_meta_.Save(file_handle, cur_vec_num);
-        for (SizeT i = 0; i < chunk_num; ++i) {
-            SizeT chunk_size = (i < chunk_num - 1) ? this->chunk_size_ : last_chunk_size;
-            this->inners_[i].Save(file_handle, chunk_size, this->vec_store_meta_, this->graph_store_meta_);
-        }
-    }
-
     static This Load(LocalFileHandle &file_handle, SizeT max_chunk_n = 0) {
         SizeT chunk_size;
         file_handle.Read(&chunk_size, sizeof(chunk_size));
@@ -452,6 +452,12 @@ public:
 public:
     DataStoreInnerBase() = default;
 
+    void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) const {
+        this->vec_store_inner_.Save(file_handle, cur_vec_num, vec_store_meta);
+        this->graph_store_inner_.Save(file_handle, cur_vec_num, graph_store_meta);
+        file_handle.Append(this->labels_.get(), sizeof(LabelType) * cur_vec_num);
+    }
+
     void Free(SizeT cur_vec_num, const GraphStoreMeta &graph_store_meta) { graph_store_inner_.Free(cur_vec_num, graph_store_meta); }
 
     SizeT GetSizeInBytes(SizeT chunk_size, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) const {
@@ -528,12 +534,6 @@ public:
         auto vec_store_inner = VecStoreInner::Make(chunk_size, vec_store_meta, mem_usage);
         auto graph_store_inner = GraphStoreInner::Make(chunk_size, graph_store_meta, mem_usage);
         return This(chunk_size, std::move(vec_store_inner), std::move(graph_store_inner));
-    }
-
-    void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) {
-        this->vec_store_inner_.Save(file_handle, cur_vec_num, vec_store_meta);
-        this->graph_store_inner_.Save(file_handle, cur_vec_num, graph_store_meta);
-        file_handle.Append(this->labels_.get(), sizeof(LabelType) * cur_vec_num);
     }
 
     static This Load(LocalFileHandle &file_handle,

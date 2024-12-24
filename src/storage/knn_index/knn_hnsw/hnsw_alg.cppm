@@ -84,7 +84,7 @@ public:
 
     SizeT GetSizeInBytes() const { return sizeof(M_) + sizeof(ef_construction_) + data_store_.GetSizeInBytes(); }
 
-    void Save(LocalFileHandle &file_handle) {
+    void Save(LocalFileHandle &file_handle) const {
         file_handle.Append(&M_, sizeof(M_));
         file_handle.Append(&ef_construction_, sizeof(ef_construction_));
         data_store_.Save(file_handle);
@@ -448,6 +448,7 @@ public:
     using DataStore = DataStore<VecStoreType, LabelType, OwnMem>;
     using Distance = typename VecStoreType::Distance;
     using CompressVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
+    constexpr static bool kOwnMem = OwnMem;
 
     KnnHnsw(SizeT M, SizeT ef_construction, DataStore data_store, Distance distance) {
         this->M_ = M;
@@ -498,6 +499,7 @@ public:
     using This = KnnHnsw<VecStoreType, LabelType, false>;
     using DataStore = DataStore<VecStoreType, LabelType, false>;
     using Distance = typename VecStoreType::Distance;
+    constexpr static bool kOwnMem = false;
 
     KnnHnsw(SizeT M, SizeT ef_construction, DataStore data_store, Distance distance) {
         this->M_ = M;
