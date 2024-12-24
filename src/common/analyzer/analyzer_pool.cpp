@@ -321,11 +321,13 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             }
             return {MakeUnique<NGramAnalyzer>(ngram), Status::OK()};
         }
-        case Str2Int(KEYWORD.data()): {
-            return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
-        }
+        case Str2Int(KEYWORD.data()):
         case Str2Int(WHITESPACE.data()): {
-            return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
+            const auto suffix_pos = name.find_first_of('-');
+            if (suffix_pos == std::string_view::npos || suffix_pos + 1 == name.size()) {
+                return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
+            }
+            return {MakeUnique<WhitespaceAnalyzer>(name.substr(suffix_pos + 1)), Status::OK()};
         }
         default: {
             if(std::filesystem::is_regular_file(name)) {
