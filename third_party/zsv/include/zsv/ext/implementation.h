@@ -24,7 +24,7 @@
  * extension
  */
 #ifndef ZSV_EXT
-# define ZSV_EXT 1
+#define ZSV_EXT 1
 #endif
 
 ZSV_BEGIN_DECL
