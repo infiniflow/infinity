@@ -326,7 +326,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         String highlight_str = String(intent_size, ' ') + "highlight: ";
         SizeT highlight_count = select_statement->highlight_list_->size();
         if (highlight_count == 0) {
-            String error_message = "No select list";
+            String error_message = "No highlight expression";
             UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < highlight_count - 1; ++idx) {
@@ -336,6 +336,22 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         highlight_str += select_statement->highlight_list_->back()->ToString();
 
         result->emplace_back(MakeShared<String>(highlight_str));
+    }
+
+    if (select_statement->unnest_expr_list_ != nullptr) {
+        String unnest_str = String(intent_size, ' ') + "unnest: ";
+        SizeT unnest_count = select_statement->unnest_expr_list_->size();
+        if (unnest_count == 0) {
+            String error_message = "No unnest expression";
+            UnrecoverableError(error_message);
+        }
+        for (SizeT idx = 0; idx < unnest_count - 1; ++idx) {
+            ParsedExpr *expr = select_statement->unnest_expr_list_->at(idx);
+            unnest_str += expr->ToString() + ", ";
+        }
+        unnest_str += select_statement->unnest_expr_list_->back()->ToString();
+
+        result->emplace_back(MakeShared<String>(unnest_str));
     }
 
     status = BuildBaseTableRef(select_statement->table_ref_, result, intent_size);

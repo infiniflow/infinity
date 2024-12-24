@@ -32,14 +32,14 @@ export module bound_select_statement;
 
 namespace infinity {
 
-export struct BoundSelectStatement final: public BoundStatement {
+export struct BoundSelectStatement final : public BoundStatement {
 public:
     static inline UniquePtr<BoundSelectStatement> Make(SharedPtr<BindContext> bind_context) {
         return MakeUnique<BoundSelectStatement>(std::move(bind_context));
     }
 
 public:
-    inline explicit BoundSelectStatement(SharedPtr<BindContext> bind_context): bind_context_(std::move(bind_context)) {}
+    inline explicit BoundSelectStatement(SharedPtr<BindContext> bind_context) : bind_context_(std::move(bind_context)) {}
 
     SharedPtr<LogicalNode> BuildPlan(QueryContext *query_context) final;
 
@@ -104,6 +104,9 @@ public:
 
     // Highlight info
     Map<SizeT, SharedPtr<HighlightInfo>> highlight_columns_{};
+
+    // Unnest columns
+    Vector<SizeT> unnest_columns_{};
 
     // Order by expression list
     Vector<SharedPtr<BaseExpression>> order_by_expressions_{};

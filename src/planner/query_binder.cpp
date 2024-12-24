@@ -239,12 +239,25 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
         }
     }
 
-    // 13. ORDER BY
+    // 13. unnest list
+    if (statement.unnest_expr_list_ != nullptr) {
+        for (auto *unnest_expr : *statement.unnest_expr_list_) {
+            const String &column_name = unnest_expr->GetName();
+            if (!(bind_context_ptr_->project_index_by_name_.contains(column_name))) {
+                Status status = Status::InvalidColumnName(fmt::format("Unnest column: {} not found in select list", column_name));
+                RecoverableError(status);
+            }
+            SizeT column_id = bind_context_ptr_->project_index_by_name_[column_name];
+            bound_select_statement->unnest_columns_.emplace_back(column_id);
+        }
+    }
+
+    // 14. ORDER BY
     if (statement.order_by_list_ != nullptr) {
         BuildOrderBy(query_context_ptr_, statement, bound_select_statement);
     }
 
-    // 14. LIMIT
+    // 15. LIMIT
     if (statement.limit_expr_ != nullptr) {
         BuildLimit(query_context_ptr_, statement, bound_select_statement);
     }
@@ -260,8 +273,8 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
         bind_context_ptr_->result_index_ = bind_context_ptr_->project_table_index_;
     }
 
-    // 15. TOP
-    // 16. UNION/INTERSECT/EXCEPT
+    // 16. TOP
+    // 17. UNION/INTERSECT/EXCEPT
 
     bound_select_statement->projection_index_ = bind_context_ptr_->project_table_index_;
     bound_select_statement->groupby_index_ = bind_context_ptr_->group_by_table_index_;

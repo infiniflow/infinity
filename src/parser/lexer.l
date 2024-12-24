@@ -202,6 +202,7 @@ TRUE            { return TRUE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
 UNLOCK          { return UNLOCK; }
+UNNEST          { return UNNEST; }
 UNSIGNED        { return UNSIGNED; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }
