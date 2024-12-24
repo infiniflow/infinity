@@ -156,8 +156,8 @@ protected:
     PlainVecStoreInner(const DataType *ptr) { this->ptr_ = ptr; }
 
 public:
-    static This LoadFromPtr(const char *&ptr, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta) {
-        assert(cur_vec_num <= max_vec_num);
+    PlainVecStoreInner() = default;
+    static This LoadFromPtr(const char *&ptr, SizeT cur_vec_num, const Meta &meta) {
         const auto *p = reinterpret_cast<const DataType *>(ptr); // fixme
         ptr += sizeof(DataType) * cur_vec_num * meta.dim();
         return This(p);

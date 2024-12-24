@@ -98,7 +98,9 @@ public:
     void Save(LocalFileHandle &file_handle) const {
         file_handle.Append(&dim_, sizeof(dim_));
         file_handle.Append(mean_.get(), sizeof(MeanType) * dim_);
-        file_handle.Append(&global_cache_, sizeof(GlobalCacheType));
+        if constexpr (!std::same_as<GlobalCacheType, Tuple<>>) {
+            file_handle.Append(&global_cache_, sizeof(GlobalCacheType));
+        }
     }
 
     LVQQuery MakeQuery(const DataType *vec) const {
@@ -222,7 +224,9 @@ public:
         file_handle.Read(&dim, sizeof(dim));
         This meta(dim);
         file_handle.Read(meta.mean_.get(), sizeof(MeanType) * dim);
-        file_handle.Read(&meta.global_cache_, sizeof(GlobalCacheType));
+        if constexpr (!std::is_same_v<GlobalCacheType, Tuple<>>) {
+            file_handle.Read(&meta.global_cache_, sizeof(GlobalCacheType));
+        }
         return meta;
     }
 

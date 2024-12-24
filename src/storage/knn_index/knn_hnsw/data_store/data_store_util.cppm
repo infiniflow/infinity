@@ -49,4 +49,26 @@ private:
     const T *ptr_ = nullptr;
 };
 
+export template <bool OwnMem>
+class PPtr {
+public:
+    PPtr() = default;
+    void set(char *ptr) { ptr_ = ptr; }
+    char *get() const { return ptr_; }
+
+private:
+    char *ptr_;
+};
+
+export template <>
+class PPtr<false> {
+public:
+    PPtr() = default;
+    void set(const char *ptr) { ptr_ = ptr; }
+    const char *get() const { return ptr_; }
+
+private:
+    const char *ptr_ = nullptr;
+};
+
 } // namespace infinity
