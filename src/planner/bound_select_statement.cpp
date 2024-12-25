@@ -58,6 +58,7 @@ import logical_import;
 import logical_dummy_scan;
 import logical_match;
 import logical_fusion;
+import logical_unnest;
 
 import subquery_unnest;
 
@@ -99,6 +100,12 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             SharedPtr<LogicalNode> filter = BuildFilter(root, where_conditions_, query_context, bind_context);
             filter->set_left_node(root);
             root = filter;
+        }
+
+        if (!unnest_expressions_.empty()) {
+            SharedPtr<LogicalNode> unnest = BuildUnnest(root, unnest_expressions_, query_context, bind_context);
+            unnest->set_left_node(root);
+            root = unnest;
         }
 
         if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
@@ -143,7 +150,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                 root = top;
             }
         } else if (limit_expression_.get() != nullptr) {
-            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), std::static_pointer_cast<BaseTableRef>(table_ref_ptr_), limit_expression_, offset_expression_, total_hits_count_flag_);
+            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+                                                  std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                  limit_expression_,
+                                                  offset_expression_,
+                                                  total_hits_count_flag_);
             limit->set_left_node(root);
             root = limit;
         }
@@ -389,7 +400,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         }
 
         if (limit_expression_.get() != nullptr) {
-            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), base_table_ref, limit_expression_, offset_expression_, total_hits_count_flag_);
+            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+                                                  base_table_ref,
+                                                  limit_expression_,
+                                                  offset_expression_,
+                                                  total_hits_count_flag_);
             limit->set_left_node(root);
             root = limit;
         }
@@ -563,6 +578,15 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildFilter(SharedPtr<LogicalNode> 
     auto filter = MakeShared<LogicalFilter>(bind_context->GetNewLogicalNodeId(), filter_expr);
 
     return filter;
+}
+
+SharedPtr<LogicalNode> BoundSelectStatement::BuildUnnest(SharedPtr<LogicalNode> &root,
+                                                         Vector<SharedPtr<BaseExpression>> &expressions,
+                                                         QueryContext *query_context,
+                                                         const SharedPtr<BindContext> &bind_context) {
+    // SharedPtr<LogicalUnnest> unnest
+    auto unnest = MakeShared<LogicalUnnest>(bind_context->GetNewLogicalNodeId(), expressions);
+    return unnest;
 }
 
 void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,

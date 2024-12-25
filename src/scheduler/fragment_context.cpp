@@ -332,6 +332,9 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         case PhysicalOperatorType::kFilter: {
             return MakeTaskStateTemplate<FilterOperatorState>(physical_ops[operator_id]);
         }
+        case PhysicalOperatorType::kUnnest: {
+            return MakeTaskStateTemplate<UnnestOperatorState>(physical_ops[operator_id]);
+        }
         case PhysicalOperatorType::kIndexScan: {
             if (operator_id != physical_ops.size() - 1) {
                 String error_message = "Table scan operator must be the first operator of the fragment.";
@@ -854,6 +857,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kParallelAggregate:
         case PhysicalOperatorType::kFilter:
+        case PhysicalOperatorType::kUnnest:
         case PhysicalOperatorType::kHash:
         case PhysicalOperatorType::kLimit:
         case PhysicalOperatorType::kTop:
@@ -1178,6 +1182,7 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kTableScan:
         case PhysicalOperatorType::kFilter:
+        case PhysicalOperatorType::kUnnest:
         case PhysicalOperatorType::kIndexScan: {
             if (fragment_type_ == FragmentType::kSerialMaterialize) {
                 UnrecoverableError(

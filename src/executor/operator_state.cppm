@@ -444,6 +444,11 @@ export struct CompactFinishOperatorState : public OperatorState {
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
+// Unnest
+export struct UnnestOperatorState : public OperatorState {
+    inline explicit UnnestOperatorState() : OperatorState(PhysicalOperatorType::kUnnest) {}
+};
+
 // Source
 export enum class SourceStateType {
     kInvalid,

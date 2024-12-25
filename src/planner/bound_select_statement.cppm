@@ -67,6 +67,11 @@ public:
                                        QueryContext *query_context,
                                        const SharedPtr<BindContext> &bind_context);
 
+    SharedPtr<LogicalNode> BuildUnnest(SharedPtr<LogicalNode> &root,
+                                       Vector<SharedPtr<BaseExpression>> &expressions,
+                                       QueryContext *query_context,
+                                       const SharedPtr<BindContext> &bind_context);
+
     void BuildSubquery(SharedPtr<LogicalNode> &root,
                        SharedPtr<BaseExpression> &condition,
                        QueryContext *query_context,

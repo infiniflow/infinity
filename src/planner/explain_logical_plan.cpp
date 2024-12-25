@@ -52,11 +52,11 @@ import logical_match;
 import logical_match_tensor_scan;
 import logical_match_sparse_scan;
 import logical_fusion;
-import base_expression;
-
+import logical_unnest;
 import logical_node_type;
 import third_party;
 
+import base_expression;
 import expression_type;
 import knn_expression;
 import aggregate_expression;
@@ -109,6 +109,10 @@ Status ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vecto
         }
         case LogicalNodeType::kFilter: {
             Explain((LogicalFilter *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kUnnest: {
+            Explain((LogicalUnnest *)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kProjection: {

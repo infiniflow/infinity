@@ -76,6 +76,7 @@ import physical_merge_aggregate;
 import status;
 import physical_operator_type;
 import physical_read_cache;
+import physical_unnest;
 
 import explain_logical_plan;
 import logical_show;
@@ -315,6 +316,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kReadCache: {
             Explain(static_cast<const PhysicalReadCache *>(op), result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kUnnest: {
+            Explain(static_cast<const PhysicalUnnest *>(op), result, intent_size);
             break;
         }
         default: {
@@ -2767,6 +2772,49 @@ void ExplainPhysicalPlan::Explain(const PhysicalReadCache *read_cache_node, Shar
     output_columns += read_cache_node->GetOutputNames()->back();
     output_columns += "]";
     result->emplace_back(MakeShared<String>(output_columns));
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalUnnest *unnest_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String unnest_node_header_str;
+    if (intent_size != 0) {
+        unnest_node_header_str = String(intent_size - 2, ' ') + "-> Unnest ";
+    } else {
+        unnest_node_header_str = "\"-> Unnest \" ";
+    }
+
+    unnest_node_header_str += "(" + std::to_string(unnest_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(unnest_node_header_str));
+
+    // Unnest expression
+    {
+        String unnest_expression_str = String(intent_size, ' ') + " - unnest expression: [";
+        Vector<SharedPtr<BaseExpression>> expression_list = unnest_node->expression_list();
+        SizeT expression_count = expression_list.size();
+        for (SizeT idx = 0; idx < expression_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
+            unnest_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(expression_list.back().get(), unnest_expression_str);
+        unnest_expression_str += "]";
+        result->emplace_back(MakeShared<String>(unnest_expression_str));
+    }
+
+    // unnest expression
+    String filter_str = String(intent_size, ' ') + " - filter: ";
+
+    result->emplace_back(MakeShared<String>(filter_str));
+
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = unnest_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
 }
 
 } // namespace infinity
