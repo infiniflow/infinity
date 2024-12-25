@@ -31,6 +31,8 @@ public:
 
     T *get() const { return ptr_.get(); }
 
+    UniquePtr<T[]> exchange(UniquePtr<T[]> ptr) { return std::exchange(ptr_, std::move(ptr)); }
+
 private:
     UniquePtr<T[]> ptr_;
 };

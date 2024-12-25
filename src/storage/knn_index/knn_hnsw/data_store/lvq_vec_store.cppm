@@ -258,7 +258,7 @@ public:
         for (SizeT i = 0; i < this->dim_; ++i) {
             new_mean[i] /= cur_vec_num;
         }
-        this->mean_ = std::move(new_mean);
+        new_mean = this->mean_.exchange(std::move(new_mean)); //
 
         for (auto [inner, size] : inners) {
             for (SizeT i = 0; i < size; ++i) {
