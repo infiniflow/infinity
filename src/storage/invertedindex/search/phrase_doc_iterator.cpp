@@ -36,11 +36,7 @@ PhraseDocIterator::PhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters,
     block_max_bm25_score_cache_part_info_vals_.resize(pos_iters_.size());
 }
 
-void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader) {
-    // BM25 parameters
-    constexpr float k1 = 1.2F;
-    constexpr float b = 0.75F;
-
+void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, const float delta, const float k1, const float b) {
     column_length_reader_ = std::move(column_length_reader);
     const u64 total_df = column_length_reader_->GetTotalDF();
     const float avg_column_len = column_length_reader_->GetAvgColumnLength();
@@ -50,13 +46,14 @@ void PhraseDocIterator::InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&col
         total_idf += std::log1p((total_df - doc_freq + 0.5F) / (doc_freq + 0.5F));
     }
     bm25_common_score_ = weight_ * total_idf * (k1 + 1.0F);
-    bm25_score_upper_bound_ = bm25_common_score_ / (1.0F + k1 * b / avg_column_len);
+    bm25_score_upper_bound_ = bm25_common_score_ * (avg_column_len / (avg_column_len + k1 * b) + delta / (k1 + 1.0F));
     f1 = k1 * (1.0F - b);
     f2 = k1 * b / avg_column_len;
     f3 = f2 * std::numeric_limits<u16>::max();
+    f4 = delta / (k1 + 1.0F);
     if (SHOULD_LOG_TRACE()) {
         OStringStream oss;
-        oss << "TermDocIterator: ";
+        oss << "PhraseDocIterator: ";
         if (column_name_ptr_ != nullptr) {
             oss << "column: " << *column_name_ptr_ << ",";
         }
@@ -129,7 +126,7 @@ float PhraseDocIterator::BlockMaxBM25Score() {
             }
             div_add_min = std::min(div_add_min, current_div_add_min);
         }
-        block_max_bm25_score_cache_ = bm25_common_score_ / (1.0F + div_add_min);
+        block_max_bm25_score_cache_ = bm25_common_score_ * (1.0F / (1.0F + div_add_min) + f4);
     }
     return block_max_bm25_score_cache_;
 }
@@ -167,7 +164,7 @@ float PhraseDocIterator::BM25Score() {
     // bm25_common_score_ * tf / (tf + k1 * (1.0F - b + b * column_len / avg_column_len));
     const auto doc_len = column_length_reader_->GetColumnLength(doc_id_);
     const float p = f1 + f2 * doc_len;
-    bm25_score_cache_ = bm25_common_score_ * tf_ / (tf_ + p);
+    bm25_score_cache_ = bm25_common_score_ * (tf_ / (tf_ + p) + f4);
     return bm25_score_cache_;
 }
 
