@@ -1,0 +1,45 @@
+
+statement ok
+DROP TABLE IF EXISTS ft_whitespace_sharp;
+
+statement ok
+CREATE TABLE ft_whitespace_sharp(num int, doc varchar DEFAULT 'default text');
+
+statement ok
+INSERT INTO ft_whitespace_sharp VALUES (1, '2020-01-01#2023-01-01'), (2, '2023@01$01'), (3, '01 01#@2023'), (4);
+
+statement ok
+CREATE INDEX ft_index ON ft_whitespace_sharp(doc) USING FULLTEXT WITH (analyzer = 'whitespace-#@$');
+
+query I
+SELECT * FROM ft_whitespace_sharp;
+----
+1 2020-01-01#2023-01-01
+2 2023@01$01
+3 01 01#@2023
+4 default text
+
+query I
+SELECT * FROM ft_whitespace_sharp SEARCH MATCH TEXT ('doc^4.5', '2023-01-01^5.0', 'topn=10');
+----
+1 2020-01-01#2023-01-01
+
+query II
+SELECT * FROM ft_whitespace_sharp SEARCH MATCH TEXT ('doc^4.5', '"01 01"^3.3', 'topn=10');
+----
+3 01 01#@2023
+
+query III
+SELECT * FROM ft_whitespace_sharp SEARCH MATCH TEXT ('doc^4.5', '"01#01"^3.3', 'topn=10');
+----
+2 2023@01$01
+
+query IV rowsort
+SELECT * FROM ft_whitespace_sharp SEARCH MATCH TEXT ('doc^4.5', '2023^3.3', 'topn=10');
+----
+2 2023@01$01
+3 01 01#@2023
+
+# Clean up
+statement ok
+DROP TABLE ft_whitespace_sharp;

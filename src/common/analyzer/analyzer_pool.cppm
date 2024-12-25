@@ -30,6 +30,8 @@ public:
 
     Tuple<UniquePtr<Analyzer>, Status> GetAnalyzer(const std::string_view &name);
 
+    static u64 AnalyzerNameToInt(const char *str);
+
     void Set(const std::string_view &name);
 
 public:

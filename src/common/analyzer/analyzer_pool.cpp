@@ -46,6 +46,10 @@ constexpr u64 Str2Int(const char *str, u64 last_value = basis) {
     return (*str != '\0' && *str != '-') ? Str2Int(str + 1, (*str ^ last_value) * prime) : last_value;
 }
 
+u64 AnalyzerPool::AnalyzerNameToInt(const char *str) {
+    return Str2Int(str);
+}
+
 bool IcharEquals(char a, char b) { return ToLower(static_cast<int>(a)) == ToLower(static_cast<int>(b)); }
 
 bool IEquals(std::string_view lhs, std::string_view rhs) { return std::ranges::equal(lhs, rhs, IcharEquals); }
@@ -321,11 +325,13 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
             }
             return {MakeUnique<NGramAnalyzer>(ngram), Status::OK()};
         }
-        case Str2Int(KEYWORD.data()): {
-            return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
-        }
+        case Str2Int(KEYWORD.data()):
         case Str2Int(WHITESPACE.data()): {
-            return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
+            const auto suffix_pos = name.find_first_of('-');
+            if (suffix_pos == std::string_view::npos || suffix_pos + 1 == name.size()) {
+                return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
+            }
+            return {MakeUnique<WhitespaceAnalyzer>(name.substr(suffix_pos + 1)), Status::OK()};
         }
         default: {
             if(std::filesystem::is_regular_file(name)) {
