@@ -22,8 +22,11 @@ import analyzer;
 namespace infinity {
 
 export class WhitespaceAnalyzer : public Analyzer {
+    String delimiters_{};
+
 public:
     WhitespaceAnalyzer() = default;
+    explicit WhitespaceAnalyzer(std::string_view delimiters);
     ~WhitespaceAnalyzer() override = default;
 
 protected:
