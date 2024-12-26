@@ -56,6 +56,7 @@ public:
                            MinimumShouldMatchOption &&minimum_should_match_option,
                            f32 score_threshold,
                            FulltextSimilarity ft_similarity,
+                           const BM25Params &bm25_params,
                            u64 match_table_index,
                            SharedPtr<Vector<LoadMeta>> load_metas,
                            bool cache_result);
@@ -115,6 +116,7 @@ private:
     MinimumShouldMatchOption minimum_should_match_option_{};
     f32 score_threshold_{};
     FulltextSimilarity ft_similarity_{FulltextSimilarity::kBM25};
+    BM25Params bm25_params_;
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
 };

@@ -28,10 +28,6 @@ public:
     // ref: https://en.wikipedia.org/wiki/Okapi_BM25
     virtual void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, float delta, float k1, float b) = 0;
 
-    void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, const float delta = 0.0F) {
-        return InitBM25Info(std::move(column_length_reader), delta, 1.2F, 0.75F);
-    }
-
     virtual RowID BlockMinPossibleDocID() const = 0;
 
     virtual RowID BlockLastDocID() const = 0;

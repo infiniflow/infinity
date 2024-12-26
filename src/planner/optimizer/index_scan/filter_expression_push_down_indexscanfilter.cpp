@@ -461,6 +461,7 @@ private:
                 MinimumShouldMatchOption minimum_should_match_option;
                 f32 score_threshold = {};
                 FulltextSimilarity ft_similarity = FulltextSimilarity::kBM25;
+                BM25Params bm25_params;
                 Vector<String> index_names;
                 {
                     SearchOptions search_ops(filter_fulltext_expr->options_text_);
@@ -528,6 +529,43 @@ private:
                             RecoverableError(Status::SyntaxError(R"(similarity option must be "BM25" or "boolean".)"));
                         }
                     }
+                    // option: bm25_params
+                    if (iter = search_ops.options_.find("bm25_param_k1"); iter != search_ops.options_.end()) {
+                        const auto k1_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (k1_v < 0.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_k1 must be a non-negative float. default value: 1.2"));
+                        }
+                        bm25_params.k1 = k1_v;
+                    }
+                    if (iter = search_ops.options_.find("bm25_param_b"); iter != search_ops.options_.end()) {
+                        const auto b_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (b_v < 0.0f || b_v > 1.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_b must be in the range [0.0f, 1.0f]. default value: 0.75"));
+                        }
+                        bm25_params.b = b_v;
+                    }
+                    if (iter = search_ops.options_.find("bm25_param_delta"); iter != search_ops.options_.end()) {
+                        const auto delta_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (delta_v < 0.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_delta must be a non-negative float. default value: 0.0"));
+                        }
+                        bm25_params.delta_term = delta_v;
+                        bm25_params.delta_phrase = delta_v;
+                    }
+                    if (iter = search_ops.options_.find("bm25_param_delta_term"); iter != search_ops.options_.end()) {
+                        const auto delta_term_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (delta_term_v < 0.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_delta_term must be a non-negative float. default value: 0.0"));
+                        }
+                        bm25_params.delta_term = delta_term_v;
+                    }
+                    if (iter = search_ops.options_.find("bm25_param_delta_phrase"); iter != search_ops.options_.end()) {
+                        const auto delta_phrase_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (delta_phrase_v < 0.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_delta_phrase must be a non-negative float. default value: 0.0"));
+                        }
+                        bm25_params.delta_phrase = delta_phrase_v;
+                    }
 
                     // option: indexes
                     if (iter = search_ops.options_.find("indexes"); iter != search_ops.options_.end()) {
@@ -564,6 +602,7 @@ private:
                                                                 std::move(minimum_should_match_option),
                                                                 score_threshold,
                                                                 ft_similarity,
+                                                                bm25_params,
                                                                 std::move(index_names));
             }
             case Enum::kAndExpr: {

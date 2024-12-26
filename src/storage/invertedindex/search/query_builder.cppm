@@ -34,16 +34,20 @@ export struct FullTextQueryContext {
     UniquePtr<QueryNode> query_tree_{};
     UniquePtr<QueryNode> optimized_query_tree_{};
     const FulltextSimilarity ft_similarity_{};
+    const BM25Params bm25_params_{};
     const MinimumShouldMatchOption minimum_should_match_option_{};
     u32 minimum_should_match_ = 0;
     u32 topn_ = 0;
     EarlyTermAlgo early_term_algo_ = EarlyTermAlgo::kNaive;
     const Vector<String> &index_names_;
+
     FullTextQueryContext(const FulltextSimilarity ft_similarity,
+                         const BM25Params &bm25_params,
                          const MinimumShouldMatchOption &minimum_should_match_option,
                          const u32 topn,
                          const Vector<String> &index_names)
-        : ft_similarity_(ft_similarity), minimum_should_match_option_(minimum_should_match_option), topn_(topn), index_names_(index_names) {}
+        : ft_similarity_(ft_similarity), bm25_params_(bm25_params), minimum_should_match_option_(minimum_should_match_option), topn_(topn),
+          index_names_(index_names) {}
 };
 
 export class QueryBuilder {
@@ -54,7 +58,7 @@ public:
 
     ~QueryBuilder();
 
-    Map<String, String> GetColumn2Analyzer(const Vector<String> &hints) { return index_reader_.GetColumn2Analyzer(hints); }
+    Map<String, String> GetColumn2Analyzer(const Vector<String> &hints) const { return index_reader_.GetColumn2Analyzer(hints); }
 
     UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
