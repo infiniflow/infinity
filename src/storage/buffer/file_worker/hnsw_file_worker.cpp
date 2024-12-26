@@ -82,7 +82,7 @@ void HnswFileWorker::AllocateInMemory() {
 }
 
 void HnswFileWorker::FreeInMemory() {
-    if (!data_ || !hnsw_mem_) {
+    if (!data_ && !hnsw_mem_) {
         String error_message = "FreeInMemory: Data is not allocated.";
         UnrecoverableError(error_message);
     }
