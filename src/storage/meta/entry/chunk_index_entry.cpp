@@ -276,6 +276,7 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                           column_def,
                                                           buffer_mgr->persistence_manager());
             BufferObj *buffer_obj = buffer_mgr->GetBufferObject(std::move(file_worker));
+            buffer_obj->ToMmap();
             chunk_index_entry->buffer_obj_ = buffer_obj;
             break;
         }
