@@ -153,7 +153,7 @@ public:
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            hnsw_index->Save(*file_handle);
+            hnsw_index->SaveToPtr(*file_handle);
         }
         {
             SizeT file_size = VirtualStore::GetFileSize(filepath);

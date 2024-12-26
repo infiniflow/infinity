@@ -15,6 +15,8 @@
 module;
 
 #include <tuple>
+#include <cstring>
+#include<cerrno>
 
 module file_worker;
 
@@ -223,7 +225,10 @@ void FileWorker::Mmap() {
     auto [defer_fn, read_path] = GetFilePathInner(false);
     bool use_object_cache = persistence_manager_ != nullptr;
     SizeT file_size = VirtualStore::GetFileSize(read_path);
-    VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
+    int ret = VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
+    if (ret < 0) {
+        UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
+    }
     if (use_object_cache) {
         const void *ptr = mmap_addr_ + obj_addr_.part_offset_;
         this->ReadFromMmapImpl(ptr, obj_addr_.part_size_);

@@ -301,7 +301,7 @@ public:
 template <typename DataType, typename CompressType, typename LVQCache, bool OwnMem>
 class LVQVecStoreInnerBase {
 public:
-    using This = LVQVecStoreInner<DataType, CompressType, LVQCache, OwnMem>;
+    using This = LVQVecStoreInnerBase<DataType, CompressType, LVQCache, OwnMem>;
     using Meta = LVQVecStoreMetaBase<DataType, CompressType, LVQCache, OwnMem>;
     // Decompress: Q = scale * C + bias + Mean
     using LocalCacheType = LVQCache::LocalCacheType;
@@ -314,6 +314,14 @@ public:
 
     void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const Meta &meta) const {
         file_handle.Append(ptr_.get(), cur_vec_num * meta.compress_data_size());
+    }
+
+    static void
+    SaveToPtr(LocalFileHandle &file_handle, const Vector<const This *> &inners, const Meta &meta, SizeT ck_size, SizeT chunk_num, SizeT last_chunk_size) {
+        for (SizeT i = 0; i < chunk_num; ++i) {
+            SizeT chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+            file_handle.Append(inners[i]->ptr_.get(), chunk_size * meta.compress_data_size());
+        }
     }
 
     const LVQData *GetVec(SizeT idx, const Meta &meta) const {
@@ -343,10 +351,12 @@ public:
 
 export template <typename DataType, typename CompressType, typename LVQCache, bool OwnMem>
 class LVQVecStoreInner : public LVQVecStoreInnerBase<DataType, CompressType, LVQCache, OwnMem> {
+public:
     using This = LVQVecStoreInner<DataType, CompressType, LVQCache, OwnMem>;
     using Meta = LVQVecStoreMetaBase<DataType, CompressType, LVQCache, OwnMem>;
     using LocalCacheType = LVQCache::LocalCacheType;
     using LVQData = LVQData<DataType, LocalCacheType, CompressType>;
+    using Base = LVQVecStoreInnerBase<DataType, CompressType, LVQCache, OwnMem>;
 
 private:
     LVQVecStoreInner(SizeT max_vec_num, const Meta &meta) { this->ptr_ = MakeUnique<char[]>(max_vec_num * meta.compress_data_size()); }
@@ -376,8 +386,10 @@ private:
 
 export template <typename DataType, typename CompressType, typename LVQCache>
 class LVQVecStoreInner<DataType, CompressType, LVQCache, false> : public LVQVecStoreInnerBase<DataType, CompressType, LVQCache, false> {
+public:
     using This = LVQVecStoreInner<DataType, CompressType, LVQCache, false>;
     using Meta = LVQVecStoreMetaBase<DataType, CompressType, LVQCache, false>;
+    using Base = LVQVecStoreInnerBase<DataType, CompressType, LVQCache, false>;
 
 private:
     LVQVecStoreInner(const char *ptr) { this->ptr_ = ptr; }

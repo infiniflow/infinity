@@ -276,7 +276,6 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                           column_def,
                                                           buffer_mgr->persistence_manager());
             BufferObj *buffer_obj = buffer_mgr->GetBufferObject(std::move(file_worker));
-            buffer_obj->ToMmap();
             chunk_index_entry->buffer_obj_ = buffer_obj;
             break;
         }
@@ -456,9 +455,6 @@ void ChunkIndexEntry::SaveIndexFile() {
         return;
     }
     buffer_obj_->Save();
-    if (segment_index_entry_->table_index_entry()->index_base()->index_type_ == IndexType::kHnsw) {
-        buffer_obj_->ToMmap();
-    }
 }
 
 void ChunkIndexEntry::DeprecateChunk(TxnTimeStamp commit_ts) {

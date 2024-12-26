@@ -79,10 +79,10 @@ protected:
 
     virtual void ReadFromFileImpl(SizeT file_size) = 0;
 
+    Pair<Optional<DeferFn<std::function<void()>>>, String> GetFilePathInner(bool spill);
+
 private:
     String ChooseFileDir(bool spill) const;
-
-    Pair<Optional<DeferFn<std::function<void()>>>, String> GetFilePathInner(bool spill);
 
 public:
     const SharedPtr<String> data_dir_{};

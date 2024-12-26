@@ -56,12 +56,9 @@ protected:
 
     void ReadFromFileImpl(SizeT file_size) override;
 
-    bool ReadFromMmapImpl(const void *ptr, SizeT size) override;
-
-    void FreeFromMmapImpl() override;
-
 private:
     SizeT index_size_{};
+    void *hnsw_mem_{};
 };
 
 } // namespace infinity

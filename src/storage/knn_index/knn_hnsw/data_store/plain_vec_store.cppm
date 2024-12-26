@@ -87,6 +87,7 @@ class PlainVecStoreInnerBase {
 public:
     using This = PlainVecStoreInnerBase<DataType, OwnMem>;
     using Meta = PlainVecStoreMeta<DataType>;
+    using Base = PlainVecStoreInnerBase<DataType, OwnMem>;
 
 public:
     PlainVecStoreInnerBase() = default;
@@ -95,6 +96,14 @@ public:
 
     void Save(LocalFileHandle &file_handle, SizeT cur_vec_num, const Meta &meta) const {
         file_handle.Append(ptr_.get(), sizeof(DataType) * cur_vec_num * meta.dim());
+    }
+
+    static void
+    SaveToPtr(LocalFileHandle &file_handle, const Vector<const This *> &inners, const Meta &meta, SizeT ck_size, SizeT chunk_num, SizeT last_chunk_size) {
+        for (SizeT i = 0; i < chunk_num; ++i) {
+            SizeT chunk_size = (i < chunk_num - 1) ? ck_size : last_chunk_size;
+            file_handle.Append(inners[i]->ptr_.get(), sizeof(DataType) * chunk_size * meta.dim());
+        }
     }
 
     const DataType *GetVec(SizeT idx, const Meta &meta) const { return ptr_.get() + idx * meta.dim(); }
@@ -119,8 +128,10 @@ public:
 
 export template <typename DataType, bool OwnMem>
 class PlainVecStoreInner : public PlainVecStoreInnerBase<DataType, OwnMem> {
+public:
     using This = PlainVecStoreInner<DataType, OwnMem>;
     using Meta = PlainVecStoreMeta<DataType>;
+    using Base = PlainVecStoreInnerBase<DataType, OwnMem>;
 
 protected:
     PlainVecStoreInner(SizeT max_vec_num, const Meta &meta) { this->ptr_ = MakeUnique<DataType[]>(max_vec_num * meta.dim()); }
