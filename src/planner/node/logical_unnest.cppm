@@ -42,6 +42,7 @@ public:
     inline String name() final { return "LogicalUnnest"; }
 
     Vector<SharedPtr<BaseExpression>>& expression_list() { return expression_list_; }
+    const Vector<SharedPtr<BaseExpression>>& expression_list() const { return expression_list_; }
 
 private:
     Vector<SharedPtr<BaseExpression>> expression_list_{};

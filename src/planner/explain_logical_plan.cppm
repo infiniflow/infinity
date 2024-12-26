@@ -50,6 +50,8 @@ import logical_match;
 import logical_match_sparse_scan;
 import logical_match_tensor_scan;
 import logical_fusion;
+import logical_unnest;
+import logical_unnest_aggregate;
 import base_expression;
 import status;
 
@@ -86,6 +88,10 @@ public:
     static Status Explain(const LogicalProject *project_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalFilter *filter_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static Status Explain(const LogicalUnnest *unnest_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static Status Explain(const LogicalUnnestAggregate *unnest_aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static Status Explain(const LogicalTableScan *table_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 

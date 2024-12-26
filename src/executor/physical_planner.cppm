@@ -145,7 +145,10 @@ private:
     // Read cache
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildReadCache(const SharedPtr<LogicalNode> &logical_operator) const;
 
+    // Unnest
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildUnnest(const SharedPtr<LogicalNode> &logical_operator) const;
+
+    [[nodiscard]] UniquePtr<PhysicalOperator> BuildUnnestAggregate(const SharedPtr<LogicalNode> &logical_operator) const;
 
     // Explain
     [[nodiscard]] UniquePtr<PhysicalOperator> BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const;

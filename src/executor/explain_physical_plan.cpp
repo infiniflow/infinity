@@ -77,6 +77,7 @@ import status;
 import physical_operator_type;
 import physical_read_cache;
 import physical_unnest;
+import physical_unnest_aggregate;
 
 import explain_logical_plan;
 import logical_show;
@@ -320,6 +321,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kUnnest: {
             Explain(static_cast<const PhysicalUnnest *>(op), result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kUnnestAggregate: {
+            Explain(static_cast<const PhysicalUnnestAggregate *>(op), result, intent_size);
             break;
         }
         default: {
@@ -2799,15 +2804,90 @@ void ExplainPhysicalPlan::Explain(const PhysicalUnnest *unnest_node, SharedPtr<V
         result->emplace_back(MakeShared<String>(unnest_expression_str));
     }
 
-    // unnest expression
-    String filter_str = String(intent_size, ' ') + " - filter: ";
-
-    result->emplace_back(MakeShared<String>(filter_str));
-
     // Output column
     {
         String output_columns_str = String(intent_size, ' ') + " - output columns: [";
         SharedPtr<Vector<String>> output_columns = unnest_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+}
+
+void ExplainPhysicalPlan::Explain(const PhysicalUnnestAggregate *unnest_aggregate_node,
+                                  SharedPtr<Vector<SharedPtr<String>>> &result,
+                                  i64 intent_size) {
+    String unnest_node_header_str;
+    if (intent_size != 0) {
+        unnest_node_header_str = String(intent_size - 2, ' ') + "-> Unnest ";
+    } else {
+        unnest_node_header_str = "\"-> Unnest \" ";
+    }
+
+    unnest_node_header_str += "(" + std::to_string(unnest_aggregate_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(unnest_node_header_str));
+
+    // Unnest expression
+    {
+        String unnest_expression_str = String(intent_size, ' ') + " - unnest expression: [";
+        Vector<SharedPtr<BaseExpression>> expression_list = unnest_aggregate_node->expression_list();
+        SizeT expression_count = expression_list.size();
+        for (SizeT idx = 0; idx < expression_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
+            unnest_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(expression_list.back().get(), unnest_expression_str);
+        unnest_expression_str += "]";
+        result->emplace_back(MakeShared<String>(unnest_expression_str));
+    }
+
+    SizeT groups_count = unnest_aggregate_node->groups_.size();
+    SizeT aggregates_count = unnest_aggregate_node->aggregates_.size();
+
+//    // Aggregate Table index
+//    {
+//        String aggregate_table_index =
+//            String(intent_size, ' ') + " - aggregate table index: #" + std::to_string(unnest_aggregate_node->AggregateTableIndex());
+//        result->emplace_back(MakeShared<String>(aggregate_table_index));
+//    }
+
+    // Aggregate expressions
+    {
+        String aggregate_expression_str = String(intent_size, ' ') + " - aggregate: [";
+        if (aggregates_count != 0) {
+            for (SizeT idx = 0; idx < aggregates_count - 1; ++idx) {
+                ExplainLogicalPlan::Explain(unnest_aggregate_node->aggregates_[idx].get(), aggregate_expression_str);
+                aggregate_expression_str += ", ";
+            }
+            ExplainLogicalPlan::Explain(unnest_aggregate_node->aggregates_.back().get(), aggregate_expression_str);
+        }
+        aggregate_expression_str += "]";
+        result->emplace_back(MakeShared<String>(aggregate_expression_str));
+    }
+
+    // Group by expressions
+    if (groups_count != 0) {
+        // Group by table index
+        //        String group_table_index = String(intent_size, ' ') + " - group by table index: #" +
+        //        std::to_string(unnest_aggregate_node->GroupTableIndex()); result->emplace_back(MakeShared<String>(group_table_index));
+
+        String group_by_expression_str = String(intent_size, ' ') + " - group by: [";
+        for (SizeT idx = 0; idx < groups_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(unnest_aggregate_node->groups_[idx].get(), group_by_expression_str);
+            group_by_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(unnest_aggregate_node->groups_.back().get(), group_by_expression_str);
+        group_by_expression_str += "]";
+        result->emplace_back(MakeShared<String>(group_by_expression_str));
+    }
+
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = unnest_aggregate_node->GetOutputNames();
         SizeT column_count = output_columns->size();
         for (SizeT idx = 0; idx < column_count - 1; ++idx) {
             output_columns_str += output_columns->at(idx) + ", ";

@@ -35,6 +35,7 @@ export enum class LogicalNodeType : u8 {
     kSort,
     kTop,
     kUnnest,
+    kUnnestAggregate,
 
     // DML
     kDelete,

@@ -153,6 +153,7 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
         case PhysicalOperatorType::kParallelAggregate:
         case PhysicalOperatorType::kFilter:
         case PhysicalOperatorType::kUnnest:
+        case PhysicalOperatorType::kUnnestAggregate:
         case PhysicalOperatorType::kHash:
         case PhysicalOperatorType::kLimit: {
             if (phys_op->left() == nullptr) {

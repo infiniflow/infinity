@@ -53,6 +53,7 @@ import logical_match_tensor_scan;
 import logical_match_sparse_scan;
 import logical_fusion;
 import logical_unnest;
+import logical_unnest_aggregate;
 import logical_node_type;
 import third_party;
 
@@ -113,6 +114,10 @@ Status ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vecto
         }
         case LogicalNodeType::kUnnest: {
             Explain((LogicalUnnest *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kUnnestAggregate: {
+            Explain((LogicalUnnestAggregate *)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kProjection: {
@@ -772,6 +777,128 @@ Status ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, SharedPtr<V
     }
     return Status::OK();
 }
+
+
+Status ExplainLogicalPlan::Explain(const LogicalUnnest *unnest_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String unnest_node_header_str;
+    if (intent_size != 0) {
+        unnest_node_header_str = fmt::format("{}-> UNNEST ", String(intent_size - 2, ' '));
+    } else {
+        unnest_node_header_str = "UNNEST ";
+    }
+
+    unnest_node_header_str += fmt::format("({})", unnest_node->node_id());
+    result->emplace_back(MakeShared<String>(unnest_node_header_str));
+
+    // Unnest expression
+    {
+        String unnest_expression_str = String(intent_size, ' ') + " - unnest expression: [";
+        const Vector<SharedPtr<BaseExpression>>& expression_list = unnest_node->expression_list();
+        SizeT expression_count = expression_list.size();
+        for (SizeT idx = 0; idx < expression_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
+            unnest_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(expression_list.back().get(), unnest_expression_str);
+        unnest_expression_str += "]";
+        result->emplace_back(MakeShared<String>(unnest_expression_str));
+    }
+
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = unnest_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+    return Status::OK();
+}
+
+
+Status ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+    String unnest_node_header_str;
+    if (intent_size != 0) {
+        unnest_node_header_str = fmt::format("{}-> UNNEST AGGREGATE ", String(intent_size - 2, ' '));
+    } else {
+        unnest_node_header_str = "UNNEST AGGREGATE ";
+    }
+
+    unnest_node_header_str += "(" + std::to_string(unnest_aggregate_node->node_id()) + ")";
+    result->emplace_back(MakeShared<String>(unnest_node_header_str));
+
+    // Unnest expression
+    {
+        String unnest_expression_str = String(intent_size, ' ') + " - unnest expression: [";
+        const Vector<SharedPtr<BaseExpression>>& expression_list = unnest_aggregate_node->unnest_expression_list();
+        SizeT expression_count = expression_list.size();
+        for (SizeT idx = 0; idx < expression_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
+            unnest_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(expression_list.back().get(), unnest_expression_str);
+        unnest_expression_str += "]";
+        result->emplace_back(MakeShared<String>(unnest_expression_str));
+    }
+
+    SizeT groups_count = unnest_aggregate_node->groups_.size();
+    SizeT aggregates_count = unnest_aggregate_node->aggregates_.size();
+
+    //    // Aggregate Table index
+    //    {
+    //        String aggregate_table_index =
+    //            String(intent_size, ' ') + " - aggregate table index: #" + std::to_string(unnest_aggregate_node->AggregateTableIndex());
+    //        result->emplace_back(MakeShared<String>(aggregate_table_index));
+    //    }
+
+    // Aggregate expressions
+    {
+        String aggregate_expression_str = String(intent_size, ' ') + " - aggregate: [";
+        if (aggregates_count != 0) {
+            for (SizeT idx = 0; idx < aggregates_count - 1; ++idx) {
+                ExplainLogicalPlan::Explain(unnest_aggregate_node->aggregates_[idx].get(), aggregate_expression_str);
+                aggregate_expression_str += ", ";
+            }
+            ExplainLogicalPlan::Explain(unnest_aggregate_node->aggregates_.back().get(), aggregate_expression_str);
+        }
+        aggregate_expression_str += "]";
+        result->emplace_back(MakeShared<String>(aggregate_expression_str));
+    }
+
+    // Group by expressions
+    if (groups_count != 0) {
+        // Group by table index
+        //        String group_table_index = String(intent_size, ' ') + " - group by table index: #" +
+        //        std::to_string(unnest_aggregate_node->GroupTableIndex()); result->emplace_back(MakeShared<String>(group_table_index));
+
+        String group_by_expression_str = String(intent_size, ' ') + " - group by: [";
+        for (SizeT idx = 0; idx < groups_count - 1; ++idx) {
+            ExplainLogicalPlan::Explain(unnest_aggregate_node->groups_[idx].get(), group_by_expression_str);
+            group_by_expression_str += ", ";
+        }
+        ExplainLogicalPlan::Explain(unnest_aggregate_node->groups_.back().get(), group_by_expression_str);
+        group_by_expression_str += "]";
+        result->emplace_back(MakeShared<String>(group_by_expression_str));
+    }
+
+    // Output column
+    {
+        String output_columns_str = String(intent_size, ' ') + " - output columns: [";
+        SharedPtr<Vector<String>> output_columns = unnest_aggregate_node->GetOutputNames();
+        SizeT column_count = output_columns->size();
+        for (SizeT idx = 0; idx < column_count - 1; ++idx) {
+            output_columns_str += output_columns->at(idx) + ", ";
+        }
+        output_columns_str += output_columns->back() + "]";
+        result->emplace_back(MakeShared<String>(output_columns_str));
+    }
+    return Status::OK();
+}
+
+
 
 Status ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String table_scan_header;
