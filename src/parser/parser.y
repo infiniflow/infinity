@@ -2167,7 +2167,17 @@ show_statement: SHOW DATABASES {
       $$->show_type_ = infinity::ShowStmtType::kFunction;
       $$->function_name_ = $2;
       free($2);
-};
+}
+| SHOW SNAPSHOTS {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListSnapshots;
+}
+| SHOW SNAPSHOT IDENTIFIER {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kShowSnapshot;
+     $$->snapshot_name_ = $3;
+     free($3);
+}
 
 /*
  * FLUSH STATEMENT

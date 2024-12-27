@@ -552,6 +552,30 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kListSnapshots: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("scope");
+            output_names_->emplace_back("time");
+            output_names_->emplace_back("commit");
+            output_names_->emplace_back("size");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
+        case ShowStmtType::kShowSnapshot: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             RecoverableError(status);
@@ -714,6 +738,14 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kFunction: {
             ExecuteShowFunction(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kListSnapshots: {
+            ExecuteListSnapshots(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kShowSnapshot: {
+            ExecuteShowSnapshot(query_context, show_operator_state);
             break;
         }
         default: {
@@ -6422,6 +6454,71 @@ void PhysicalShow::ExecuteShowFunction(QueryContext *query_context, ShowOperator
         Status status = Status::Unknown(fmt::format("function: {}", function_name));
         RecoverableError(status);
     }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        bigint_type,
+        bigint_type
+    };
+
+    output_block_ptr->Init(column_types);
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(column_types);
+
+//    {
+//        SizeT column_id = 0;
+//        {
+//            Value value = Value::MakeVarchar("memory_objects");
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//        }
+//
+//        ++column_id;
+//        {
+//            Value value = Value::MakeVarchar(GlobalResourceUsage::GetObjectCountInfo());
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//        }
+//    }
+//
+//    {
+//        SizeT column_id = 0;
+//        {
+//            Value value = Value::MakeVarchar("memory_allocation");
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//        }
+//
+//        ++column_id;
+//        {
+//            Value value = Value::MakeVarchar(GlobalResourceUsage::GetRawMemoryInfo());
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//        }
+//    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));

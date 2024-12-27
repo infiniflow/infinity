@@ -1718,6 +1718,38 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->function_name_);
             break;
         }
+        case ShowStmtType::kListSnapshots: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kListSnapshots,
+                                                          "",
+                                                          "",
+                                                          bind_context_ptr->GenerateTableIndex(),
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          statement->function_name_);
+            break;
+        }
+        case ShowStmtType::kShowSnapshot: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kShowSnapshot,
+                                                          "",
+                                                          statement->snapshot_name_,
+                                                          bind_context_ptr->GenerateTableIndex(),
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          statement->function_name_);
+            break;
+        }
         default: {
             String error_message = "Unexpected show statement type.";
             UnrecoverableError(error_message);
