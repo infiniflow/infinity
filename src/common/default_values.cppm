@@ -200,8 +200,10 @@ export {
     constexpr std::string_view DEFAULT_RESULT_CACHE = "off";
     constexpr SizeT DEFAULT_CACHE_RESULT_CAPACITY = 10000;
 
+    constexpr std::string_view DEFAULT_SNAPSHOT_DIR = "/var/infinity/snapshot";
+
     // default persistence parameter
-    constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence"; // Empty means disabled
+    constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence";
     constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "128MB";   // 128MB
     constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu;    // 128MB
 
@@ -293,6 +295,7 @@ export {
 
     constexpr std::string_view RECORD_RUNNING_QUERY_OPTION_NAME = "record_running_query";
 
+    constexpr std::string_view SNAPSHOT_DIR_OPTION_NAME = "snapshot_dir";
     // Variable name
     constexpr std::string_view QUERY_COUNT_VAR_NAME = "query_count";                         // global and session
     constexpr std::string_view SESSION_COUNT_VAR_NAME = "session_count";                     // global

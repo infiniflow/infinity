@@ -171,6 +171,7 @@ export enum class GlobalOptionIndex : i8 {
     kDenseIndexBuildingWorker = 53,
     kSparseIndexBuildingWorker = 54,
     kFulltextIndexBuildingWorker = 55,
+    kSnapshotDir = 56,
     kInvalid = 57,
 };
 

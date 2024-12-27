@@ -93,6 +93,7 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kDeltaCheckpointThreshold;
     name2index_[String(WAL_FLUSH_OPTION_NAME)] = GlobalOptionIndex::kFlushMethodAtCommit;
     name2index_[String(RESOURCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kResourcePath;
+    name2index_[String(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
 
     name2index_[String(RECORD_RUNNING_QUERY_OPTION_NAME)] = GlobalOptionIndex::kRecordRunningQuery;
 }
