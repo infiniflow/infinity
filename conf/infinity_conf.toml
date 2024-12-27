@@ -43,7 +43,7 @@ mem_index_capacity       = 65536
 # secret_key               = "minioadmin"
 # enable_https             = false
 
-snapshots_dir            = "/var/infinity/snapshots"
+snapshot_dir            = "/var/infinity/snapshots"
 
 [buffer]
 buffer_manager_size      = "4GB"

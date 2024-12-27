@@ -2590,7 +2590,7 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListSnapshots;
 }
-| ADMIN SHOW SNAPSHOT STRING {
+| ADMIN SHOW SNAPSHOT IDENTIFIER {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowSnapshot;
      $$->snapshot_name_ = $4;
