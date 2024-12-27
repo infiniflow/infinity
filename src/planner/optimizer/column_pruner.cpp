@@ -96,6 +96,9 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
         case LogicalNodeType::kUnnest: {
             break;
         }
+        case LogicalNodeType::kUnnestAggregate: {
+            break;
+        }
         case LogicalNodeType::kProjection: {
             if (!all_referenced_) {
                 auto &proj = op.Cast<LogicalProject>();

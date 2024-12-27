@@ -70,6 +70,7 @@ import physical_merge_aggregate;
 import physical_match_sparse_scan;
 import physical_read_cache;
 import physical_unnest;
+import physical_unnest_aggregate;
 
 export module explain_physical_plan;
 
@@ -187,6 +188,8 @@ public:
     static void Explain(const PhysicalReadCache *read_cache_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 
     static void Explain(const PhysicalUnnest *unnest_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
+
+    static void Explain(const PhysicalUnnestAggregate *unnest_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size = 0);
 };
 
 } // namespace infinity
