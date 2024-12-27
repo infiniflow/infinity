@@ -115,7 +115,7 @@ bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index->Save(*file_handle_);
+                    index->SaveToPtr(*file_handle_);
                 } else {
                     UnrecoverableError("Invalid index type.");
                 }

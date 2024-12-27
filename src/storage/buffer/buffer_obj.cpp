@@ -227,6 +227,11 @@ void BufferObj::PickForCleanup() {
         LOG_INFO(fmt::format("BufferObj::PickForCleanup: obj_rc_ is {}, buffer: {}", obj_rc_, GetFilename()));
         return;
     }
+    if (type_ == BufferType::kMmap) {
+        file_worker_->Munmap();
+        status_ = BufferStatus::kFreed;
+        return;
+    }
     switch (status_) {
         // when insert data into table with index, the index buffer_obj
         // will remain BufferStatus::kNew, so we should allow this situation
@@ -336,7 +341,7 @@ void BufferObj::UnloadInner() {
             status_ = BufferStatus::kFreed;
             type_ = BufferType::kMmap;
         } else if (type_ == BufferType::kMmap) {
-            file_worker_->Munmap();
+            file_worker_->MmapNotNeed();
             status_ = BufferStatus::kFreed;
         } else {
             buffer_mgr_->PushGCQueue(this);
