@@ -40,10 +40,7 @@ FixHeapManager::FixHeapManager(const u64 chunk_size, bool allow_cross_chunk) : c
     allow_storage_across_chunks_ = allow_cross_chunk;
 }
 
-FixHeapManager::FixHeapManager(BufferManager *buffer_mgr,
-                               BlockColumnEntry *block_column_entry,
-                               const u64 chunk_size,
-                               bool allow_cross_chunk)
+FixHeapManager::FixHeapManager(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, const u64 chunk_size, bool allow_cross_chunk)
     : current_chunk_size_(chunk_size), current_chunk_offset_(block_column_entry->LastChunkOff()), buffer_mgr_(buffer_mgr),
       block_column_entry_(block_column_entry) {
 #ifdef INFINITY_DEBUG

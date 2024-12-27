@@ -22,9 +22,9 @@ module;
 
 export module jieba;
 
-export namespace cppjieba{
+export namespace cppjieba {
 
-    using cppjieba::Word;
-    using cppjieba::Jieba;
+using cppjieba::Jieba;
+using cppjieba::Word;
 
-}
+} // namespace cppjieba

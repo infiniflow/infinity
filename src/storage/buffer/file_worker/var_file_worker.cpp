@@ -33,8 +33,9 @@ VarFileWorker::VarFileWorker(SharedPtr<String> data_dir,
                              SharedPtr<String> file_dir,
                              SharedPtr<String> file_name,
                              SizeT buffer_size,
-                             PersistenceManager* persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(buffer_size) {}
+                             PersistenceManager *persistence_manager)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
+      buffer_size_(buffer_size) {}
 
 VarFileWorker::~VarFileWorker() {
     if (data_ != nullptr) {
@@ -83,7 +84,7 @@ bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
     buffer->Write(ptr);
 
     Status status = file_handle_->Append(buffer_data.get(), data_size);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     prepare_success = true;
@@ -103,7 +104,7 @@ void VarFileWorker::ReadFromFileImpl(SizeT file_size) {
 
     auto buffer = MakeUnique<char[]>(buffer_size_);
     auto [nbytes, status] = file_handle_->Read(buffer.get(), buffer_size_);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     if (nbytes != buffer_size_) {

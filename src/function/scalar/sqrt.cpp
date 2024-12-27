@@ -34,51 +34,51 @@ void RegisterSqrtFunction(const UniquePtr<Catalog> &catalog_ptr) {
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction sqrt_int8(func_name,
-                            {DataType(LogicalType::kTinyInt)},
-                            DataType(LogicalType::kDouble),
-                            &ScalarFunction::UnaryFunctionWithFailure<TinyIntT, DoubleT, SqrtFunction>);
+                             {DataType(LogicalType::kTinyInt)},
+                             DataType(LogicalType::kDouble),
+                             &ScalarFunction::UnaryFunctionWithFailure<TinyIntT, DoubleT, SqrtFunction>);
     function_set_ptr->AddFunction(sqrt_int8);
 
     ScalarFunction sqrt_int16(func_name,
-                             {DataType(LogicalType::kSmallInt)},
-                             {DataType(LogicalType::kDouble)},
-                             &ScalarFunction::UnaryFunctionWithFailure<SmallIntT, DoubleT, SqrtFunction>);
+                              {DataType(LogicalType::kSmallInt)},
+                              {DataType(LogicalType::kDouble)},
+                              &ScalarFunction::UnaryFunctionWithFailure<SmallIntT, DoubleT, SqrtFunction>);
     function_set_ptr->AddFunction(sqrt_int16);
 
     ScalarFunction sqrt_int32(func_name,
-                             {DataType(LogicalType::kInteger)},
-                             {DataType(LogicalType::kDouble)},
-                             &ScalarFunction::UnaryFunctionWithFailure<IntegerT, DoubleT, SqrtFunction>);
+                              {DataType(LogicalType::kInteger)},
+                              {DataType(LogicalType::kDouble)},
+                              &ScalarFunction::UnaryFunctionWithFailure<IntegerT, DoubleT, SqrtFunction>);
     function_set_ptr->AddFunction(sqrt_int32);
 
     ScalarFunction sqrt_int64(func_name,
-                             {DataType(LogicalType::kBigInt)},
-                             {DataType(LogicalType::kDouble)},
-                             &ScalarFunction::UnaryFunctionWithFailure<BigIntT, DoubleT, SqrtFunction>);
+                              {DataType(LogicalType::kBigInt)},
+                              {DataType(LogicalType::kDouble)},
+                              &ScalarFunction::UnaryFunctionWithFailure<BigIntT, DoubleT, SqrtFunction>);
     function_set_ptr->AddFunction(sqrt_int64);
 
     ScalarFunction sqrt_float(func_name,
-                             {DataType(LogicalType::kFloat)},
-                             {DataType(LogicalType::kDouble)},
-                             &ScalarFunction::UnaryFunctionWithFailure<FloatT, DoubleT, SqrtFunction>);
+                              {DataType(LogicalType::kFloat)},
+                              {DataType(LogicalType::kDouble)},
+                              &ScalarFunction::UnaryFunctionWithFailure<FloatT, DoubleT, SqrtFunction>);
     function_set_ptr->AddFunction(sqrt_float);
 
     ScalarFunction sqrt_double(func_name,
-                              {DataType(LogicalType::kDouble)},
-                              {DataType(LogicalType::kDouble)},
-                              &ScalarFunction::UnaryFunctionWithFailure<DoubleT, DoubleT, SqrtFunction>);
+                               {DataType(LogicalType::kDouble)},
+                               {DataType(LogicalType::kDouble)},
+                               &ScalarFunction::UnaryFunctionWithFailure<DoubleT, DoubleT, SqrtFunction>);
     function_set_ptr->AddFunction(sqrt_double);
 
     ScalarFunction sqrt_float16(func_name,
-                               {DataType(LogicalType::kFloat16)},
-                               {DataType(LogicalType::kDouble)},
-                               &ScalarFunction::UnaryFunctionWithFailure<Float16T, DoubleT, SqrtFunction>);
+                                {DataType(LogicalType::kFloat16)},
+                                {DataType(LogicalType::kDouble)},
+                                &ScalarFunction::UnaryFunctionWithFailure<Float16T, DoubleT, SqrtFunction>);
     function_set_ptr->AddFunction(sqrt_float16);
 
     ScalarFunction sqrt_bfloat16(func_name,
-                                {DataType(LogicalType::kBFloat16)},
-                                {DataType(LogicalType::kDouble)},
-                                &ScalarFunction::UnaryFunctionWithFailure<BFloat16T, DoubleT, SqrtFunction>);
+                                 {DataType(LogicalType::kBFloat16)},
+                                 {DataType(LogicalType::kDouble)},
+                                 &ScalarFunction::UnaryFunctionWithFailure<BFloat16T, DoubleT, SqrtFunction>);
     function_set_ptr->AddFunction(sqrt_bfloat16);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

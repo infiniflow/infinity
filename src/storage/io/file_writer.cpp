@@ -30,7 +30,7 @@ FileWriter::FileWriter(const String &path, SizeT buffer_size)
     : path_(path), data_(MakeUnique<char_t[]>(buffer_size)), offset_(0), total_written_(0), buffer_size_(buffer_size) {
     // Fixme: Open file out of constructor
     auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     file_handle_ = std::move(file_handle);

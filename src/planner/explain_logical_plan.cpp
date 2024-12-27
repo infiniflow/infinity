@@ -778,7 +778,6 @@ Status ExplainLogicalPlan::Explain(const LogicalFilter *filter_node, SharedPtr<V
     return Status::OK();
 }
 
-
 Status ExplainLogicalPlan::Explain(const LogicalUnnest *unnest_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String unnest_node_header_str;
     if (intent_size != 0) {
@@ -793,7 +792,7 @@ Status ExplainLogicalPlan::Explain(const LogicalUnnest *unnest_node, SharedPtr<V
     // Unnest expression
     {
         String unnest_expression_str = String(intent_size, ' ') + " - unnest expression: [";
-        const Vector<SharedPtr<BaseExpression>>& expression_list = unnest_node->expression_list();
+        const Vector<SharedPtr<BaseExpression>> &expression_list = unnest_node->expression_list();
         SizeT expression_count = expression_list.size();
         for (SizeT idx = 0; idx < expression_count - 1; ++idx) {
             ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
@@ -818,8 +817,8 @@ Status ExplainLogicalPlan::Explain(const LogicalUnnest *unnest_node, SharedPtr<V
     return Status::OK();
 }
 
-
-Status ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
+Status
+ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregate_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String unnest_node_header_str;
     if (intent_size != 0) {
         unnest_node_header_str = fmt::format("{}-> UNNEST AGGREGATE ", String(intent_size - 2, ' '));
@@ -833,7 +832,7 @@ Status ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregat
     // Unnest expression
     {
         String unnest_expression_str = String(intent_size, ' ') + " - unnest expression: [";
-        const Vector<SharedPtr<BaseExpression>>& expression_list = unnest_aggregate_node->unnest_expression_list();
+        const Vector<SharedPtr<BaseExpression>> &expression_list = unnest_aggregate_node->unnest_expression_list();
         SizeT expression_count = expression_list.size();
         for (SizeT idx = 0; idx < expression_count - 1; ++idx) {
             ExplainLogicalPlan::Explain(expression_list[idx].get(), unnest_expression_str);
@@ -897,8 +896,6 @@ Status ExplainLogicalPlan::Explain(const LogicalUnnestAggregate *unnest_aggregat
     }
     return Status::OK();
 }
-
-
 
 Status ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     String table_scan_header;

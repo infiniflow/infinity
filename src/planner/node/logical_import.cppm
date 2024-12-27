@@ -21,7 +21,6 @@ import logical_node_type;
 import column_binding;
 import logical_node;
 
-
 import internal_types;
 import statement_common;
 import data_type;
@@ -31,14 +30,9 @@ namespace infinity {
 
 export class LogicalImport : public LogicalNode {
 public:
-    explicit inline LogicalImport(u64 node_id,
-                                  TableEntry *table_entry,
-                                  String file_path,
-                                  bool header,
-                                  char delimiter,
-                                  CopyFileType type)
-        : LogicalNode(node_id, LogicalNodeType::kImport), table_entry_(table_entry), file_type_(type),
-          file_path_(std::move(file_path)), header_(header), delimiter_(delimiter) {}
+    explicit inline LogicalImport(u64 node_id, TableEntry *table_entry, String file_path, bool header, char delimiter, CopyFileType type)
+        : LogicalNode(node_id, LogicalNodeType::kImport), table_entry_(table_entry), file_type_(type), file_path_(std::move(file_path)),
+          header_(header), delimiter_(delimiter) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

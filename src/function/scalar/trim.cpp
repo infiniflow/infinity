@@ -1,6 +1,6 @@
 module;
 
-#include<cctype>
+#include <cctype>
 
 module trim;
 
@@ -47,28 +47,27 @@ inline void TrimFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *le
         return;
     }
 
-    long rpos = input_len-1;
+    long rpos = input_len - 1;
     while (rpos > -1 && std::isspace(static_cast<unsigned char>(input[rpos]))) {
         rpos--;
     }
 
-    Span<const char> res_span = Span<const char>(&input[lpos], rpos-lpos+1);
+    Span<const char> res_span = Span<const char>(&input[lpos], rpos - lpos + 1);
     result_ptr->AppendVarcharInner(res_span, result);
 }
 
-
-void RegisterTrimFunction(const UniquePtr<Catalog> &catalog_ptr){
+void RegisterTrimFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "trim";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction trim_function(func_name,
-                                     {DataType(LogicalType::kVarchar)},
-                                     {DataType(LogicalType::kVarchar)},
-                                     &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, TrimFunction>);
+                                 {DataType(LogicalType::kVarchar)},
+                                 {DataType(LogicalType::kVarchar)},
+                                 &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, TrimFunction>);
     function_set_ptr->AddFunction(trim_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

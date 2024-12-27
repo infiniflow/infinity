@@ -24,4 +24,4 @@ class Catalog;
 
 export void RegisterExtractFunction(const UniquePtr<Catalog> &catalog_ptr);
 
-}
+} // namespace infinity

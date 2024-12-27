@@ -145,7 +145,7 @@ TEST_P(RepeatReplayTest, append) {
         TestAppend(txn_mgr);
         infinity::InfinityContext::instance().UnInit();
     }
-    {                                                            // replay with no checkpoint, only replay wal
+    { // replay with no checkpoint, only replay wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
         Storage *storage = InfinityContext::instance().storage();
@@ -156,7 +156,7 @@ TEST_P(RepeatReplayTest, append) {
         CheckTable(txn_mgr, 2);
         infinity::InfinityContext::instance().UnInit();
     }
-    {                                                            // replay with full checkpoint + wal
+    { // replay with full checkpoint + wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
         Storage *storage = InfinityContext::instance().storage();
@@ -174,7 +174,7 @@ TEST_P(RepeatReplayTest, append) {
         CheckTable(txn_mgr, 3);
         infinity::InfinityContext::instance().UnInit();
     }
-    for (int i = 0; i < 2; ++i) {                                // replay with full checkpoint + delta checkpoint + wal
+    for (int i = 0; i < 2; ++i) { // replay with full checkpoint + delta checkpoint + wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
         Storage *storage = InfinityContext::instance().storage();
@@ -269,7 +269,7 @@ TEST_P(RepeatReplayTest, import) {
         CheckTable(txn_mgr, 1);
         infinity::InfinityContext::instance().UnInit();
     }
-    {                                                            // replay with no checkpoint, only replay wal
+    { // replay with no checkpoint, only replay wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
         Storage *storage = InfinityContext::instance().storage();
@@ -281,7 +281,7 @@ TEST_P(RepeatReplayTest, import) {
         CheckTable(txn_mgr, 2);
         infinity::InfinityContext::instance().UnInit();
     }
-    {                                                            // replay with full checkpoint + wal
+    { // replay with full checkpoint + wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
         Storage *storage = InfinityContext::instance().storage();
@@ -300,7 +300,7 @@ TEST_P(RepeatReplayTest, import) {
         CheckTable(txn_mgr, 3);
         infinity::InfinityContext::instance().UnInit();
     }
-    for (int i = 0; i < 2; ++i) {                                // replay with full checkpoint + delta checkpoint + wal
+    for (int i = 0; i < 2; ++i) { // replay with full checkpoint + delta checkpoint + wal
         infinity::InfinityContext::instance().InitPhase1(config_path);
         infinity::InfinityContext::instance().InitPhase2(); // auto full checkpoint when initialize
         Storage *storage = InfinityContext::instance().storage();

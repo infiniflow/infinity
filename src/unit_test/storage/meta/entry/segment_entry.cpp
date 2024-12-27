@@ -52,7 +52,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 void CreateTable();
 void CreateIndex();
-void InsertData(const String& db_name, const String& table_name);
+void InsertData(const String &db_name, const String &table_name);
 void DropIndex();
 void DropTable();
 
@@ -70,9 +70,9 @@ TEST_P(SegmentEntryTest, decode_index_test) {
         auto segment_entry = table_entry->GetSegmentEntry(0);
         EXPECT_TRUE(segment_entry != nullptr);
         String encoded_index = SegmentEntry::EncodeIndex(0, table_entry);
-        std::cout<<"encoded_index: "<<encoded_index<<std::endl;
+        std::cout << "encoded_index: " << encoded_index << std::endl;
         EXPECT_TRUE(encoded_index == "#default_db#tbl1#0");
-        Vector<std::string_view> decoded_index  = SegmentEntry::DecodeIndex(encoded_index);
+        Vector<std::string_view> decoded_index = SegmentEntry::DecodeIndex(encoded_index);
         EXPECT_TRUE(decoded_index[0] == "default_db");
         EXPECT_TRUE(decoded_index[1] == "tbl1");
         EXPECT_TRUE(decoded_index[2] == "0");
@@ -112,9 +112,11 @@ TEST_P(SegmentEntryTest, segment_entry_to_string_test) {
         EXPECT_TRUE(table_status.ok());
         auto segment_entry = table_entry->GetSegmentEntry(0);
         String segment_path = segment_entry->ToString();
-        std::cout<<segment_path<<std::endl;
-        EXPECT_TRUE(std::regex_match(segment_path, 
-                    std::regex("Segment\\spath:\\s(.*)_db_default_db/(.*)_table_tbl1/seg_0,\\sid:\\s0,\\srow_count:\\s4,\\sblock_count:\\s4,\\sstatus:\\sSealed"))); 
+        std::cout << segment_path << std::endl;
+        EXPECT_TRUE(std::regex_match(
+            segment_path,
+            std::regex(
+                "Segment\\spath:\\s(.*)_db_default_db/(.*)_table_tbl1/seg_0,\\sid:\\s0,\\srow_count:\\s4,\\sblock_count:\\s4,\\sstatus:\\sSealed")));
     }
 
     DropTable();
@@ -132,7 +134,7 @@ TEST_P(SegmentEntryTest, set_sealed_test) {
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         auto segment_entry = table_entry->GetSegmentEntry(0);
-        std::cout<<"segment_entry_status: "<<ToString(segment_entry->status())<<std::endl;
+        std::cout << "segment_entry_status: " << ToString(segment_entry->status()) << std::endl;
         EXPECT_FALSE(segment_entry->SetSealed());
     }
 
@@ -151,7 +153,7 @@ TEST_P(SegmentEntryTest, set_compacting_test) {
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         auto segment_entry = table_entry->GetSegmentEntry(0);
-        std::cout<<"segment_entry_status: "<<ToString(segment_entry->status())<<std::endl;
+        std::cout << "segment_entry_status: " << ToString(segment_entry->status()) << std::endl;
         EXPECT_TRUE(segment_entry->TrySetCompacting(nullptr));
         EXPECT_FALSE(segment_entry->TrySetCompacting(nullptr));
     }
@@ -171,7 +173,7 @@ TEST_P(SegmentEntryTest, set_no_delete_test) {
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         auto segment_entry = table_entry->GetSegmentEntry(0);
-        std::cout<<"segment_entry_status: "<<ToString(segment_entry->status())<<std::endl;
+        std::cout << "segment_entry_status: " << ToString(segment_entry->status()) << std::endl;
         EXPECT_THROW(segment_entry->SetNoDelete(), UnrecoverableException);
         EXPECT_TRUE(segment_entry->TrySetCompacting(nullptr));
         EXPECT_TRUE(segment_entry->SetNoDelete());
@@ -192,7 +194,7 @@ TEST_P(SegmentEntryTest, set_deprecated_test) {
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         auto segment_entry = table_entry->GetSegmentEntry(0);
-        std::cout<<"segment_entry_status: "<<ToString(segment_entry->status())<<std::endl;
+        std::cout << "segment_entry_status: " << ToString(segment_entry->status()) << std::endl;
         EXPECT_THROW(segment_entry->SetDeprecated(txn1->BeginTS()), UnrecoverableException);
         EXPECT_TRUE(segment_entry->TrySetCompacting(nullptr));
         EXPECT_TRUE(segment_entry->SetNoDelete());
@@ -214,7 +216,7 @@ TEST_P(SegmentEntryTest, roll_back_compact_test) {
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
         EXPECT_TRUE(table_status.ok());
         auto segment_entry = table_entry->GetSegmentEntry(0);
-        std::cout<<"segment_entry_status: "<<ToString(segment_entry->status())<<std::endl;
+        std::cout << "segment_entry_status: " << ToString(segment_entry->status()) << std::endl;
         EXPECT_THROW(segment_entry->RollbackCompact(), UnrecoverableException);
         EXPECT_TRUE(segment_entry->TrySetCompacting(nullptr));
         EXPECT_THROW(segment_entry->RollbackCompact(), UnrecoverableException);

@@ -57,6 +57,7 @@ public:
     u64 groupby_index_{};
     Vector<SharedPtr<BaseExpression>> aggregates_{};
     u64 aggregate_index_{};
+
 private:
     Vector<SharedPtr<BaseExpression>> unnest_expression_list_{};
 };

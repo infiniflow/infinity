@@ -215,7 +215,7 @@ public:
 
     inline const SharedPtr<String> &GetTableComment() const { return table_comment_; }
 
-    TxnTimeStamp max_commit_ts() const { 
+    TxnTimeStamp max_commit_ts() const {
         std::shared_lock lock(rw_locker_);
         return max_commit_ts_;
     }
@@ -369,7 +369,7 @@ public:
 
     void SetUnlock();
 
-    enum struct TableStatus: u8 {
+    enum struct TableStatus : u8 {
         kNone = 0,
         kCreatingIndex,
         kCompacting,

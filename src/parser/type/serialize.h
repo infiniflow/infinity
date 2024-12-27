@@ -93,7 +93,7 @@ inline void WriteBufAdv<std::string>(char *&buf, const std::string &value) {
     buf += len;
 }
 
-template<typename T>
+template <typename T>
 inline void WriteBufVecAdv(char *&buf, const T *data, size_t size) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
     memcpy(buf, data, sizeof(T) * size);

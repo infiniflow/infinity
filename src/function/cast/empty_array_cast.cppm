@@ -44,15 +44,16 @@ export inline BoundCastFunc BindEmptyArrayCast(const DataType &source, const Dat
 struct EmptyTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static bool Run(SourceType, TargetType &) {
-        UnrecoverableError(fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        UnrecoverableError(
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
         return false;
     }
 };
 
-template<>
+template <>
 bool EmptyTryCastToFixlen::Run(EmptyArrayT, SparseT &target) {
     target.nnz_ = 0;
     return true;
 }
 
-}
+} // namespace infinity

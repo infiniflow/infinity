@@ -24,7 +24,6 @@ import logger;
 import stl;
 import infinity_context;
 
-
 import function_set;
 import aggregate_function_set;
 import aggregate_function;
@@ -43,11 +42,9 @@ import data_type;
 
 using namespace infinity;
 class SmallIntegerCastTest : public BaseTest {
-    void SetUp() override {
-    }
+    void SetUp() override {}
 
-    void TearDown() override {
-    }
+    void TearDown() override {}
 };
 
 TEST_F(SmallIntegerCastTest, small_integer_cast0) {

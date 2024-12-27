@@ -41,51 +41,51 @@ void RegisterRoundFunction(const UniquePtr<Catalog> &catalog_ptr) {
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction round_int8(func_name,
-                            {DataType(LogicalType::kTinyInt)},
-                            DataType(LogicalType::kTinyInt),
-                            &ScalarFunction::UnaryFunction<TinyIntT, TinyIntT, RoundFunctionInt>);
+                              {DataType(LogicalType::kTinyInt)},
+                              DataType(LogicalType::kTinyInt),
+                              &ScalarFunction::UnaryFunction<TinyIntT, TinyIntT, RoundFunctionInt>);
     function_set_ptr->AddFunction(round_int8);
 
     ScalarFunction round_int16(func_name,
-                             {DataType(LogicalType::kSmallInt)},
-                             {DataType(LogicalType::kSmallInt)},
-                             &ScalarFunction::UnaryFunction<SmallIntT, SmallIntT, RoundFunctionInt>);
+                               {DataType(LogicalType::kSmallInt)},
+                               {DataType(LogicalType::kSmallInt)},
+                               &ScalarFunction::UnaryFunction<SmallIntT, SmallIntT, RoundFunctionInt>);
     function_set_ptr->AddFunction(round_int16);
 
     ScalarFunction round_int32(func_name,
-                             {DataType(LogicalType::kInteger)},
-                             {DataType(LogicalType::kInteger)},
-                             &ScalarFunction::UnaryFunction<IntegerT, IntegerT, RoundFunctionInt>);
+                               {DataType(LogicalType::kInteger)},
+                               {DataType(LogicalType::kInteger)},
+                               &ScalarFunction::UnaryFunction<IntegerT, IntegerT, RoundFunctionInt>);
     function_set_ptr->AddFunction(round_int32);
 
     ScalarFunction round_int64(func_name,
-                             {DataType(LogicalType::kBigInt)},
-                             {DataType(LogicalType::kBigInt)},
-                             &ScalarFunction::UnaryFunction<BigIntT, BigIntT, RoundFunctionInt>);
+                               {DataType(LogicalType::kBigInt)},
+                               {DataType(LogicalType::kBigInt)},
+                               &ScalarFunction::UnaryFunction<BigIntT, BigIntT, RoundFunctionInt>);
     function_set_ptr->AddFunction(round_int64);
 
     ScalarFunction round_float(func_name,
-                             {DataType(LogicalType::kFloat)},
-                             {DataType(LogicalType::kDouble)},
-                             &ScalarFunction::UnaryFunctionWithFailure<FloatT, DoubleT, RoundFunctionFloat>);
+                               {DataType(LogicalType::kFloat)},
+                               {DataType(LogicalType::kDouble)},
+                               &ScalarFunction::UnaryFunctionWithFailure<FloatT, DoubleT, RoundFunctionFloat>);
     function_set_ptr->AddFunction(round_float);
 
     ScalarFunction round_double(func_name,
-                              {DataType(LogicalType::kDouble)},
-                              {DataType(LogicalType::kDouble)},
-                              &ScalarFunction::UnaryFunctionWithFailure<DoubleT, DoubleT, RoundFunctionFloat>);
+                                {DataType(LogicalType::kDouble)},
+                                {DataType(LogicalType::kDouble)},
+                                &ScalarFunction::UnaryFunctionWithFailure<DoubleT, DoubleT, RoundFunctionFloat>);
     function_set_ptr->AddFunction(round_double);
 
     ScalarFunction round_float16(func_name,
-                               {DataType(LogicalType::kFloat16)},
-                               {DataType(LogicalType::kDouble)},
-                               &ScalarFunction::UnaryFunctionWithFailure<Float16T, DoubleT, RoundFunctionFloat>);
+                                 {DataType(LogicalType::kFloat16)},
+                                 {DataType(LogicalType::kDouble)},
+                                 &ScalarFunction::UnaryFunctionWithFailure<Float16T, DoubleT, RoundFunctionFloat>);
     function_set_ptr->AddFunction(round_float16);
 
     ScalarFunction round_bfloat16(func_name,
-                                {DataType(LogicalType::kBFloat16)},
-                                {DataType(LogicalType::kDouble)},
-                                &ScalarFunction::UnaryFunctionWithFailure<BFloat16T, DoubleT, RoundFunctionFloat>);
+                                  {DataType(LogicalType::kBFloat16)},
+                                  {DataType(LogicalType::kDouble)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<BFloat16T, DoubleT, RoundFunctionFloat>);
     function_set_ptr->AddFunction(round_bfloat16);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

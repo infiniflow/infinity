@@ -104,7 +104,6 @@ TEST_F(ColumnVectorDecimalTest, flat_decimal) {
         EXPECT_EQ(vx.value_.decimal.lower, static_cast<i64>(i));
     }
 
-
     column_vector.Reset();
     EXPECT_EQ(column_vector.capacity(), 0u);
     EXPECT_EQ(column_vector.Size(), 0u);

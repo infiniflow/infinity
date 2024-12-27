@@ -90,7 +90,6 @@ public:
               std::set<ConstraintType> constraints,
               std::shared_ptr<ParsedExpr> default_expr = nullptr);
 
-
     ColumnDef(LogicalType logical_type,
               const std::shared_ptr<TypeInfo> &type_info_ptr,
               std::string comment,

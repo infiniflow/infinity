@@ -13,11 +13,11 @@
 // limitations under the License.
 
 #include "type/logical_type.h"
+#include "complex/sparse_type.h"
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include "complex/sparse_type.h"
- 
+
 namespace infinity {
 
 static const char *type2name[] = {
@@ -53,14 +53,14 @@ static const char *type2name[] = {
     "Line",
     "LineSegment",
     "Box",
-//    "Path",
-//    "Polygon",
+    //    "Path",
+    //    "Polygon",
     "Circle",
 
     // Other
-//    "Bitmap",
+    //    "Bitmap",
     "UUID",
-//    "Blob",
+    //    "Blob",
     "Embedding",
     "RowID",
 
@@ -95,69 +95,69 @@ static_assert(std::size(type2name) == to_underlying_val(LogicalType::kInvalid) +
 
 std::unordered_map<std::string, LogicalType> name2type = {
     // Bool
-    {"boolean", LogicalType::kBoolean }, 
-    {"bool", LogicalType::kBoolean }, 
+    {"boolean", LogicalType::kBoolean},
+    {"bool", LogicalType::kBoolean},
 
-    {"tinyint", LogicalType::kTinyInt },
-    {"int8", LogicalType::kTinyInt },
-    {"smallint" , LogicalType::kSmallInt },
-    {"int16" , LogicalType::kSmallInt },
-    {"integer" , LogicalType::kInteger },
-    {"int" , LogicalType::kInteger },
-    {"int32" , LogicalType::kInteger },
-    {"bigint" , LogicalType::kBigInt },
-    {"int64" , LogicalType::kBigInt },
-    {"hugeint" , LogicalType::kHugeInt },
-    {"decimal" , LogicalType::kDecimal },
-    {"float" , LogicalType::kFloat },
-    {"float32" , LogicalType::kFloat },
-    {"double" , LogicalType::kDouble },
-    {"float64" , LogicalType::kDouble },
+    {"tinyint", LogicalType::kTinyInt},
+    {"int8", LogicalType::kTinyInt},
+    {"smallint", LogicalType::kSmallInt},
+    {"int16", LogicalType::kSmallInt},
+    {"integer", LogicalType::kInteger},
+    {"int", LogicalType::kInteger},
+    {"int32", LogicalType::kInteger},
+    {"bigint", LogicalType::kBigInt},
+    {"int64", LogicalType::kBigInt},
+    {"hugeint", LogicalType::kHugeInt},
+    {"decimal", LogicalType::kDecimal},
+    {"float", LogicalType::kFloat},
+    {"float32", LogicalType::kFloat},
+    {"double", LogicalType::kDouble},
+    {"float64", LogicalType::kDouble},
 
     // std::string
-    {"varchar" , LogicalType::kVarchar }, 
+    {"varchar", LogicalType::kVarchar},
 
     // Date and Time
-    {"date" , LogicalType::kDate }, 
-    {"time" , LogicalType::kTime },
-    { "datetime" , LogicalType::kDateTime },
-    { "timestamp" , LogicalType::kTimestamp },
-    { "interval" , LogicalType::kInterval },
+    {"date", LogicalType::kDate},
+    {"time", LogicalType::kTime},
+    {"datetime", LogicalType::kDateTime},
+    {"timestamp", LogicalType::kTimestamp},
+    {"interval", LogicalType::kInterval},
 
     // Nested types
-    {"array" , LogicalType::kArray }, 
-    {"tuple" , LogicalType::kTuple },
+    {"array", LogicalType::kArray},
+    {"tuple", LogicalType::kTuple},
 
     // Geography
-    { "point" , LogicalType::kPoint }, 
-    {"line" , LogicalType::kLine },
-    { "linesegment" , LogicalType::kLineSeg },
-    {"box" , LogicalType::kBox },
+    {"point", LogicalType::kPoint},
+    {"line", LogicalType::kLine},
+    {"linesegment", LogicalType::kLineSeg},
+    {"box", LogicalType::kBox},
 
     //    "Path",
     //    "Polygon",
-    {"circle" , LogicalType::kCircle },
+    {"circle", LogicalType::kCircle},
 
     // Other
     //    "Bitmap",
-    { "uuid" , LogicalType::kUuid },
+    {"uuid", LogicalType::kUuid},
 
     //    "Blob",
-    { "embedding" , LogicalType::kEmbedding },
-    {"rowid" , LogicalType::kRowID },
+    {"embedding", LogicalType::kEmbedding},
+    {"rowid", LogicalType::kRowID},
 
     // Heterogeneous/Mix type
-    { "heterogeneous" , LogicalType::kMixed }, 
-    { "null" , LogicalType::kNull },
-    { "missing" , LogicalType::kMissing },
+    {"heterogeneous", LogicalType::kMixed},
+    {"null", LogicalType::kNull},
+    {"missing", LogicalType::kMissing},
 
     // tensor
-    { "tensor" , LogicalType::kTensor },
-    { "tensorarray" , LogicalType::kTensorArray },
+    {"tensor", LogicalType::kTensor},
+    {"tensorarray", LogicalType::kTensorArray},
 
     // sparse
-    { "sparse" , LogicalType::kSparse},
-    { "emptyarray", LogicalType::kEmptyArray},
+    {"sparse", LogicalType::kSparse},
+    {"emptyarray", LogicalType::kEmptyArray},
 
     // FP16
     {"float16", LogicalType::kFloat16},
@@ -167,7 +167,7 @@ std::unordered_map<std::string, LogicalType> name2type = {
     // multi-vector
     {"multivector", LogicalType::kMultiVector},
 
-    { "invalid" , LogicalType::kInvalid },
+    {"invalid", LogicalType::kInvalid},
 };
 
 static int64_t type_size[] = {
@@ -207,14 +207,14 @@ static int64_t type_size[] = {
     24, // Line
     32, // LineSegment
     32, // Box
-//    16, // Path
-//    48, // Polygon
+        //    16, // Path
+        //    48, // Polygon
     24, // Circle
 
     // Other
-//    16, // Bitmap
+    //    16, // Bitmap
     16, // UUID
-//    16, // Blob
+        //    16, // Blob
     8,  // Embedding
     8,  // RowID
 
@@ -248,7 +248,7 @@ const char *LogicalType2Str(LogicalType logical_type) { return type2name[to_unde
 
 LogicalType Str2LogicalType(const std::string &str) {
     auto iter = name2type.find(str);
-    if(iter != name2type.end()){
+    if (iter != name2type.end()) {
         return iter->second;
     } else {
         return LogicalType::kInvalid;

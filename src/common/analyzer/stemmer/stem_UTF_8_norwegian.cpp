@@ -200,16 +200,16 @@ static int r_main_suffix(struct SN_env *z) {
             if (out_grouping_b_U(z, g_v, 97, 248, 0))
                 return 0;
         }
-            lab0: {
-                int ret = slice_del(z); /* delete, line 46 */
-                if (ret < 0)
-                    return ret;
-            } break;
-            case 3: {
-                int ret = slice_from_s(z, 2, s_1); /* <-, line 48 */
-                if (ret < 0)
-                    return ret;
-            } break;
+        lab0: {
+            int ret = slice_del(z); /* delete, line 46 */
+            if (ret < 0)
+                return ret;
+        } break;
+        case 3: {
+            int ret = slice_from_s(z, 2, s_1); /* <-, line 48 */
+            if (ret < 0)
+                return ret;
+        } break;
     }
     return 1;
 }
@@ -235,7 +235,7 @@ static int r_consonant_pair(struct SN_env *z) {
             if (!(find_among_b(z, a_1, 2))) {
                 z->lb = mlimit;
                 return 0;
-            }              /* substring, line 54 */
+            } /* substring, line 54 */
             z->bra = z->c; /* ], line 54 */
             z->lb = mlimit;
         }

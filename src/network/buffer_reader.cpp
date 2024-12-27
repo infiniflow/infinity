@@ -175,7 +175,7 @@ void BufferReader::receive_more(SizeT bytes) {
         RecoverableError(Status::ClientClose());
     }
 
-    if(bytes_read == 0) {
+    if (bytes_read == 0) {
         LOG_TRACE("Client is disconnected.");
         RecoverableError(Status::ClientClose());
     }

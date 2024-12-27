@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <sstream>
+#include <vector>
 
 module logical_join;
 

@@ -54,8 +54,9 @@ export inline BoundCastFunc BindDateCast(DataType &target) {
 
 struct DateTryCastToFixlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType , TargetType &) {
-        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+    static inline bool Run(SourceType, TargetType &) {
+        String error_message =
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
     }
@@ -63,29 +64,30 @@ struct DateTryCastToFixlen {
 
 struct DateTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType , TargetType &, ColumnVector*) {
-        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+    static inline bool Run(SourceType, TargetType &, ColumnVector *) {
+        String error_message =
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
     }
 };
 
 template <>
-inline bool DateTryCastToFixlen::Run(DateT , DateTimeT &) {
+inline bool DateTryCastToFixlen::Run(DateT, DateTimeT &) {
     String error_message = "Not implemented";
     UnrecoverableError(error_message);
     return false;
 }
 
 template <>
-inline bool DateTryCastToFixlen::Run(DateT , TimestampT &) {
+inline bool DateTryCastToFixlen::Run(DateT, TimestampT &) {
     String error_message = "Not implemented";
     UnrecoverableError(error_message);
     return false;
 }
 
 template <>
-inline bool DateTryCastToVarlen::Run(DateT , VarcharT &, ColumnVector*) {
+inline bool DateTryCastToVarlen::Run(DateT, VarcharT &, ColumnVector *) {
     String error_message = "Not implemented";
     UnrecoverableError(error_message);
     return false;

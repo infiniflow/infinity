@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "embedding_type.h"
-#include <cstring>
 #include <arrow/type.h>
+#include <cstring>
 
 namespace infinity {
 

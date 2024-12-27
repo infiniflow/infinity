@@ -24,7 +24,6 @@ import logger;
 import stl;
 import infinity_context;
 
-
 import function_set;
 import aggregate_function_set;
 import aggregate_function;
@@ -43,12 +42,9 @@ import data_type;
 
 using namespace infinity;
 class BigIntCastTest : public BaseTest {
-    void SetUp() override {
-    }
+    void SetUp() override {}
 
-    void TearDown() override {
-        BaseTest::TearDown();
-    }
+    void TearDown() override { BaseTest::TearDown(); }
 };
 
 TEST_F(BigIntCastTest, bigint_cast0) {
@@ -198,51 +194,51 @@ TEST_F(BigIntCastTest, bigint_cast0) {
         source = std::numeric_limits<BigIntT>::min();
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
 
-//        src_str = std::to_string(source);
-//        EXPECT_EQ(src_str.size(), 20);
-//        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+        //        src_str = std::to_string(source);
+        //        EXPECT_EQ(src_str.size(), 20);
+        //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = std::numeric_limits<BigIntT>::max();
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
-//        src_str = std::to_string(source);
-//        EXPECT_EQ(src_str.size(), 19);
-//        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+        //        src_str = std::to_string(source);
+        //        EXPECT_EQ(src_str.size(), 19);
+        //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 0;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
-//        src_str = std::to_string(source);
-//        EXPECT_EQ(src_str.size(), 1);
-//        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+        //        src_str = std::to_string(source);
+        //        EXPECT_EQ(src_str.size(), 1);
+        //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 9;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
-//        src_str = std::to_string(source);
-//        EXPECT_EQ(src_str.size(), 1);
-//        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+        //        src_str = std::to_string(source);
+        //        EXPECT_EQ(src_str.size(), 1);
+        //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 10;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
-//        src_str = std::to_string(source);
-//        EXPECT_EQ(src_str.size(), 2);
-//        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+        //        src_str = std::to_string(source);
+        //        EXPECT_EQ(src_str.size(), 2);
+        //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 99;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
-//        src_str = std::to_string(source);
-//        EXPECT_EQ(src_str.size(), 2);
-//        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+        //        src_str = std::to_string(source);
+        //        EXPECT_EQ(src_str.size(), 2);
+        //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = -100;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
-//        src_str = std::to_string(source);
-//        EXPECT_EQ(src_str.size(), 4);
-//        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+        //        src_str = std::to_string(source);
+        //        EXPECT_EQ(src_str.size(), 4);
+        //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
 
         source = 100;
         EXPECT_TRUE(IntegerTryCastToVarlen::Run(source, target, col_varchar_ptr.get()));
-//        src_str = std::to_string(source);
-//        EXPECT_EQ(src_str.size(), 3);
-//        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
+        //        src_str = std::to_string(source);
+        //        EXPECT_EQ(src_str.size(), 3);
+        //        EXPECT_STREQ(src_str.c_str(), target.ToString().c_str());
     }
 }
 

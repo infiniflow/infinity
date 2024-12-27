@@ -14,11 +14,11 @@
 
 module;
 
-#include <fcntl.h>
-#include <unistd.h>
 #include <cerrno>
 #include <cstring>
+#include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 module local_file_handle;
 
@@ -32,17 +32,17 @@ namespace infinity {
 
 LocalFileHandle::~LocalFileHandle() {
     Status status = Sync();
-    if(!status.ok()) {
-        return ;
+    if (!status.ok()) {
+        return;
     }
 
-    if(fd_ == -1) {
+    if (fd_ == -1) {
         String error_message = fmt::format("File was closed before or not open");
         UnrecoverableError(error_message);
     }
 
     i32 ret = close(fd_);
-    if(ret == -1) {
+    if (ret == -1) {
         String error_message = fmt::format("Close file: {}, error: {}", path_, strerror(errno));
         UnrecoverableError(error_message);
     }
@@ -58,17 +58,17 @@ LocalFileHandle::~LocalFileHandle() {
 
 Status LocalFileHandle::Close() {
     Status status = Sync();
-    if(!status.ok()) {
+    if (!status.ok()) {
         return status;
     }
 
-    if(fd_ == -1) {
+    if (fd_ == -1) {
         String error_message = fmt::format("File was closed before");
         UnrecoverableError(error_message);
     }
 
     i32 ret = close(fd_);
-    if(ret == -1) {
+    if (ret == -1) {
         String error_message = fmt::format("Close file: {}, error: {}", path_, strerror(errno));
         UnrecoverableError(error_message);
     }
@@ -80,13 +80,13 @@ Status LocalFileHandle::Close() {
 }
 
 Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
-    if(access_mode_ != FileAccessMode::kWrite) {
+    if (access_mode_ != FileAccessMode::kWrite) {
         String error_message = fmt::format("File: {} isn't open.", path_);
         UnrecoverableError(error_message);
     }
     i64 written = 0;
     while (written < (i64)nbytes) {
-        i64 write_count = write(fd_, (char*)buffer + written, nbytes - written);
+        i64 write_count = write(fd_, (char *)buffer + written, nbytes - written);
         if (write_count == -1) {
             String error_message = fmt::format("Can't write file: {}: {}. fd: {}", path_, strerror(errno), fd_);
             UnrecoverableError(error_message);
@@ -96,9 +96,7 @@ Status LocalFileHandle::Append(const void *buffer, u64 nbytes) {
     return Status::OK();
 }
 
-Status LocalFileHandle::Append(const String &buffer, u64 nbytes) {
-    return Append(buffer.data(), nbytes);
-}
+Status LocalFileHandle::Append(const String &buffer, u64 nbytes) { return Append(buffer.data(), nbytes); }
 
 Tuple<SizeT, Status> LocalFileHandle::Read(void *buffer, u64 nbytes) {
     i64 read_n = 0;
@@ -143,7 +141,7 @@ Status LocalFileHandle::Seek(u64 nbytes) {
 }
 
 i64 LocalFileHandle::FileSize() {
-    struct stat s {};
+    struct stat s{};
     if (fstat(fd_, &s) == -1) {
         return -1;
     }
@@ -155,7 +153,7 @@ Tuple<char *, SizeT, Status> LocalFileHandle::MmapRead(const String &name) { ret
 Status LocalFileHandle::Unmmap(const String &name) { return Status::OK(); }
 
 Status LocalFileHandle::Sync() {
-    if(access_mode_ != FileAccessMode::kWrite) {
+    if (access_mode_ != FileAccessMode::kWrite) {
         return Status::OK();
     }
 

@@ -97,7 +97,6 @@ public:
     const String *column_name_ptr_ = nullptr;
 
 private:
-
     u32 doc_freq_ = 0;
     u64 total_df_ = 0;
 

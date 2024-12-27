@@ -52,10 +52,10 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
         return true;
     }
 
-    OperatorState* prev_op_state = operator_state->prev_op_state_;
+    OperatorState *prev_op_state = operator_state->prev_op_state_;
 
     SizeT data_block_count = prev_op_state->data_block_array_.size();
-    for(SizeT block_idx = 0; block_idx < data_block_count; ++ block_idx) {
+    for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
         DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
         auto txn = query_context->GetTxn();
         Vector<RowID> row_ids;
@@ -70,8 +70,8 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
         if (!row_ids.empty()) {
             LOG_TRACE(fmt::format("Found to delete: row_count {}", row_ids.size()));
             txn->Delete(table_entry_ptr_, row_ids); // TODO: segment id in `row_ids` is fixed.
-            DeleteOperatorState* delete_operator_state = static_cast<DeleteOperatorState*>(operator_state);
-            ++ delete_operator_state->count_;
+            DeleteOperatorState *delete_operator_state = static_cast<DeleteOperatorState *>(operator_state);
+            ++delete_operator_state->count_;
             delete_operator_state->sum_ += row_ids.size();
         } else {
             LOG_TRACE("DELETE: No row_id, skip");

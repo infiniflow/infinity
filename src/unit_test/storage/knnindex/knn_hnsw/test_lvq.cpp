@@ -174,7 +174,7 @@ TEST_F(HnswLVQTest, test1) {
 
         {
             auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kWrite);
-            if(!status.ok()) {
+            if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
 
@@ -190,7 +190,7 @@ TEST_F(HnswLVQTest, test1) {
         }
         {
             auto [file_handle, status] = VirtualStore::Open(file_path, FileAccessMode::kRead);
-            if(!status.ok()) {
+            if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
             auto lvq_store = DataStore::Load(*file_handle);

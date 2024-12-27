@@ -45,7 +45,7 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> data_dir,
                                SharedPtr<String> file_name,
                                SharedPtr<IndexBase> index_base,
                                SharedPtr<ColumnDef> column_def,
-                               PersistenceManager* persistence_manager,
+                               PersistenceManager *persistence_manager,
                                SizeT index_size)
     : IndexFileWorker(std::move(data_dir),
                       std::move(temp_dir),

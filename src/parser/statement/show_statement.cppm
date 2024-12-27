@@ -23,4 +23,4 @@ namespace infinity {
 export using infinity::ShowStatement;
 export using infinity::ShowStmtType;
 
-}
+} // namespace infinity

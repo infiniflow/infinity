@@ -27,9 +27,8 @@ import third_party;
 
 namespace infinity {
 
-
 bool PeriodicTrigger::Check() {
-    if(interval_ == 0) {
+    if (interval_ == 0) {
         return false;
     }
     const auto now = std::chrono::system_clock::now();

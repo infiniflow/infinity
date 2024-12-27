@@ -107,8 +107,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
                 if (const BlockID new_block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY; new_block_id != block_id) {
                     block_id = new_block_id;
-                    column_vector =
-                        MakeUnique<ColumnVector>(block_entries[block_id]->GetConstColumnVector(buffer_mgr, column_id));
+                    column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetConstColumnVector(buffer_mgr, column_id));
                     tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
                 }
             }
@@ -199,8 +198,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
                 if (const BlockID new_block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY; new_block_id != block_id) {
                     block_id = new_block_id;
-                    column_vector =
-                        MakeUnique<ColumnVector>(block_entries[block_id]->GetConstColumnVector(buffer_mgr, column_id));
+                    column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetConstColumnVector(buffer_mgr, column_id));
                 }
             }
             auto [raw_data, embedding_num] = column_vector->GetTensorRaw(block_offset);

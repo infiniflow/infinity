@@ -41,19 +41,18 @@ inline void Md5Function::Run(VarcharT &left, VarcharT &result, ColumnVector *lef
     result_ptr->AppendVarcharInner(digest_span, result);
 }
 
-
-void RegisterMd5Function(const UniquePtr<Catalog> &catalog_ptr){
+void RegisterMd5Function(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "md5";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction md5_function(func_name,
-                                     {DataType(LogicalType::kVarchar)},
-                                     {DataType(LogicalType::kVarchar)},
-                                     &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, Md5Function>);
+                                {DataType(LogicalType::kVarchar)},
+                                {DataType(LogicalType::kVarchar)},
+                                &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, Md5Function>);
     function_set_ptr->AddFunction(md5_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

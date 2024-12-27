@@ -31,7 +31,7 @@ FunctionExpr::~FunctionExpr() {
 std::string FunctionExpr::ToString() const {
     std::stringstream ss;
 
-    if(arguments_ == nullptr) {
+    if (arguments_ == nullptr) {
         // No argument function
         ss << func_name_ << "()";
         return ss.str();

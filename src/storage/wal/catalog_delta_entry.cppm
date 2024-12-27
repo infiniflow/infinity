@@ -91,7 +91,7 @@ export class CatalogDeltaOperation {
 public:
     explicit CatalogDeltaOperation(CatalogDeltaOpType type) : type_(type) {}
     CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts);
-    virtual ~CatalogDeltaOperation(){};
+    virtual ~CatalogDeltaOperation() {};
     CatalogDeltaOpType GetType() const { return type_; }
     virtual String GetTypeStr() const = 0;
     [[nodiscard]] virtual SizeT GetSizeInBytes() const = 0;
@@ -180,7 +180,7 @@ export class AddSegmentEntryOp : public CatalogDeltaOperation {
 public:
     static UniquePtr<AddSegmentEntryOp> ReadAdv(const char *&ptr);
 
-    AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY){};
+    AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {};
 
     AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts, String segment_filter_binary_data = "");
 
@@ -209,7 +209,7 @@ export class AddBlockEntryOp : public CatalogDeltaOperation {
 public:
     static UniquePtr<AddBlockEntryOp> ReadAdv(const char *&ptr);
 
-    AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY){};
+    AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY) {};
 
     AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts, String block_filter_binary_data = "");
 
@@ -243,7 +243,7 @@ export class AddColumnEntryOp : public CatalogDeltaOperation {
 public:
     static UniquePtr<AddColumnEntryOp> ReadAdv(const char *&ptr);
 
-    AddColumnEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY){};
+    AddColumnEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY) {};
 
     AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts);
 

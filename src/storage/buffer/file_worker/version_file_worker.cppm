@@ -37,7 +37,7 @@ public:
                                SharedPtr<String> file_dir,
                                SharedPtr<String> file_name,
                                SizeT capacity,
-                               PersistenceManager* persistence_manager);
+                               PersistenceManager *persistence_manager);
 
     virtual ~VersionFileWorker() override;
 

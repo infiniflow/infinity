@@ -87,14 +87,14 @@ TEST_P(DataBlockTest, test1) {
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kLine));
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kLineSeg));
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kBox));
-//    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPath));
-//    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPolygon));
+    //    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPath));
+    //    column_types.emplace_back(MakeShared<DataType>(LogicalType::kPolygon));
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kCircle));
 
     // Other * 4
-//    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBitmap));
+    //    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBitmap));
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kUuid));
-//    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBlob));
+    //    column_types.emplace_back(MakeShared<DataType>(LogicalType::kBlob));
 
     // 32 dimension * float vector
     column_types.emplace_back(MakeShared<DataType>(LogicalType::kEmbedding, EmbeddingInfo::Make(EmbeddingDataType::kElemFloat, 32)));

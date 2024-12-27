@@ -91,9 +91,7 @@ void UnrecoverableError(const String &message) {
     throw UnrecoverableException(message);
 }
 
-std::string_view GetErrorMsg(const String &message) {
-    return message;
-}
+std::string_view GetErrorMsg(const String &message) { return message; }
 
 #endif
 

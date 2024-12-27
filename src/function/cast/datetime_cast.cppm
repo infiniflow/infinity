@@ -58,7 +58,8 @@ export inline BoundCastFunc BindDateTimeCast(DataType &target) {
 struct DateTimeTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        String error_message =
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
 
         return false;
@@ -67,8 +68,9 @@ struct DateTimeTryCastToFixlen {
 
 struct DateTimeTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType, TargetType &, ColumnVector*) {
-        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+    static inline bool Run(SourceType, TargetType &, ColumnVector *) {
+        String error_message =
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
     }
@@ -96,7 +98,7 @@ inline bool DateTimeTryCastToFixlen::Run(DateTimeT, TimestampT &) {
 }
 
 template <>
-inline bool DateTimeTryCastToVarlen::Run(DateTimeT, VarcharT &, ColumnVector*) {
+inline bool DateTimeTryCastToVarlen::Run(DateTimeT, VarcharT &, ColumnVector *) {
     String error_message = "Not implemented";
     UnrecoverableError(error_message);
     return false;

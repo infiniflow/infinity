@@ -32,8 +32,7 @@ namespace infinity {
 export class LogicalDelete final : public LogicalNode {
 
 public:
-    LogicalDelete(u64 node_id, TableEntry *table_entry_ptr)
-        : LogicalNode(node_id, LogicalNodeType::kDelete), table_entry_ptr_(table_entry_ptr) {}
+    LogicalDelete(u64 node_id, TableEntry *table_entry_ptr) : LogicalNode(node_id, LogicalNodeType::kDelete), table_entry_ptr_(table_entry_ptr) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

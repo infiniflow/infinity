@@ -125,8 +125,8 @@ void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
         }
         VariantEmplaceFuncs[var_id](&filter);
         std::visit(Overload{[](const std::monostate &empty) -> void {
-                                 String error_message = "MinMaxDataFilter::DeserializeFromStringStream(): invalid zero var_id";
-                                 UnrecoverableError(error_message);
+                                String error_message = "MinMaxDataFilter::DeserializeFromStringStream(): invalid zero var_id";
+                                UnrecoverableError(error_message);
                             },
                             [&is]<typename T>(InnerMinMaxDataFilterT<T> &filter) -> void { filter.LoadFromIStringStream(is); }},
                    filter);

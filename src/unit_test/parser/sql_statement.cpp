@@ -200,7 +200,7 @@ TEST_F(StatementParsingTest, good_test1) {
         EXPECT_EQ(create_index_info->schema_name_, "");
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
-        IndexInfo * index_info1 = create_index_info->index_info_;
+        IndexInfo *index_info1 = create_index_info->index_info_;
         EXPECT_EQ(index_info1->index_type_, IndexType::kIVF);
         EXPECT_EQ(index_info1->column_name_, "c1");
         EXPECT_EQ(index_info1->index_param_list_->size(), 1u);

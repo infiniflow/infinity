@@ -314,7 +314,7 @@ public:
     static Status ErrorInit(const String &detailed_info);
     static Status FileIsOpen(const String &filename);
     static Status Unknown(const String &name);
-    static Status InvalidQueryOption(const String& detail);
+    static Status InvalidQueryOption(const String &detail);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");

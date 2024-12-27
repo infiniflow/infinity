@@ -21,12 +21,12 @@
 #include "type/info/sparse_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
+#include <arrow/type.h>
 #include <charconv>
 #include <ctype.h>
 #include <iostream>
 #include <stdio.h>
-#include <stdlib.h> 
-#include <arrow/type.h>
+#include <stdlib.h>
 
 namespace infinity {
 
@@ -56,7 +56,7 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         case LogicalType::kLineSeg:
         case LogicalType::kBox:
         case LogicalType::kCircle:
-//        case kBitmap:
+            //        case kBitmap:
         case LogicalType::kUuid:
         case LogicalType::kEmbedding:
         case LogicalType::kRowID: {
@@ -71,9 +71,9 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         case LogicalType::kMultiVector:
         case LogicalType::kArray:
         case LogicalType::kTuple: {
-//        case kPath:
-//        case kPolygon:
-//        case kBlob:
+            //        case kPath:
+            //        case kPolygon:
+            //        case kBlob:
             plain_type_ = false;
             break;
         }
@@ -273,9 +273,9 @@ int32_t DataType::GetSizeInBytes() const {
             case LogicalType::kArray:
                 ParserError("Array isn't implemented here.");
                 break;
-//            case LogicalType::kBitmap:
-//                size += sizeof(int64_t);
-//                break;
+                //            case LogicalType::kBitmap:
+                //                size += sizeof(int64_t);
+                //                break;
             case LogicalType::kDecimal:
                 size += sizeof(int64_t) * 2;
                 break;
@@ -305,16 +305,16 @@ void DataType::WriteAdv(char *&ptr) const {
         case LogicalType::kArray:
             ParserError("Array isn't implemented here.");
             break;
-//        case LogicalType::kBitmap: {
-//            int64_t limit = MAX_BITMAP_SIZE_INTERNAL;
-//            if (this->type_info_ != nullptr) {
-//                const BitmapInfo *bitmap_info = dynamic_cast<BitmapInfo *>(this->type_info_.get());
-//                if (bitmap_info != nullptr)
-//                    limit = bitmap_info->length_limit();
-//            }
-//            WriteBufAdv<int64_t>(ptr, limit);
-//            break;
-//        }
+            //        case LogicalType::kBitmap: {
+            //            int64_t limit = MAX_BITMAP_SIZE_INTERNAL;
+            //            if (this->type_info_ != nullptr) {
+            //                const BitmapInfo *bitmap_info = dynamic_cast<BitmapInfo *>(this->type_info_.get());
+            //                if (bitmap_info != nullptr)
+            //                    limit = bitmap_info->length_limit();
+            //            }
+            //            WriteBufAdv<int64_t>(ptr, limit);
+            //            break;
+            //        }
         case LogicalType::kDecimal: {
             int64_t precision = 0;
             int64_t scale = 0;
@@ -362,11 +362,11 @@ std::shared_ptr<DataType> DataType::ReadAdv(const char *&ptr, int32_t maxbytes) 
         case LogicalType::kArray:
             ParserError("Array isn't implemented here.");
             break;
-//        case LogicalType::kBitmap: {
-//            int64_t limit = ReadBufAdv<int64_t>(ptr);
-//            type_info = BitmapInfo::Make(limit);
-//            break;
-//        }
+            //        case LogicalType::kBitmap: {
+            //            int64_t limit = ReadBufAdv<int64_t>(ptr);
+            //            type_info = BitmapInfo::Make(limit);
+            //            break;
+            //        }
         case LogicalType::kDecimal: {
             int64_t precision = ReadBufAdv<int64_t>(ptr);
             int64_t scale = ReadBufAdv<int64_t>(ptr);
@@ -584,35 +584,35 @@ std::string DataType::TypeToString<BoxT>() {
     return "Box";
 }
 
-//template <>
-//std::string DataType::TypeToString<PathT>() {
-//    return "Path";
-//}
+// template <>
+// std::string DataType::TypeToString<PathT>() {
+//     return "Path";
+// }
 //
-//template <>
-//std::string DataType::TypeToString<PolygonT>() {
-//    return "Polygon";
-//}
+// template <>
+// std::string DataType::TypeToString<PolygonT>() {
+//     return "Polygon";
+// }
 
 template <>
 std::string DataType::TypeToString<CircleT>() {
     return "Circle";
 }
 
-//template <>
-//std::string DataType::TypeToString<BitmapT>() {
-//    return "Bitmap";
-//}
+// template <>
+// std::string DataType::TypeToString<BitmapT>() {
+//     return "Bitmap";
+// }
 
 template <>
 std::string DataType::TypeToString<UuidT>() {
     return "UUID";
 }
 
-//template <>
-//std::string DataType::TypeToString<BlobT>() {
-//    return "Blob";
-//}
+// template <>
+// std::string DataType::TypeToString<BlobT>() {
+//     return "Blob";
+// }
 
 template <>
 std::string DataType::TypeToString<EmbeddingT>() {
@@ -665,7 +665,7 @@ uint8_t DataType::StringToValue<uint8_t>(const std::string_view &str) {
     }
     uint8_t value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    if(res.ptr != str.data() + str.size()) {
+    if (res.ptr != str.data() + str.size()) {
         std::string error_message = fmt::format("Error: parse u8 integer: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
@@ -680,7 +680,7 @@ TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str) {
     }
     TinyIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    if(res.ptr != str.data() + str.size()) {
+    if (res.ptr != str.data() + str.size()) {
         std::string error_message = fmt::format("Error: parse tiny integer: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
@@ -695,7 +695,7 @@ SmallIntT DataType::StringToValue<SmallIntT>(const std::string_view &str) {
     }
     SmallIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    if(res.ptr != str.data() + str.size()) {
+    if (res.ptr != str.data() + str.size()) {
         std::string error_message = fmt::format("Error: parse small integer: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
@@ -710,7 +710,7 @@ IntegerT DataType::StringToValue<IntegerT>(const std::string_view &str) {
     }
     IntegerT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    if(res.ptr != str.data() + str.size()) {
+    if (res.ptr != str.data() + str.size()) {
         std::string error_message = fmt::format("Error: parse integer: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
@@ -725,7 +725,7 @@ BigIntT DataType::StringToValue<BigIntT>(const std::string_view &str) {
     }
     BigIntT value{};
     auto res = std::from_chars(str.begin(), str.end(), value);
-    if(res.ptr != str.data() + str.size()) {
+    if (res.ptr != str.data() + str.size()) {
         std::string error_message = fmt::format("Error: parse big integer: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);

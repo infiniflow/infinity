@@ -1113,9 +1113,13 @@ TEST_F(SelectStatementParsingTest, good_test3) {
 
         {
             SelectStatement *select = (SelectStatement *)((*result->statements_ptr_)[1]);
-            { EXPECT_EQ(select->limit_expr_->type_, ParsedExprType::kSubquery); }
+            {
+                EXPECT_EQ(select->limit_expr_->type_, ParsedExprType::kSubquery);
+            }
 
-            { EXPECT_EQ(select->offset_expr_->type_, ParsedExprType::kSubquery); }
+            {
+                EXPECT_EQ(select->offset_expr_->type_, ParsedExprType::kSubquery);
+            }
         }
 
         result->Reset();
@@ -1329,7 +1333,7 @@ TEST_F(SelectStatementParsingTest, bad_knn_test) {
         // bit only support hamming
         String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0,0,1,0,1,0,1,1,0,0], 'bit', 'cosine', 3) WHERE a > 0;";
         parser->Parse(input_sql, result.get());
-//        std::cout << result->error_message_ << std::endl;
+        //        std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
     }
@@ -1361,7 +1365,7 @@ TEST_F(SelectStatementParsingTest, bad_search_test) {
         // bit only support hamming
         String input_sql = "SELECT b FROM t1 SEARCH MATCH VECTOR (c1, [1,0,1,0,1,1,0], 'bit', 'l2', 3) WHERE a > 0 LIMIT 5;";
         parser->Parse(input_sql, result.get());
-//        std::cout << result->error_message_ << std::endl;
+        //        std::cout << result->error_message_ << std::endl;
         EXPECT_FALSE(result->error_message_.empty());
         EXPECT_TRUE(result->statements_ptr_ == nullptr);
     }

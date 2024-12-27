@@ -198,8 +198,8 @@ export struct Bound {
     } ty_ = kUnbounded;
     Vector<u8> key_;
 
-    Bound() : ty_(kUnbounded){};
-    Bound(BoundType ty) : ty_(ty){};
+    Bound() : ty_(kUnbounded) {};
+    Bound(BoundType ty) : ty_(ty) {};
     Bound(BoundType ty, u8 *key_ptr, SizeT key_len) : ty_(ty), key_(key_ptr, key_ptr + key_len) {}
 
     bool ExceededBy(u8 *inp_ptr, SizeT inp_len) {

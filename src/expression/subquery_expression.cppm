@@ -45,7 +45,6 @@ public:
     Vector<SharedPtr<ColumnExpression>> correlated_columns{};
 
 private:
-
 };
 
 } // namespace infinity

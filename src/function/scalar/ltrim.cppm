@@ -10,4 +10,4 @@ class Catalog;
 
 export void RegisterLtrimFunction(const UniquePtr<Catalog> &catalog_ptr);
 
-}
+} // namespace infinity

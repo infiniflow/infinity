@@ -24,12 +24,7 @@ import infinity_exception;
 export module diskann_dist_func;
 
 namespace infinity {
-export enum class DiskAnnMetricType{
-    L2,
-    Cosine,
-    IP,
-    Invalid
-};
+export enum class DiskAnnMetricType { L2, Cosine, IP, Invalid };
 
 export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
 DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
@@ -77,50 +72,42 @@ DiffType IPDistance(const ElemType1 *vector1, const ElemType2 *vector2, const Di
 
 // Compute the L2 squared norm of vector
 export template <typename ElemType = f32, typename DimType = u32>
-void ComputL2sq(ElemType *vecs_l2sq, ElemType *data, const DimType dim){
+void ComputL2sq(ElemType *vecs_l2sq, ElemType *data, const DimType dim) {
     matrixA_multiply_transpose_matrixB_output_to_C(data, data, 1, 1, dim, vecs_l2sq);
     *vecs_l2sq = sqrt(*vecs_l2sq);
 }
 
-export void ComputeClosestCenters(f32 *data, SizeT num_points, SizeT dim,
-                             f32 *pivot_data, SizeT num_centers,
-                             u32 *closest_centers_ivf,
-                             Vector<SizeT> *inverted_index = nullptr){
-    search_top_1_without_dis<f32, f32, f32, u32>(dim,
-                            num_points,
-                            data,
-                            num_centers,
-                            pivot_data,
-                            closest_centers_ivf);
+export void ComputeClosestCenters(f32 *data,
+                                  SizeT num_points,
+                                  SizeT dim,
+                                  f32 *pivot_data,
+                                  SizeT num_centers,
+                                  u32 *closest_centers_ivf,
+                                  Vector<SizeT> *inverted_index = nullptr) {
+    search_top_1_without_dis<f32, f32, f32, u32>(dim, num_points, data, num_centers, pivot_data, closest_centers_ivf);
 
-    if (inverted_index != nullptr){
+    if (inverted_index != nullptr) {
         for (SizeT i = 0; i < num_points; ++i) {
             inverted_index[closest_centers_ivf[i]].push_back(i);
         }
     }
 }
 
-export inline u64 RoundUp(u64 X, u64 Y){
-    return ((X + Y - 1) / Y) * Y;
-}
+export inline u64 RoundUp(u64 X, u64 Y) { return ((X + Y - 1) / Y) * Y; }
 
-export inline u64 DivRoundUp(u64 X, u64 Y){
-    return (X / Y) + (X % Y != 0);
-}
-
+export inline u64 DivRoundUp(u64 X, u64 Y) { return (X / Y) + (X % Y != 0); }
 
 export template <typename DataType>
-class DiskAnnDistance{
+class DiskAnnDistance {
     using This = DiskAnnDistance<DataType>;
+
 public:
     DiskAnnDistance() : distance_metric_(DiskAnnMetricType::Invalid) {};
-    DiskAnnDistance(DiskAnnMetricType metric): distance_metric_(metric){}
+    DiskAnnDistance(DiskAnnMetricType metric) : distance_metric_(metric) {}
 
-    ~DiskAnnDistance(){}
+    ~DiskAnnDistance() {}
 
-    static This Make(DiskAnnMetricType metric) {
-        return This(metric);
-    }
+    static This Make(DiskAnnMetricType metric) { return This(metric); }
 
     f32 Compare(DataType *x, DataType *y, SizeT dim) const {
         if (distance_metric_ == DiskAnnMetricType::Cosine) {
@@ -136,20 +123,16 @@ public:
         }
     }
 
-    DiskAnnMetricType GetMetric() const {
-        return distance_metric_;
-    }
+    DiskAnnMetricType GetMetric() const { return distance_metric_; }
 
-    bool PreprocessingRequired() const {
-        return false;
-    }
+    bool PreprocessingRequired() const { return false; }
 
-    void PreprocessBasePoints(DataType *original_data, const SizeT orig_dim, const SizeT num_points){
+    void PreprocessBasePoints(DataType *original_data, const SizeT orig_dim, const SizeT num_points) {
         // preprocessing not required now
         return;
     }
 
-    void PreprocessQuery(const DataType *query_vec, const SizeT query_dim, DataType *scratch_query){
+    void PreprocessQuery(const DataType *query_vec, const SizeT query_dim, DataType *scratch_query) {
         // preprocessing not required now, just copy the query to scratch_query
         memcpy(scratch_query, query_vec, query_dim * sizeof(DataType));
 
@@ -157,9 +140,7 @@ public:
         // normalizeAndCopy(query_vec, (uint32_t)query_dim, query_scratch);
     }
 
-    SizeT GetRequiredAlignment() const {
-        return alignment_factor_;
-    }
+    SizeT GetRequiredAlignment() const { return alignment_factor_; }
 
 protected:
     DiskAnnMetricType distance_metric_;

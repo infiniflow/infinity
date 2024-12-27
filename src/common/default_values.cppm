@@ -107,9 +107,9 @@ export {
     constexpr std::string_view DEFAULT_OPTIMIZE_INTERVAL_SEC_STR = "10s"; // 10 seconds
     constexpr SizeT MAX_OPTIMIZE_INTERVAL_SEC = 60 * 60 * 24 * 30;        // 1 month
 
-    constexpr SizeT MIN_MEMINDEX_CAPACITY = DEFAULT_BLOCK_CAPACITY;           // 1 Block
-    constexpr SizeT DEFAULT_MEMINDEX_CAPACITY = 8 * DEFAULT_BLOCK_CAPACITY;   // 8 * 8192 = 65536 rows
-    constexpr SizeT MAX_MEMINDEX_CAPACITY = DEFAULT_SEGMENT_CAPACITY;         // 1 Segment
+    constexpr SizeT MIN_MEMINDEX_CAPACITY = DEFAULT_BLOCK_CAPACITY;         // 1 Block
+    constexpr SizeT DEFAULT_MEMINDEX_CAPACITY = 8 * DEFAULT_BLOCK_CAPACITY; // 8 * 8192 = 65536 rows
+    constexpr SizeT MAX_MEMINDEX_CAPACITY = DEFAULT_SEGMENT_CAPACITY;       // 1 Segment
 
     constexpr i64 MIN_WAL_FILE_SIZE_THRESHOLD = 1024;                                    // 1KB
     constexpr i64 DEFAULT_WAL_FILE_SIZE_THRESHOLD = 1 * 1024l * 1024l * 1024l;           // 1GB
@@ -202,13 +202,13 @@ export {
 
     // default persistence parameter
     constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence"; // Empty means disabled
-    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "128MB"; // 128MB
-    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu;  // 128MB
+    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "128MB";   // 128MB
+    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu;    // 128MB
 
     constexpr std::string_view DEFAULT_STORAGE_TYPE = "local";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_BUCKET = "infinity";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_DIR = "/var/infinity/localdiskcache";
-    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "128GB"; // 128GB
+    constexpr std::string_view DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT_STR = "128GB";         // 128GB
     constexpr SizeT DEFAULT_OBJECT_STORAGE_DISK_CACHE_LIMIT = 128 * 1024lu * 1024lu * 1024lu; // 128GB
 
     // network
@@ -220,8 +220,8 @@ export {
     constexpr SizeT DEFAULT_PEER_RETRY_DELAY = 1000; // 1 second
     constexpr SizeT DEFAULT_PEER_RETRY_COUNT = 2;
     constexpr SizeT DEFAULT_PEER_CONNECT_TIMEOUT = 2000; // 2 seconds
-    constexpr SizeT DEFAULT_PEER_RECV_TIMEOUT = 0;    // not set
-    constexpr SizeT DEFAULT_PEER_SEND_TIMEOUT = 0;    // not set
+    constexpr SizeT DEFAULT_PEER_RECV_TIMEOUT = 0;       // not set
+    constexpr SizeT DEFAULT_PEER_SEND_TIMEOUT = 0;       // not set
 
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";

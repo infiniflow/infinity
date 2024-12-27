@@ -50,11 +50,8 @@ protected:
 export template <typename SkipListType>
 class SkipIndexDecoder : public IndexDecoder {
 public:
-    SkipIndexDecoder(ByteSliceReader *doc_list_reader,
-                     u32 doc_list_begin,
-                     const DocListFormatOption &doc_list_format_option)
-        : IndexDecoder(doc_list_format_option), skiplist_reader_(nullptr), doc_list_reader_(doc_list_reader),
-          doc_list_begin_pos_(doc_list_begin) {
+    SkipIndexDecoder(ByteSliceReader *doc_list_reader, u32 doc_list_begin, const DocListFormatOption &doc_list_format_option)
+        : IndexDecoder(doc_list_format_option), skiplist_reader_(nullptr), doc_list_reader_(doc_list_reader), doc_list_begin_pos_(doc_list_begin) {
         doc_id_encoder_ = GetDocIDEncoder();
         tf_list_encoder_ = GetTFEncoder();
         doc_payload_encoder_ = GetDocPayloadEncoder();
@@ -90,9 +87,7 @@ public:
 
     // u32: block max tf
     // u16: block max (ceil(tf / doc length) * numeric_limits<u16>::max())
-    Pair<u32, u16> GetBlockMaxInfo() const {
-        return skiplist_reader_->GetBlockMaxInfo();
-    }
+    Pair<u32, u16> GetBlockMaxInfo() const { return skiplist_reader_->GetBlockMaxInfo(); }
 
     bool DecodeCurrentDocIDBuffer(docid_t *doc_buffer) {
         doc_list_reader_->Seek(offset_ + doc_list_begin_pos_);

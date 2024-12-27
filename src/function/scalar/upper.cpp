@@ -36,19 +36,18 @@ inline void UpperFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *l
     result_ptr->AppendVarcharInner(upper_str, result);
 }
 
-
-void RegisterUpperFunction(const UniquePtr<Catalog> &catalog_ptr){
+void RegisterUpperFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "upper";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction upper_function(func_name,
-                                     {DataType(LogicalType::kVarchar)},
-                                     {DataType(LogicalType::kVarchar)},
-                                     &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, UpperFunction>);
+                                  {DataType(LogicalType::kVarchar)},
+                                  {DataType(LogicalType::kVarchar)},
+                                  &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, UpperFunction>);
     function_set_ptr->AddFunction(upper_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

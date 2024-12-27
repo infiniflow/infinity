@@ -18,7 +18,6 @@ module;
 
 export module global_resource_usage;
 
-
 namespace infinity {
 
 export using infinity::GlobalResourceUsage;

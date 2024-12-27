@@ -42,7 +42,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          DBEntryTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-TEST_P(DBEntryTest, decode_index_test){
+TEST_P(DBEntryTest, decode_index_test) {
     String db_name = "untitled_db";
     String encode_ed_name = DBEntry::EncodeIndex(db_name);
     EXPECT_TRUE(DBEntry::DecodeIndex(encode_ed_name)[0] == "untitled_db");
@@ -51,17 +51,18 @@ TEST_P(DBEntryTest, decode_index_test){
     EXPECT_THROW(DBEntry::DecodeIndex(db_name), UnrecoverableException);
 }
 
-TEST_P(DBEntryTest, to_string_test){
+TEST_P(DBEntryTest, to_string_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog(); 
+    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get database"));
 
     auto [db_entry, status] = catalog->GetDatabase("default_db", txn1->TxnID(), txn1->BeginTS());
     std::cout << *(db_entry->ToString()) << std::endl;
-    EXPECT_TRUE(std::regex_match(*(db_entry->ToString()), 
-                    std::regex("DBEntry,\\sdb_entry_dir:\\s/var/infinity/data/(.*)_db_default_db,\\stxn\\sid:\\s1,\\stable\\scount:\\s0")));
+    EXPECT_TRUE(
+        std::regex_match(*(db_entry->ToString()),
+                         std::regex("DBEntry,\\sdb_entry_dir:\\s/var/infinity/data/(.*)_db_default_db,\\stxn\\sid:\\s1,\\stable\\scount:\\s0")));
 
-    //create table, drop table
+    // create table, drop table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -69,18 +70,19 @@ TEST_P(DBEntryTest, to_string_test){
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
 
         auto [db_entry, status3] = catalog->GetDatabase("default_db", txn1->TxnID(), txn1->BeginTS());
         std::cout << *(db_entry->ToString()) << std::endl;
-        EXPECT_TRUE(std::regex_match(*(db_entry->ToString()), 
-                        std::regex("DBEntry,\\sdb_entry_dir:\\s/var/infinity/data/(.*)_db_default_db,\\stxn\\sid:\\s1,\\stable\\scount:\\s1")));
+        EXPECT_TRUE(
+            std::regex_match(*(db_entry->ToString()),
+                             std::regex("DBEntry,\\sdb_entry_dir:\\s/var/infinity/data/(.*)_db_default_db,\\stxn\\sid:\\s1,\\stable\\scount:\\s1")));
 
         auto [table_entry1, status2] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status2.ok());
@@ -89,13 +91,12 @@ TEST_P(DBEntryTest, to_string_test){
     txn_mgr->CommitTxn(txn1);
 }
 
-TEST_P(DBEntryTest, get_all_table_metas_test){
+TEST_P(DBEntryTest, get_all_table_metas_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog(); 
+    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get database"));
 
-
-    //create table, drop table
+    // create table, drop table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -103,12 +104,12 @@ TEST_P(DBEntryTest, get_all_table_metas_test){
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
 
         auto [db_entry, status3] = catalog->GetDatabase("default_db", txn1->TxnID(), txn1->BeginTS());
@@ -125,11 +126,10 @@ TEST_P(DBEntryTest, get_all_table_metas_test){
 
 TEST_P(DBEntryTest, remove_table_entry_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog(); 
+    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get database"));
 
-
-    //create table, remove table entry, drop table
+    // create table, remove table entry, drop table
     {
         Vector<SharedPtr<ColumnDef>> columns;
         {
@@ -137,12 +137,12 @@ TEST_P(DBEntryTest, remove_table_entry_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
 
         auto [db_entry, status3] = catalog->GetDatabase("default_db", txn1->TxnID(), txn1->BeginTS());
@@ -150,7 +150,7 @@ TEST_P(DBEntryTest, remove_table_entry_test) {
 
         auto [table_entry1, status2] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_FALSE(status2.ok());
-        EXPECT_STREQ(status2.message() ,"Not existed entry.");
+        EXPECT_STREQ(status2.message(), "Not existed entry.");
     }
 
     txn_mgr->CommitTxn(txn1);

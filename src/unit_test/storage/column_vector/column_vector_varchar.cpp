@@ -57,7 +57,6 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
@@ -113,7 +112,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    
+
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -163,7 +162,6 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -208,7 +206,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    
+
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -319,7 +317,6 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -375,7 +372,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    
+
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -466,7 +463,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    
+
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -501,7 +498,6 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -557,7 +553,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
 
     // ====
     column_vector.Initialize();
-    
+
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);

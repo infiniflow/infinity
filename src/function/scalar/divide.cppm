@@ -24,4 +24,4 @@ class Catalog;
 
 export void RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr);
 
-}
+} // namespace infinity

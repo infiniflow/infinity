@@ -45,7 +45,7 @@ struct BGQueryState;
 export class QueryContext {
 
 public:
-    explicit QueryContext(BaseSession* session);
+    explicit QueryContext(BaseSession *session);
 
     ~QueryContext();
 
@@ -53,8 +53,8 @@ public:
               TaskScheduler *scheduler_ptr,
               Storage *storage_ptr,
               ResourceManager *resource_manager_ptr,
-              SessionManager* session_manager,
-              PersistenceManager* persistence_manager);
+              SessionManager *session_manager,
+              PersistenceManager *persistence_manager);
 
     inline void UnInit() {
         initialized_ = false;
@@ -96,7 +96,6 @@ public:
 
     void RollbackTxn();
 
-
     [[nodiscard]] Txn *GetTxn() const { return session_ptr_->GetTxn(); }
 
     bool SetTxn(Txn *txn) const {
@@ -125,10 +124,10 @@ public:
     [[nodiscard]] inline PhysicalPlanner *physical_planner() const { return physical_planner_.get(); }
     [[nodiscard]] inline FragmentBuilder *fragment_builder() const { return fragment_builder_.get(); }
 
-    [[nodiscard]] BaseSession* current_session() const { return session_ptr_; }
+    [[nodiscard]] BaseSession *current_session() const { return session_ptr_; }
 
     void FlushProfiler(TaskProfiler &&profiler) {
-        if(query_profiler_) {
+        if (query_profiler_) {
             query_profiler_->Flush(std::move(profiler));
         }
     }
@@ -136,10 +135,9 @@ public:
     void CreateQueryProfiler();
 
 private:
-    QueryResult HandleAdminStatement(const AdminStatement* admin_statement);
+    QueryResult HandleAdminStatement(const AdminStatement *admin_statement);
 
 private:
-
     void RecordQueryProfiler(const StatementType &type);
     void StartProfile(QueryPhase phase);
     void StopProfile(QueryPhase phase);
@@ -161,7 +159,7 @@ private:
     BaseSession *session_ptr_{};
     ResourceManager *resource_manager_{};
     SessionManager *session_manager_{};
-    PersistenceManager* persistence_manager_{};
+    PersistenceManager *persistence_manager_{};
 
     u64 catalog_version_{};
 
@@ -178,7 +176,6 @@ private:
     u64 memory_size_limit_{};
 
     bool initialized_{false};
-
 };
 
 } // namespace infinity

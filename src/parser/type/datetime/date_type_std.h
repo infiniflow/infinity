@@ -11,7 +11,7 @@ struct DateTypeStd {
 
     DateTypeStd() = default;
 
-    explicit constexpr DateTypeStd(int32_t date_value) : value(date_value){};
+    explicit constexpr DateTypeStd(int32_t date_value) : value(date_value) {};
 
     inline int32_t GetValue() const { return value; }
 
@@ -35,7 +35,7 @@ private:
     static bool YMD2Date(const std::chrono::year_month_day &ymd, DateTypeStd &date);
 
     // static bool Date2YMD(int32_t days, int32_t &year, int32_t &month, int32_t &day);
-    static bool Date2YMD(int32_t days, std::chrono::year_month_day& ymd);
+    static bool Date2YMD(int32_t days, std::chrono::year_month_day &ymd);
 
     inline static bool IsLeapYear(int32_t year) { return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0); }
 
@@ -61,4 +61,4 @@ public:
     static int64_t GetDatePart(DateTypeStd input, TimeUnit unit);
 };
 
-}
+} // namespace infinity

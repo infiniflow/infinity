@@ -168,9 +168,7 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
     }
 }
 
-BlockColumnEntry *BlockEntry::GetColumnBlockEntry(SizeT column_idx) const {
-    return columns_[column_idx].get();
-}
+BlockColumnEntry *BlockEntry::GetColumnBlockEntry(SizeT column_idx) const { return columns_[column_idx].get(); }
 
 ColumnVector BlockEntry::GetColumnVector(BufferManager *buffer_mgr, ColumnID column_id) const {
     auto *block_column_entry = GetColumnBlockEntry(column_id);
@@ -580,7 +578,7 @@ Vector<String> BlockEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     Vector<String> res;
     res.reserve(columns_.size());
-    for(const auto& block_column_entry: columns_) {
+    for (const auto &block_column_entry : columns_) {
         Vector<String> files = block_column_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), files.begin(), files.end());
     }
@@ -672,7 +670,9 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
 }
 
 void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id) {
-    auto iter = std::lower_bound(columns_.begin(), columns_.end(), column_id, [&](const auto &column, ColumnID column_id) { return column->column_id() < column_id; });
+    auto iter = std::lower_bound(columns_.begin(), columns_.end(), column_id, [&](const auto &column, ColumnID column_id) {
+        return column->column_id() < column_id;
+    });
     if (iter != columns_.end() && (*iter)->column_id() == column_id) {
         *iter = std::move(column_entry);
     } else {

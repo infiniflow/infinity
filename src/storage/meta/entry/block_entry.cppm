@@ -58,7 +58,7 @@ public:
 
 public:
     // for iterator unit test
-    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, "") {};
 
     ~BlockEntry() override;
 
@@ -224,9 +224,9 @@ protected:
     // check if a value must not exist in the block
     SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
 
-    TxnTimeStamp min_row_ts_{}; // Indicate the commit_ts last append
-    TxnTimeStamp max_row_ts_{}; // Indicate the commit_ts last append/update/delete
-    TxnTimeStamp checkpoint_ts_{0};        // replay not set
+    TxnTimeStamp min_row_ts_{};     // Indicate the commit_ts last append
+    TxnTimeStamp max_row_ts_{};     // Indicate the commit_ts last append/update/delete
+    TxnTimeStamp checkpoint_ts_{0}; // replay not set
 
     TransactionID using_txn_id_{0}; // Temporarily used to lock the modification to block entry.
 

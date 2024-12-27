@@ -34,9 +34,8 @@ public:
                                  SharedPtr<BaseExpression> limit_expression,
                                  SharedPtr<BaseExpression> offset_expression,
                                  bool total_hits_count_flag)
-        : LogicalNode(node_id, LogicalNodeType::kLimit), base_table_ref_(std::move(base_table_ref)),
-          limit_expression_(std::move(limit_expression)), offset_expression_(std::move(offset_expression)),
-          total_hits_count_flag_(total_hits_count_flag) {}
+        : LogicalNode(node_id, LogicalNodeType::kLimit), base_table_ref_(std::move(base_table_ref)), limit_expression_(std::move(limit_expression)),
+          offset_expression_(std::move(offset_expression)), total_hits_count_flag_(total_hits_count_flag) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

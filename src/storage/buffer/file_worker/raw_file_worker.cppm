@@ -34,7 +34,7 @@ public:
                            SharedPtr<String> file_dir,
                            SharedPtr<String> file_name,
                            u32 file_size,
-                           PersistenceManager* persistence_manager);
+                           PersistenceManager *persistence_manager);
 
     virtual ~RawFileWorker() override;
 

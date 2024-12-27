@@ -2847,12 +2847,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalUnnestAggregate *unnest_aggregat
     SizeT groups_count = unnest_aggregate_node->groups_.size();
     SizeT aggregates_count = unnest_aggregate_node->aggregates_.size();
 
-//    // Aggregate Table index
-//    {
-//        String aggregate_table_index =
-//            String(intent_size, ' ') + " - aggregate table index: #" + std::to_string(unnest_aggregate_node->AggregateTableIndex());
-//        result->emplace_back(MakeShared<String>(aggregate_table_index));
-//    }
+    //    // Aggregate Table index
+    //    {
+    //        String aggregate_table_index =
+    //            String(intent_size, ' ') + " - aggregate table index: #" + std::to_string(unnest_aggregate_node->AggregateTableIndex());
+    //        result->emplace_back(MakeShared<String>(aggregate_table_index));
+    //    }
 
     // Aggregate expressions
     {

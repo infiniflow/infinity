@@ -32,7 +32,10 @@ namespace infinity {
 
 export class PhysicalMergeHash final : public PhysicalOperator {
 public:
-    explicit PhysicalMergeHash(SharedPtr<Vector<String>> output_names, SharedPtr<Vector<SharedPtr<DataType>>> output_types, u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+    explicit PhysicalMergeHash(SharedPtr<Vector<String>> output_names,
+                               SharedPtr<Vector<SharedPtr<DataType>>> output_types,
+                               u64 id,
+                               SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kMergeHash, nullptr, nullptr, id, load_metas), output_names_(std::move(output_names)),
           output_types_(std::move(output_types)) {}
 

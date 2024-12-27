@@ -16,9 +16,7 @@ public:
         numbers.clear();
         loser.clear();
     }
-    u64 GetRandom(u64 max_val) {
-        return static_cast<u64>(random() % max_val) * random() % max_val;
-    }
+    u64 GetRandom(u64 max_val) { return static_cast<u64>(random() % max_val) * random() % max_val; }
 
     void GenerateData(SizeT num_size, SizeT loser_num, u64 max_val);
 
@@ -65,7 +63,7 @@ void LoserTreeTest::MultiWayMerge(infinity::SizeT num_size, infinity::SizeT lose
         auto min_value = loser_tree->TopKey();
         auto min_source = loser_tree->TopSource();
         merge_res.push_back(min_value);
-        auto& min_seq = num_idx[min_source];
+        auto &min_seq = num_idx[min_source];
 
         if (min_seq < loser[min_source].size()) {
             loser_tree->DeleteTopInsert(&(loser[min_source][min_seq]), false);

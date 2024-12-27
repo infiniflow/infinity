@@ -18,7 +18,6 @@ module;
 
 export module null_value;
 
-
 import stl;
 import infinity_exception;
 import internal_types;
@@ -152,38 +151,38 @@ inline BoxT NullValue() {
     return BoxT(p1, p2);
 }
 
-//template <>
-//inline PathT NullValue() {
-//    PathT path(std::numeric_limits<u32>::infinity(), std::numeric_limits<i32>::infinity());
-//    path.ptr = std::numeric_limits<ptr_t>::infinity();
-//    return path;
-//}
+// template <>
+// inline PathT NullValue() {
+//     PathT path(std::numeric_limits<u32>::infinity(), std::numeric_limits<i32>::infinity());
+//     path.ptr = std::numeric_limits<ptr_t>::infinity();
+//     return path;
+// }
 //
-//template <>
-//inline PolygonT NullValue() {
-//    PolygonT polygon;
-//    polygon.ptr = std::numeric_limits<ptr_t>::infinity();
-//    polygon.point_count = u64_inf;
-//    PointT null_point = PointT(std::numeric_limits<f64>::infinity(), std::numeric_limits<f64>::infinity());
-//    polygon.bounding_box.upper_left.x = std::numeric_limits<f64>::infinity();
-//    polygon.bounding_box.upper_left.y = std::numeric_limits<f64>::infinity();
-//    polygon.bounding_box.lower_right.x = std::numeric_limits<f64>::infinity();
-//    polygon.bounding_box.lower_right.y = std::numeric_limits<f64>::infinity();
-//    return polygon;
-//}
+// template <>
+// inline PolygonT NullValue() {
+//     PolygonT polygon;
+//     polygon.ptr = std::numeric_limits<ptr_t>::infinity();
+//     polygon.point_count = u64_inf;
+//     PointT null_point = PointT(std::numeric_limits<f64>::infinity(), std::numeric_limits<f64>::infinity());
+//     polygon.bounding_box.upper_left.x = std::numeric_limits<f64>::infinity();
+//     polygon.bounding_box.upper_left.y = std::numeric_limits<f64>::infinity();
+//     polygon.bounding_box.lower_right.x = std::numeric_limits<f64>::infinity();
+//     polygon.bounding_box.lower_right.y = std::numeric_limits<f64>::infinity();
+//     return polygon;
+// }
 
 template <>
 inline CircleT NullValue() {
     return CircleT(PointT(std::numeric_limits<f64>::infinity(), std::numeric_limits<f64>::infinity()), std::numeric_limits<f64>::infinity());
 }
 
-//template <>
-//inline BitmapT NullValue() {
-//    BitmapT bitmap;
-//    bitmap.ptr = u64_ptr_inf;
-//    bitmap.count = u64_inf;
-//    return bitmap;
-//}
+// template <>
+// inline BitmapT NullValue() {
+//     BitmapT bitmap;
+//     bitmap.ptr = u64_ptr_inf;
+//     bitmap.count = u64_inf;
+//     return bitmap;
+// }
 
 template <>
 inline UuidT NullValue() {
@@ -191,13 +190,13 @@ inline UuidT NullValue() {
     return uuid;
 }
 
-//template <>
-//inline BlobT NullValue() {
-//    BlobT blob;
-//    blob.size = u64_inf;
-//    blob.ptr = std::numeric_limits<ptr_t>::infinity();
-//    return blob;
-//}
+// template <>
+// inline BlobT NullValue() {
+//     BlobT blob;
+//     blob.size = u64_inf;
+//     blob.ptr = std::numeric_limits<ptr_t>::infinity();
+//     return blob;
+// }
 
 template <>
 inline EmbeddingT NullValue() {

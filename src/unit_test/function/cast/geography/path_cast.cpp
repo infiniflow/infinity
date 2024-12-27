@@ -24,7 +24,6 @@ import logger;
 import stl;
 import infinity_context;
 
-
 import function_set;
 import aggregate_function_set;
 import aggregate_function;

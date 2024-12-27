@@ -26,17 +26,11 @@ import physical_match;
 namespace infinity {
 
 CachedMatch::CachedMatch(TxnTimeStamp query_ts, LogicalMatch *logical_match)
-    : CachedScanBase(LogicalNodeType::kMatch,
-                      logical_match->base_table_ref_.get(),
-                      query_ts,
-                      logical_match->GetOutputNames()),
+    : CachedScanBase(LogicalNodeType::kMatch, logical_match->base_table_ref_.get(), query_ts, logical_match->GetOutputNames()),
       match_expr_(logical_match->match_expr_), filter_expression_(logical_match->filter_expression_), topn_(logical_match->top_n_) {}
 
 CachedMatch::CachedMatch(TxnTimeStamp query_ts, PhysicalMatch *physical_match)
-    : CachedScanBase(LogicalNodeType::kMatch,
-                      physical_match->base_table_ref().get(),
-                      query_ts,
-                      physical_match->GetOutputNames()),
+    : CachedScanBase(LogicalNodeType::kMatch, physical_match->base_table_ref().get(), query_ts, physical_match->GetOutputNames()),
       match_expr_(physical_match->match_expr()), filter_expression_(physical_match->filter_expression()), topn_(physical_match->top_n()) {}
 
 u64 CachedMatch::Hash() const {

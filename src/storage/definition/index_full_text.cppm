@@ -42,7 +42,7 @@ public:
                   Vector<String> column_names,
                   const String &analyzer,
                   optionflag_t flag = OPTION_FLAG_ALL)
-        : IndexBase(IndexType::kFullText, index_name, index_comment, file_name, std::move(column_names)), analyzer_(analyzer), flag_(flag){};
+        : IndexBase(IndexType::kFullText, index_name, index_comment, file_name, std::move(column_names)), analyzer_(analyzer), flag_(flag) {};
 
     ~IndexFullText() final = default;
 

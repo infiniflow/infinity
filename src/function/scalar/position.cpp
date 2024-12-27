@@ -27,20 +27,19 @@ struct PositionFunction {
 };
 
 template <>
-inline void PositionFunction::Run(VarcharT &first, VarcharT &second, IntegerT &result, ColumnVector *first_ptr, ColumnVector * second_ptr, ColumnVector *) {
+inline void
+PositionFunction::Run(VarcharT &first, VarcharT &second, IntegerT &result, ColumnVector *first_ptr, ColumnVector *second_ptr, ColumnVector *) {
     Span<const char> first_v = first_ptr->GetVarcharInner(first);
     Span<const char> second_v = second_ptr->GetVarcharInner(second);
     String first_str(first_v.data(), first_v.size());
     String second_str(second_v.data(), second_v.size());
     String::size_type pos = first_str.find(second_str);
-    if(pos == String::npos){
+    if (pos == String::npos) {
         result = 0;
-    }else{
+    } else {
         result = pos + 1;
     }
 }
-
-
 
 void RegisterPositionFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "char_position";
@@ -48,9 +47,9 @@ void RegisterPositionFunction(const UniquePtr<Catalog> &catalog_ptr) {
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction varchar_pos_int32(func_name,
-                                  {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
-                                  {DataType(LogicalType::kInteger)},
-                                  &ScalarFunction::BinaryFunctionVarlenToVarlen<VarcharT, VarcharT, IntegerT, PositionFunction>);
+                                     {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
+                                     {DataType(LogicalType::kInteger)},
+                                     &ScalarFunction::BinaryFunctionVarlenToVarlen<VarcharT, VarcharT, IntegerT, PositionFunction>);
     function_set_ptr->AddFunction(varchar_pos_int32);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

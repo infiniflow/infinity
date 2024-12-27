@@ -39,6 +39,5 @@ public:
     void UpdateScoreThreshold(float threshold) override;
 
     u32 MatchCount() const override;
-
 };
 } // namespace infinity

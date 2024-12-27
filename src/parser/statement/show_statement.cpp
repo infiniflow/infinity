@@ -76,23 +76,23 @@ std::string ShowStatement::ToString() const {
             ss << "Show databases";
             break;
         }
-        case ShowStmtType::kSegments : {
+        case ShowStmtType::kSegments: {
             ss << "Show Segments";
             break;
         }
-        case ShowStmtType::kSegment : {
+        case ShowStmtType::kSegment: {
             ss << "Show Segment";
             break;
         }
-        case ShowStmtType::kBlocks : {
+        case ShowStmtType::kBlocks: {
             ss << "Show Blocks";
             break;
         }
-        case ShowStmtType::kBlock : {
+        case ShowStmtType::kBlock: {
             ss << "Show Block";
             break;
         }
-        case ShowStmtType::kBlockColumn : {
+        case ShowStmtType::kBlockColumn: {
             ss << "Show Block Column";
             break;
         }

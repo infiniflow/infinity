@@ -23,7 +23,7 @@ public:
 
     ~PostingMerger();
 
-    void Merge(const Vector<SegmentTermPosting *> &segment_term_postings, const RowID& merge_base_rowid);
+    void Merge(const Vector<SegmentTermPosting *> &segment_term_postings, const RowID &merge_base_rowid);
 
     void Dump(const SharedPtr<FileWriter> &file_writer, TermMeta &term_meta);
 

@@ -112,7 +112,14 @@ public:
 
     void Search(const QueryElemType *query, const QueryElemType *data, u32 dim, DistFunc dist_f, u32 segment_id, u32 segment_offset);
 
-    void Search(const QueryElemType *query, const QueryElemType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id, const Bitmask &bitmask);
+    void Search(const QueryElemType *query,
+                const QueryElemType *data,
+                u32 dim,
+                DistFunc dist_f,
+                u16 row_cnt,
+                u32 segment_id,
+                u16 block_id,
+                const Bitmask &bitmask);
 
     void Search(const DistType *dist, const RowID *row_ids, u16 count);
 
@@ -150,7 +157,13 @@ private:
 };
 
 template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
-void MergeKnn<QueryElemType, C, DistType>::Search(const QueryElemType *query, const QueryElemType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id) {
+void MergeKnn<QueryElemType, C, DistType>::Search(const QueryElemType *query,
+                                                  const QueryElemType *data,
+                                                  u32 dim,
+                                                  DistFunc dist_f,
+                                                  u16 row_cnt,
+                                                  u32 segment_id,
+                                                  u16 block_id) {
     this->total_count_ += row_cnt;
     u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
     for (u64 i = 0; i < this->query_count_; ++i) {
@@ -164,7 +177,12 @@ void MergeKnn<QueryElemType, C, DistType>::Search(const QueryElemType *query, co
 }
 
 template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
-void MergeKnn<QueryElemType, C, DistType>::Search(const QueryElemType *query, const QueryElemType *data, u32 dim, DistFunc dist_f, u32 segment_id, u32 segment_offset) {
+void MergeKnn<QueryElemType, C, DistType>::Search(const QueryElemType *query,
+                                                  const QueryElemType *data,
+                                                  u32 dim,
+                                                  DistFunc dist_f,
+                                                  u32 segment_id,
+                                                  u32 segment_offset) {
     ++this->total_count_;
     for (u64 i = 0; i < this->query_count_; ++i) {
         const QueryElemType *x_i = query + i * dim;
@@ -175,13 +193,13 @@ void MergeKnn<QueryElemType, C, DistType>::Search(const QueryElemType *query, co
 
 template <typename QueryElemType, template <typename, typename> typename C, typename DistType>
 void MergeKnn<QueryElemType, C, DistType>::Search(const QueryElemType *query,
-                                             const QueryElemType *data,
-                                             u32 dim,
-                                             DistFunc dist_f,
-                                             u16 row_cnt,
-                                             u32 segment_id,
-                                             u16 block_id,
-                                             const Bitmask &bitmask) {
+                                                  const QueryElemType *data,
+                                                  u32 dim,
+                                                  DistFunc dist_f,
+                                                  u16 row_cnt,
+                                                  u32 segment_id,
+                                                  u16 block_id,
+                                                  const Bitmask &bitmask) {
     if (bitmask.IsAllTrue()) {
         Search(query, data, dim, dist_f, row_cnt, segment_id, block_id);
         return;

@@ -86,4 +86,4 @@ export enum class LogicalNodeType : u8 {
     kReadCache,
     kMock,
 };
-}
+} // namespace infinity

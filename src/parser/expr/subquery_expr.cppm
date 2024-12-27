@@ -23,4 +23,4 @@ namespace infinity {
 export using infinity::SubqueryExpr;
 export using infinity::SubqueryType;
 
-}
+} // namespace infinity

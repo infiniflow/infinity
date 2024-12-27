@@ -24,7 +24,6 @@ import logger;
 import stl;
 import infinity_context;
 
-
 import function_set;
 import aggregate_function_set;
 import aggregate_function;
@@ -44,12 +43,9 @@ import infinity_exception;
 
 using namespace infinity;
 class HugeIntCastTest : public BaseTest {
-    void SetUp() override {
-    }
+    void SetUp() override {}
 
-    void TearDown() override {
-        BaseTest::TearDown();
-    }
+    void TearDown() override { BaseTest::TearDown(); }
 };
 
 TEST_F(HugeIntCastTest, hugeint_cast0) {

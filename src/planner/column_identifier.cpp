@@ -70,8 +70,8 @@ ColumnIdentifier::ColumnIdentifier(SharedPtr<String> db_name,
                                    SharedPtr<String> table_name,
                                    SharedPtr<String> column_name,
                                    SharedPtr<String> alias_name)
-    : db_name_ptr_(std::move(db_name)), schema_name_ptr_(std::move(schema_name)), column_name_ptr_(std::move(column_name)), table_name_ptr_(std::move(table_name)),
-      alias_name_ptr_(std::move(alias_name)) {}
+    : db_name_ptr_(std::move(db_name)), schema_name_ptr_(std::move(schema_name)), column_name_ptr_(std::move(column_name)),
+      table_name_ptr_(std::move(table_name)), alias_name_ptr_(std::move(alias_name)) {}
 
 String ColumnIdentifier::ToString() const {
     if (table_name_ptr_.get() != nullptr)

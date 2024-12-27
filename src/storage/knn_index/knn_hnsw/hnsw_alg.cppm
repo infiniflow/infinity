@@ -402,10 +402,7 @@ public:
             using CompressedDistance = typename CompressVecStoreType::Distance;
             CompressedDistance distance = std::move(distance_).ToLVQDistance(data_store_.dim());
             auto compressed_datastore = std::move(data_store_).template CompressToLVQ<CompressVecStoreType>();
-            return MakeUnique<KnnHnsw<CompressVecStoreType, LabelType>>(M_,
-                                                                        ef_construction_,
-                                                                        std::move(compressed_datastore),
-                                                                        std::move(distance));
+            return MakeUnique<KnnHnsw<CompressVecStoreType, LabelType>>(M_, ef_construction_, std::move(compressed_datastore), std::move(distance));
         }
     }
 

@@ -263,7 +263,8 @@ public:
 public:
     static void SetMultiVector(MultiVectorT &dest_multi_vec, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info);
 
-    static Pair<Span<const char>, SizeT> GetMultiVector(const MultiVectorT &multi_vec, const VectorBuffer *buffer, const EmbeddingInfo *embedding_info);
+    static Pair<Span<const char>, SizeT>
+    GetMultiVector(const MultiVectorT &multi_vec, const VectorBuffer *buffer, const EmbeddingInfo *embedding_info);
 
     static void SetTensor(TensorT &dest_tensor, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info);
 
@@ -1318,13 +1319,13 @@ public:
         return left_v.size() == right_v.size() && std::strncmp(left_v.data(), right_v.data(), left_v.size()) == 0;
     }
 
-    friend void GetReaderValue(const IteratorType &left, const char* &dst, SizeT &dst_len) {
+    friend void GetReaderValue(const IteratorType &left, const char *&dst, SizeT &dst_len) {
         Span<const char> left_v = left.col_->GetVarchar(left.idx_);
         dst = left_v.data();
         dst_len = left_v.size();
     }
 
-    friend void SetReaderValue(IteratorType &left, const char* dst, int dst_len) {
+    friend void SetReaderValue(IteratorType &left, const char *dst, int dst_len) {
         Span<const char> span(dst, dst_len);
         left.col_->AppendVarchar(span);
     }

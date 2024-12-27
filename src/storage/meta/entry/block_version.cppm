@@ -55,7 +55,6 @@ export struct BlockVersion {
     void SpillToFile(LocalFileHandle *file_handle) const;
     static UniquePtr<BlockVersion> LoadFromFile(LocalFileHandle *file_handle);
 
-
     void GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const;
 
     void GetDeleteTS(SizeT offset, SizeT size, ColumnVector &res) const;

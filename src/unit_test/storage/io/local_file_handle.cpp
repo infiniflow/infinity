@@ -51,12 +51,13 @@ TEST_F(LocalFileTest, TestDir) {
 
     VirtualStore::MakeDirectory(dir);
 
-    auto [local_file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);;
+    auto [local_file_handle, status] = VirtualStore::Open(path, FileAccessMode::kWrite);
+    ;
     EXPECT_TRUE(status.ok());
 
     SizeT len = 10;
     UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-    for(SizeT i = 0; i < len; ++ i) {
+    for (SizeT i = 0; i < len; ++i) {
         data_array[i] = i + 1;
     }
 
@@ -99,7 +100,7 @@ TEST_F(LocalFileTest, TestRead) {
         EXPECT_TRUE(read_status.ok());
 
         EXPECT_EQ(read_len, len);
-        for(SizeT i = 0; i < len; ++i) {
+        for (SizeT i = 0; i < len; ++i) {
             EXPECT_EQ(read_data[i], i + 1);
         }
     }
@@ -119,7 +120,7 @@ TEST_F(LocalFileTest, TestRename) {
 
     SizeT len = 10;
     UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
-    for(SizeT i = 0; i < len; ++ i) {
+    for (SizeT i = 0; i < len; ++i) {
         data_array[i] = i + 1;
     }
 
@@ -166,7 +167,7 @@ TEST_F(LocalFileTest, TestTruncate) {
         EXPECT_TRUE(read_status.ok());
         EXPECT_EQ(read_len, 10);
 
-        for(SizeT i = 0; i < 10; ++i) {
+        for (SizeT i = 0; i < 10; ++i) {
             EXPECT_EQ(truncated_data[i], i + 1);
         }
     }
@@ -174,7 +175,6 @@ TEST_F(LocalFileTest, TestTruncate) {
     VirtualStore::DeleteFile(path);
     EXPECT_FALSE(VirtualStore::Exists(path));
 }
-
 
 TEST_F(LocalFileTest, TestMerge) {
     using namespace infinity;
@@ -188,7 +188,7 @@ TEST_F(LocalFileTest, TestMerge) {
 
     SizeT src_len = 10;
     UniquePtr<char[]> data_array1 = MakeUnique<char[]>(src_len);
-    for(SizeT i = 0; i < src_len; ++ i) {
+    for (SizeT i = 0; i < src_len; ++i) {
         data_array1[i] = i + 1;
     }
 
@@ -200,7 +200,7 @@ TEST_F(LocalFileTest, TestMerge) {
 
     SizeT dst_len = 10;
     UniquePtr<char[]> data_array2 = MakeUnique<char[]>(dst_len);
-    for(SizeT i = 0; i < dst_len; ++ i) {
+    for (SizeT i = 0; i < dst_len; ++i) {
         data_array2[i] = i + 1;
     }
 
@@ -217,10 +217,10 @@ TEST_F(LocalFileTest, TestMerge) {
     EXPECT_TRUE(merge_read_status.ok());
 
     EXPECT_EQ(read_len, (i64)(src_len + dst_len));
-    for(SizeT i = 0; i < dst_len; ++i) {
+    for (SizeT i = 0; i < dst_len; ++i) {
         EXPECT_EQ(combined_data[i], i + 1);
     }
-    for(SizeT i = dst_len; i < src_len + dst_len; ++i) {
+    for (SizeT i = dst_len; i < src_len + dst_len; ++i) {
         EXPECT_EQ(combined_data[i], i - dst_len + 1);
     }
 
@@ -245,7 +245,7 @@ TEST_F(LocalFileTest, TestCleanDir) {
 
     SizeT src_len = 10;
     UniquePtr<char[]> data_array1 = MakeUnique<char[]>(src_len);
-    for(SizeT i = 0; i < src_len; ++ i) {
+    for (SizeT i = 0; i < src_len; ++i) {
         data_array1[i] = i + 1;
     }
 
@@ -259,14 +259,13 @@ TEST_F(LocalFileTest, TestCleanDir) {
     append_src_file_handle->Append(data_array1.get(), src_len);
     append_src_file_handle->Sync();
 
-
     // Append more to file2.txt
     auto [append_file2_handle, status3] = VirtualStore::Open(file_path2, FileAccessMode::kWrite);
     EXPECT_TRUE(status3.ok());
 
     SizeT len2 = 20;
     UniquePtr<char[]> data_array2 = MakeUnique<char[]>(len2);
-    for(SizeT i = 0; i < len2; ++i) {
+    for (SizeT i = 0; i < len2; ++i) {
         data_array2[i] = i + 11;
     }
 

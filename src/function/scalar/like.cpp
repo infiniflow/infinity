@@ -88,12 +88,12 @@ inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
     String error_message = "Not implement";
     UnrecoverableError(error_message);
 
-//    ptr_t left_ptr = left.GetDataPtr();
-//    SizeT left_len = left.GetDataLen();
-//    ptr_t right_ptr = right.GetDataPtr();
-//    SizeT right_len = right.GetDataLen();
+    //    ptr_t left_ptr = left.GetDataPtr();
+    //    SizeT left_len = left.GetDataLen();
+    //    ptr_t right_ptr = right.GetDataPtr();
+    //    SizeT right_len = right.GetDataLen();
 
-//    result = LikeOperator(left_ptr, left_len, right_ptr, right_len);
+    //    result = LikeOperator(left_ptr, left_len, right_ptr, right_len);
 }
 
 struct NotLikeFunction {
@@ -101,7 +101,6 @@ struct NotLikeFunction {
     static inline void Run(TA, TB, TC &) {
         String error_message = "Not implement";
         UnrecoverableError(error_message);
-
     }
 };
 
@@ -110,13 +109,12 @@ inline void NotLikeFunction::Run(VarcharT &, VarcharT &, bool &) {
     String error_message = "Not implement";
     UnrecoverableError(error_message);
 
+    //    ptr_t left_ptr = left.GetDataPtr();
+    //    SizeT left_len = left.GetDataLen();
+    //    ptr_t right_ptr = right.GetDataPtr();
+    //    SizeT right_len = right.GetDataLen();
 
-//    ptr_t left_ptr = left.GetDataPtr();
-//    SizeT left_len = left.GetDataLen();
-//    ptr_t right_ptr = right.GetDataPtr();
-//    SizeT right_len = right.GetDataLen();
-
-//    result = !LikeOperator(left_ptr, left_len, right_ptr, right_len);
+    //    result = !LikeOperator(left_ptr, left_len, right_ptr, right_len);
 }
 
 void RegisterLikeFunction(const UniquePtr<Catalog> &catalog_ptr) {

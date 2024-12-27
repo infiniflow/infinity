@@ -92,7 +92,7 @@ void PhysicalCompactFinish::SaveSegmentData(QueryContext *query_context, const C
             }
             Vector<SegmentIndexEntry *> segment_index_entries;
             auto &segment_index_map = table_index_entry->index_by_segment();
-            for (const auto *old_segment :  compact_segment_data.old_segments_) {
+            for (const auto *old_segment : compact_segment_data.old_segments_) {
                 auto iter = segment_index_map.find(old_segment->segment_id());
                 if (iter == segment_index_map.end()) {
                     continue;

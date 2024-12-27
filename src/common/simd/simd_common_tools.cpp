@@ -39,5 +39,4 @@ U8MaskPtr GetU8MasksForAVX2() {
     return u8_mask_array.masks;
 }
 
-
 } // namespace infinity

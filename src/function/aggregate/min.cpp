@@ -103,7 +103,7 @@ public:
 
     void Update(const SmallIntT *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
-    inline void ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT ) { value_ = input[idx] < value_ ? input[idx] : value_; }
+    inline void ConstantUpdate(const SmallIntT *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
 
     inline ptr_t Finalize() { return (ptr_t)&value_; }
 

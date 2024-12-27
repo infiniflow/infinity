@@ -35,7 +35,7 @@ public:
                                 SharedPtr<String> file_name,
                                 SharedPtr<IndexBase> index_base,
                                 SharedPtr<ColumnDef> column_def,
-                                PersistenceManager* persistence_manager,
+                                PersistenceManager *persistence_manager,
                                 SizeT index_size = 0);
 
     ~BMPIndexFileWorker() override;
