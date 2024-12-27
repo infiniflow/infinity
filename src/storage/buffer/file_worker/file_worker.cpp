@@ -215,21 +215,19 @@ void FileWorker::Mmap() {
     }
     auto [defer_fn, read_path] = GetFilePathInner(false);
     bool use_object_cache = persistence_manager_ != nullptr;
-    SizeT file_size = VirtualStore::GetFileSize(read_path);
-    int ret = VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
-    if (ret < 0) {
-        UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
-    }
-    // ret = madvise(mmap_addr_, file_size, MADV_DONTNEED);
-    // if (ret < 0) {
-    //     UnrecoverableError(fmt::format("Madvise file {} failed. {}", read_path, strerror(errno)));
-    // }
     if (use_object_cache) {
-        const void *ptr = mmap_addr_ + obj_addr_.part_offset_;
-        this->ReadFromMmapImpl(ptr, obj_addr_.part_size_);
+        int ret = VirtualStore::MmapFilePart(read_path, obj_addr_.part_offset_, obj_addr_.part_size_, mmap_addr_);
+        if (ret < 0) {
+            UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
+        }
+        this->ReadFromMmapImpl(mmap_addr_, obj_addr_.part_size_);
     } else {
-        const void *ptr = mmap_addr_;
-        this->ReadFromMmapImpl(ptr, file_size);
+        SizeT file_size = VirtualStore::GetFileSize(read_path);
+        int ret = VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
+        if (ret < 0) {
+            UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
+        }
+        this->ReadFromMmapImpl(mmap_addr_, file_size);
     }
 }
 
@@ -237,21 +235,18 @@ void FileWorker::Munmap() {
     if (mmap_addr_ == nullptr) {
         return;
     }
-    auto [defer_fn, read_path] = GetFilePathInner(false);
     this->FreeFromMmapImpl();
-    VirtualStore::MunmapFile(read_path);
+    auto [defer_fn, read_path] = GetFilePathInner(false);
+    bool use_object_cache = persistence_manager_ != nullptr;
+    if (use_object_cache) {
+        VirtualStore::MunmapFilePart(mmap_addr_, obj_addr_.part_offset_, obj_addr_.part_size_);
+    } else {
+        VirtualStore::MunmapFile(read_path);
+    }
     mmap_addr_ = nullptr;
     mmap_data_ = nullptr;
 }
 
-void FileWorker::MmapNotNeed() {
-    // this->Munmap();
-    // auto [defer_fn, read_path] = GetFilePathInner(false);
-    // SizeT file_size = VirtualStore::GetFileSize(read_path);
-    // int ret = madvise(mmap_addr_, file_size, MADV_PAGEOUT);
-    // if (ret < 0) {
-    //     UnrecoverableError(fmt::format("Madvise file {} failed. {}", read_path, strerror(errno)));
-    // }
-}
+void FileWorker::MmapNotNeed() {}
 
 } // namespace infinity

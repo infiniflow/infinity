@@ -456,6 +456,9 @@ void ChunkIndexEntry::SaveIndexFile() {
         return;
     }
     buffer_obj_->Save();
+    if (segment_index_entry_->table_index_entry()->index_base()->index_type_ == IndexType::kHnsw) {
+        buffer_obj_->ToMmap();
+    }
 }
 
 void ChunkIndexEntry::DeprecateChunk(TxnTimeStamp commit_ts) {
