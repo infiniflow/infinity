@@ -23,7 +23,6 @@ public:
     explicit CreateSchemaInfo() : ExtraDDLInfo(DDLType::kDatabase) {}
 
     [[nodiscard]] std::string ToString() const final;
-
 };
 
 } // namespace infinity

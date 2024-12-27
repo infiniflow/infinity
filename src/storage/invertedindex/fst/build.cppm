@@ -28,7 +28,7 @@ struct LastTransition {
     u8 inp_{0};
     Output out_{0};
     LastTransition() = default;
-    LastTransition(u8 inp, Output out) : present_(true), inp_(inp), out_(out){};
+    LastTransition(u8 inp, Output out) : present_(true), inp_(inp), out_(out) {};
 };
 
 struct BuilderNodeUnfinished {

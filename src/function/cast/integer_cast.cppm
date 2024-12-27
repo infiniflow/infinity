@@ -16,7 +16,6 @@ module;
 
 export module integer_cast;
 
-
 import stl;
 import bound_cast_func;
 import column_vector_cast;
@@ -85,7 +84,8 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
 struct IntegerTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        String error_message =
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
     }
@@ -93,8 +93,9 @@ struct IntegerTryCastToFixlen {
 
 struct IntegerTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType, TargetType &, ColumnVector*) {
-        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+    static inline bool Run(SourceType, TargetType &, ColumnVector *) {
+        String error_message =
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
     }
@@ -166,7 +167,7 @@ inline bool IntegerTryCastToFixlen::Run(u8, DecimalT &) {
 
 // Cast u8 to VarcharT type
 template <>
-inline bool IntegerTryCastToVarlen::Run(u8 source, VarcharT &target, ColumnVector*) {
+inline bool IntegerTryCastToVarlen::Run(u8 source, VarcharT &target, ColumnVector *) {
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -249,7 +250,7 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT, DecimalT &) {
 
 // Cast TinyIntT to VarcharT type
 template <>
-inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, ColumnVector*) {
+inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, ColumnVector *) {
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -338,7 +339,7 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT, DecimalT &) {
 
 // Cast SmallIntT to VarcharT type
 template <>
-inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, ColumnVector*) {
+inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, ColumnVector *) {
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -430,7 +431,7 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT, DecimalT &) {
 
 // Cast IntegerT to VarcharT type
 template <>
-inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, ColumnVector*) {
+inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, ColumnVector *) {
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -525,7 +526,7 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT, DecimalT &) {
 
 // Cast integer to varlen type
 template <>
-inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, ColumnVector* vector_ptr) {
+inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, ColumnVector *vector_ptr) {
     if (source == 0) {
         target.short_.data_[0] = '0';
         target.length_ = 1;
@@ -612,7 +613,7 @@ inline bool IntegerTryCastToFixlen::Run(HugeIntT, DecimalT &) {
 
 // Cast integer to varlen type
 template <>
-inline bool IntegerTryCastToVarlen::Run(HugeIntT, VarcharT &, ColumnVector*) {
+inline bool IntegerTryCastToVarlen::Run(HugeIntT, VarcharT &, ColumnVector *) {
     String error_message = "Not implemented";
     UnrecoverableError(error_message);
     return false;

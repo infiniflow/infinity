@@ -52,11 +52,7 @@ bool PhysicalMergeLimit::Execute(QueryContext *query_context, OperatorState *ope
     if (limit_op_state->input_data_blocks_.empty()) {
         return false;
     }
-    auto result = PhysicalLimit::Execute(query_context,
-                                         limit_op_state->input_data_blocks_,
-                                         limit_op_state->data_block_array_,
-                                         counter_.get(),
-                                         false);
+    auto result = PhysicalLimit::Execute(query_context, limit_op_state->input_data_blocks_, limit_op_state->data_block_array_, counter_.get(), false);
 
     if (counter_->IsLimitOver() || limit_op_state->input_complete_) {
         limit_op_state->input_complete_ = true;

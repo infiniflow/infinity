@@ -88,7 +88,7 @@ TEST_F(KnnFlatL2Top1Test, test1) {
     EXPECT_FLOAT_EQ(id_array[0].segment_offset_, 0);
 
     {
-        KnnFlatL2Top1 <f32> knn_distance_m(query_embedding.get(), 1, dimension, EmbeddingDataType::kElemFloat);
+        KnnFlatL2Top1<f32> knn_distance_m(query_embedding.get(), 1, dimension, EmbeddingDataType::kElemFloat);
         auto p_bitmask = Bitmask::MakeSharedAllTrue(base_embedding_count);
         p_bitmask->SetFalse(0);
         {

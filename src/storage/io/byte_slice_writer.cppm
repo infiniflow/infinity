@@ -161,9 +161,7 @@ inline ByteSlice *ByteSliceWriter::GetSliceForWrite() {
     return slice;
 }
 
-inline ByteSliceList *ByteSliceWriter::AllocateByteSliceList() {
-    return new ByteSliceList();
-}
+inline ByteSliceList *ByteSliceWriter::AllocateByteSliceList() { return new ByteSliceList(); }
 
 inline void ByteSliceWriter::DeAllocateByteSliceList(ByteSliceList *&byte_slice_list) {
     delete byte_slice_list;

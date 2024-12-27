@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include <string>
+#include <vector>
 module merge_knn;
 
 import stl;

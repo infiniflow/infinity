@@ -44,9 +44,9 @@ export struct MatchTensorScanIndexOptions {
     explicit MatchTensorScanIndexOptions(u32 topn) : topn_(topn) {}
 
     bool operator==(const MatchTensorScanIndexOptions &other) const {
-        return topn_ == other.topn_ && emvb_centroid_nprobe_ == other.emvb_centroid_nprobe_ &&
-               emvb_threshold_first_ == other.emvb_threshold_first_ && emvb_n_doc_to_score_ == other.emvb_n_doc_to_score_ &&
-               emvb_n_doc_out_second_stage_ == other.emvb_n_doc_out_second_stage_ && emvb_threshold_final_ == other.emvb_threshold_final_;
+        return topn_ == other.topn_ && emvb_centroid_nprobe_ == other.emvb_centroid_nprobe_ && emvb_threshold_first_ == other.emvb_threshold_first_ &&
+               emvb_n_doc_to_score_ == other.emvb_n_doc_to_score_ && emvb_n_doc_out_second_stage_ == other.emvb_n_doc_out_second_stage_ &&
+               emvb_threshold_final_ == other.emvb_threshold_final_;
     }
 };
 

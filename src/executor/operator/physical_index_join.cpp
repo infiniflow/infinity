@@ -19,7 +19,6 @@ import stl;
 import query_context;
 import operator_state;
 
-
 module physical_index_join;
 
 namespace infinity {

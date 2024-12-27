@@ -14,10 +14,10 @@
 
 #pragma once
 
-#include <string>
-#include <mutex>
-#include <unordered_map>
 #include <atomic>
+#include <mutex>
+#include <string>
+#include <unordered_map>
 
 namespace infinity {
 
@@ -161,5 +161,3 @@ private:
 };
 
 } // namespace infinity
-
-

@@ -32,7 +32,7 @@ extern template class EMVBSearch<160>;
 extern template class EMVBSearch<192>;
 extern template class EMVBSearch<224>;
 extern template class EMVBSearch<256>;
-}
+} // namespace infinity
 
 using namespace infinity;
 

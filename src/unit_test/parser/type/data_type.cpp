@@ -81,18 +81,18 @@ TEST_F(DataTypeTest, GetTypeName) {
     EXPECT_EQ(line_seg_type.ToString(), "LineSegment");
     DataType box_type(LogicalType::kBox);
     EXPECT_EQ(box_type.ToString(), "Box");
-//    DataType path_type(LogicalType::kPath);
-//    EXPECT_EQ(path_type.ToString(), "Path");
-//    DataType polygon(LogicalType::kPolygon);
-//    EXPECT_EQ(polygon.ToString(), "Polygon");
+    //    DataType path_type(LogicalType::kPath);
+    //    EXPECT_EQ(path_type.ToString(), "Path");
+    //    DataType polygon(LogicalType::kPolygon);
+    //    EXPECT_EQ(polygon.ToString(), "Polygon");
     DataType circle_type(LogicalType::kCircle);
     EXPECT_EQ(circle_type.ToString(), "Circle");
-//    DataType bitmap_type(LogicalType::kBitmap);
-//    EXPECT_EQ(bitmap_type.ToString(), "Bitmap");
+    //    DataType bitmap_type(LogicalType::kBitmap);
+    //    EXPECT_EQ(bitmap_type.ToString(), "Bitmap");
     DataType uuid_type(LogicalType::kUuid);
     EXPECT_EQ(uuid_type.ToString(), "UUID");
-//    DataType blob_type(LogicalType::kBlob);
-//    EXPECT_EQ(blob_type.ToString(), "Blob");
+    //    DataType blob_type(LogicalType::kBlob);
+    //    EXPECT_EQ(blob_type.ToString(), "Blob");
     DataType vector_type(LogicalType::kEmbedding);
     EXPECT_EQ(vector_type.ToString(), "Embedding");
     DataType row_id_type(LogicalType::kRowID);
@@ -159,7 +159,7 @@ TEST_F(DataTypeTest, ReadWrite) {
         MakeShared<DataType>(LogicalType::kTinyInt),
         MakeShared<DataType>(LogicalType::kFloat),
         MakeShared<DataType>(LogicalType::kTuple),
-//        MakeShared<DataType>(LogicalType::kBitmap, type_info_bitmap),
+        //        MakeShared<DataType>(LogicalType::kBitmap, type_info_bitmap),
         MakeShared<DataType>(LogicalType::kDecimal, type_info_decimal),
         MakeShared<DataType>(LogicalType::kEmbedding, type_info_embedding),
     };

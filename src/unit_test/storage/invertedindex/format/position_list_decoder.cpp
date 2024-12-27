@@ -38,7 +38,8 @@ TEST_F(PositionListDecoderTest, test1) {
 
     pos_t pos_buffer[BUFFER_SIZE_];
 
-    // It seems that PositionListDecoder cannot be used directly for PositionListEncoder, so its subclass InMemPositionListDecoder is used for testing here.
+    // It seems that PositionListDecoder cannot be used directly for PositionListEncoder, so its subclass InMemPositionListDecoder is used for testing
+    // here.
     PositionListDecoder *position_decoder = position_encoder.GetInMemPositionListDecoder();
 
     auto pos_count1 = position_decoder->DecodeRecord(pos_buffer, MAX_DOC_PER_RECORD);

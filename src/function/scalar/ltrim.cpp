@@ -1,6 +1,6 @@
 module;
 
-#include<cctype>
+#include <cctype>
 
 module ltrim;
 
@@ -40,23 +40,22 @@ inline void LtrimFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *l
         pos++;
     }
 
-    Span<const char> res_span = Span<const char>(&input[pos], input_len-pos);
+    Span<const char> res_span = Span<const char>(&input[pos], input_len - pos);
     result_ptr->AppendVarcharInner(res_span, result);
 }
 
-
-void RegisterLtrimFunction(const UniquePtr<Catalog> &catalog_ptr){
+void RegisterLtrimFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "ltrim";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction ltrim_function(func_name,
-                                     {DataType(LogicalType::kVarchar)},
-                                     {DataType(LogicalType::kVarchar)},
-                                     &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, LtrimFunction>);
+                                  {DataType(LogicalType::kVarchar)},
+                                  {DataType(LogicalType::kVarchar)},
+                                  &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, LtrimFunction>);
     function_set_ptr->AddFunction(ltrim_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

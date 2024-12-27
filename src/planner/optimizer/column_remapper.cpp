@@ -33,7 +33,7 @@ namespace infinity {
 void BindingRemapper::VisitNode(LogicalNode &op) {
     auto load_func = [&]() {
         auto load_metas = op.load_metas();
-        column_cnt_ = output_types_? output_types_->size() : 0;
+        column_cnt_ = output_types_ ? output_types_->size() : 0;
 
         if (load_metas.get() != nullptr) {
             column_cnt_ += load_metas->size();
@@ -113,7 +113,7 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  expression->alias_,
                                                  column_cnt_ - 3);
             }
-            case SpecialType::kCreateTs: 
+            case SpecialType::kCreateTs:
             case SpecialType::kDeleteTs: {
                 break;
             }

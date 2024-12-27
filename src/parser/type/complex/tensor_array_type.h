@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include <span>
 #include "embedding_type.h"
+#include <span>
 
 namespace infinity {
 

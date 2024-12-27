@@ -1359,7 +1359,7 @@ void ProcessDataBlocks(QueryResult &query_result, WrapQueryResult &wrap_query_re
         ProcessColumns(data_block, query_result.result_table_->ColumnCount(), columns);
     }
 
-    if(query_result.result_table_->total_hits_count_flag_) {
+    if (query_result.result_table_->total_hits_count_flag_) {
         nlohmann::json json_response;
         json_response["total_hits_count"] = query_result.result_table_->total_hits_count_;
         wrap_query_result.extra_result = json_response.dump();

@@ -55,6 +55,7 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
                                     &index_reader_,
                                     context.early_term_algo_,
                                     context.ft_similarity_,
+                                    context.bm25_params_,
                                     context.minimum_should_match_,
                                     context.topn_,
                                     context.index_names_};

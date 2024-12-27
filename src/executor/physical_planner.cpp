@@ -86,6 +86,8 @@ import physical_create_index_prepare;
 import physical_create_index_do;
 import physical_create_index_finish;
 import physical_read_cache;
+import physical_unnest;
+import physical_unnest_aggregate;
 
 import logical_node;
 import logical_node_type;
@@ -130,6 +132,8 @@ import logical_match_tensor_scan;
 import logical_match_sparse_scan;
 import logical_fusion;
 import logical_read_cache;
+import logical_unnest;
+import logical_unnest_aggregate;
 
 import value;
 import value_expression;
@@ -337,6 +341,14 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kReadCache: {
             result = BuildReadCache(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kUnnest: {
+            result = BuildUnnest(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kUnnestAggregate: {
+            result = BuildUnnestAggregate(logical_operator);
             break;
         }
         default: {
@@ -970,6 +982,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
                                      std::move(logical_match->minimum_should_match_option_),
                                      logical_match->score_threshold_,
                                      logical_match->ft_similarity_,
+                                     logical_match->bm25_params_,
                                      logical_match->TableIndex(),
                                      logical_operator->load_metas(),
                                      true /*cache_result*/);
@@ -1188,6 +1201,50 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildReadCache(const SharedPtr<Logi
                                          logical_read_cache->column_map_,
                                          logical_read_cache->load_metas(),
                                          logical_read_cache->is_min_heap_);
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUnnest(const SharedPtr<LogicalNode> &logical_operator) const {
+    auto input_logical_node = logical_operator->left_node();
+    if (input_logical_node.get() == nullptr) {
+        String error_message = "Logical filter node has no input node.";
+        UnrecoverableError(error_message);
+    }
+    if (logical_operator->right_node().get() != nullptr) {
+        String error_message = "Logical filter node shouldn't have right child.";
+        UnrecoverableError(error_message);
+    }
+
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+
+    auto *logical_unnest = static_cast<LogicalUnnest *>(logical_operator.get());
+    return MakeUnique<PhysicalUnnest>(logical_unnest->node_id(),
+                                      std::move(input_physical_operator),
+                                      logical_unnest->expression_list(),
+                                      logical_unnest->load_metas());
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUnnestAggregate(const SharedPtr<LogicalNode> &logical_operator) const {
+    auto input_logical_node = logical_operator->left_node();
+    if (input_logical_node.get() == nullptr) {
+        String error_message = "Logical filter node has no input node.";
+        UnrecoverableError(error_message);
+    }
+    if (logical_operator->right_node().get() != nullptr) {
+        String error_message = "Logical filter node shouldn't have right child.";
+        UnrecoverableError(error_message);
+    }
+
+    auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
+
+    auto *logical_unnest_aggregate = static_cast<LogicalUnnestAggregate *>(logical_operator.get());
+    return MakeUnique<PhysicalUnnestAggregate>(logical_unnest_aggregate->node_id(),
+                                               std::move(input_physical_operator),
+                                               logical_unnest_aggregate->groups(),
+                                               logical_unnest_aggregate->group_by_index(),
+                                               logical_unnest_aggregate->aggregates(),
+                                               logical_unnest_aggregate->aggregate_index(),
+                                               logical_unnest_aggregate->unnest_expression_list(),
+                                               logical_unnest_aggregate->load_metas());
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExplain(const SharedPtr<LogicalNode> &logical_operator) const {

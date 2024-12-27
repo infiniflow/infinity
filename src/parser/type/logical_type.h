@@ -32,10 +32,10 @@
 #include "type/geo/point_type.h"
 #include "type/geo/polygon_type.h"
 #include "type/heterogenous/mixed_type.h"
-#include "type/number/decimal_type.h"
-#include "type/number/huge_int.h"
-#include "type/number/float16.h"
 #include "type/number/bfloat16.h"
+#include "type/number/decimal_type.h"
+#include "type/number/float16.h"
+#include "type/number/huge_int.h"
 
 namespace infinity {
 
@@ -77,14 +77,14 @@ enum class LogicalType : int8_t {
     kLine,
     kLineSeg,
     kBox,
-//    kPath,
-//    kPolygon,
+    //    kPath,
+    //    kPolygon,
     kCircle,
 
     // Other * 4
-//    kBitmap,
+    //    kBitmap,
     kUuid,
-//    kBlob,
+    //    kBlob,
     kEmbedding,
     kRowID,
 

@@ -33,8 +33,9 @@ DataFileWorker::DataFileWorker(SharedPtr<String> data_dir,
                                SharedPtr<String> file_dir,
                                SharedPtr<String> file_name,
                                SizeT buffer_size,
-                               PersistenceManager* persistence_manager)
-    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(buffer_size) {}
+                               PersistenceManager *persistence_manager)
+    : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager),
+      buffer_size_(buffer_size) {}
 
 DataFileWorker::~DataFileWorker() {
     if (data_ != nullptr) {
@@ -74,23 +75,23 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
 
     u64 magic_number = 0x00dd3344;
     Status status = file_handle_->Append(&magic_number, sizeof(magic_number));
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
 
     status = file_handle_->Append(const_cast<SizeT *>(&buffer_size_), sizeof(buffer_size_));
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
 
     status = file_handle_->Append(data_, buffer_size_);
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
 
     u64 checksum{};
     status = file_handle_->Append(&checksum, sizeof(checksum));
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
@@ -107,7 +108,7 @@ void DataFileWorker::ReadFromFileImpl(SizeT file_size) {
     // file header: magic number, buffer_size
     u64 magic_number{0};
     auto [nbytes1, status1] = file_handle_->Read(&magic_number, sizeof(magic_number));
-    if(!status1.ok()) {
+    if (!status1.ok()) {
         RecoverableError(status1);
     }
     if (nbytes1 != sizeof(magic_number)) {

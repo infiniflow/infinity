@@ -132,7 +132,6 @@ void TxnIndexStore::AddSegmentOptimizing(SegmentIndexEntry *segment_index_entry)
     index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
 }
 
-
 bool TxnIndexStore::TryRevert() {
     if (status_ == TxnStoreStatus::kNone) {
         return false;
@@ -143,7 +142,6 @@ bool TxnIndexStore::TryRevert() {
     status_ = TxnStoreStatus::kNone;
     return true;
 }
-
 
 ///-----------------------------------------------------------------------------
 
@@ -721,7 +719,7 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         Catalog::RemoveTableEntry(table_entry, txn_id);
     }
 
-    Catalog* catalog_ptr = InfinityContext::instance().storage()->catalog();
+    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
     for (auto [db_entry, ptr_seq_n] : txn_dbs_) {
         db_entry->Cleanup();
 

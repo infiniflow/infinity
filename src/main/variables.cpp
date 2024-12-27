@@ -77,4 +77,4 @@ SessionVariable VarUtil::GetSessionVarByName(const String &variable_name) {
     return SessionVariable::kInvalid;
 }
 
-}
+} // namespace infinity

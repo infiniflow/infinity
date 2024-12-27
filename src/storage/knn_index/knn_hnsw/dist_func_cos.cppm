@@ -165,7 +165,7 @@ public:
     }
 };
 
-template<typename DataType>
+template <typename DataType>
 LVQCosDist<DataType, i8> PlainCosDist<DataType>::ToLVQDistance(SizeT dim) && {
     return LVQCosDist<DataType, i8>(dim);
 }

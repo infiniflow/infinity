@@ -27,11 +27,9 @@ import infinity_context;
 using namespace infinity;
 
 class JsonTest : public BaseTest {
-    void SetUp() override {
-    }
+    void SetUp() override {}
 
-    void TearDown() override {
-    }
+    void TearDown() override {}
 };
 
 TEST_F(JsonTest, test1) {

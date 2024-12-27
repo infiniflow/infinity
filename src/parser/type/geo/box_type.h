@@ -23,7 +23,7 @@ namespace infinity {
 struct BoxType {
     BoxType() = default;
 
-    BoxType(PointType ul, PointType lr) : upper_left(ul), lower_right(lr){};
+    BoxType(PointType ul, PointType lr) : upper_left(ul), lower_right(lr) {};
 
     PointType upper_left;
     PointType lower_right;

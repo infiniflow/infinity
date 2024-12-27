@@ -12,7 +12,7 @@ struct TimeTypeStd {
 
     TimeTypeStd() = default;
 
-    explicit constexpr TimeTypeStd(int32_t time_value) : value(time_value){};
+    explicit constexpr TimeTypeStd(int32_t time_value) : value(time_value) {};
 
     inline int32_t GetValue() const { return value; }
 
@@ -58,4 +58,4 @@ public:
     int32_t value{};
 };
 
-}
+} // namespace infinity

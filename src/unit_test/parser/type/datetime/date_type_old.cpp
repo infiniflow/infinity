@@ -29,7 +29,6 @@ import parser_assert;
 using namespace infinity;
 class DateTypeOldTest : public BaseTest {};
 
-
 //
 TEST_F(DateTypeOldTest, test1) {
     using namespace infinity;
@@ -59,7 +58,7 @@ TEST_F(DateTypeOldTest, TestEqStdChronoForward) {
     using namespace std;
     using namespace std::chrono;
 
-    //2020-1-31
+    // 2020-1-31
     DateTOld date;
     date.FromString("2020-01-31");
 
@@ -70,8 +69,8 @@ TEST_F(DateTypeOldTest, TestEqStdChronoForward) {
     time_t time_c = mktime(&tmdate);
     system_clock::time_point tp = system_clock::from_time_t(time_c);
     sys_days sysdays = ceil<days>(tp);
-    
-    for(i32 i = 0; i < 30000; i++) {
+
+    for (i32 i = 0; i < 30000; i++) {
         year_month_day ymd = year_month_day(sysdays);
         String ymd_s = format("{:%Y-%m-%d}", ymd);
         EXPECT_STREQ(date.ToString().c_str(), ymd_s.c_str());
@@ -84,23 +83,22 @@ TEST_F(DateTypeOldTest, TestEqStdChronoForward) {
         EXPECT_TRUE(date.Add(date, oneday_interval, date_output));
         date = date_output;
     }
-
 }
 
 TEST_F(DateTypeOldTest, TestEqStdChronoBackward) {
-    using namespace infinity; 
+    using namespace infinity;
     using namespace std;
     using namespace std::chrono;
 
-    //2020-1-31
-    //std::chrono::
+    // 2020-1-31
+    // std::chrono::
     DateTOld date;
     date.FromString("2020-01-31");
- 
+
     year_month_day ymd(year{2020}, month{1}, day{31});
     sys_days sysdays = sys_days{ymd};
-    
-    for(i32 i = 0; i < 30000; i++) {
+
+    for (i32 i = 0; i < 30000; i++) {
         year_month_day ymd = year_month_day(sysdays);
         String ymd_s = format("{:%Y-%m-%d}", ymd);
         EXPECT_STREQ(date.ToString().c_str(), ymd_s.c_str());
@@ -113,5 +111,4 @@ TEST_F(DateTypeOldTest, TestEqStdChronoBackward) {
         EXPECT_TRUE(date.Subtract(date, oneday_interval, date_output));
         date = date_output;
     }
-
 }

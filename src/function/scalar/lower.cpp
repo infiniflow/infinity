@@ -36,19 +36,18 @@ inline void LowerFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *l
     result_ptr->AppendVarcharInner(lower_str, result);
 }
 
-
-void RegisterLowerFunction(const UniquePtr<Catalog> &catalog_ptr){
+void RegisterLowerFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "lower";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction lower_function(func_name,
-                                     {DataType(LogicalType::kVarchar)},
-                                     {DataType(LogicalType::kVarchar)},
-                                     &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, LowerFunction>);
+                                  {DataType(LogicalType::kVarchar)},
+                                  {DataType(LogicalType::kVarchar)},
+                                  &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, LowerFunction>);
     function_set_ptr->AddFunction(lower_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

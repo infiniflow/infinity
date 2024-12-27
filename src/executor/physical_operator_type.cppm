@@ -35,6 +35,8 @@ export enum class PhysicalOperatorType : i8 {
 
     kTableScan,
     kFilter,
+    kUnnest,
+    kUnnestAggregate,
     kIndexScan,
     kDummyScan,
     kKnnScan,

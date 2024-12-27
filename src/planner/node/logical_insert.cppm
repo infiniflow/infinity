@@ -30,10 +30,12 @@ namespace infinity {
 
 export class LogicalInsert : public LogicalNode {
 public:
-    explicit inline
-    LogicalInsert(u64 node_id, TableEntry *table_collection_ptr, u64 table_index, Vector<Vector<SharedPtr<BaseExpression>>> value_list)
+    explicit inline LogicalInsert(u64 node_id,
+                                  TableEntry *table_collection_ptr,
+                                  u64 table_index,
+                                  Vector<Vector<SharedPtr<BaseExpression>>> value_list)
         : LogicalNode(node_id, LogicalNodeType::kInsert), table_entry_(table_collection_ptr), value_list_(std::move(value_list)),
-          table_index_(table_index){};
+          table_index_(table_index) {};
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 

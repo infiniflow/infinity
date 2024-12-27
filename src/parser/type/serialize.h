@@ -109,7 +109,7 @@ inline void WriteBuf<std::tuple<>>(char *const buf, const std::tuple<> &) {}
 template <>
 inline void WriteBufAdv<std::tuple<>>(char *&buf, const std::tuple<> &) {}
 
-template<typename T>
+template <typename T>
 inline void WriteBufVecAdv(char *&buf, const T *data, size_t size) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
     memcpy(buf, data, sizeof(T) * size);

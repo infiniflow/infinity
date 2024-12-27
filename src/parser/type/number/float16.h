@@ -11,8 +11,8 @@
 #endif
 
 #if defined(__F16C__)
-#include <x86intrin.h>
 #include "common/simd/simd_init_h.h"
+#include <x86intrin.h>
 #endif
 
 namespace infinity {
@@ -30,14 +30,12 @@ T bit_cast(const U &u) {
 
 #if defined(__ARM_NEON)
 template <typename Dest, typename Src>
-Dest memcpy_cast(const Src& src)
-{
+Dest memcpy_cast(const Src &src) {
     static_assert(sizeof(Dest) == sizeof(Src), "Sizes of types do not match");
     Dest dest;
-    const char* srcPtr = reinterpret_cast<const char*>(&src);
-    char* destPtr = reinterpret_cast<char*>(&dest);
-    for (size_t i = 0; i < sizeof(Dest); i++)
-    {
+    const char *srcPtr = reinterpret_cast<const char *>(&src);
+    char *destPtr = reinterpret_cast<char *>(&dest);
+    for (size_t i = 0; i < sizeof(Dest); i++) {
         destPtr[i] = srcPtr[i];
     }
     return dest;

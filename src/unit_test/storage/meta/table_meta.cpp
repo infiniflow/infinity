@@ -55,16 +55,17 @@ TEST_P(TableMetaTest, to_string_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
-        std::cout << *(table_entry->GetTableMeta()->ToString()) << std::endl; 
-        EXPECT_TRUE(std::regex_match(*(table_entry->GetTableMeta()->ToString()), 
-                    std::regex("TableMeta,(\\s)db_entry_dir:(\\s)(.*)default_db,(\\s)table(\\s)name:(\\s)tbl1,(\\s)entry(\\s)count:(\\s)1")));       
+        std::cout << *(table_entry->GetTableMeta()->ToString()) << std::endl;
+        EXPECT_TRUE(std::regex_match(
+            *(table_entry->GetTableMeta()->ToString()),
+            std::regex("TableMeta,(\\s)db_entry_dir:(\\s)(.*)default_db,(\\s)table(\\s)name:(\\s)tbl1,(\\s)entry(\\s)count:(\\s)1")));
 
         auto [table_entry1, status2] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status2.ok());
@@ -89,20 +90,19 @@ TEST_P(TableMetaTest, name_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
         std::cout << *(table_entry->GetTableMeta()->table_name_ptr()) << std::endl;
         std::cout << table_entry->GetTableMeta()->table_name() << std::endl;
         std::cout << *(table_entry->GetTableMeta()->db_entry_dir()) << std::endl;
         EXPECT_STREQ(table_entry->GetTableMeta()->table_name_ptr()->c_str(), "tbl1");
         EXPECT_STREQ(table_entry->GetTableMeta()->table_name().c_str(), "tbl1");
-        EXPECT_TRUE(std::regex_match(*(table_entry->GetTableMeta()->db_entry_dir()), 
-                    std::regex("(.*)default_db")));
+        EXPECT_TRUE(std::regex_match(*(table_entry->GetTableMeta()->db_entry_dir()), std::regex("(.*)default_db")));
 
         auto [table_entry1, status2] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
         EXPECT_TRUE(status2.ok());
@@ -127,14 +127,14 @@ TEST_P(TableMetaTest, get_all_entries_test) {
             constraints.insert(ConstraintType::kNotNull);
             i64 column_id = 0;
             auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 128);
-            auto column_def_ptr =
-                MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
+            auto column_def_ptr = MakeShared<ColumnDef>(column_id, MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo), "col1", constraints);
             columns.emplace_back(column_def_ptr);
         }
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>("tbl1"), MakeShared<String>(), columns);
-        auto [table_entry, status] = catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
+        auto [table_entry, status] =
+            catalog->CreateTable("default_db", txn1->TxnID(), txn1->BeginTS(), std::move(tbl1_def), ConflictType::kError, txn_mgr);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(table_entry->GetTableMeta()->GetAllEntries().size(), 1);     
+        EXPECT_EQ(table_entry->GetTableMeta()->GetAllEntries().size(), 1);
         EXPECT_FALSE(table_entry->GetTableMeta()->Empty());
 
         auto [table_entry1, status2] = catalog->DropTableByName("default_db", "tbl1", ConflictType::kError, txn1->TxnID(), txn1->BeginTS(), txn_mgr);
@@ -145,4 +145,3 @@ TEST_P(TableMetaTest, get_all_entries_test) {
 
     txn_mgr->CommitTxn(txn1);
 }
-

@@ -29,7 +29,7 @@ enum class PeerThriftServerStatus : u8 {
 
 export class PoolPeerThriftServer {
 public:
-    void Init(const String& server_address, i32 port_no, i32 pool_size);
+    void Init(const String &server_address, i32 port_no, i32 pool_size);
     Thread Start();
     void Shutdown();
 

@@ -10,7 +10,7 @@ namespace infinity {
 
 FusionExpr::FusionExpr() : ParsedExpr(ParsedExprType::kFusion) {}
 
-FusionExpr::~FusionExpr(){}
+FusionExpr::~FusionExpr() {}
 
 std::string FusionExpr::ToString() const {
     if (!alias_.empty()) {

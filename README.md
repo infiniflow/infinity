@@ -102,7 +102,7 @@ See the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) g
 
 ## 📜 Roadmap
 
-See the [Infinity Roadmap 2024](https://github.com/infiniflow/infinity/issues/338)
+See the [Infinity Roadmap 2025](https://github.com/infiniflow/infinity/issues/2393)
 
 ## 🙌 Community
 

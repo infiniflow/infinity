@@ -56,6 +56,7 @@ public:
                            MinimumShouldMatchOption &&minimum_should_match_option,
                            f32 score_threshold,
                            FulltextSimilarity ft_similarity,
+                           const BM25Params &bm25_params,
                            u64 match_table_index,
                            SharedPtr<Vector<LoadMeta>> load_metas,
                            bool cache_result);
@@ -70,9 +71,7 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
 
-    SizeT TaskletCount() override {
-        return 1;
-    }
+    SizeT TaskletCount() override { return 1; }
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
@@ -115,6 +114,7 @@ private:
     MinimumShouldMatchOption minimum_should_match_option_{};
     f32 score_threshold_{};
     FulltextSimilarity ft_similarity_{FulltextSimilarity::kBM25};
+    BM25Params bm25_params_;
 
     bool ExecuteInner(QueryContext *query_context, OperatorState *operator_state);
 };

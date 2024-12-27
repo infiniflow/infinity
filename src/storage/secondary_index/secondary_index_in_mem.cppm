@@ -62,9 +62,8 @@ public:
 
     virtual Pair<u32, Bitmask> RangeQuery(const void *input) const = 0;
 
-    static SharedPtr<SecondaryIndexInMem> NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def,
-                                                                 SegmentIndexEntry *segment_index_entry,
-                                                                 RowID begin_row_id);
+    static SharedPtr<SecondaryIndexInMem>
+    NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, SegmentIndexEntry *segment_index_entry, RowID begin_row_id);
 };
 
 } // namespace infinity

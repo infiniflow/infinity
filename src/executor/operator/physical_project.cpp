@@ -147,7 +147,7 @@ bool PhysicalProject::Execute(QueryContext *, OperatorState *operator_state) {
 
         prev_op_state->data_block_array_.clear();
         if (prev_op_state->Complete()) {
-            if(prev_op_state->total_hits_count_flag_) {
+            if (prev_op_state->total_hits_count_flag_) {
                 project_operator_state->total_hits_count_flag_ = true;
                 project_operator_state->total_hits_count_ = prev_op_state->total_hits_count_;
             }

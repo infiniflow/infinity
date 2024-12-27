@@ -42,7 +42,7 @@ private:
     // in minmax build task, first set build_time_ to be the begin_ts of the task txn
     // if set to valid time, we know one job has started
     mutable std::mutex mutex_check_task_start_;
-    TxnTimeStamp build_time_{UNCOMMIT_TS};     // for minmax filter
+    TxnTimeStamp build_time_{UNCOMMIT_TS};          // for minmax filter
     std::atomic_flag finished_build_minmax_filter_; // for minmax filter
     UniquePtr<MinMaxDataFilter> min_max_data_filter_;
 

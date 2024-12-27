@@ -216,7 +216,7 @@ std::unique_ptr<char[]> GetConcatenatedTensorDataFromSubArray(const std::vector<
                                                               uint32_t &query_total_dimension) {
     static_assert(!std::is_same_v<T, bool>);
     std::unique_ptr<char[]> result;
-    T * output_data = nullptr;
+    T *output_data = nullptr;
     switch (sub_array_array[0]->literal_type_) {
         case LiteralType::kIntegerArray:
         case LiteralType::kDoubleArray: {
@@ -253,16 +253,18 @@ std::unique_ptr<char[]> GetConcatenatedTensorDataFromSubArray(const std::vector<
                 break;
             }
             case LiteralType::kSubArrayArray: {
-                for(uint32_t j = 0; j < sub_array_array[i]->sub_array_array_.size(); ++j) {
+                for (uint32_t j = 0; j < sub_array_array[i]->sub_array_array_.size(); ++j) {
                     switch (sub_array_array[i]->sub_array_array_[j]->literal_type_) {
                         case LiteralType::kIntegerArray: {
-                            FillConcatenatedTensorData(output_data + (i*sub_array_array[i]->sub_array_array_.size()+j) * tensor_column_basic_embedding_dim,
+                            FillConcatenatedTensorData(output_data +
+                                                           (i * sub_array_array[i]->sub_array_array_.size() + j) * tensor_column_basic_embedding_dim,
                                                        sub_array_array[i]->sub_array_array_[j]->long_array_,
                                                        tensor_column_basic_embedding_dim);
                             break;
                         }
                         case LiteralType::kDoubleArray: {
-                            FillConcatenatedTensorData(output_data + (i*sub_array_array[i]->sub_array_array_.size()+j) * tensor_column_basic_embedding_dim,
+                            FillConcatenatedTensorData(output_data +
+                                                           (i * sub_array_array[i]->sub_array_array_.size() + j) * tensor_column_basic_embedding_dim,
                                                        sub_array_array[i]->sub_array_array_[j]->double_array_,
                                                        tensor_column_basic_embedding_dim);
                             break;

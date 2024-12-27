@@ -2,7 +2,6 @@ module;
 
 import stl;
 
-
 export module byte_slice;
 
 namespace infinity {

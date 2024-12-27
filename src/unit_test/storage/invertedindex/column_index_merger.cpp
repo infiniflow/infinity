@@ -41,30 +41,29 @@ public:
 protected:
     void CreateIndex(const char *paragraphs[],
                      const SizeT num_paragraph,
-                     const String& index_dir,
-                     const Vector<String>& chunk_names,
-                     const Vector<RowID>& base_row_ids,
-                     const Vector<u32>& row_offsets,
-                     const Vector<u32>& row_counts);
+                     const String &index_dir,
+                     const Vector<String> &chunk_names,
+                     const Vector<RowID> &base_row_ids,
+                     const Vector<u32> &row_offsets,
+                     const Vector<u32> &row_counts);
 
-    void CreateIndex(const Vector<String>& paragraphs,
-                     const String& index_dir,
-                     const Vector<String>& chunk_names,
-                     const Vector<RowID>& base_row_ids,
-                     const Vector<u32>& row_offsets,
-                     const Vector<u32>& row_counts);
+    void CreateIndex(const Vector<String> &paragraphs,
+                     const String &index_dir,
+                     const Vector<String> &chunk_names,
+                     const Vector<RowID> &base_row_ids,
+                     const Vector<u32> &row_offsets,
+                     const Vector<u32> &row_counts);
 
-    void MergeAndCheckIndex(const String& index_dir,
-                            const Vector<String>& base_names,
-                            const Vector<RowID>& base_row_ids,
+    void MergeAndCheckIndex(const String &index_dir,
+                            const Vector<String> &base_names,
+                            const Vector<RowID> &base_row_ids,
                             const String &dst_base_name,
                             const Vector<ExpectedPosting> &expected_postings);
 
-    void GenerateParagraphs(u32 term_num, u32 row_num, u32 word_num, Vector<String>& paragraphs, Vector<ExpectedPosting>& expected_postings);
-    void GenerateTerms(Vector<String>& terms, u32 term_num);
-    void GenerateExpectedPosting(Map<String, Vector<int>>& term_postings,
-                                 Vector<ExpectedPosting>& expected_postings);
-    String GetParagraph(const Vector<String>& terms);
+    void GenerateParagraphs(u32 term_num, u32 row_num, u32 word_num, Vector<String> &paragraphs, Vector<ExpectedPosting> &expected_postings);
+    void GenerateTerms(Vector<String> &terms, u32 term_num);
+    void GenerateExpectedPosting(Map<String, Vector<int>> &term_postings, Vector<ExpectedPosting> &expected_postings);
+    String GetParagraph(const Vector<String> &terms);
     String GetTerm(u32 n);
 
 protected:
@@ -77,12 +76,12 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ColumnIndexMergerTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
-                                        const String& index_dir,
-                                        const Vector<String>& chunk_names,
-                                        const Vector<RowID>& base_row_ids,
-                                        const Vector<u32>& row_offsets,
-                                        const Vector<u32>& row_counts) {
+void ColumnIndexMergerTest::CreateIndex(const Vector<String> &paragraphs,
+                                        const String &index_dir,
+                                        const Vector<String> &chunk_names,
+                                        const Vector<RowID> &base_row_ids,
+                                        const Vector<u32> &row_offsets,
+                                        const Vector<u32> &row_counts) {
     EXPECT_EQ(chunk_names.size(), base_row_ids.size());
     EXPECT_EQ(chunk_names.size(), row_offsets.size());
     EXPECT_EQ(chunk_names.size(), row_counts.size());
@@ -102,18 +101,18 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
 
 void ColumnIndexMergerTest::CreateIndex(const char *paragraphs[],
                                         const SizeT num_paragraph,
-                                        const String& index_dir,
-                                        const Vector<String>& chunk_names,
-                                        const Vector<RowID>& base_row_ids,
-                                        const Vector<u32>& row_offsets,
-                                        const Vector<u32>& row_counts) {
+                                        const String &index_dir,
+                                        const Vector<String> &chunk_names,
+                                        const Vector<RowID> &base_row_ids,
+                                        const Vector<u32> &row_offsets,
+                                        const Vector<u32> &row_counts) {
     Vector<String> paragraphs_vec(paragraphs, paragraphs + num_paragraph);
     CreateIndex(paragraphs_vec, index_dir, chunk_names, base_row_ids, row_offsets, row_counts);
 }
 
-void ColumnIndexMergerTest::MergeAndCheckIndex(const String& index_dir,
-                                               const Vector<String>& base_names,
-                                               const Vector<RowID>& base_row_ids,
+void ColumnIndexMergerTest::MergeAndCheckIndex(const String &index_dir,
+                                               const Vector<String> &base_names,
+                                               const Vector<RowID> &base_row_ids,
                                                const String &dst_base_name,
                                                const Vector<ExpectedPosting> &expected_postings) {
     auto column_index_merger = MakeShared<ColumnIndexMerger>(index_dir, flag_);
@@ -168,17 +167,20 @@ void ColumnIndexMergerTest::GenerateTerms(Vector<infinity::String> &terms, infin
     }
 }
 
-String ColumnIndexMergerTest::GetParagraph(const Vector<String>& terms) {
+String ColumnIndexMergerTest::GetParagraph(const Vector<String> &terms) {
     String paragraph;
-    for (const auto& term : terms) {
+    for (const auto &term : terms) {
         paragraph.append(term);
         paragraph.append(" ");
     }
     return paragraph;
 }
 
-void ColumnIndexMergerTest::GenerateParagraphs(u32 term_num, u32 row_num, u32 word_num,
-                                               Vector<String> &paragraphs, Vector<ExpectedPosting>& expected_postings) {
+void ColumnIndexMergerTest::GenerateParagraphs(u32 term_num,
+                                               u32 row_num,
+                                               u32 word_num,
+                                               Vector<String> &paragraphs,
+                                               Vector<ExpectedPosting> &expected_postings) {
     Vector<String> terms;
     GenerateTerms(terms, term_num);
 
@@ -194,7 +196,7 @@ void ColumnIndexMergerTest::GenerateParagraphs(u32 term_num, u32 row_num, u32 wo
             u32 term_id = random() % term_num;
             auto term = terms[term_id];
             all_terms.emplace_back(terms[term_id]);
-            auto& posting = term_postings[term];
+            auto &posting = term_postings[term];
             posting[i]++;
         }
         paragraphs.emplace_back(GetParagraph(all_terms));
@@ -203,14 +205,14 @@ void ColumnIndexMergerTest::GenerateParagraphs(u32 term_num, u32 row_num, u32 wo
     GenerateExpectedPosting(term_postings, expected_postings);
 }
 
-void ColumnIndexMergerTest::GenerateExpectedPosting(Map<String, Vector<int>> &term_postings,
-                                                    Vector<ExpectedPosting> &expected_postings) {
-    for (auto& [term, posting] : term_postings) {
+void ColumnIndexMergerTest::GenerateExpectedPosting(Map<String, Vector<int>> &term_postings, Vector<ExpectedPosting> &expected_postings) {
+    for (auto &[term, posting] : term_postings) {
         Vector<u32> tfs;
         Vector<RowID> doc_ids;
         for (SizeT i = 0; i < posting.size(); ++i) {
             auto term_count = posting[i];
-            if (!term_count) continue;
+            if (!term_count)
+                continue;
             tfs.emplace_back(term_count);
             doc_ids.emplace_back(RowID(0, static_cast<u32>(i)));
         }
@@ -230,18 +232,14 @@ TEST_P(ColumnIndexMergerTest, GenerateParagraphsTest) {
     u32 word_num = 10;
 
     GenerateParagraphs(term_num, row_num, word_num, paragraphs, expected_postings);
-    for (auto& expected_posting : expected_postings) {
+    for (auto &expected_posting : expected_postings) {
         EXPECT_EQ(expected_posting.doc_ids.size(), expected_posting.tfs.size());
     }
 }
 
 TEST_P(ColumnIndexMergerTest, BasicParagraphTest) {
     using namespace infinity;
-    const char *paragraphs[] = {
-        R"#(B A)#",
-        R"#(A B A)#",
-        R"#(A A A)#"
-    };
+    const char *paragraphs[] = {R"#(B A)#", R"#(A B A)#", R"#(A A A)#"};
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
     const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
@@ -371,7 +369,6 @@ TEST_P(ColumnIndexMergerTest, BasicParagraphTest5) {
     CreateIndex(paragraphs, num_paragraph, index_dir, base_names, base_row_ids, row_offsets, row_counts);
     MergeAndCheckIndex(index_dir, base_names, base_row_ids, dst_base_name, expected_postings);
 }
-
 
 TEST_P(ColumnIndexMergerTest, GeneratePargraphsMergeTest) {
     using namespace infinity;

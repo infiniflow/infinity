@@ -1,7 +1,7 @@
 module;
 
-#include <cstring>
 #include <cstdio>
+#include <cstring>
 
 export module buf_writer;
 import stl;
@@ -15,7 +15,7 @@ export struct BufWriter {
         spill_buffer_ = MakeUnique<char_t[]>(spill_buf_size_);
     }
 
-    void Write(const char* data, SizeT data_size) {
+    void Write(const char *data, SizeT data_size) {
         if (spill_buf_idx_ + data_size > spill_buf_size_) {
             Flush();
         }
@@ -30,13 +30,11 @@ export struct BufWriter {
         }
     }
 
-    SizeT Tell() {
-        return ftell(spill_file_);
-    }
+    SizeT Tell() { return ftell(spill_file_); }
 
     FILE *spill_file_{nullptr};
     SizeT spill_buf_idx_{0};
     UniquePtr<char_t[]> spill_buffer_{};
     SizeT spill_buf_size_{0};
 };
-}
+} // namespace infinity

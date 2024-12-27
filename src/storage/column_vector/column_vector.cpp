@@ -2296,7 +2296,10 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(const char *&ptr, i32 maxbytes) {
 
 //////////////////////////////tensor////////////////////////////////////
 
-void ColumnVector::SetMultiVector(MultiVectorT &dest_multi_vec, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info) {
+void ColumnVector::SetMultiVector(MultiVectorT &dest_multi_vec,
+                                  VectorBuffer *dest_buffer,
+                                  Span<const char> data,
+                                  const EmbeddingInfo *embedding_info) {
     SizeT unit_embedding_bytes = embedding_info->Size();
     if (data.size() % unit_embedding_bytes != 0) {
         UnrecoverableError(fmt::format("Data size {} is not a multiple of embedding size {}", data.size(), unit_embedding_bytes));

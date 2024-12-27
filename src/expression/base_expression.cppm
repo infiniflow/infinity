@@ -16,7 +16,6 @@ module;
 
 export module base_expression;
 
-
 import stl;
 import expression_type;
 import data_type;
@@ -46,10 +45,10 @@ export struct SourcePosition {
 
 export class BaseExpression : public EnableSharedFromThis<BaseExpression> {
 public:
-    explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments) : type_(type), arguments_(std::move(arguments)){};
+    explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments) : type_(type), arguments_(std::move(arguments)) {};
 
     explicit BaseExpression(ExpressionType type, Vector<SharedPtr<BaseExpression>> arguments, String alias)
-        : alias_(std::move(alias)), type_(type), arguments_(std::move(arguments)){};
+        : alias_(std::move(alias)), type_(type), arguments_(std::move(arguments)) {};
 
     virtual ~BaseExpression() = default;
 

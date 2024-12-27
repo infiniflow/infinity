@@ -30,7 +30,7 @@ enum struct HTTPServerStatus : u8 {
 
 export class HTTPServer {
 public:
-    Thread Start(const String& server_address, u16 port);
+    Thread Start(const String &server_address, u16 port);
     void Shutdown();
 
 private:

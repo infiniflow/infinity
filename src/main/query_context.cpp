@@ -318,12 +318,12 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
 }
 
 void QueryContext::CreateQueryProfiler() {
-    if(InfinityContext::instance().storage()->catalog() == nullptr) {
-        return ;
+    if (InfinityContext::instance().storage()->catalog() == nullptr) {
+        return;
     }
 
     if (InfinityContext::instance().storage()->catalog()->GetProfile()) {
-        if(query_profiler_ == nullptr) {
+        if (query_profiler_ == nullptr) {
             query_profiler_ = MakeShared<QueryProfiler>(true);
         }
     }

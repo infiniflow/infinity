@@ -245,7 +245,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
                           static_cast<TimeDurationType>(finish_init_query_builder_time - execute_start_time).count()));
 
     // 2 build query iterator
-    FullTextQueryContext full_text_query_context(ft_similarity_, minimum_should_match_option_, top_n_, match_expr_->index_names_);
+    FullTextQueryContext full_text_query_context(ft_similarity_, bm25_params_, minimum_should_match_option_, top_n_, match_expr_->index_names_);
     full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
     const auto query_iterators = CreateQueryIterators(query_builder, full_text_query_context, early_term_algo_, begin_threshold_, score_threshold_);
     const auto finish_query_builder_time = std::chrono::high_resolution_clock::now();
@@ -331,6 +331,7 @@ PhysicalMatch::PhysicalMatch(const u64 id,
                              MinimumShouldMatchOption &&minimum_should_match_option,
                              const f32 score_threshold,
                              const FulltextSimilarity ft_similarity,
+                             const BM25Params &bm25_params,
                              const u64 match_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas,
                              const bool cache_result)
@@ -338,7 +339,7 @@ PhysicalMatch::PhysicalMatch(const u64 id,
       base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), index_reader_(std::move(index_reader)),
       query_tree_(std::move(query_tree)), begin_threshold_(begin_threshold), early_term_algo_(early_term_algo), top_n_(top_n),
       common_query_filter_(common_query_filter), minimum_should_match_option_(std::move(minimum_should_match_option)),
-      score_threshold_(score_threshold), ft_similarity_(ft_similarity) {}
+      score_threshold_(score_threshold), ft_similarity_(ft_similarity), bm25_params_(bm25_params) {}
 
 PhysicalMatch::~PhysicalMatch() = default;
 

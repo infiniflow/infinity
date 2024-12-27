@@ -10,4 +10,4 @@ class Catalog;
 
 export void RegisterIsinfFunction(const UniquePtr<Catalog> &catalog_ptr);
 
-}
+} // namespace infinity

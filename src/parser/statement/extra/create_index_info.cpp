@@ -81,7 +81,7 @@ IndexInfo::~IndexInfo() {
 }
 
 CreateIndexInfo::~CreateIndexInfo() {
-    if(index_info_ != nullptr) {
+    if (index_info_ != nullptr) {
         delete index_info_;
         index_info_ = nullptr;
     }

@@ -18,7 +18,7 @@
 namespace infinity {
 
 std::string StatementType2Str(StatementType statement_type) {
-    switch(statement_type) {
+    switch (statement_type) {
         case StatementType::kInvalidStmt: {
             ParserError("Unexpected error.");
             break;
@@ -79,4 +79,4 @@ std::string StatementType2Str(StatementType statement_type) {
     return "Error";
 }
 
-}
+} // namespace infinity

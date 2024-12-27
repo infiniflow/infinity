@@ -155,7 +155,7 @@ bool FragmentTask::QuitFromWorkerLoop() {
 }
 
 TaskBinding FragmentTask::TaskBinding() const {
-    struct TaskBinding binding {};
+    struct TaskBinding binding{};
 
     binding.task_id_ = task_id_;
     binding.fragment_id_ = FragmentId();

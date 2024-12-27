@@ -188,9 +188,7 @@ public:
     const std::string &db_name() const { return db_name_; }
     const std::string &table_name() const { return table_name_; }
 
-    void SetDBName(const std::string &db_name) {
-        db_name_ = db_name;
-    }
+    void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
 private:
     std::string db_name_;
@@ -209,9 +207,7 @@ public:
     const std::string &db_name() const { return db_name_; }
     const std::string &table_name() const { return table_name_; }
 
-    void SetDBName(const std::string &db_name) {
-        db_name_ = db_name;
-    }
+    void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
 private:
     std::string db_name_;

@@ -16,7 +16,6 @@ module;
 
 import stl;
 
-
 import physical_operator_type;
 import physical_operator;
 import query_context;

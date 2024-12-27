@@ -171,7 +171,7 @@ String CastExpression::ToString() const { return fmt::format("Cast({} AS {})", a
 
 u64 CastExpression::Hash() const {
     u64 h = 0;
-    h ^= std::hash<SizeT>() (reinterpret_cast<SizeT>(func_.function));
+    h ^= std::hash<SizeT>()(reinterpret_cast<SizeT>(func_.function));
     h ^= arguments_[0]->Hash();
     return h;
 }

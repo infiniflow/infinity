@@ -14,8 +14,6 @@
 
 module;
 
-
-
 export module file_reader;
 
 import stl;

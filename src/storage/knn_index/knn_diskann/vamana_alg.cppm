@@ -99,10 +99,7 @@ public:
         // SaveLabels(file_handler);
     }
 
-    void SaveGraph(LocalFileHandle &file_handle) { 
-        graph_store_.Save(file_handle, nd_ + num_frozen_pts_, num_frozen_pts_, start_); 
-
-    }
+    void SaveGraph(LocalFileHandle &file_handle) { graph_store_.Save(file_handle, nd_ + num_frozen_pts_, num_frozen_pts_, start_); }
 
     static UniquePtr<This> Load(LocalFileHandle &file_handle) {}
 

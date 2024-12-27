@@ -50,7 +50,7 @@ enum class TypeInfoType : uint8_t {
 
 class TypeInfo {
 public:
-    explicit TypeInfo(TypeInfoType type) : type_(type){};
+    explicit TypeInfo(TypeInfoType type) : type_(type) {};
 
     virtual ~TypeInfo() = default;
 

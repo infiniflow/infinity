@@ -24,6 +24,7 @@ public:
         ++n;
         return n;
     }
+
 protected:
     struct Loser {
         // flag, true if is a virtual maximum sentinel
@@ -42,11 +43,10 @@ protected:
     Comparator cmp_;
 
     bool first_insert_;
+
 public:
-    explicit LoserTreeBase(const Source& k,
-                           const Comparator& cmp = Comparator())
-         : ik_(k), k_(round_up_to_power_of_two(k)),
-          losers_(2 * k_), cmp_(cmp), first_insert_(true) {
+    explicit LoserTreeBase(const Source &k, const Comparator &cmp = Comparator())
+        : ik_(k), k_(round_up_to_power_of_two(k)), losers_(2 * k_), cmp_(cmp), first_insert_(true) {
         /*
         for (Source i = ik_ - 1; i < k_; i++) {
             losers_[i + k_].sup = true;
@@ -59,15 +59,11 @@ public:
         }
     }
 
-    Source TopSource() {
-        return losers_[0].source;
-    }
+    Source TopSource() { return losers_[0].source; }
 
-    ValueType TopKey() {
-        return losers_[0].key;
-    }
+    ValueType TopKey() { return losers_[0].key; }
 
-    void InsertStart(const ValueType* keyp, const Source& source, bool sup) {
+    void InsertStart(const ValueType *keyp, const Source &source, bool sup) {
         Source pos = k_ + source;
         losers_[pos].source = source;
         losers_[pos].sup = sup;
@@ -87,14 +83,13 @@ public:
     }
 
     // Recursively compute the winner of the competition at player root.
-    Source InitWinner(const Source& root) {
+    Source InitWinner(const Source &root) {
         if (root >= k_) {
             return root;
         }
         Source left = InitWinner(2 * root);
         Source right = InitWinner(2 * root + 1);
-        if (losers_[right].sup ||
-            (!losers_[left].sup && !cmp_(losers_[right].key, losers_[left].key))) {
+        if (losers_[right].sup || (!losers_[left].sup && !cmp_(losers_[right].key, losers_[left].key))) {
             losers_[root] = losers_[right];
             return left;
         } else {
@@ -118,12 +113,10 @@ public:
     using Source = typename Super::Source;
 
 public:
-    explicit LoserTree(const Source& k,
-                       const Comparator& cmp = Comparator())
-        : Super(k, cmp) {}
+    explicit LoserTree(const Source &k, const Comparator &cmp = Comparator()) : Super(k, cmp) {}
 
     // Delete the current minimum and insert a new element.
-    void DeleteTopInsert(const ValueType* keyp, bool sup) {
+    void DeleteTopInsert(const ValueType *keyp, bool sup) {
         assert(sup == (keyp == nullptr));
         Source source = Super::losers_[0].source;
         ValueType key = (keyp ? *keyp : ValueType());

@@ -257,7 +257,9 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
 
 export void ColumnVectorSetResult(TensorT &target, auto &&...args) { ColumnVector::SetTensor(target, std::forward<decltype(args)>(args)...); }
 
-export void ColumnVectorSetResult(MultiVectorT &target, auto &&...args) { ColumnVector::SetMultiVector(target, std::forward<decltype(args)>(args)...); }
+export void ColumnVectorSetResult(MultiVectorT &target, auto &&...args) {
+    ColumnVector::SetMultiVector(target, std::forward<decltype(args)>(args)...);
+}
 
 template <typename TargetValueType, typename SourceValueType>
 void EmbeddingTryCastToTensorMultiVectorImpl(const EmbeddingT &source,

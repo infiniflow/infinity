@@ -34,7 +34,7 @@ SharedPtr<BaseExpression> AggregateBinder::BuildExpression(const ParsedExpr &exp
     return result;
 }
 
-SharedPtr<BaseExpression> AggregateBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64 , bool ) {
+SharedPtr<BaseExpression> AggregateBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
     Status status = Status::SyntaxError("KNN expression isn't supported in in aggregate function");
     RecoverableError(status);
     return nullptr;

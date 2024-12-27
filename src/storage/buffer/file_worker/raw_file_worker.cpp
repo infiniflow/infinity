@@ -33,7 +33,7 @@ RawFileWorker::RawFileWorker(SharedPtr<String> data_dir,
                              SharedPtr<String> file_dir,
                              SharedPtr<String> file_name,
                              u32 file_size,
-                             PersistenceManager* persistence_manager)
+                             PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), buffer_size_(file_size) {}
 
 RawFileWorker::~RawFileWorker() {
@@ -67,7 +67,7 @@ void RawFileWorker::FreeInMemory() {
 bool RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     assert(data_ != nullptr && buffer_size_ > 0);
     auto status = file_handle_->Append(data_, buffer_size_);
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
@@ -78,7 +78,7 @@ void RawFileWorker::ReadFromFileImpl(SizeT file_size) {
     buffer_size_ = file_handle_->FileSize();
     data_ = static_cast<void *>(new char[buffer_size_]);
     auto [nbytes, status1] = file_handle_->Read(data_, buffer_size_);
-    if(!status1.ok()) {
+    if (!status1.ok()) {
         RecoverableError(status1);
     }
     if (nbytes != buffer_size_) {

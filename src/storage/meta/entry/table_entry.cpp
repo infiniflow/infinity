@@ -430,7 +430,8 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
             }
         }
         PopulateEntireConfig populate_entire_config{.prepare_ = false, .check_ts_ = false};
-        [[maybe_unused]] SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
+        [[maybe_unused]] SharedPtr<SegmentIndexEntry> segment_index_entry =
+            table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
     }
 }
 
@@ -714,7 +715,8 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
             case IndexType::kSecondary:
             case IndexType::kBMP: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
-                    LOG_TRACE(fmt::format("Table {}.{} index {} segment {} MemIndexInsert.", *GetDBName(), *table_name_, *index_base->index_name_, seg_id));
+                    LOG_TRACE(
+                        fmt::format("Table {}.{} index {} segment {} MemIndexInsert.", *GetDBName(), *table_name_, *index_base->index_name_, seg_id));
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
                 }
                 break;
@@ -1444,7 +1446,7 @@ Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
 
 IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
 
-void TableEntry::InvalidateFullTextIndexCache() { 
+void TableEntry::InvalidateFullTextIndexCache() {
     LOG_DEBUG(fmt::format("Invalidate fulltext index cache: table_name: {}", *table_name_));
     fulltext_column_index_cache_.Invalidate();
 }
@@ -1594,7 +1596,6 @@ void TableEntry::SetCreateIndexDone() {
     }
     table_status_ = TableStatus::kNone;
 }
-
 
 void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs, TxnTableStore *txn_table_store) {
     ExpressionBinder tmp_binder(nullptr);

@@ -30,7 +30,7 @@ SQLParser::SQLParser() {
 
 SQLParser::~SQLParser() { sqllex_destroy(scanner_); }
 
-void SQLParser::Parse(const std::string &sql_text, ParserResult* result) {
+void SQLParser::Parse(const std::string &sql_text, ParserResult *result) {
 
     state_ = sql_scan_string(sql_text.c_str(), scanner_);
 

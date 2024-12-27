@@ -27,4 +27,4 @@ public:
     static i64 OpenFileCount();
 };
 
-}
+} // namespace infinity

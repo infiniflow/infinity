@@ -28,11 +28,11 @@ module;
 #include <thrift/transport/TSocket.h>
 #include <thrift/transport/TTransportUtils.h>
 
-//#include "infinity_thrift/InfinityService.h"
-//#include "infinity_thrift/infinity_types.h"
-//#include "statement/explain_statement.h"
-//#include "statement/extra/extra_ddl_info.h"
-//#include "statement/statement_common.h"
+// #include "infinity_thrift/InfinityService.h"
+// #include "infinity_thrift/infinity_types.h"
+// #include "statement/explain_statement.h"
+// #include "statement/extra/extra_ddl_info.h"
+// #include "statement/statement_common.h"
 
 module thrift_server;
 
@@ -55,9 +55,7 @@ class InfinityServiceCloneFactory final : public infinity_thrift_rpc::InfinitySe
 public:
     ~InfinityServiceCloneFactory() final = default;
 
-    infinity_thrift_rpc::InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) final {
-        return new InfinityThriftService;
-    }
+    infinity_thrift_rpc::InfinityServiceIf *getHandler(const ::apache::thrift::TConnectionInfo &connInfo) final { return new InfinityThriftService; }
 
     void releaseHandler(infinity_thrift_rpc::InfinityServiceIf *handler) final { delete handler; }
 };
@@ -67,10 +65,10 @@ public:
 
 #if THRIFT_SERVER_TYPE == 2
 
-void ThreadedThriftServer::Init(const String& server_address, i32 port_no) {
+void ThreadedThriftServer::Init(const String &server_address, i32 port_no) {
 
     fmt::print("API server listen on {}: {}\n", server_address, port_no);
-//    std::cout << "API server listen on: " << server_address << ": " << port_no << std::endl;
+    //    std::cout << "API server listen on: " << server_address << ": " << port_no << std::endl;
     SharedPtr<TBinaryProtocolFactory> binary_protocol_factory = MakeShared<TBinaryProtocolFactory>();
     binary_protocol_factory->setStrict(true, true);
     server = MakeUnique<TThreadedServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
@@ -80,15 +78,15 @@ void ThreadedThriftServer::Init(const String& server_address, i32 port_no) {
 }
 
 void ThreadedThriftServer::Start() {
-    if(started_) {
-        return ;
+    if (started_) {
+        return;
     }
     started_ = true;
     server->serve();
 }
 
 void ThreadedThriftServer::Shutdown() {
-    if(started_) {
+    if (started_) {
         server->stop();
         started_ = false;
     }
@@ -96,12 +94,12 @@ void ThreadedThriftServer::Shutdown() {
 
 #elif THRIFT_SERVER_TYPE == 0
 
-void PoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_size) {
+void PoolThriftServer::Init(const String &server_address, i32 port_no, i32 pool_size) {
 
     SharedPtr<TServerSocket> server_socket = MakeShared<TServerSocket>(server_address, port_no);
 
     SharedPtr<TBinaryProtocolFactory> protocol_factory = MakeShared<TBinaryProtocolFactory>();
-//    SharedPtr<TCompactProtocolFactory> protocol_factory = MakeShared<TCompactProtocolFactory>();
+    //    SharedPtr<TCompactProtocolFactory> protocol_factory = MakeShared<TCompactProtocolFactory>();
 
     SharedPtr<ThreadFactory> threadFactory = MakeShared<ThreadFactory>();
 
@@ -110,7 +108,7 @@ void PoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_
     threadManager->start();
 
     fmt::print("API server(for Infinity-SDK) listen on {}: {}, connection limit: {}\n", server_address, port_no, pool_size);
-//    std::cout << "API server listen on: " << server_address << ": " << port_no << ", thread pool: " << pool_size << std::endl;
+    //    std::cout << "API server listen on: " << server_address << ": " << port_no << ", thread pool: " << pool_size << std::endl;
 
     server =
         MakeUnique<TThreadPoolServer>(MakeShared<infinity_thrift_rpc::InfinityServiceProcessorFactory>(MakeShared<InfinityServiceCloneFactory>()),
@@ -138,7 +136,6 @@ Thread PoolThriftServer::Start() {
         status_.store(ThriftServerStatus::kStopped);
         status_.notify_one();
     });
-
 }
 
 void PoolThriftServer::Shutdown() {
@@ -159,7 +156,7 @@ void PoolThriftServer::Shutdown() {
 
 #elif THRIFT_SERVER_TYPE == 1
 
-void NonBlockPoolThriftServer::Init(const String& server_address, i32 port_no, i32 pool_size) {
+void NonBlockPoolThriftServer::Init(const String &server_address, i32 port_no, i32 pool_size) {
 
     SharedPtr<ThreadFactory> thread_factory = MakeShared<ThreadFactory>();
     service_handler_ = MakeShared<InfinityThriftService>();
@@ -172,7 +169,7 @@ void NonBlockPoolThriftServer::Init(const String& server_address, i32 port_no, i
     threadManager->start();
 
     fmt::print("Non-block API server listen on {}: {}, connection limit: {}\n", server_address, port_no, pool_size);
-//    std::cout << "Non-block API server listen on: " << server_address << ": " << port_no << ", thread pool: " << pool_size << std::endl;
+    //    std::cout << "Non-block API server listen on: " << server_address << ": " << port_no << ", thread pool: " << pool_size << std::endl;
 
     SharedPtr<TNonblockingServerSocket> non_block_socket = MakeShared<TNonblockingServerSocket>(server_address, port_no);
 
@@ -189,15 +186,15 @@ void NonBlockPoolThriftServer::Init(const String& server_address, i32 port_no, i
 }
 
 void NonBlockPoolThriftServer::Start() {
-    if(started_) {
-        return ;
+    if (started_) {
+        return;
     }
     started_ = true;
     server_thread_->start();
 }
 
 void NonBlockPoolThriftServer::Shutdown() {
-    if(started_) {
+    if (started_) {
         server_thread_->join();
         started_ = false;
     }

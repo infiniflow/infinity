@@ -15,8 +15,8 @@
 #pragma once
 
 #include "base_statement.h"
-#include "statement_common.h"
 #include "expr/parsed_expr.h"
+#include "statement_common.h"
 
 namespace infinity {
 

@@ -56,25 +56,25 @@ void PhysicalFilter::Init() {
 }
 
 bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
-    auto* prev_op_state = operator_state->prev_op_state_;
-    auto* filter_operator_state = static_cast<FilterOperatorState *>(operator_state);
+    auto *prev_op_state = operator_state->prev_op_state_;
+    auto *filter_operator_state = static_cast<FilterOperatorState *>(operator_state);
 
-    if(prev_op_state->data_block_array_.empty()) {
+    if (prev_op_state->data_block_array_.empty()) {
         String error_message = "No input data array from input";
         UnrecoverableError(error_message);
     }
 
     SizeT input_block_count = prev_op_state->data_block_array_.size();
 
-    for(SizeT block_idx = 0; block_idx < input_block_count; ++ block_idx) {
+    for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
 
         // create uninitialized data block for output
         UniquePtr<DataBlock> data_block = DataBlock::MakeUniquePtr();
-        DataBlock* output_data_block = data_block.get();
+        DataBlock *output_data_block = data_block.get();
         operator_state->data_block_array_.emplace_back(std::move(data_block));
 
         SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
-        DataBlock* input_data_block = prev_op_state->data_block_array_[block_idx].get();
+        DataBlock *input_data_block = prev_op_state->data_block_array_[block_idx].get();
 
         // selector contains a pointer to input data, which should not be shared by multiple tasks
         ExpressionSelector selector;

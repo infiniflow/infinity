@@ -54,7 +54,7 @@ bool SearchOptions::operator==(const SearchOptions &rhs) const {
 
 std::string SearchOptions::ToString() {
     std::ostringstream oss;
-//    size_t num_options = options_.size();
+    //    size_t num_options = options_.size();
     auto it = options_.begin();
     auto end = options_.end();
     int cnt = 0;

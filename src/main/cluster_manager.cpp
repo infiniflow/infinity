@@ -104,7 +104,6 @@ Status ClusterManager::UnInit(bool not_unregister) {
     return Status::OK();
 }
 
-
 Tuple<SharedPtr<PeerClient>, Status> ClusterManager::ConnectToServerNoLock(const String &from_node_name, const String &server_ip, i64 server_port) {
     SharedPtr<PeerClient> client = MakeShared<PeerClient>(from_node_name, server_ip, server_port);
     Status client_status = client->Init();

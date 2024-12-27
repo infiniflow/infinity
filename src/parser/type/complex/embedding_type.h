@@ -17,6 +17,7 @@
 #include "parser_assert.h"
 #include "type/number/bfloat16.h"
 #include "type/number/float16.h"
+#include <arrow/type_fwd.h>
 #include <bitset>
 #include <cassert>
 #include <charconv>
@@ -24,7 +25,6 @@
 #include <cstring>
 #include <limits>
 #include <sstream>
-#include <arrow/type_fwd.h>
 
 namespace infinity {
 
@@ -106,7 +106,7 @@ inline EmbeddingDataType ToEmbeddingDataType<bfloat16_t>() {
 struct EmbeddingType {
 public:
     char *ptr{};
-        bool new_allocated_{};
+    bool new_allocated_{};
 
     static size_t embedding_type_width[];
 

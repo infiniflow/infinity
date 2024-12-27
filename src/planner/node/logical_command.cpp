@@ -60,7 +60,7 @@ String LogicalCommand::ToString(i64 &space) const {
         case CommandType::kExport: {
             ExportCmd *export_cmd_info = (ExportCmd *)(command_info_.get());
             ss << String(space, ' ') << arrow_str << "Export ";
-            switch(export_cmd_info->export_type()) {
+            switch (export_cmd_info->export_type()) {
                 case ExportType::kProfileRecord: {
                     ss << "Profile Record: " << export_cmd_info->file_no();
                 }
@@ -68,14 +68,14 @@ String LogicalCommand::ToString(i64 &space) const {
             break;
         }
         case CommandType::kSet: {
-            SetCmd* set_cmd_info = (SetCmd*)(command_info_.get());
+            SetCmd *set_cmd_info = (SetCmd *)(command_info_.get());
             ss << String(space, ' ') << arrow_str;
-            if(set_cmd_info->scope() == SetScope::kSession) {
+            if (set_cmd_info->scope() == SetScope::kSession) {
                 ss << "Set session variable: ";
             } else {
                 ss << "Set global variable: ";
             }
-            switch(set_cmd_info->value_type()) {
+            switch (set_cmd_info->value_type()) {
                 case SetVarType::kBool: {
                     ss << set_cmd_info->var_name() << " = " << set_cmd_info->value_bool();
                     break;

@@ -23,4 +23,4 @@ namespace infinity {
 export using infinity::ConstantExpr;
 export using infinity::LiteralType;
 
-}
+} // namespace infinity

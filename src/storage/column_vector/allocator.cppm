@@ -18,7 +18,6 @@ import global_resource_usage;
 
 export module allocator;
 
-
 namespace infinity {
 
 export class Allocator {

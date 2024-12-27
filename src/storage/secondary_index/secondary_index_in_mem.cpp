@@ -59,9 +59,7 @@ public:
         : SecondaryIndexInMem(segment_index_entry), begin_row_id_(begin_row_id) {
         IncreaseMemoryUsageBase(MemoryCostOfThis());
     }
-    ~SecondaryIndexInMemT() override {
-        DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow());
-    }
+    ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
     u32 GetRowCount() const override {
         std::shared_lock lock(map_mutex_);
         return in_mem_secondary_index_.size();
@@ -145,45 +143,44 @@ MemIndexTracerInfo SecondaryIndexInMem::GetInfo() const {
 
 TableIndexEntry *SecondaryIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }
 
-SharedPtr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def,
-                                                                           SegmentIndexEntry *segment_index_entry,
-                                                                           RowID begin_row_id) {
+SharedPtr<SecondaryIndexInMem>
+SecondaryIndexInMem::NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, SegmentIndexEntry *segment_index_entry, RowID begin_row_id) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {
         UnrecoverableError("Column type can't build secondary index");
     }
     switch (column_def->type()->type()) {
         case LogicalType::kTinyInt: {
-            return MakeShared<SecondaryIndexInMemT<TinyIntT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<TinyIntT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kSmallInt: {
-            return MakeShared<SecondaryIndexInMemT<SmallIntT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<SmallIntT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kInteger: {
-            return MakeShared<SecondaryIndexInMemT<IntegerT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<IntegerT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kBigInt: {
-            return MakeShared<SecondaryIndexInMemT<BigIntT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<BigIntT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kFloat: {
-            return MakeShared<SecondaryIndexInMemT<FloatT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<FloatT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kDouble: {
-            return MakeShared<SecondaryIndexInMemT<DoubleT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<DoubleT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kDate: {
-            return MakeShared<SecondaryIndexInMemT<DateT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<DateT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kTime: {
-            return MakeShared<SecondaryIndexInMemT<TimeT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<TimeT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kDateTime: {
-            return MakeShared<SecondaryIndexInMemT<DateTimeT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<DateTimeT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kTimestamp: {
-            return MakeShared<SecondaryIndexInMemT<TimestampT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<TimestampT>>(segment_index_entry, begin_row_id);
         }
         case LogicalType::kVarchar: {
-            return MakeShared<SecondaryIndexInMemT<VarcharT> >(segment_index_entry, begin_row_id);
+            return MakeShared<SecondaryIndexInMemT<VarcharT>>(segment_index_entry, begin_row_id);
         }
         default: {
             return nullptr;

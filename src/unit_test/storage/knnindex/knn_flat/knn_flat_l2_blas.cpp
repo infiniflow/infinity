@@ -101,7 +101,7 @@ TEST_F(KnnFlatL2BlasTest, test1) {
     EXPECT_FLOAT_EQ(id_array[3].segment_offset_, 3);
 
     {
-        KnnFlatL2Blas <f32> knn_distance_m(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
+        KnnFlatL2Blas<f32> knn_distance_m(query_embedding.get(), 1, top_k, dimension, EmbeddingDataType::kElemFloat);
         auto p_bitmask = Bitmask::MakeSharedAllTrue(base_embedding_count);
         p_bitmask->SetFalse(1);
         {

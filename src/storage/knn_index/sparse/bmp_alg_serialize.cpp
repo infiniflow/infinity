@@ -14,8 +14,8 @@
 
 module;
 
-#include <vector>
 #include "common/simd/simd_common_intrin_include.h"
+#include <vector>
 
 module bmp_alg;
 

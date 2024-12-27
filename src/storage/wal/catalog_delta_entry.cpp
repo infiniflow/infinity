@@ -144,9 +144,7 @@ const String CatalogDeltaOperation::ToString() const {
                        *encode_);
 }
 
-String CatalogDeltaOperation::ToStringSimple() const {
-    return fmt::format("type: {}, encode: {}", CatalogDeltaOpTypeToString(type_), *encode_);
-}
+String CatalogDeltaOperation::ToStringSimple() const { return fmt::format("type: {}, encode: {}", CatalogDeltaOpTypeToString(type_), *encode_); }
 
 CatalogDeltaOperation::CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts)
     : begin_ts_(base_entry->begin_ts_), txn_id_(base_entry->txn_id_), commit_ts_(base_entry->commit_ts_), encode_(base_entry->encode_ptr()),
@@ -378,7 +376,6 @@ void CatalogDeltaOperation::CheckDelete() {
         [[maybe_unused]] auto *add_segment_index_op = static_cast<AddSegmentIndexEntryOp *>(this);
     }
 }
-
 
 AddDBEntryOp::AddDBEntryOp(DBEntry *db_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_DATABASE_ENTRY, db_entry, commit_ts), db_entry_dir_(db_entry->db_entry_dir()),
@@ -1321,29 +1318,29 @@ void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1) {
 #if 1
         SizeT encode1_len = encode1.size();
         SizeT encode2_len = encode2.size();
-        if(encode1_len > encode2_len) {
+        if (encode1_len > encode2_len) {
             // encode1 isn't prefix of encode2
             break;
         }
         // encode1_len <= encode2_len
         SizeT idx = 0;
-        while(idx < encode1_len) {
-            if(encode1[idx] != encode2[idx]) {
+        while (idx < encode1_len) {
+            if (encode1[idx] != encode2[idx]) {
                 break;
             }
-            ++ idx;
+            ++idx;
         }
 
-        if(idx != encode1_len) {
-            break;  // encode1 is not prefix of encode2
+        if (idx != encode1_len) {
+            break; // encode1 is not prefix of encode2
         }
 
-        if(idx == encode2_len) {
+        if (idx == encode2_len) {
             ++iter;
             continue; // encode1 == encode2;
         }
 
-        if(encode2[idx] != '#') {
+        if (encode2[idx] != '#') {
             ++iter;
             continue; // encode1 is not prefix of encode2
         }

@@ -49,7 +49,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         UnrecoverableError(error_message);
     }
 
-    if(persistence_manager_ != nullptr && !to_spill) {
+    if (persistence_manager_ != nullptr && !to_spill) {
         String write_dir = *file_dir_;
         String write_path = Path(*data_dir_) / write_dir / *file_name_;
         String tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
@@ -59,9 +59,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
             UnrecoverableError(status.message());
         }
         file_handle_ = std::move(file_handle);
-        DeferFn defer_fn([&]() {
-            file_handle_ = nullptr;
-        });
+        DeferFn defer_fn([&]() { file_handle_ = nullptr; });
 
         bool prepare_success = false;
 
@@ -91,9 +89,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
             UnrecoverableError(status.message());
         }
         file_handle_ = std::move(file_handle);
-        DeferFn defer_fn([&]() {
-            file_handle_ = nullptr;
-        });
+        DeferFn defer_fn([&]() { file_handle_ = nullptr; });
 
         if (to_spill) {
             LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
@@ -126,9 +122,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
         file_size = file_handle->FileSize();
     }
     file_handle_ = std::move(file_handle);
-    DeferFn defer_fn2([&]() {
-        file_handle_ = nullptr;
-    });
+    DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
     ReadFromFileImpl(file_size);
 }
 
@@ -160,10 +154,7 @@ void FileWorker::MoveFile() {
 // Get absolute file path. As key of buffer handle.
 String FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
 
-String FileWorker::ChooseFileDir(bool spill) const {
-    return spill ? (Path(*temp_dir_) / *file_dir_)
-                 : (Path(*data_dir_) / *file_dir_);
-}
+String FileWorker::ChooseFileDir(bool spill) const { return spill ? (Path(*temp_dir_) / *file_dir_) : (Path(*data_dir_) / *file_dir_); }
 
 Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathInner(bool from_spill) {
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
@@ -190,7 +181,6 @@ Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathIn
     }
     return {std::move(defer_fn), std::move(read_path)};
 }
-
 
 void FileWorker::CleanupFile() const {
     if (persistence_manager_ != nullptr) {

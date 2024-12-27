@@ -39,8 +39,8 @@ namespace infinity {
 
 Optimizer::Optimizer(QueryContext *query_context_ptr) : query_context_ptr_(query_context_ptr) {
     // TODO: need an equivalent expression optimizer
-    AddRule(MakeUnique<ApplyFastRoughFilter>());      // put it before SecondaryIndexScanBuilder
-    AddRule(MakeUnique<IndexScanBuilder>()); // put it before ColumnPruner, necessary for filter_fulltext and index_scan
+    AddRule(MakeUnique<ApplyFastRoughFilter>()); // put it before SecondaryIndexScanBuilder
+    AddRule(MakeUnique<IndexScanBuilder>());     // put it before ColumnPruner, necessary for filter_fulltext and index_scan
     AddRule(MakeUnique<ColumnPruner>());
     AddRule(MakeUnique<LazyLoad>());
     AddRule(MakeUnique<ColumnRemapper>());
@@ -58,17 +58,16 @@ void Optimizer::AddRule(UniquePtr<OptimizerRule> rule) { rules_.emplace_back(std
 void Optimizer::optimize(SharedPtr<LogicalNode> &unoptimized_plan, StatementType statement_type) {
     // Expression folding should be done in logical planner before optimizer
     // Non-select plan, the root node won't be project.
-    switch(statement_type) {
+    switch (statement_type) {
         case StatementType::kSelect:
         case StatementType::kExplain:
         case StatementType::kDelete:
-        case StatementType::kUpdate:
-        {
+        case StatementType::kUpdate: {
             ; // continue;
             break;
         }
         default: {
-            return ;
+            return;
         }
     }
 

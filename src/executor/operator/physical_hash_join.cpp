@@ -19,7 +19,6 @@ import query_context;
 import operator_state;
 import stl;
 
-
 module physical_hash_join;
 
 namespace infinity {

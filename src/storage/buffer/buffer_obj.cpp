@@ -297,7 +297,6 @@ void BufferObj::ToMmap() {
             status_ = BufferStatus::kFreed;
             type_ = BufferType::kMmap;
             break;
-
         }
         case BufferStatus::kFreed: {
             type_ = BufferType::kMmap;

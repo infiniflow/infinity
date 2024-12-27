@@ -427,79 +427,79 @@ TEST_P(GreaterEqualsFunctionsTest, greater_equals_func) {
         }
     }
 
-//    {
-//        Vector<SharedPtr<BaseExpression>> inputs;
-//        SharedPtr<DataType> data_type1 = MakeShared<DataType>(LogicalType::kVarchar);
-//        SharedPtr<DataType> data_type2 = MakeShared<DataType>(LogicalType::kVarchar);
-//        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
-//
-//        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type1, "t1", 1, "c1", 0, 0);
-//        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type2, "t1", 1, "c2", 1, 0);
-//
-//        inputs.emplace_back(col1_expr_ptr);
-//        inputs.emplace_back(col2_expr_ptr);
-//
-//        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-//        EXPECT_STREQ(">=(Varchar, Varchar)->Boolean", func.ToString().c_str());
-//
-//        Vector<SharedPtr<DataType>> column_types;
-//        column_types.emplace_back(data_type1);
-//        column_types.emplace_back(data_type2);
-//
-//        SizeT row_count = DEFAULT_VECTOR_SIZE;
-//
-//        DataBlock data_block;
-//        data_block.Init(column_types);
-//
-//        for (SizeT i = 0; i < row_count; ++i) {
-//            if (i % 2 == 0) {
-//                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
-//                data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + std::to_string(i)));
-//            } else {
-//                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
-//                data_block.AppendValue(1, Value::MakeVarchar("helloworld" + std::to_string(i)));
-//            }
-//        }
-//        data_block.Finalize();
-//
-//        for (SizeT i = 0; i < row_count; ++i) {
-//            Value v1 = data_block.GetValue(0, i);
-//            Value v2 = data_block.GetValue(1, i);
-//            EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
-//            EXPECT_EQ(v2.type_.type(), LogicalType::kVarchar);
-//            if (i % 2 == 0) {
-//                EXPECT_EQ(v1.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
-//                EXPECT_EQ(v2.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
-//            } else {
-//                EXPECT_EQ(v1.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
-//                EXPECT_EQ(v2.value_.varchar.ToString(), "helloworld" + std::to_string(i));
-//            }
-//        }
-//
-//        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
-//        result->Initialize();
-//        func.function_(data_block, result);
-//
-//        for (SizeT i = 0; i < row_count; ++i) {
-//            Value v = result->GetValue(i);
-//            EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
-//            if (i % 2 == 0) {
-//                String s1 = "Helloworld" + std::to_string(i);
-//                String s2 = "Helloworld" + std::to_string(i);
-//                if (s1 >= s2) {
-//                    EXPECT_EQ(v.value_.boolean, true);
-//                } else {
-//                    EXPECT_EQ(v.value_.boolean, false);
-//                }
-//            } else {
-//                String s1 = "Helloworld" + std::to_string(i);
-//                String s2 = "helloworld" + std::to_string(i);
-//                if (s1 >= s2) {
-//                    EXPECT_EQ(v.value_.boolean, true);
-//                } else {
-//                    EXPECT_EQ(v.value_.boolean, false);
-//                }
-//            }
-//        }
-//    }
+    //    {
+    //        Vector<SharedPtr<BaseExpression>> inputs;
+    //        SharedPtr<DataType> data_type1 = MakeShared<DataType>(LogicalType::kVarchar);
+    //        SharedPtr<DataType> data_type2 = MakeShared<DataType>(LogicalType::kVarchar);
+    //        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBoolean);
+    //
+    //        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(*data_type1, "t1", 1, "c1", 0, 0);
+    //        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(*data_type2, "t1", 1, "c2", 1, 0);
+    //
+    //        inputs.emplace_back(col1_expr_ptr);
+    //        inputs.emplace_back(col2_expr_ptr);
+    //
+    //        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+    //        EXPECT_STREQ(">=(Varchar, Varchar)->Boolean", func.ToString().c_str());
+    //
+    //        Vector<SharedPtr<DataType>> column_types;
+    //        column_types.emplace_back(data_type1);
+    //        column_types.emplace_back(data_type2);
+    //
+    //        SizeT row_count = DEFAULT_VECTOR_SIZE;
+    //
+    //        DataBlock data_block;
+    //        data_block.Init(column_types);
+    //
+    //        for (SizeT i = 0; i < row_count; ++i) {
+    //            if (i % 2 == 0) {
+    //                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
+    //                data_block.AppendValue(1, Value::MakeVarchar("Helloworld" + std::to_string(i)));
+    //            } else {
+    //                data_block.AppendValue(0, Value::MakeVarchar("Helloworld" + std::to_string(i)));
+    //                data_block.AppendValue(1, Value::MakeVarchar("helloworld" + std::to_string(i)));
+    //            }
+    //        }
+    //        data_block.Finalize();
+    //
+    //        for (SizeT i = 0; i < row_count; ++i) {
+    //            Value v1 = data_block.GetValue(0, i);
+    //            Value v2 = data_block.GetValue(1, i);
+    //            EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
+    //            EXPECT_EQ(v2.type_.type(), LogicalType::kVarchar);
+    //            if (i % 2 == 0) {
+    //                EXPECT_EQ(v1.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
+    //                EXPECT_EQ(v2.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
+    //            } else {
+    //                EXPECT_EQ(v1.value_.varchar.ToString(), "Helloworld" + std::to_string(i));
+    //                EXPECT_EQ(v2.value_.varchar.ToString(), "helloworld" + std::to_string(i));
+    //            }
+    //        }
+    //
+    //        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+    //        result->Initialize();
+    //        func.function_(data_block, result);
+    //
+    //        for (SizeT i = 0; i < row_count; ++i) {
+    //            Value v = result->GetValue(i);
+    //            EXPECT_EQ(v.type_.type(), LogicalType::kBoolean);
+    //            if (i % 2 == 0) {
+    //                String s1 = "Helloworld" + std::to_string(i);
+    //                String s2 = "Helloworld" + std::to_string(i);
+    //                if (s1 >= s2) {
+    //                    EXPECT_EQ(v.value_.boolean, true);
+    //                } else {
+    //                    EXPECT_EQ(v.value_.boolean, false);
+    //                }
+    //            } else {
+    //                String s1 = "Helloworld" + std::to_string(i);
+    //                String s2 = "helloworld" + std::to_string(i);
+    //                if (s1 >= s2) {
+    //                    EXPECT_EQ(v.value_.boolean, true);
+    //                } else {
+    //                    EXPECT_EQ(v.value_.boolean, false);
+    //                }
+    //            }
+    //        }
+    //    }
 }

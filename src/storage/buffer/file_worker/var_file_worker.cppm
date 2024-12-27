@@ -31,7 +31,7 @@ public:
                            SharedPtr<String> file_dir,
                            SharedPtr<String> file_name,
                            SizeT buffer_size,
-                           PersistenceManager* persistence_manager);
+                           PersistenceManager *persistence_manager);
 
     virtual ~VarFileWorker() override;
 

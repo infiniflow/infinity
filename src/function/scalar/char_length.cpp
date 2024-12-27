@@ -32,19 +32,18 @@ inline bool CharLengthFunction::Run(VarcharT &left, int &result) {
     return true;
 }
 
-
-void RegisterCharLengthFunction(const UniquePtr<Catalog> &catalog_ptr){
+void RegisterCharLengthFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "char_length";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction char_length_function(func_name,
-                                     {DataType(LogicalType::kVarchar)},
-                                     {DataType(LogicalType::kInteger)},
-                                     &ScalarFunction::UnaryFunctionWithFailure<VarcharT, IntegerT, CharLengthFunction>);
+                                        {DataType(LogicalType::kVarchar)},
+                                        {DataType(LogicalType::kInteger)},
+                                        &ScalarFunction::UnaryFunctionWithFailure<VarcharT, IntegerT, CharLengthFunction>);
     function_set_ptr->AddFunction(char_length_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity
