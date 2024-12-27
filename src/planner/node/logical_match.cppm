@@ -68,6 +68,7 @@ public:
     MinimumShouldMatchOption minimum_should_match_option_{};
     f32 score_threshold_{};
     FulltextSimilarity ft_similarity_{FulltextSimilarity::kBM25};
+    BM25Params bm25_params_;
 };
 
 } // namespace infinity

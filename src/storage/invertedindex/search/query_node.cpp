@@ -26,6 +26,7 @@ import parse_fulltext_options;
 import keyword_iterator;
 import must_first_iterator;
 import batch_or_iterator;
+import blockmax_leaf_iterator;
 
 namespace infinity {
 
@@ -421,10 +422,10 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParam
         return nullptr;
     }
     auto search = MakeUnique<TermDocIterator>(std::move(posting_iterator), column_id, GetWeight(), params.ft_similarity);
-    auto column_length_reader = MakeUnique<FullTextColumnLengthReader>(column_index_reader);
-    search->InitBM25Info(std::move(column_length_reader));
     search->term_ptr_ = &term_;
     search->column_name_ptr_ = &column_;
+    auto column_length_reader = MakeUnique<FullTextColumnLengthReader>(column_index_reader);
+    search->InitBM25Info(std::move(column_length_reader), params.bm25_params.delta_term, params.bm25_params.k1, params.bm25_params.b);
     return search;
 }
 
@@ -449,10 +450,10 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchPar
         posting_iterators.emplace_back(std::move(posting_iterator));
     }
     auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), GetWeight(), slop_, params.ft_similarity);
-    auto column_length_reader = MakeUnique<FullTextColumnLengthReader>(column_index_reader);
-    search->InitBM25Info(std::move(column_length_reader));
     search->terms_ptr_ = &terms_;
     search->column_name_ptr_ = &column_;
+    auto column_length_reader = MakeUnique<FullTextColumnLengthReader>(column_index_reader);
+    search->InitBM25Info(std::move(column_length_reader), params.bm25_params.delta_phrase, params.bm25_params.k1, params.bm25_params.b);
     return search;
 }
 

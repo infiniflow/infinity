@@ -53,16 +53,23 @@ class DocIterator;
 class EarlyTerminateIterator;
 enum class EarlyTermAlgo;
 enum class FulltextSimilarity;
+struct BM25Params;
 
 struct CreateSearchParams {
     const TableEntry *table_entry;
     const IndexReader *index_reader;
     EarlyTermAlgo early_term_algo;
     FulltextSimilarity ft_similarity;
+    const BM25Params &bm25_params;
     uint32_t minimum_should_match;
     uint32_t topn;
     const std::vector<std::string> &index_names_;
-    [[nodiscard]] CreateSearchParams RemoveMSM() const { return {table_entry, index_reader, early_term_algo, ft_similarity, 0, topn, index_names_}; }
+
+    [[nodiscard]] CreateSearchParams RemoveMSM() const {
+        CreateSearchParams copy_value = *this;
+        copy_value.minimum_should_match = 0;
+        return copy_value;
+    }
 };
 
 // step 1. get the query tree from parser
