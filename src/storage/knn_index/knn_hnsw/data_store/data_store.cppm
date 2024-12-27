@@ -427,13 +427,11 @@ private:
 
 public:
     DataStore() = default;
-    DataStore(DataStore &&other)
-        : Base(std::move(other)), inner_(std::move(other.inner_)), ptr_start_(other.ptr_start_), cur_vec_num_(other.cur_vec_num_) {}
+    DataStore(DataStore &&other) : Base(std::move(other)), inner_(std::move(other.inner_)), cur_vec_num_(other.cur_vec_num_) {}
     DataStore &operator=(DataStore &&other) {
         if (this != &other) {
             Base::operator=(std::move(other));
             inner_ = std::move(other.inner_);
-            ptr_start_ = other.ptr_start_;
             cur_vec_num_ = other.cur_vec_num_;
         }
         return *this;
@@ -464,12 +462,8 @@ public:
 
     SizeT mem_usage() const { return 0; }
 
-    const char *ptr_start() const { return ptr_start_; }
-    void set_ptr_start(const char *ptr_start) { ptr_start_ = ptr_start; }
-
 private:
     Inner inner_;
-    const char *ptr_start_ = nullptr;
     SizeT cur_vec_num_ = 0;
 
 public:

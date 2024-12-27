@@ -524,7 +524,6 @@ public:
 
 public:
     static UniquePtr<This> LoadFromPtr(const char *&ptr, SizeT size) {
-        const char *ptr_start = ptr;
         const char *ptr_end = ptr + size;
         SizeT M = ReadBufAdv<SizeT>(ptr);
         SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
@@ -533,16 +532,7 @@ public:
         if (SizeT diff = ptr_end - ptr; diff != 0) {
             UnrecoverableError("LoadFromPtr failed");
         }
-        data_store.set_ptr_start(ptr_start);
         return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance));
-    }
-
-    bool LoadAgain(const char *&ptr, SizeT size) {
-        if (this->data_store_.ptr_start() == ptr) {
-            return false;
-        }
-        *this = std::move(*LoadFromPtr(ptr, size));
-        return true;
     }
 };
 
