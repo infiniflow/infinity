@@ -33,7 +33,6 @@ import conjunction_expression;
 
 namespace infinity {
 
-
 export class LogicalNodeVisitor {
 public:
     virtual void VisitNode(LogicalNode &op) = 0;

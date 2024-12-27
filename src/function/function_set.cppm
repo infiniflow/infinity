@@ -18,7 +18,6 @@ export module function_set;
 
 import stl;
 
-
 import function;
 import base_expression;
 import function_expr;
@@ -41,9 +40,7 @@ public:
 
     [[nodiscard]] const String &name() const { return name_; }
 
-    FunctionType type() const  {
-        return type_;
-    }
+    FunctionType type() const { return type_; }
 
     String name_;
     FunctionType type_;

@@ -65,9 +65,7 @@ export struct MmapReader {
         }
     }
 
-    ~MmapReader() {
-        MunmapFile(data_ptr_, data_len_, offset_diff_);
-    }
+    ~MmapReader() { MunmapFile(data_ptr_, data_len_, offset_diff_); }
 
     void Seek(SizeT pos, bool set = false) {
         if (set) {
@@ -87,7 +85,7 @@ export struct MmapReader {
         idx_ += sizeof(u32);
     }
 
-    SizeT ReadBuf(char* buf, SizeT len) {
+    SizeT ReadBuf(char *buf, SizeT len) {
         if (idx_ + len <= data_len_) {
             memcpy(buf, data_ptr_ + idx_, len);
             idx_ += len;
@@ -100,8 +98,8 @@ export struct MmapReader {
         }
     }
 
-    char* ReadBufNonCopy(SizeT len) {
-        char* buf = (char*)(data_ptr_ + idx_);
+    char *ReadBufNonCopy(SizeT len) {
+        char *buf = (char *)(data_ptr_ + idx_);
         idx_ = std::min(idx_ + len, data_len_);
         return buf;
     }

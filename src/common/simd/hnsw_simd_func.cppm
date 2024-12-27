@@ -14,8 +14,8 @@
 
 module;
 
-#include <cmath>
 #include "simd_common_intrin_include.h"
+#include <cmath>
 
 import stl;
 import simd_common_tools;
@@ -208,7 +208,7 @@ export float F32CosSSE(const float *pv1, const float *pv2, SizeT dim) {
     _mm_store_ps(V1TmpRes, norm_v1);
     _mm_store_ps(V2TmpRes, norm_v2);
 
-    float mul_res = MulTmpRes[0] + MulTmpRes[1] + MulTmpRes[2] + MulTmpRes[3]; 
+    float mul_res = MulTmpRes[0] + MulTmpRes[1] + MulTmpRes[2] + MulTmpRes[3];
     float v1_res = V1TmpRes[0] + V1TmpRes[1] + V1TmpRes[2] + V1TmpRes[3];
     float v2_res = V2TmpRes[0] + V2TmpRes[1] + V2TmpRes[2] + V2TmpRes[3];
 

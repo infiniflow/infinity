@@ -78,7 +78,7 @@ String LogicalExport::ToString(i64 &space) const {
     }
 
     ss << "to " << schema_name_ << '.' << table_name_ << ", offset " << offset_;
-    if(limit_ != 0) {
+    if (limit_ != 0) {
         ss << " limit " << limit_;
     }
 

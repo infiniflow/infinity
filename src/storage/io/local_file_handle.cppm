@@ -33,7 +33,6 @@ public:
     }
     ~LocalFileHandle();
 
-
     Status Append(const void *buffer, u64 nbytes);
     Status Append(const String &buffer, u64 nbytes);
     Tuple<SizeT, Status> Read(void *buffer, u64 nbytes);
@@ -45,13 +44,9 @@ public:
     Status Sync();
 
 public:
-    i32 FileDescriptor() const {
-        return fd_;
-    }
+    i32 FileDescriptor() const { return fd_; }
 
-    String Path() const {
-        return path_;
-    }
+    String Path() const { return path_; }
 
 private:
     Status Close();

@@ -49,9 +49,7 @@ protected:
         txn_mgr_ = storage_->txn_manager();
     }
 
-    void TearDown() override {
-        infinity::InfinityContext::instance().UnInit();
-    }
+    void TearDown() override { infinity::InfinityContext::instance().UnInit(); }
 
     Txn *DeleteRow(const String &db_name, const String &table_name, Vector<SegmentOffset> segment_offsets) {
         auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Delete row"));
@@ -123,8 +121,7 @@ protected:
 TEST_F(ConflictCheckTest, conflict_check_delete) {
     auto db_name = std::make_shared<std::string>("default_db");
     auto table_name = std::make_shared<std::string>("table1");
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
 
     SizeT row_cnt = 10;

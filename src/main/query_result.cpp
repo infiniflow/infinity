@@ -38,7 +38,7 @@ String QueryResult::ToString() const {
             return "DELETE 0 1";
         }
         default: {
-            ss <<std::endl;
+            ss << std::endl;
         }
     }
 
@@ -50,7 +50,7 @@ String QueryResult::ToString() const {
         }
         ss << result_table_->GetColumnNameById(idx) << end;
     }
-    ss <<std::endl;
+    ss << std::endl;
 
     // Get Block count
     SizeT block_count = result_table_->DataBlockCount();
@@ -58,13 +58,11 @@ String QueryResult::ToString() const {
     // Iterate all blocks
     for (SizeT idx = 0; idx < block_count; ++idx) {
         // Get current block
-        DataBlock* current_block = result_table_->GetDataBlockById(idx).get();
+        DataBlock *current_block = result_table_->GetDataBlockById(idx).get();
         ss << current_block->ToString();
     }
 
     return ss.str();
 }
 
-
-
-}
+} // namespace infinity

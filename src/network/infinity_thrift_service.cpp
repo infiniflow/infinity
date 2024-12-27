@@ -2745,7 +2745,7 @@ void InfinityThriftService::ProcessDataBlocks(const QueryResult &result,
         }
     }
 
-    if(result.result_table_->total_hits_count_flag_) {
+    if (result.result_table_->total_hits_count_flag_) {
         nlohmann::json json_response;
         json_response["total_hits_count"] = result.result_table_->total_hits_count_;
         response.extra_result = json_response.dump();

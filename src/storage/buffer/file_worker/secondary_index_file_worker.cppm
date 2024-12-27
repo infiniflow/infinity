@@ -39,7 +39,7 @@ public:
                                       SharedPtr<IndexBase> index_base,
                                       SharedPtr<ColumnDef> column_def,
                                       u32 row_count,
-                                      PersistenceManager* persistence_manager)
+                                      PersistenceManager *persistence_manager)
         : IndexFileWorker(std::move(data_dir),
                           std::move(temp_dir),
                           std::move(file_dir),

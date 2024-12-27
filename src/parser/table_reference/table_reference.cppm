@@ -23,4 +23,4 @@ namespace infinity {
 export using infinity::TableReference;
 export using infinity::TableRefType;
 
-}
+} // namespace infinity

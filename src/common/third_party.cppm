@@ -74,29 +74,29 @@ module;
 export module third_party;
 
 namespace minio {
-    namespace s3 {
-        export using minio::s3::BaseUrl;
-        export using minio::s3::Client;
-        export using minio::s3::RemoveObjectArgs;
-        export using minio::s3::RemoveObjectResponse;
-        export using minio::s3::CopyObjectArgs;
-        export using minio::s3::CopySource;
-        export using minio::s3::CopyObjectResponse;
-        export using minio::s3::DownloadObjectArgs;
-        export using minio::s3::DownloadObjectResponse;
-        export using minio::s3::UploadObjectArgs;
-        export using minio::s3::UploadObjectResponse;
-        export using minio::s3::PutObjectArgs;
-        export using minio::s3::PutObjectResponse;
-        export using minio::s3::BucketExistsArgs;
-        export using minio::s3::BucketExistsResponse;
-        export using minio::s3::MakeBucketArgs;
-        export using minio::s3::MakeBucketResponse;
-    } // namespace s3
+namespace s3 {
+export using minio::s3::BaseUrl;
+export using minio::s3::Client;
+export using minio::s3::RemoveObjectArgs;
+export using minio::s3::RemoveObjectResponse;
+export using minio::s3::CopyObjectArgs;
+export using minio::s3::CopySource;
+export using minio::s3::CopyObjectResponse;
+export using minio::s3::DownloadObjectArgs;
+export using minio::s3::DownloadObjectResponse;
+export using minio::s3::UploadObjectArgs;
+export using minio::s3::UploadObjectResponse;
+export using minio::s3::PutObjectArgs;
+export using minio::s3::PutObjectResponse;
+export using minio::s3::BucketExistsArgs;
+export using minio::s3::BucketExistsResponse;
+export using minio::s3::MakeBucketArgs;
+export using minio::s3::MakeBucketResponse;
+} // namespace s3
 
-    namespace creds {
-        export using minio::creds::StaticProvider;
-    } // namespace creds
+namespace creds {
+export using minio::creds::StaticProvider;
+} // namespace creds
 
 } // namespace minio
 

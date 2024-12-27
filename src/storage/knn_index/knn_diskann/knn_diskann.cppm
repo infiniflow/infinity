@@ -45,11 +45,11 @@ public:
     }
 
     void CreateIndex() {
-        //TODO
+        // TODO
     }
 
     void Search() {
-        //TODO
+        // TODO
     }
 
     void Begin() {
@@ -84,11 +84,11 @@ public:
         begin_ = false;
     }
 
-    [[nodiscard]] inline DistType *GetDistances() const  { return distance_array_.get(); }
+    [[nodiscard]] inline DistType *GetDistances() const { return distance_array_.get(); }
 
-    [[nodiscard]] inline RowID *GetIDs() const  { return id_array_.get(); }
+    [[nodiscard]] inline RowID *GetIDs() const { return id_array_.get(); }
 
-    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const  {
+    [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const {
         if (idx >= this->query_count_) {
             String error_message = "Query index exceeds the limit";
             UnrecoverableError(error_message);
@@ -96,7 +96,7 @@ public:
         return distance_array_.get() + idx * this->top_k_;
     }
 
-    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const  {
+    [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const {
         if (idx >= this->query_count_) {
             String error_message = "Query index exceeds the limit";
             UnrecoverableError(error_message);
@@ -116,7 +116,6 @@ private:
 
     const DistType *queries_{};
     bool begin_{false};
-
 };
 
 } // namespace infinity

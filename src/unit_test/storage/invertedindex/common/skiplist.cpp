@@ -22,7 +22,7 @@ import skiplist;
 using namespace infinity;
 
 class SkiplistTest : public BaseTest {};
-# if 0
+#if 0
 typedef u32 Key;
 typedef u32 Value;
 

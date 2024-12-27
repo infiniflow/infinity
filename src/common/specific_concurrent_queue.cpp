@@ -30,7 +30,7 @@ void SpecificConcurrentQueue<BufferObj *>::Enqueue(BufferObj *const &item) {
 }
 
 template <>
-void SpecificConcurrentQueue<BufferObj *>::Enqueue(BufferObj * &&item) {
+void SpecificConcurrentQueue<BufferObj *>::Enqueue(BufferObj *&&item) {
     queue_.enqueue(std::move(item));
 }
 
@@ -53,4 +53,4 @@ template <>
 bool SpecificConcurrentQueue<Vector<bool>>::TryDequeue(Vector<bool> &item) {
     return queue_.try_dequeue(item);
 }
-} // namespace infinitye
+} // namespace infinity

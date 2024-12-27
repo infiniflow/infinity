@@ -84,8 +84,8 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
                 RecoverableError(status);
             }
             --column_id;
-            //TODO: If we do not have a projection before sort, expression will need to be evaluated twice
-            // now return shared_ptr of the chosen project_expr
+            // TODO: If we do not have a projection before sort, expression will need to be evaluated twice
+            //  now return shared_ptr of the chosen project_expr
             return bind_context_ptr->project_exprs_[column_id];
         } else {
             Status status = Status::SyntaxError("Order by non-integer constant value.");
@@ -120,12 +120,8 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
 
     const SharedPtr<BaseExpression> &project_expr = bind_context_ptr->project_exprs_[column_id];
 
-    SharedPtr<ColumnExpression> result = ColumnExpression::Make(project_expr->Type(),
-                                                                binding_table_name,
-                                                                binding_table_index,
-                                                                std::to_string(column_id),
-                                                                column_id,
-                                                                depth);
+    SharedPtr<ColumnExpression> result =
+        ColumnExpression::Make(project_expr->Type(), binding_table_name, binding_table_index, std::to_string(column_id), column_id, depth);
     result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kProjection);
     return result;
 }

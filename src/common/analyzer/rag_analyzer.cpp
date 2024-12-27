@@ -16,16 +16,16 @@ module;
 
 #define PCRE2_CODE_UNIT_WIDTH 8
 
+#include <cassert>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <openccxx.h>
 #include <pcre2.h>
 #include <re2/re2.h>
 #include <sstream>
-#include <iostream>
-#include <chrono>
-#include <cassert>
 
 #include "string_utils.h"
 
@@ -768,7 +768,7 @@ int RAGAnalyzer::DFS(const String &chars,
     if (s >= len) {
         if (memo_all) {
             token_list.push_back(pre_tokens);
-        } else if (auto [vec_str ,current_score] = Score(pre_tokens); current_score > max_score) {
+        } else if (auto [vec_str, current_score] = Score(pre_tokens); current_score > max_score) {
             best_tokens = std::move(vec_str);
             max_score = current_score;
         }
@@ -1062,7 +1062,7 @@ inline void CheckDP2(const RAGAnalyzer *this_ptr, const std::string_view input_s
                                  std::format("[{} in top{}]", i + 1, topn));
     }
 }
-}
+} // namespace dp_debug
 #endif
 
 String RAGAnalyzer::Merge(const String &tks_str) const {

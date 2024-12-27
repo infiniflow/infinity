@@ -27,4 +27,4 @@ export using infinity::WriteBuf;
 export using infinity::WriteBufAdv;
 export using infinity::WriteBufVecAdv;
 
-}
+} // namespace infinity

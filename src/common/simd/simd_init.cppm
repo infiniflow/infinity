@@ -27,19 +27,19 @@ export using infinity::IsAVX2Supported;
 export using infinity::IsAVX512Supported;
 export using infinity::IsAVX512BWSupported;
 
-export using F32DistanceFuncType = f32(*)(const f32 *, const f32 *, SizeT);
-export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);
-export using I8CosDistanceFuncType = f32(*)(const i8 *, const i8 *, SizeT);
-export using U8DistanceFuncType = i32(*)(const u8 *, const u8 *, SizeT);
-//dimension in hamming distance is in bytes
-export using U8HammingDistanceFuncType = f32(*)(const u8 *, const u8 *, SizeT);
-export using U8CosDistanceFuncType = f32(*)(const u8 *, const u8 *, SizeT);
-export using MaxSimF32BitIPFuncType = f32(*)(const f32 *, const u8 *, SizeT);
-export using MaxSimI32BitIPFuncType = i32(*)(const i32 *, const u8 *, SizeT);
-export using MaxSimI64BitIPFuncType = i64(*)(const i64 *, const u8 *, SizeT);
+export using F32DistanceFuncType = f32 (*)(const f32 *, const f32 *, SizeT);
+export using I8DistanceFuncType = i32 (*)(const i8 *, const i8 *, SizeT);
+export using I8CosDistanceFuncType = f32 (*)(const i8 *, const i8 *, SizeT);
+export using U8DistanceFuncType = i32 (*)(const u8 *, const u8 *, SizeT);
+// dimension in hamming distance is in bytes
+export using U8HammingDistanceFuncType = f32 (*)(const u8 *, const u8 *, SizeT);
+export using U8CosDistanceFuncType = f32 (*)(const u8 *, const u8 *, SizeT);
+export using MaxSimF32BitIPFuncType = f32 (*)(const f32 *, const u8 *, SizeT);
+export using MaxSimI32BitIPFuncType = i32 (*)(const i32 *, const u8 *, SizeT);
+export using MaxSimI64BitIPFuncType = i64 (*)(const i64 *, const u8 *, SizeT);
 export using FilterScoresOutputIdsFuncType = u32 * (*)(u32 *, f32, const f32 *, u32);
-export using SearchTop1WithDisF32U32FuncType = void(*)(u32, u32, const f32 *, u32, const f32 *, u32 *, f32 *);
-export using BatchBM25FuncType = void(*)(u32, u32, const f32 *, const f32 *, const f32 *, const u32 *, const u32 *, u32 *, f32 *);
+export using SearchTop1WithDisF32U32FuncType = void (*)(u32, u32, const f32 *, u32, const f32 *, u32 *, f32 *);
+export using BatchBM25FuncType = void (*)(u32, u32, const f32 *, const f32 *, const f32 *, const u32 *, const u32 *, u32 *, f32 *);
 
 // F32 distance functions
 export F32DistanceFuncType GetL2DistanceFuncPtr();

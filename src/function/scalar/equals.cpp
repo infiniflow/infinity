@@ -50,7 +50,9 @@ struct BooleanEqualsFunction {
 };
 
 template <>
-inline void BooleanEqualsFunction::Run<u8, u8, u8>(u8 left, u8 right, u8 &result) { result = ~(left ^ right); }
+inline void BooleanEqualsFunction::Run<u8, u8, u8>(u8 left, u8 right, u8 &result) {
+    result = ~(left ^ right);
+}
 
 template <>
 inline void BooleanEqualsFunction::Run<bool, bool, bool>(bool left, bool right, bool &result) {

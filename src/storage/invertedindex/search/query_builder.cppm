@@ -52,7 +52,7 @@ export struct FullTextQueryContext {
 
 export class QueryBuilder {
 public:
-    explicit QueryBuilder(BaseTableRef *base_table_ref) : base_table_ref_(base_table_ref), table_entry_(base_table_ref->table_entry_ptr_){};
+    explicit QueryBuilder(BaseTableRef *base_table_ref) : base_table_ref_(base_table_ref), table_entry_(base_table_ref->table_entry_ptr_) {};
 
     void Init(IndexReader index_reader);
 

@@ -17,7 +17,6 @@ module;
 import stl;
 import data_block;
 
-
 module task_result;
 
 namespace infinity {

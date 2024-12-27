@@ -98,11 +98,11 @@ void ObjStat::CheckValid(const String &obj_key, SizeT current_object_size) const
         while (it2 != deleted_ranges.end()) {
             if (it1->end_ >= it2->start_) {
                 String error_message = fmt::format("CurrentObjFinalize Object {} deleted ranges intersect: [{}, {}), [{}, {})",
-                                                    obj_key,
-                                                    it1->start_,
-                                                    it1->end_,
-                                                    it2->start_,
-                                                    it2->end_);
+                                                   obj_key,
+                                                   it1->start_,
+                                                   it1->end_,
+                                                   it2->start_,
+                                                   it2->end_);
                 LOG_ERROR(error_message);
             }
             it1 = it2;

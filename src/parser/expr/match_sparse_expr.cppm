@@ -24,4 +24,4 @@ export using infinity::MatchSparseExpr;
 
 export using infinity::SparseMetricType;
 
-}
+} // namespace infinity

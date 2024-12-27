@@ -26,7 +26,7 @@ bool SkipListReader::SkipTo(u32 query_doc_id, u32 &doc_id, u32 &prev_doc_id, u32
         const u32 local_prev_ttf = current_ttf;
         if (current_cursor >= num_in_buffer) {
             auto [status, ret] = LoadBuffer();
-//            assert(status == 0);
+            //            assert(status == 0);
             if (!ret) {
                 // current segment is exhausted
                 // skip current block
@@ -142,7 +142,8 @@ Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
             const Int16Encoder *tf_percentage_encoder = GetTermPercentageEncoder();
             u32 tf_percentage_num = tf_percentage_encoder->Decode(block_max_tf_percentage_buffer_.get(), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (tf_percentage_num != doc_num) {
-                String error_message = fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num);
+                String error_message =
+                    fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num);
                 UnrecoverableError(error_message);
                 return MakePair(-1, false);
             }

@@ -22,5 +22,4 @@ namespace infinity {
 export using infinity::TypeInfo;
 export using TypeInfoType = TypeInfoType;
 
-}
-
+} // namespace infinity

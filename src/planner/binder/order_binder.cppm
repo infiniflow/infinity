@@ -24,7 +24,6 @@ import parsed_expr;
 
 export module order_binder;
 
-
 namespace infinity {
 
 export class OrderBinder : public ExpressionBinder {

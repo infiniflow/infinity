@@ -57,7 +57,8 @@ export inline BoundCastFunc BindTimestampCast(DataType &target) {
 struct TimestampTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        String error_message =
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
     }
@@ -65,36 +66,37 @@ struct TimestampTryCastToFixlen {
 
 struct TimestampTryCastToVarlen {
     template <typename SourceType, typename TargetType>
-    static inline bool Run(SourceType, TargetType &, ColumnVector*) {
-        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+    static inline bool Run(SourceType, TargetType &, ColumnVector *) {
+        String error_message =
+            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         UnrecoverableError(error_message);
         return false;
     }
 };
 
 template <>
-inline bool TimestampTryCastToFixlen::Run(TimestampT , DateT &) {
+inline bool TimestampTryCastToFixlen::Run(TimestampT, DateT &) {
     String error_message = "Not implement: TimestampTryCastToFixlen::Run";
     UnrecoverableError(error_message);
     return false;
 }
 
 template <>
-inline bool TimestampTryCastToFixlen::Run(TimestampT , TimeT &) {
+inline bool TimestampTryCastToFixlen::Run(TimestampT, TimeT &) {
     String error_message = "Not implement: TimestampTryCastToFixlen::Run";
     UnrecoverableError(error_message);
     return false;
 }
 
 template <>
-inline bool TimestampTryCastToFixlen::Run(TimestampT , DateTimeT &) {
+inline bool TimestampTryCastToFixlen::Run(TimestampT, DateTimeT &) {
     String error_message = "Not implement: TimestampTryCastToFixlen::Run";
     UnrecoverableError(error_message);
     return false;
 }
 
 template <>
-inline bool TimestampTryCastToVarlen::Run(TimestampT , VarcharT &, ColumnVector*) {
+inline bool TimestampTryCastToVarlen::Run(TimestampT, VarcharT &, ColumnVector *) {
     String error_message = "Not implement: TimestampTryCastToFixlen::Run";
     UnrecoverableError(error_message);
     return false;

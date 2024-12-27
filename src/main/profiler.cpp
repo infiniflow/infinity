@@ -42,9 +42,10 @@ void BaseProfiler::End() {
 
 std::string BaseProfiler::BeginTime() {
 
-//    const std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> begin_ts = const_cast<std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>>(begin_ts_);
-    std::time_t now_time_t  = std::chrono::system_clock::to_time_t(begin_ts_);
-    std::tm* now_tm = std::localtime(&now_time_t);
+    //    const std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> begin_ts =
+    //    const_cast<std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>>(begin_ts_);
+    std::time_t now_time_t = std::chrono::system_clock::to_time_t(begin_ts_);
+    std::tm *now_tm = std::localtime(&now_time_t);
 
     char buffer[128];
     strftime(buffer, sizeof(buffer), "%T", now_tm);
@@ -64,9 +65,10 @@ std::string BaseProfiler::BeginTime() {
 }
 
 std::string BaseProfiler::EndTime() {
-//    const std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> end_ts = const_cast<std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>>(end_ts_);
-    std::time_t now_time_t  = std::chrono::system_clock::to_time_t(end_ts_);
-    std::tm* now_tm = std::localtime(&now_time_t);
+    //    const std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> end_ts =
+    //    const_cast<std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>>(end_ts_);
+    std::time_t now_time_t = std::chrono::system_clock::to_time_t(end_ts_);
+    std::tm *now_tm = std::localtime(&now_time_t);
 
     char buffer[128];
     strftime(buffer, sizeof(buffer), "%F %T", now_tm);
@@ -76,13 +78,13 @@ std::string BaseProfiler::EndTime() {
 
     std::chrono::milliseconds ms;
     std::chrono::microseconds cs;
-//    std::chrono::nanoseconds ns;
+    //    std::chrono::nanoseconds ns;
 
     ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_ts_.time_since_epoch()) % 1000;
     cs = std::chrono::duration_cast<std::chrono::microseconds>(end_ts_.time_since_epoch()) % 1000000;
-//    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_ts_.time_since_epoch()) % 1000000000;
+    //    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_ts_.time_since_epoch()) % 1000000000;
     ss << buffer << "." << ms.count() << "." << cs.count() % 1000;
-//    ss << buffer << "." << ms.count() << "." << cs.count() % 1000 << "." << ns.count() % 1000;
+    //    ss << buffer << "." << ms.count() << "." << cs.count() % 1000 << "." << ns.count() % 1000;
     return ss.str();
 }
 
@@ -106,9 +108,7 @@ String BaseProfiler::ElapsedToString(NanoSeconds duration, i64 scale) {
     return result;
 }
 
-String BaseProfiler::ElapsedToString(i64 scale) const {
-    return ElapsedToString(this->ElapsedInternal(), scale);
-}
+String BaseProfiler::ElapsedToString(i64 scale) const { return ElapsedToString(this->ElapsedInternal(), scale); }
 
 void OptimizerProfiler::StartRule(const String &rule_name) {
     profilers_.emplace_back(rule_name);
@@ -152,10 +152,10 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
     profiler_.End();
 
     uint64_t input_rows{};
-    if(operator_state->prev_op_state_ != nullptr) {
+    if (operator_state->prev_op_state_ != nullptr) {
         SizeT input_data_block_count = operator_state->prev_op_state_->data_block_array_.size();
-        for(SizeT block_id = 0; block_id < input_data_block_count; ++ block_id) {
-            DataBlock* input_data_block = operator_state->prev_op_state_->data_block_array_[block_id].get();
+        for (SizeT block_id = 0; block_id < input_data_block_count; ++block_id) {
+            DataBlock *input_data_block = operator_state->prev_op_state_->data_block_array_[block_id].get();
             input_rows += input_data_block->Finalized() ? input_data_block->row_count() : 0;
         }
     }
@@ -163,13 +163,14 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
     uint64_t output_rows{};
     uint64_t output_data_size{};
     SizeT output_data_block_count = operator_state->data_block_array_.size();
-    for(SizeT block_id = 0; block_id < output_data_block_count; ++ block_id) {
-        DataBlock* output_data_block = operator_state->data_block_array_[block_id].get();
+    for (SizeT block_id = 0; block_id < output_data_block_count; ++block_id) {
+        DataBlock *output_data_block = operator_state->data_block_array_[block_id].get();
         output_data_size += output_data_block->Finalized() ? output_data_block->GetSizeInBytes() : 0;
         output_rows += output_data_block->Finalized() ? output_data_block->row_count() : 0;
     }
 
-    OperatorInformation info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, output_data_size, output_rows);
+    OperatorInformation
+        info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, output_data_size, output_rows);
 
     timings_.push_back(std::move(info));
     active_operator_ = nullptr;
@@ -226,7 +227,7 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
         UnrecoverableError(error_message);
     }
 
-    BaseProfiler& phase_profiler = profilers_[phase_idx];
+    BaseProfiler &phase_profiler = profilers_[phase_idx];
     phase_profiler.set_name(QueryPhaseToString(phase));
     phase_profiler.Begin();
 }
@@ -272,16 +273,11 @@ void QueryProfiler::ExecuteRender(std::stringstream &ss) const {
             for (const auto &operators : task.second) {
                 ss << "  |- Times: " << times << std::endl;
                 for (const auto &op : operators.timings_) {
-                    ss << "    -> " << op.name_
-                       << ": BeginTime: " << op.start_
-                       << ": EndTime: " << op.end_
-                       << ": ElapsedTime: " << op.elapsed_
-                       << ", InputRows: " << op.input_rows_
-                       << ", OutputRows: " << op.output_rows_
-                       << ", OutputDataSize: " << op.output_data_size_
+                    ss << "    -> " << op.name_ << ": BeginTime: " << op.start_ << ": EndTime: " << op.end_ << ": ElapsedTime: " << op.elapsed_
+                       << ", InputRows: " << op.input_rows_ << ", OutputRows: " << op.output_rows_ << ", OutputDataSize: " << op.output_data_size_
                        << std::endl;
                 }
-                times ++;
+                times++;
             }
         }
     }
@@ -349,7 +345,7 @@ nlohmann::json QueryProfiler::Serialize(const QueryProfiler *profiler) {
                     json_info["output_data_size"] = op.output_data_size_;
                     json_operators["infos"].push_back(json_info);
                 }
-                times ++;
+                times++;
                 json_tasks["operators"].push_back(json_operators);
             }
             json_tasks["task_start"] = task_start;

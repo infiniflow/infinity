@@ -245,6 +245,7 @@ public:
     void AttachDeltaCheckpoint(const String &file_name);
 
     static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
+
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
 
@@ -292,7 +293,6 @@ public:
     atomic_bool enable_profile_{false};
 
 private:
-
     Atomic<bool> running_{};
     UniquePtr<Thread> mem_index_commit_thread_{};
 

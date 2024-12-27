@@ -86,7 +86,10 @@ void ObjectStorageProcess::Process() {
                     LOG_TRACE("Copy task");
                     CopyTask *copy_task = static_cast<CopyTask *>(object_storage_task.get());
                     assert(copy_task != nullptr);
-                    VirtualStore::s3_client_->CopyObject(VirtualStore::bucket_, copy_task->src_object_name, VirtualStore::bucket_, copy_task->dst_object_name);
+                    VirtualStore::s3_client_->CopyObject(VirtualStore::bucket_,
+                                                         copy_task->src_object_name,
+                                                         VirtualStore::bucket_,
+                                                         copy_task->dst_object_name);
                     LOG_TRACE("Copy task done");
                     break;
                 }

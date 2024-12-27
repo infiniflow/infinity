@@ -24,4 +24,4 @@ export using infinity::MatchTensorSearchMethod;
 
 export using infinity::MatchTensorExpr;
 
-}
+} // namespace infinity

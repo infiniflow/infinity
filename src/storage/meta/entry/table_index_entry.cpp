@@ -228,7 +228,6 @@ void TableIndexEntry::CommitCompact([[maybe_unused]] TransactionID txn_id, TxnTi
     }
 }
 
-
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;
 

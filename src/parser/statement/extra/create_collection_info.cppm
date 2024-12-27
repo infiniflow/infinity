@@ -23,4 +23,3 @@ namespace infinity {
 export using infinity::CreateCollectionInfo;
 
 }
-

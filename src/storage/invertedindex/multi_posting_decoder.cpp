@@ -190,7 +190,7 @@ bool MultiPostingDecoder::DiskSegMoveToSegment(SegmentPosting &cur_segment_posti
     return true;
 }
 
-IndexDecoder* MultiPostingDecoder::CreateDocIndexDecoder(u32 doc_list_begin_pos) {
+IndexDecoder *MultiPostingDecoder::CreateDocIndexDecoder(u32 doc_list_begin_pos) {
     return new SkipIndexDecoder<SkipListReaderByteSlice>(&doc_reader_, doc_list_begin_pos, format_option_.GetDocListFormatOption());
 }
 

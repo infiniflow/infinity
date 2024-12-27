@@ -19,7 +19,6 @@ module;
 
 module buffer_writer;
 
-
 import stl;
 import third_party;
 import pg_message;

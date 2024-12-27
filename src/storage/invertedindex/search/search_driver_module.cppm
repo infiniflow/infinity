@@ -23,4 +23,4 @@ namespace infinity {
 export using infinity::FulltextQueryOperatorOption;
 export using infinity::SearchDriver;
 
-}
+} // namespace infinity

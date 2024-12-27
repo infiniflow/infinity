@@ -273,9 +273,9 @@ Status ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vect
 }
 
 Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
-                             SharedPtr<Vector<SharedPtr<String>>> &result,
-                             i64 intent_size,
-                             SharedPtr<String> alias_ptr) {
+                               SharedPtr<Vector<SharedPtr<String>>> &result,
+                               i64 intent_size,
+                               SharedPtr<String> alias_ptr) {
     Status status = Status::OK();
     if (alias_ptr.get() != nullptr) {
         String select_str = String(intent_size, ' ') + "SELECT AS " + *alias_ptr;
@@ -298,7 +298,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
                 auto *with_expr = select_statement->with_exprs_->at(idx);
                 SharedPtr<String> alias_str = MakeShared<String>(with_expr->alias_);
                 status = BuildSelect((SelectStatement *)with_expr->select_, result, intent_size, alias_ptr);
-                if(!status.ok()) {
+                if (!status.ok()) {
                     return status;
                 }
             }
@@ -355,7 +355,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
     }
 
     status = BuildBaseTableRef(select_statement->table_ref_, result, intent_size);
-    if(!status.ok()) {
+    if (!status.ok()) {
         return status;
     }
 
@@ -436,7 +436,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
             }
         }
         status = BuildSelect(select_statement->nested_select_, result, intent_size);
-        if(!status.ok()) {
+        if (!status.ok()) {
             return status;
         }
     }
@@ -832,7 +832,7 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
 
             SharedPtr<String> delimiter = MakeShared<String>(String(intent_size, ' ') + "delimiter: " + copy_statement->delimiter_);
             result->emplace_back(delimiter);
-            if(!copy_statement->copy_from_) {
+            if (!copy_statement->copy_from_) {
                 // export
                 SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
@@ -846,7 +846,7 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
         case CopyFileType::kJSON: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSON");
             result->emplace_back(file_type);
-            if(!copy_statement->copy_from_) {
+            if (!copy_statement->copy_from_) {
                 // export
                 SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
@@ -860,7 +860,7 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
         case CopyFileType::kFVECS: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: FVECS");
             result->emplace_back(file_type);
-            if(!copy_statement->copy_from_) {
+            if (!copy_statement->copy_from_) {
                 // export
                 SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
@@ -874,7 +874,7 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
         case CopyFileType::kJSONL: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSONL");
             result->emplace_back(file_type);
-            if(!copy_statement->copy_from_) {
+            if (!copy_statement->copy_from_) {
                 // export
                 SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);

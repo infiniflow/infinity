@@ -24,7 +24,6 @@ import logger;
 import stl;
 import infinity_context;
 
-
 import function_set;
 import aggregate_function_set;
 import aggregate_function;
@@ -44,12 +43,9 @@ import data_type;
 using namespace infinity;
 
 class LineSegCastTest : public BaseTest {
-    void SetUp() override {
-    }
+    void SetUp() override {}
 
-    void TearDown() override {
-        BaseTest::TearDown();
-    }
+    void TearDown() override { BaseTest::TearDown(); }
 };
 
 TEST_F(LineSegCastTest, line_seg_cast0) {

@@ -29,8 +29,8 @@ namespace infinity {
 
 export class SegmentPosting {
 public:
-    SegmentPosting(){};
-    ~SegmentPosting(){};
+    SegmentPosting() {};
+    ~SegmentPosting() {};
 
     // for on disk segment posting
     void Init(SharedPtr<ByteSliceList> slice_list, RowID base_row_id, u64 doc_count, TermMeta &term_meta);
@@ -78,7 +78,7 @@ private:
     TermMeta term_meta_;
     SharedPtr<PostingWriter> posting_writer_{nullptr};
     SharedPtr<FileReader> posting_reader_{nullptr};
-    String* path_ = nullptr;
+    String *path_ = nullptr;
     u64 pos_begin_ = 0;
     u64 pos_size_ = 0;
     u64 doc_start_ = 0;

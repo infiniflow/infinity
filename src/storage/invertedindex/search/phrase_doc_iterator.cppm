@@ -115,4 +115,4 @@ private:
     // debug statistics
     u32 calc_score_cnt_ = 0;
 };
-}
+} // namespace infinity

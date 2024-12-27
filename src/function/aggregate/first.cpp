@@ -89,9 +89,9 @@ public:
     inline static SizeT Size(const DataType &) { return sizeof(FirstState<VarcharT, VarcharT>); }
 };
 //
-//template <>
-//struct FirstState<PathT, PathT> {
-//public:
+// template <>
+// struct FirstState<PathT, PathT> {
+// public:
 //    PathT value_{};
 //    bool is_set_{false};
 //

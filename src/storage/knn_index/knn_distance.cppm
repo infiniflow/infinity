@@ -56,7 +56,6 @@ public:
     [[nodiscard]] inline u64 TotalBaseCount() const { return total_base_count_; }
 
 protected:
-
     u64 query_count_{};
     u64 dimension_{};
     u64 top_k_{};

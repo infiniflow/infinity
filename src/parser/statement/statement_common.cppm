@@ -24,4 +24,4 @@ export using infinity::InitParameter;
 export using infinity::CopyFileType;
 export using infinity::CopyFileTypeToStr;
 
-}
+} // namespace infinity

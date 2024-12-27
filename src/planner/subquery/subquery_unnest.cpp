@@ -101,7 +101,8 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             // Step1 Generate limit operator on the subquery
             SharedPtr<ValueExpression> limit_expression = MakeShared<ValueExpression>(Value::MakeBigInt(1));
             SharedPtr<ValueExpression> offset_expression = MakeShared<ValueExpression>(Value::MakeBigInt(0));
-            SharedPtr<LogicalLimit> limit_node = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), nullptr, limit_expression, offset_expression, false);
+            SharedPtr<LogicalLimit> limit_node =
+                MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), nullptr, limit_expression, offset_expression, false);
 
             limit_node->set_left_node(subquery_plan);
             // Step2 Generate aggregate first operator on the limit operator
@@ -421,7 +422,8 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         auto &left_column_expr = correlated_columns[idx];
         SizeT correlated_column_index = correlated_base_index + idx;
         if (correlated_column_index >= subplan_column_bindings.size()) {
-            Status status = Status::SyntaxError(fmt::format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()));
+            Status status =
+                Status::SyntaxError(fmt::format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()));
             RecoverableError(status);
         }
 

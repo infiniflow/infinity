@@ -167,7 +167,7 @@ std::string ColumnDef::ToString() const {
     for (auto &constraint : constraints_) {
         ss << " " << ConstrainTypeToString(constraint);
     }
-    if(!comment_.empty()) {
+    if (!comment_.empty()) {
         ss << " comment " << comment_;
     }
     if (default_expr_ != nullptr) {

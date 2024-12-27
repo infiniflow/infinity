@@ -4254,7 +4254,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
 
             status = InfinityContext::instance().ChangeServerRole(NodeRole::kFollower, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
-                if(status.code() != ErrorCode::kCantSwitchRole) {
+                if (status.code() != ErrorCode::kCantSwitchRole) {
                     LOG_INFO("Fail to change to FOLLOWER role");
                     Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
                     if (!restore_status.ok()) {
@@ -4299,7 +4299,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
 
             status = InfinityContext::instance().ChangeServerRole(NodeRole::kLearner, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
-                if(status.code() != ErrorCode::kCantSwitchRole) {
+                if (status.code() != ErrorCode::kCantSwitchRole) {
                     LOG_INFO("Fail to change to LEARNER role");
                     Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
                     if (!restore_status.ok()) {

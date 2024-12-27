@@ -48,7 +48,7 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
     if (load_metas_.get() == nullptr || load_metas_->empty()) {
         return;
     }
-//    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
+    //    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
 
     auto load_metas = *load_metas_.get();
     // FIXME: After columnar reading is supported, use a different table_ref for each LoadMetas

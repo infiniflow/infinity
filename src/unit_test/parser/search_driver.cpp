@@ -48,12 +48,12 @@ class SearchDriverTest : public BaseTest {
 
 struct LogHelper {
     void Reset() {
-//        LOG_INFO(std::move(oss).str());
+        //        LOG_INFO(std::move(oss).str());
         oss.str("");
         oss.clear();
     }
     ~LogHelper() {
-//        LOG_INFO(std::move(oss).str());
+        //        LOG_INFO(std::move(oss).str());
     }
     OStringStream oss;
 };
@@ -69,16 +69,16 @@ int ParseStream(const SearchDriver &driver, std::istream &ist) {
             continue;
         }
         line = line.substr(firstNonBlank);
-//        oss << "---query: ###" << line << "###" << std::endl;
+        //        oss << "---query: ###" << line << "###" << std::endl;
         std::unique_ptr<QueryNode> parser_result = driver.ParseSingle(line);
         if (!parser_result) {
-//            oss << "---failed" << std::endl;
+            //            oss << "---failed" << std::endl;
             return -1;
         } else {
-//            oss << "---accepted" << std::endl;
-//            oss << "---parser output tree:" << std::endl;
+            //            oss << "---accepted" << std::endl;
+            //            oss << "---parser output tree:" << std::endl;
             parser_result->PrintTree(oss);
-//            oss << std::endl;
+            //            oss << std::endl;
         }
     }
     return 0;
@@ -226,7 +226,7 @@ graphic cards
         EXPECT_EQ(rc, 0);
     } catch (RecoverableException &e) {
         // catch because dict resource file does not exist in CI environment
-//        std::cerr << fmt::format("RecoverableException: {}\n", e.what());
+        //        std::cerr << fmt::format("RecoverableException: {}\n", e.what());
     }
 }
 
@@ -254,13 +254,13 @@ graphic cards
     )##";
 
     static constexpr FulltextQueryOperatorOption ops[] = {FulltextQueryOperatorOption::kOr, FulltextQueryOperatorOption::kAnd};
-//    static constexpr const char *ops_chars[] = {"OR", "AND"};
+    //    static constexpr const char *ops_chars[] = {"OR", "AND"};
     Map<String, String> column2analyzer;
     column2analyzer["body"] = "chinese";
     String default_field("body");
     for (size_t i = 0; i < std::size(ops); ++i) {
         const auto op = ops[i];
-//        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
+        //        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
         SearchDriver driver(column2analyzer, default_field, op);
         IStringStream iss(row_quires);
         try {
@@ -268,7 +268,7 @@ graphic cards
             EXPECT_EQ(rc, 0);
         } catch (RecoverableException &e) {
             // catch because dict resource file does not exist in CI environment
-//            std::cerr << fmt::format("RecoverableException: {}\n", e.what());
+            //            std::cerr << fmt::format("RecoverableException: {}\n", e.what());
         }
     }
 }

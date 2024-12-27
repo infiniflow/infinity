@@ -22,4 +22,4 @@ namespace infinity {
 export using infinity::SparseInfo;
 
 export using infinity::SparseStoreType;
-}
+} // namespace infinity

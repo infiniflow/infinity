@@ -33,9 +33,7 @@ namespace infinity {
 
 class RemoveUnusedColumns : public LogicalNodeVisitor {
 public:
-    explicit RemoveUnusedColumns(bool is_root = false)
-        : all_referenced_(is_root) {
-    }
+    explicit RemoveUnusedColumns(bool is_root = false) : all_referenced_(is_root) {}
 
     void VisitNode(LogicalNode &op) final;
 
@@ -54,9 +52,7 @@ private:
 
 export class ColumnPruner : public OptimizerRule {
 public:
-    inline void ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) final {
-        return remove_visitor.VisitNode(*logical_plan);
-    }
+    inline void ApplyToPlan(QueryContext *, SharedPtr<LogicalNode> &logical_plan) final { return remove_visitor.VisitNode(*logical_plan); }
 
     [[nodiscard]] inline String name() const final { return "Column Pruner"; }
 
@@ -64,4 +60,4 @@ private:
     RemoveUnusedColumns remove_visitor{true};
 };
 
-}
+} // namespace infinity

@@ -14,8 +14,8 @@
 
 module;
 
-#include <cmath>
 #include "simd_common_intrin_include.h"
+#include <cmath>
 
 import stl;
 import simd_common_tools;
@@ -32,17 +32,17 @@ inline float hsum256_ps_avx(__m256 v) {
     return _mm_cvtss_f32(x32);
 }
 
-inline float hsum_ps_sse1(__m128 v) { // v = [ D C | B A ]
+inline float hsum_ps_sse1(__m128 v) {                            // v = [ D C | B A ]
     __m128 shuf = _mm_shuffle_ps(v, v, _MM_SHUFFLE(2, 3, 0, 1)); // [ C D | A B ]
-    __m128 sums = _mm_add_ps(v, shuf); // sums = [ D+C C+D | B+A A+B ]
-    shuf = _mm_movehl_ps(shuf, sums);  //  [   C   D | D+C C+D ]  // let the
-                                     //  compiler avoid a mov by reusing shuf
+    __m128 sums = _mm_add_ps(v, shuf);                           // sums = [ D+C C+D | B+A A+B ]
+    shuf = _mm_movehl_ps(shuf, sums);                            //  [   C   D | D+C C+D ]  // let the
+                                                                 //  compiler avoid a mov by reusing shuf
     sums = _mm_add_ss(sums, shuf);
     return _mm_cvtss_f32(sums);
 }
 #endif
 
-export float hsumFloatVec(const float* array, size_t size) {
+export float hsumFloatVec(const float *array, size_t size) {
     float sum = 0.0f;
     size_t i = 0;
 
@@ -53,7 +53,7 @@ export float hsumFloatVec(const float* array, size_t size) {
     return sum;
 }
 
-export float hsumFloatVecSSE(const float* array, size_t size) {
+export float hsumFloatVecSSE(const float *array, size_t size) {
     if (size < 4) {
         return hsumFloatVec(array, size);
     }
@@ -63,7 +63,7 @@ export float hsumFloatVecSSE(const float* array, size_t size) {
 
     for (; i + 4 <= size; i += 4) {
         __m128 vec = _mm_loadu_ps(&array[i]);
-        sum += hsum_ps_sse1(vec); 
+        sum += hsum_ps_sse1(vec);
     }
 
     for (; i < size; i++) {
@@ -73,7 +73,7 @@ export float hsumFloatVecSSE(const float* array, size_t size) {
     return sum;
 }
 
-export float hsumFloatVecAVX(const float* array, size_t size) {
+export float hsumFloatVecAVX(const float *array, size_t size) {
     if (size < 8) {
         return hsumFloatVec(array, size);
     }
@@ -83,7 +83,7 @@ export float hsumFloatVecAVX(const float* array, size_t size) {
 
     for (; i + 8 <= size; i += 8) {
         __m256 vec = _mm256_loadu_ps(&array[i]);
-        sum += hsum256_ps_avx(vec); 
+        sum += hsum256_ps_avx(vec);
     }
 
     for (; i < size; i++) {

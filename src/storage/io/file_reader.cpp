@@ -14,8 +14,8 @@
 
 module;
 
-#include <set>
 #include <cassert>
+#include <set>
 #include <unistd.h>
 
 module file_reader;
@@ -36,7 +36,7 @@ FileReader::FileReader(const String &path, SizeT buffer_size)
         data_ = MakeUnique<char_t[]>(buffer_size);
     }
     auto [file_handle, status] = VirtualStore::Open(path, FileAccessMode::kRead);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
@@ -69,7 +69,7 @@ void FileReader::ReFill() {
 void FileReader::Read(char_t *buffer, SizeT read_size) {
     if (buffer_size_ == 0) {
         auto [tmp_read_size, status] = file_handle_->Read(buffer, read_size);
-        if(!status.ok()) {
+        if (!status.ok()) {
             RecoverableError(status);
         }
         already_read_size_ = tmp_read_size;
@@ -89,7 +89,7 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
             }
 
             auto [tmp_read_size, status] = file_handle_->Read(buffer + start, read_size - start);
-            if(!status.ok()) {
+            if (!status.ok()) {
                 RecoverableError(status);
             }
             already_read_size_ = tmp_read_size;

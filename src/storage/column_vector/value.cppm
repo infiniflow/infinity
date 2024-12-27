@@ -163,7 +163,9 @@ export struct TensorArrayValueInfo : public ExtraValueInfo {
     friend struct Value;
     TensorArrayValueInfo() : ExtraValueInfo(ExtraValueInfoType::TENSORARRAY_VALUE_INFO) {}
     void AppendTensor(const_ptr_t ptr, SizeT bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes)); }
-    void AppendTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr_bytes)); }
+    void AppendTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
+        member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr_bytes));
+    }
     Vector<SharedPtr<EmbeddingValueInfo>> member_tensor_data_;
 };
 

@@ -114,13 +114,13 @@ private:
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
-    Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
+    Deque<WeakPtr<Txn>> beginned_txns_;        // sorted by begin ts
     Map<TxnTimeStamp, Txn *> committing_txns_; // the txns in committing stage
-    Set<TxnTimeStamp> checking_ts_{};   // the begin ts of txn that is used to check conflict
+    Set<TxnTimeStamp> checking_ts_{};          // the begin ts of txn that is used to check conflict
 
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 
-    Atomic<TxnTimeStamp> current_ts_{};         // The next txn ts
+    Atomic<TxnTimeStamp> current_ts_{}; // The next txn ts
     Atomic<TxnTimeStamp> max_committed_ts_{};
     TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 

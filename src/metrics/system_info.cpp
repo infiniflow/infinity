@@ -231,7 +231,7 @@ int get_open_fd_count(pid_t pid) {
 
 #elif defined(linux) || defined(__linux) || defined(__linux__)
 
-const char* get_items(const char* buffer, u32 item) {
+const char *get_items(const char *buffer, u32 item) {
     // read from buffer by offset
     const char *p = buffer;
 
@@ -301,7 +301,7 @@ u64 cpu_cost_of_process(pid_t pid) {
     return (utime + stime + cutime + cstime);
 }
 #endif
-}
+} // namespace
 
 i64 SystemInfo::MemoryUsage() {
     i64 vm_rss_in_kb = 0;
@@ -309,19 +309,15 @@ i64 SystemInfo::MemoryUsage() {
 #if defined(__APPLE__)
         vm_rss_in_kb = get_memory();
 #elif defined(linux) || defined(__linux) || defined(__linux__)
-        FILE* file = fopen("/proc/self/status", "r");
-        DeferFn defer_fn([&] {
-            fclose(file);
-        });
+        FILE *file = fopen("/proc/self/status", "r");
+        DeferFn defer_fn([&] { fclose(file); });
 
         constexpr i64 line_length = 128;
         char line_rss[line_length];
         std::memset(line_rss, 0, line_length);
 
-        while (fgets(line_rss, line_length, file) != NULL)
-        {
-            if (std::strncmp(line_rss, "VmRSS:", 6) == 0)
-            {
+        while (fgets(line_rss, line_length, file) != NULL) {
+            if (std::strncmp(line_rss, "VmRSS:", 6) == 0) {
                 LOG_DEBUG(line_rss);
                 String str(line_rss + 6);
                 String kb;
@@ -330,13 +326,12 @@ i64 SystemInfo::MemoryUsage() {
             }
         }
 #endif
-    } catch (std::exception& e) {
+    } catch (std::exception &e) {
         Status status = Status::FailToGetSysInfo(fmt::format("Can't get VmRSS: {}", e.what()));
         RecoverableError(status);
     }
     return vm_rss_in_kb * KB;
 }
-
 
 f64 SystemInfo::CPUUsage() {
 
@@ -391,4 +386,4 @@ i64 SystemInfo::OpenFileCount() {
     return count;
 }
 
-}
+} // namespace infinity

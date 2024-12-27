@@ -984,16 +984,16 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
             case SpecialType::kDistanceFactors:
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
-                    RecoverableError(
-                        Status::SyntaxError("DISTANCE() / DISTANCE_FACTORS() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2"));
+                    RecoverableError(Status::SyntaxError(
+                        "DISTANCE() / DISTANCE_FACTORS() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2"));
                 }
                 break;
             }
             case SpecialType::kSimilarityFactors:
             case SpecialType::kSimilarity: {
                 if (!bind_context_ptr->allow_similarity) {
-                    RecoverableError(Status::SyntaxError(
-                        "SIMILARITY() / SIMILARITY_FACTORS() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product"));
+                    RecoverableError(Status::SyntaxError("SIMILARITY() / SIMILARITY_FACTORS() needs to be allowed only when there is only MATCH "
+                                                         "VECTOR with similarity metrics, like Inner product"));
                 }
                 break;
             }

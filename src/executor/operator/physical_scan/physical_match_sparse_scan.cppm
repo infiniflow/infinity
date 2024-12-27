@@ -59,9 +59,7 @@ public:
 
     Vector<SharedPtr<Vector<SegmentID>>> PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count);
 
-    SharedPtr<MatchSparseExpression> match_sparse_expr() const {
-        return match_sparse_expr_;
-    }
+    SharedPtr<MatchSparseExpression> match_sparse_expr() const { return match_sparse_expr_; }
 
 private:
     template <typename DataType>

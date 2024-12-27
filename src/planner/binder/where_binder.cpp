@@ -67,7 +67,6 @@ void WhereBinder::CheckFuncType(FunctionType func_type) const {
         String error_message = "Only scalar function are allowed in where clause";
         UnrecoverableError(error_message);
     }
-
 }
 
 } // namespace infinity

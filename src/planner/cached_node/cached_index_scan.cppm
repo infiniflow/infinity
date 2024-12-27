@@ -39,4 +39,4 @@ private:
     SharedPtr<BaseExpression> filter_expression_;
 };
 
-}
+} // namespace infinity

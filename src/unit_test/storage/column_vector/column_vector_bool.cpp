@@ -87,7 +87,6 @@ TEST_F(ColumnVectorBoolTest, flat_boolean) {
         EXPECT_THROW(column_vector.GetValue(i + 1), UnrecoverableException);
     }
 
-
     ColumnVector clone_column_vector(data_type);
     clone_column_vector.ShallowCopy(column_vector);
     EXPECT_EQ(column_vector.Size(), clone_column_vector.Size());
@@ -218,7 +217,7 @@ TEST_F(ColumnVectorBoolTest, contant_bool) {
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
     EXPECT_TRUE(column_vector.initialized);
-    
+
     for (i64 i = 0; i < 1; ++i) {
         Value v = Value::MakeBool(static_cast<BooleanT>(i % 2 == 0));
         column_vector.AppendValue(v);

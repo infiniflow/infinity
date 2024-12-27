@@ -167,7 +167,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         SizeT output_column_id{0};
         auto *buffer_mgr = query_context->storage()->buffer_manager();
         for (auto column_id : column_ids) {
-            switch(column_id) {
+            switch (column_id) {
                 case COLUMN_IDENTIFIER_ROW_ID: {
                     u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + read_offset;
                     output_ptr->column_vectors[output_column_id]->AppendWith(RowID(segment_id, segment_offset), write_size);
@@ -188,7 +188,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                     output_ptr->column_vectors[output_column_id]->AppendWith(column_vector, read_offset, write_size);
                 }
             }
-            ++ output_column_id;
+            ++output_column_id;
         }
 
         // write_size = already read size = already write size

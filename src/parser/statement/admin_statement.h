@@ -56,14 +56,7 @@ enum class AdminStmtType {
     kInvalid,
 };
 
-enum class NodeRole {
-    kAdmin,
-    kStandalone,
-    kLeader,
-    kFollower,
-    kLearner,
-    kUnInitialized
-};
+enum class NodeRole { kAdmin, kStandalone, kLeader, kFollower, kLearner, kUnInitialized };
 
 std::string ToString(NodeRole);
 

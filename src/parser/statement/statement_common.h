@@ -14,10 +14,10 @@
 
 #pragma once
 
+#include "../type/serialize.h"
 #include <memory>
 #include <string>
 #include <vector>
-#include "../type/serialize.h"
 
 namespace infinity {
 
@@ -67,9 +67,7 @@ struct InitParameter {
 
     std::string ToString() { return param_name_ + ": " + param_value_; }
 
-    size_t GetSizeInBytes() const {
-        return sizeof(int) + param_name_.size() + sizeof(int) + param_value_.size();
-    }
+    size_t GetSizeInBytes() const { return sizeof(int) + param_name_.size() + sizeof(int) + param_value_.size(); }
 
     void WriteAdv(char *&p) {
         WriteBufAdv(p, param_name_);
@@ -92,9 +90,7 @@ struct InitParameter {
         return results;
     }
 
-    bool operator==(const InitParameter &other) const {
-        return param_name_ == other.param_name_ && param_value_ == other.param_value_;
-    }
+    bool operator==(const InitParameter &other) const { return param_name_ == other.param_name_ && param_value_ == other.param_value_; }
 };
 
 struct IfExistsInfo {

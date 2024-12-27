@@ -41,9 +41,9 @@ String LogicalUnnest::ToString(i64 &space) const {
     ss << String(space, ' ') << arrow_str << "Logical Unnest: ";
 
     SizeT expr_count = expression_list_.size();
-    for(SizeT idx = 0; idx < expr_count; ++ idx) {
+    for (SizeT idx = 0; idx < expr_count; ++idx) {
         ss << expression_list_[idx]->Name();
-        if(idx < expr_count - 1) {
+        if (idx < expr_count - 1) {
             ss << ", ";
         }
     }

@@ -77,7 +77,7 @@ public:
 
     SizeT cache_num_capacity() const { return cache_num_capacity_; }
 
-    SizeT cache_num_used() { 
+    SizeT cache_num_used() {
         std::lock_guard<std::mutex> lock(mtx_);
         return lru_map_.size();
     }

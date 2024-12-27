@@ -28,9 +28,7 @@ protected:
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
 
-SharedPtr<FileWriter> SkipListWriterTest::CreateFileWriter(infinity::String file_path) {
-    return MakeShared<FileWriter>(file_path, BUFFER_SIZE_);
-}
+SharedPtr<FileWriter> SkipListWriterTest::CreateFileWriter(infinity::String file_path) { return MakeShared<FileWriter>(file_path, BUFFER_SIZE_); }
 
 TEST_F(SkipListWriterTest, test1) {
     using namespace infinity;
