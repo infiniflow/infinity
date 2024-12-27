@@ -229,7 +229,8 @@ void BufferObj::PickForCleanup() {
     }
     if (type_ == BufferType::kMmap) {
         file_worker_->Munmap();
-        status_ = BufferStatus::kFreed;
+        buffer_mgr_->AddToCleanList(this, false /*do_free*/);
+        status_ = BufferStatus::kClean;
         return;
     }
     switch (status_) {
