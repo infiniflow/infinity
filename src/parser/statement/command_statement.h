@@ -32,6 +32,7 @@ enum class CommandType {
     kUnlockTable,
     kCleanup,
     kTestCommand,
+    kSnapshot,
 };
 
 class CommandInfo {
@@ -244,6 +245,26 @@ public:
 
 private:
     std::string command_content_{};
+};
+
+enum class SnapshotOp { kCreate, kDrop, kRestore, kInvalid };
+enum class SnapshotScope { kTable, kDatabase, kSystem, kIgnore, kInvalid };
+
+class SnapshotCmd final : public CommandInfo {
+public:
+    SnapshotCmd(std::string name, SnapshotOp op, SnapshotScope scope)
+        : CommandInfo(CommandType::kSnapshot), name_(name), operation_(op), scope_(scope) {}
+
+    [[nodiscard]] std::string ToString() const final;
+
+    const std::string &name() { return name_; }
+    SnapshotOp operation() { return operation_; }
+    SnapshotScope &scope() { return scope_; }
+
+private:
+    std::string name_{};
+    SnapshotOp operation_{SnapshotOp::kInvalid};
+    SnapshotScope scope_{SnapshotScope::kInvalid};
 };
 
 } // namespace infinity

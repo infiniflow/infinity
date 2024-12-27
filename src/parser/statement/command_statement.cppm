@@ -34,4 +34,8 @@ export using infinity::LockCmd;
 export using infinity::UnlockCmd;
 export using infinity::CleanupCmd;
 export using infinity::TestCmd;
+export using infinity::SnapshotCmd;
+export using infinity::SnapshotOp;
+export using infinity::SnapshotScope;
+
 } // namespace infinity
