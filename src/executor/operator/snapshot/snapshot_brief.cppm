@@ -14,25 +14,19 @@
 
 module;
 
-module snapshot;
+export module snapshot_brief;
 
 import stl;
-import txn;
-import query_context;
-import table_entry;
-import status;
+import command_statement;
 
 namespace infinity {
 
-Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String &table_name) {
-//    Txn *txn_ptr = query_context->GetTxn();
-//    const String &db_name = query_context->schema_name();
-//    auto [table_entry, table_status] = txn_ptr->GetTableByName(db_name, table_name);
-
-    return Status::OK();
-}
-
-Status Snapshot::RestoreTableSnapshot() { return Status::OK(); }
-Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapshot_name) { return Status::OK(); }
+export struct SnapshotBrief {
+    String snapshot_name_; // snapshot_name_
+    SnapshotScope scope_;  // system / db / table snapshot
+    u64 create_time_;      // when create the snapshot
+    u64 commit_ts_;        // txn ts the snapshot created.
+    u64 size_;             // total snapshot size
+};
 
 } // namespace infinity

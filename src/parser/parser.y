@@ -2357,23 +2357,27 @@ command_statement: USE IDENTIFIER {
     free($3->table_name_ptr_);
     delete $3;
 }
-| CREATE TABLE SNAPSHOT IDENTIFIER {
-    ParserHelper::ToLower($4);
+| CREATE SNAPSHOT IDENTIFIER ON TABLE IDENTIFIER {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($6);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($4, infinity::SnapshotOp::kCreate, infinity::SnapshotScope::kTable);
-    free($4);
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($3, infinity::SnapshotOp::kCreate, infinity::SnapshotScope::kTable, $6);
+    free($3);
+    free($6);
 }
-| CREATE DATABASE SNAPSHOT IDENTIFIER {
-    ParserHelper::ToLower($4);
+| CREATE SNAPSHOT IDENTIFIER ON DATABASE IDENTIFIER {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($6);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($4, infinity::SnapshotOp::kCreate, infinity::SnapshotScope::kDatabase);
-    free($4);
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($3, infinity::SnapshotOp::kCreate, infinity::SnapshotScope::kDatabase, $6);
+    free($3);
+    free($6);
 }
-| CREATE SYSTEM SNAPSHOT IDENTIFIER {
-    ParserHelper::ToLower($4);
+| CREATE SNAPSHOT IDENTIFIER ON SYSTEM {
+    ParserHelper::ToLower($3);
     $$ = new infinity::CommandStatement();
-    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($4, infinity::SnapshotOp::kCreate, infinity::SnapshotScope::kSystem);
-    free($4);
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($3, infinity::SnapshotOp::kCreate, infinity::SnapshotScope::kSystem);
+    free($3);
 }
 | DROP SNAPSHOT IDENTIFIER {
     ParserHelper::ToLower($3);

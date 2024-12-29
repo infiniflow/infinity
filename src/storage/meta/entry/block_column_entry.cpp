@@ -171,6 +171,8 @@ ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr, S
     return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadOnly, row_count);
 }
 
+SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() { return nullptr; }
+
 ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe, SizeT row_count) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager

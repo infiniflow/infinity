@@ -25,7 +25,7 @@ namespace infinity {
 
 class Snapshot {
 public:
-    static Status CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name);
+    static Status CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String& table_name);
     static Status RestoreTableSnapshot();
     static Status DropSnapshot(QueryContext *query_context, const String &snapshot_name);
 };

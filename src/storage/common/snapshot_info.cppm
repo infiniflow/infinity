@@ -23,14 +23,6 @@ import index_base;
 
 namespace infinity {
 
-export struct SnapshotBrief {
-    String snapshot_name_; // snapshot_name_
-    SnapshotScope scope_; // system / db / table snapshot
-    u64 create_time_; // when create the snapshot
-    u64 commit_ts_;   // txn ts the snapshot created.
-    u64 size_; // total snapshot size
-};
-
 export struct SnapshotInfo {
     // structure to represent the snapshot
     String snapshot_name_;
@@ -38,14 +30,19 @@ export struct SnapshotInfo {
     SnapshotScope scope_;
 };
 
-export struct ColumnBlockSnapshotInfo {
+export struct OutlineSnapshotInfo {
+    String filename_;
+};
+
+export struct BlockColumnSnapshotInfo {
     ColumnID column_id_;
     String filename_;
+    Vector<OutlineSnapshotInfo> outline_snapshots_;
 };
 
 export struct BlockSnapshotInfo {
     BlockID block_id_;
-    Vector<ColumnBlockSnapshotInfo> column_block_snapshots_;
+    Vector<BlockColumnSnapshotInfo> column_block_snapshots_;
 };
 
 export struct SegmentSnapshotInfo {
@@ -58,15 +55,15 @@ export struct ChunkIndexSnapshot {
     String filename_;
 };
 
-export struct SegmentIndexSnapshot {
+export struct SegmentIndexSnapshotInfo {
     Vector<ChunkIndexSnapshot> chunk_index_snapshots_{};
 };
 
-export struct TableIndexSnapshot {
+export struct TableIndexSnapshotInfo {
     String table_index_name_;
     const SharedPtr<IndexBase> index_base_{};
     const SharedPtr<String> index_dir_{};
-    Map<SegmentID, SharedPtr<SegmentIndexSnapshot>> index_by_segment_{};
+    Map<SegmentID, SharedPtr<SegmentIndexSnapshotInfo>> index_by_segment_{};
 };
 
 export struct TableSnapshotInfo : public SnapshotInfo {

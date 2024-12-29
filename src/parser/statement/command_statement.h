@@ -237,7 +237,7 @@ public:
 
 class TestCmd final : public CommandInfo {
 public:
-    TestCmd(std::string command_content) : CommandInfo(CommandType::kTestCommand), command_content_(command_content) {}
+    TestCmd(std::string command_content) : CommandInfo(CommandType::kTestCommand), command_content_(std::move(command_content)) {}
 
     [[nodiscard]] std::string ToString() const final;
 
@@ -252,8 +252,8 @@ enum class SnapshotScope { kTable, kDatabase, kSystem, kIgnore, kInvalid };
 
 class SnapshotCmd final : public CommandInfo {
 public:
-    SnapshotCmd(std::string name, SnapshotOp op, SnapshotScope scope)
-        : CommandInfo(CommandType::kSnapshot), name_(name), operation_(op), scope_(scope) {}
+    SnapshotCmd(std::string name, SnapshotOp op, SnapshotScope scope, std::optional<std::string> object_name = std::nullopt)
+        : CommandInfo(CommandType::kSnapshot), name_(std::move(name)), operation_(op), scope_(scope), object_name_(std::move(object_name)) {}
 
     [[nodiscard]] std::string ToString() const final;
 
@@ -265,6 +265,7 @@ private:
     std::string name_{};
     SnapshotOp operation_{SnapshotOp::kInvalid};
     SnapshotScope scope_{SnapshotScope::kInvalid};
+    std::optional<std::string> object_name_{std::nullopt};
 };
 
 } // namespace infinity

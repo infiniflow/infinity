@@ -29,6 +29,7 @@ import base_entry;
 import column_def;
 import value;
 import cleanup_scanner;
+import snapshot_info;
 
 namespace infinity {
 
@@ -93,6 +94,7 @@ public:
 
     ColumnVector GetConstColumnVector(BufferManager *buffer_mgr, SizeT row_count);
 
+    SharedPtr<BlockColumnSnapshotInfo> GetSnapshotInfo();
 private:
     ColumnVector GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe, SizeT row_count);
 
