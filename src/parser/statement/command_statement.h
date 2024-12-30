@@ -248,7 +248,7 @@ private:
 };
 
 enum class SnapshotOp { kCreate, kDrop, kRestore, kInvalid };
-enum class SnapshotScope { kTable, kDatabase, kSystem, kIgnore, kInvalid };
+enum class SnapshotScope : uint8_t { kTable = 0, kDatabase, kSystem, kIgnore, kInvalid };
 
 class SnapshotCmd final : public CommandInfo {
 public:
@@ -258,6 +258,7 @@ public:
     [[nodiscard]] std::string ToString() const final;
 
     const std::string &name() { return name_; }
+    const std::string &object_name() { return object_name_.value(); }
     SnapshotOp operation() { return operation_; }
     SnapshotScope &scope() { return scope_; }
 

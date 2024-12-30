@@ -1658,6 +1658,14 @@ SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo() const {
     SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
     table_snapshot_info->db_name_ = *GetDBName();
     table_snapshot_info->table_name_ = *table_name_;
+    table_snapshot_info->table_comment_ = *table_comment_;
+    table_snapshot_info->txn_id_ = txn_id_;
+    table_snapshot_info->begin_ts_ = begin_ts_;
+    table_snapshot_info->commit_ts_ = commit_ts_;
+    table_snapshot_info->max_commit_ts_ = max_commit_ts_;
+    table_snapshot_info->next_column_id_ = next_column_id_;
+    table_snapshot_info->next_segment_id_ = next_segment_id_;
+    table_snapshot_info->columns_ = columns_;
     for (const auto &segment_pair : segment_map_) {
         SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = segment_pair.second->GetSnapshotInfo();
         table_snapshot_info->segment_snapshots_.emplace(segment_pair.first, segment_snapshot_info);
