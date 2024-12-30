@@ -31,9 +31,9 @@ namespace infinity {
 
 template <typename DataType, BMPCompressType CompressType>
 template <typename IdxType>
-void BMPIvt<DataType, CompressType>::AddBlock(BMPBlockID block_id,
-                                              const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &tail_terms,
-                                              SizeT &mem_usage) {
+void BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::AddBlock(BMPBlockID block_id,
+                                                                const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &tail_terms,
+                                                                SizeT &mem_usage) {
     HashMap<IdxType, DataType> max_scores;
     for (const auto &[indices, data] : tail_terms) {
         SizeT block_size = indices.size();
@@ -49,7 +49,7 @@ void BMPIvt<DataType, CompressType>::AddBlock(BMPBlockID block_id,
 }
 
 template <typename DataType, BMPCompressType CompressType>
-void BMPIvt<DataType, CompressType>::Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores) {
+void BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores) {
     for (SizeT term_id = 0; term_id < ivt_scores.size(); ++term_id) {
         auto &posting = postings_[term_id];
         auto &term_scores = ivt_scores[term_id];
@@ -62,10 +62,10 @@ void BMPIvt<DataType, CompressType>::Optimize(i32 topk, Vector<Vector<DataType>>
     }
 }
 
-template class BMPIvt<f32, BMPCompressType::kCompressed>;
-template class BMPIvt<f32, BMPCompressType::kRaw>;
-template class BMPIvt<f64, BMPCompressType::kCompressed>;
-template class BMPIvt<f64, BMPCompressType::kRaw>;
+template class BMPIvt<f32, BMPCompressType::kCompressed, BMPOwnMem::kTrue>;
+template class BMPIvt<f32, BMPCompressType::kRaw, BMPOwnMem::kTrue>;
+template class BMPIvt<f64, BMPCompressType::kCompressed, BMPOwnMem::kTrue>;
+template class BMPIvt<f64, BMPCompressType::kRaw, BMPOwnMem::kTrue>;
 
 template <typename DataType, typename IdxType>
 SizeT TailFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
@@ -274,7 +274,7 @@ void BMPAlg<DataType, IdxType, CompressType>::Optimize(const BMPOptimizeOptions 
         SizeT term_num = bm_ivt_.term_num();
         SizeT doc_num = doc_ids_.size() - doc_ids_.size() % block_size;
 
-        bm_ivt_ = BMPIvt<DataType, CompressType>(term_num);
+        bm_ivt_ = BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>(term_num);
         Vector<Pair<Vector<IdxType>, Vector<DataType>>> fwd = block_fwd_.GetFwd(doc_num, term_num);
         TailFwd<DataType, IdxType> tail_fwd = block_fwd_.GetTailFwd();
         block_fwd_ = BlockFwd<DataType, IdxType>(block_size);

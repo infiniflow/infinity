@@ -27,10 +27,13 @@ import bmp_blockterms;
 
 namespace infinity {
 
+template <typename DataType, BMPCompressType CompressType, BMPOwnMem OwnMem>
+class BMPIvt;
+
 template <typename DataType, BMPCompressType CompressType>
-class BMPIvt {
+class BMPIvt<DataType, CompressType, BMPOwnMem::kTrue> {
 private:
-    BMPIvt(Vector<BlockPostings<DataType, CompressType>> postings) : postings_(std::move(postings)) {}
+    BMPIvt(Vector<BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>> postings) : postings_(std::move(postings)) {}
 
 public:
     BMPIvt(SizeT term_num) : postings_(term_num) {}
@@ -40,7 +43,7 @@ public:
 
     void Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores);
 
-    const BlockPostings<DataType, CompressType> &GetPostings(SizeT term_id) const { return postings_[term_id]; }
+    const BlockPostings<DataType, CompressType, BMPOwnMem::kTrue> &GetPostings(SizeT term_id) const { return postings_[term_id]; }
 
     void Prefetch(SizeT term_id) const { postings_[term_id].Prefetch(); }
 
@@ -54,8 +57,11 @@ public:
     void WriteToPtr(char *&p) const;
 
 private:
-    Vector<BlockPostings<DataType, CompressType>> postings_;
+    Vector<BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>> postings_;
 };
+
+template <typename DataType, BMPCompressType CompressType>
+class BMPIvt<DataType, CompressType, BMPOwnMem::kFalse> {};
 
 template <typename DataType, typename IdxType>
 class TailFwd {
@@ -127,7 +133,7 @@ public:
     using IdxT = IdxType;
 
 private:
-    BMPAlg(BMPIvt<DataType, CompressType> bm_ivt, BlockFwd<DataType, IdxType> block_fwd, Vector<BMPDocID> doc_ids)
+    BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kTrue> bm_ivt, BlockFwd<DataType, IdxType> block_fwd, Vector<BMPDocID> doc_ids)
         : bm_ivt_(std::move(bm_ivt)), block_fwd_(std::move(block_fwd)), doc_ids_(std::move(doc_ids)) {}
 
 public:
@@ -162,7 +168,7 @@ private:
     static BMPAlg<DataType, IdxType, CompressType> ReadAdv(const char *&p);
 
 private:
-    BMPIvt<DataType, CompressType> bm_ivt_;
+    BMPIvt<DataType, CompressType, BMPOwnMem::kTrue> bm_ivt_;
     BlockFwd<DataType, IdxType> block_fwd_;
     Vector<BMPDocID> doc_ids_;
     Atomic<SizeT> mem_usage_ = 0;

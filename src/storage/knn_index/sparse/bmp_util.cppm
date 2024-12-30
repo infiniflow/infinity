@@ -32,6 +32,11 @@ export enum class BMPCompressType : i8 {
     kInvalid = 2,
 };
 
+export enum class BMPOwnMem: i8 {
+    kTrue = 0,
+    kFalse = 1,
+};
+
 export BMPCompressType BMPCompressTypeFromString(const String &compress_type_str) {
     if (IsEqual(compress_type_str, "raww")) {
         return BMPCompressType::kRaw;

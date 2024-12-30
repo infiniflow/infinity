@@ -28,7 +28,7 @@ namespace infinity {
 // --------------------------BMPIvt--------------------------
 
 template <typename DataType, BMPCompressType CompressType>
-SizeT BMPIvt<DataType, CompressType>::GetSizeInBytes() const {
+SizeT BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::GetSizeInBytes() const {
     SizeT size = sizeof(SizeT);
     for (const auto &posting : postings_) {
         size += posting.GetSizeInBytes();
@@ -37,7 +37,7 @@ SizeT BMPIvt<DataType, CompressType>::GetSizeInBytes() const {
 }
 
 template <typename DataType, BMPCompressType CompressType>
-void BMPIvt<DataType, CompressType>::WriteAdv(char *&p) const {
+void BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::WriteAdv(char *&p) const {
     SizeT posting_size = postings_.size();
     WriteBufAdv<SizeT>(p, posting_size);
     for (const auto &posting : postings_) {
@@ -46,29 +46,29 @@ void BMPIvt<DataType, CompressType>::WriteAdv(char *&p) const {
 }
 
 template <typename DataType, BMPCompressType CompressType>
-BMPIvt<DataType, CompressType> BMPIvt<DataType, CompressType>::ReadAdv(const char *&p) {
+BMPIvt<DataType, CompressType, BMPOwnMem::kTrue> BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::ReadAdv(const char *&p) {
     SizeT posting_size = ReadBufAdv<SizeT>(p);
-    Vector<BlockPostings<DataType, CompressType>> postings(posting_size);
+    Vector<BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>> postings(posting_size);
     for (SizeT i = 0; i < posting_size; ++i) {
-        postings[i] = BlockPostings<DataType, CompressType>::ReadAdv(p);
+        postings[i] = BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>::ReadAdv(p);
     }
     return BMPIvt(std::move(postings));
 }
 
 template <typename DataType, BMPCompressType CompressType>
-void BMPIvt<DataType, CompressType>::GetSizeToPtr(const char *&p) const {
-    BlockPostings<DataType, CompressType>::GetSizeToPtr(p, postings_);
+void BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::GetSizeToPtr(const char *&p) const {
+    BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>::GetSizeToPtr(p, postings_);
 }
 
 template <typename DataType, BMPCompressType CompressType>
-void BMPIvt<DataType, CompressType>::WriteToPtr(char *&p) const {
-    BlockPostings<DataType, CompressType>::WriteToPtr(p, postings_);
+void BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::WriteToPtr(char *&p) const {
+    BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>::WriteToPtr(p, postings_);
 }
 
-template class BMPIvt<f32, BMPCompressType::kCompressed>;
-template class BMPIvt<f32, BMPCompressType::kRaw>;
-template class BMPIvt<f64, BMPCompressType::kCompressed>;
-template class BMPIvt<f64, BMPCompressType::kRaw>;
+template class BMPIvt<f32, BMPCompressType::kCompressed, BMPOwnMem::kTrue>;
+template class BMPIvt<f32, BMPCompressType::kRaw, BMPOwnMem::kTrue>;
+template class BMPIvt<f64, BMPCompressType::kCompressed, BMPOwnMem::kTrue>;
+template class BMPIvt<f64, BMPCompressType::kRaw, BMPOwnMem::kTrue>;
 
 // --------------------------TailFwd--------------------------
 
@@ -215,7 +215,7 @@ void BMPAlg<DataType, IdxType, CompressType>::WriteAdv(char *&p) const {
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
 BMPAlg<DataType, IdxType, CompressType> BMPAlg<DataType, IdxType, CompressType>::ReadAdv(const char *&p) {
-    auto postings = BMPIvt<DataType, CompressType>::ReadAdv(p);
+    auto postings = BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::ReadAdv(p);
     auto block_fwd = BlockFwd<DataType, IdxType>::ReadAdv(p);
     SizeT doc_num = ReadBufAdv<SizeT>(p);
     Vector<BMPDocID> doc_ids(doc_num);

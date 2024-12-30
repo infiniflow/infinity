@@ -21,11 +21,11 @@ import bmp_util;
 
 namespace infinity {
 
-export template <typename DataType, BMPCompressType CompressType>
+export template <typename DataType, BMPCompressType CompressType, BMPOwnMem OwnMem>
 struct BlockData {};
 
 template <typename DataType>
-struct BlockData<DataType, BMPCompressType::kCompressed> {
+struct BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> {
 public:
     void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
 
@@ -35,18 +35,35 @@ public:
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockData<DataType, BMPCompressType::kCompressed> ReadAdv(const char *&p);
+    static BlockData ReadAdv(const char *&p);
 
-    static void GetSizeToPtr(const char *&p, const Vector<const BlockData<DataType, BMPCompressType::kCompressed> *> &block_data_list);
-    static void WriteToPtr(char *&p, const Vector<const BlockData<DataType, BMPCompressType::kCompressed> *> &block_data_list);
+    static void GetSizeToPtr(const char *&p,
+                             const Vector<const BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> *> &block_data_list);
+    static void WriteToPtr(char *&p, const Vector<const BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> *> &block_data_list);
 
 private:
     Vector<BMPBlockID> block_ids_;
     Vector<DataType> max_scores_;
 };
 
+template <typename DataType>
+struct BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kFalse> {
+public:
+    BlockData(SizeT block_size, const BMPBlockID *block_ids, const DataType *max_scores)
+        : block_size_(block_size), block_ids_(block_ids), max_scores_(max_scores) {}
+
+    void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
+
+    void Prefetch() const;
+
+private:
+    SizeT block_size_;
+    const BMPBlockID *block_ids_;
+    const DataType *max_scores_;
+};
+
 export template <typename DataType>
-struct BlockData<DataType, BMPCompressType::kRaw> {
+struct BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue> {
 public:
     // template <bool UseSIMD = false>
     void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
@@ -57,17 +74,34 @@ public:
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockData<DataType, BMPCompressType::kRaw> ReadAdv(const char *&p);
+    static BlockData ReadAdv(const char *&p);
 
-    static void GetSizeToPtr(const char *&p, const Vector<const BlockData<DataType, BMPCompressType::kRaw> *> &block_data_list);
-    static void WriteToPtr(char *&p, const Vector<const BlockData<DataType, BMPCompressType::kRaw> *> &block_data_list);
+    static void GetSizeToPtr(const char *&p, const Vector<const BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue> *> &block_data_list);
+    static void WriteToPtr(char *&p, const Vector<const BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue> *> &block_data_list);
 
 public:
     Vector<DataType> max_scores_;
 };
 
+export template <typename DataType>
+struct BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse> {
+public:
+    BlockData(SizeT block_size, const DataType *max_scores) : block_size_(block_size), max_scores_(max_scores) {}
+
+    void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
+
+    void Prefetch() const;
+
+private:
+    SizeT block_size_;
+    const DataType *max_scores_;
+};
+
+export template <typename DataType, BMPCompressType CompressType, BMPOwnMem OwnMem>
+struct BlockPostings {};
+
 export template <typename DataType, BMPCompressType CompressType>
-struct BlockPostings {
+struct BlockPostings<DataType, CompressType, BMPOwnMem::kTrue> {
 public:
     DataType kth(i32 topk) const { return topk == kth_ ? kth_score_ : 0.0; }
 
@@ -77,13 +111,13 @@ public:
     void WriteAdv(char *&p) const;
     static BlockPostings ReadAdv(const char *&p);
 
-    static void GetSizeToPtr(const char *&p, const Vector<BlockPostings<DataType, CompressType>> &postings);
-    static void WriteToPtr(char *&p, const Vector<BlockPostings<DataType, CompressType>> &postings);
+    static void GetSizeToPtr(const char *&p, const Vector<BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>> &postings);
+    static void WriteToPtr(char *&p, const Vector<BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>> &postings);
 
 public:
     i32 kth_{-1};
     DataType kth_score_;
-    BlockData<DataType, CompressType> data_;
+    BlockData<DataType, CompressType, BMPOwnMem::kTrue> data_;
 };
 
 } // namespace infinity

@@ -26,12 +26,12 @@ namespace infinity {
 // --------------------------CompressedBlockData--------------------------
 
 template <typename DataType>
-SizeT BlockData<DataType, BMPCompressType::kCompressed>::GetSizeInBytes() const {
+SizeT BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue>::GetSizeInBytes() const {
     return sizeof(SizeT) + block_ids_.size() * sizeof(BMPBlockID) + max_scores_.size() * sizeof(DataType);
 }
 
 template <typename DataType>
-void BlockData<DataType, BMPCompressType::kCompressed>::WriteAdv(char *&p) const {
+void BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue>::WriteAdv(char *&p) const {
     SizeT max_score_size = max_scores_.size();
     WriteBufAdv<SizeT>(p, max_score_size);
     WriteBufVecAdv(p, block_ids_.data(), block_ids_.size());
@@ -39,8 +39,9 @@ void BlockData<DataType, BMPCompressType::kCompressed>::WriteAdv(char *&p) const
 }
 
 template <typename DataType>
-BlockData<DataType, BMPCompressType::kCompressed> BlockData<DataType, BMPCompressType::kCompressed>::ReadAdv(const char *&p) {
-    BlockData<DataType, BMPCompressType::kCompressed> res;
+BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue>
+BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue>::ReadAdv(const char *&p) {
+    BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> res;
     SizeT max_score_size = ReadBufAdv<SizeT>(p);
     res.block_ids_.resize(max_score_size);
     res.max_scores_.resize(max_score_size);
@@ -54,9 +55,9 @@ BlockData<DataType, BMPCompressType::kCompressed> BlockData<DataType, BMPCompres
 }
 
 template <typename DataType>
-void BlockData<DataType, BMPCompressType::kCompressed>::GetSizeToPtr(
+void BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue>::GetSizeToPtr(
     const char *&p,
-    const Vector<const BlockData<DataType, BMPCompressType::kCompressed> *> &block_data_list) {
+    const Vector<const BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> *> &block_data_list) {
     GetSizeInBytesVecAligned<SizeT>(p, block_data_list.size() + 1);
     SizeT num_sum = 0;
     for (const auto *block_data : block_data_list) {
@@ -67,9 +68,9 @@ void BlockData<DataType, BMPCompressType::kCompressed>::GetSizeToPtr(
 }
 
 template <typename DataType>
-void BlockData<DataType, BMPCompressType::kCompressed>::WriteToPtr(
+void BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue>::WriteToPtr(
     char *&p,
-    const Vector<const BlockData<DataType, BMPCompressType::kCompressed> *> &block_data_list) {
+    const Vector<const BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> *> &block_data_list) {
     SizeT num_sum = 0;
     Vector<SizeT> block_data_prefix_sum;
     block_data_prefix_sum.push_back(0);
@@ -86,26 +87,26 @@ void BlockData<DataType, BMPCompressType::kCompressed>::WriteToPtr(
     }
 }
 
-template struct BlockData<f32, BMPCompressType::kCompressed>;
-template struct BlockData<f64, BMPCompressType::kCompressed>;
+template struct BlockData<f32, BMPCompressType::kCompressed, BMPOwnMem::kTrue>;
+template struct BlockData<f64, BMPCompressType::kCompressed, BMPOwnMem::kTrue>;
 
 // --------------------------RawBlockData--------------------------
 
 template <typename DataType>
-SizeT BlockData<DataType, BMPCompressType::kRaw>::GetSizeInBytes() const {
+SizeT BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue>::GetSizeInBytes() const {
     return sizeof(SizeT) + max_scores_.size() * sizeof(DataType);
 }
 
 template <typename DataType>
-void BlockData<DataType, BMPCompressType::kRaw>::WriteAdv(char *&p) const {
+void BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue>::WriteAdv(char *&p) const {
     SizeT max_score_size = max_scores_.size();
     WriteBufAdv<SizeT>(p, max_score_size);
     WriteBufVecAdv(p, max_scores_.data(), max_scores_.size());
 }
 
 template <typename DataType>
-BlockData<DataType, BMPCompressType::kRaw> BlockData<DataType, BMPCompressType::kRaw>::ReadAdv(const char *&p) {
-    BlockData<DataType, BMPCompressType::kRaw> res;
+BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue> BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue>::ReadAdv(const char *&p) {
+    BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue> res;
     SizeT max_score_size = ReadBufAdv<SizeT>(p);
     res.max_scores_.resize(max_score_size);
     for (SizeT i = 0; i < max_score_size; ++i) {
@@ -115,8 +116,9 @@ BlockData<DataType, BMPCompressType::kRaw> BlockData<DataType, BMPCompressType::
 }
 
 template <typename DataType>
-void BlockData<DataType, BMPCompressType::kRaw>::GetSizeToPtr(const char *&p,
-                                                              const Vector<const BlockData<DataType, BMPCompressType::kRaw> *> &block_data_list) {
+void BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue>::GetSizeToPtr(
+    const char *&p,
+    const Vector<const BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue> *> &block_data_list) {
     GetSizeInBytesVecAligned<SizeT>(p, block_data_list.size());
     SizeT num_sum = 0;
     for (const auto *block_data : block_data_list) {
@@ -126,8 +128,9 @@ void BlockData<DataType, BMPCompressType::kRaw>::GetSizeToPtr(const char *&p,
 }
 
 template <typename DataType>
-void BlockData<DataType, BMPCompressType::kRaw>::WriteToPtr(char *&p,
-                                                            const Vector<const BlockData<DataType, BMPCompressType::kRaw> *> &block_data_list) {
+void BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue>::WriteToPtr(
+    char *&p,
+    const Vector<const BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue> *> &block_data_list) {
     SizeT num_sum = 0;
     Vector<SizeT> block_data_prefix_sum;
     block_data_prefix_sum.push_back(0);
@@ -140,46 +143,50 @@ void BlockData<DataType, BMPCompressType::kRaw>::WriteToPtr(char *&p,
     }
 }
 
-template struct BlockData<f32, BMPCompressType::kRaw>;
-template struct BlockData<f64, BMPCompressType::kRaw>;
+template struct BlockData<f32, BMPCompressType::kRaw, BMPOwnMem::kTrue>;
+template struct BlockData<f64, BMPCompressType::kRaw, BMPOwnMem::kTrue>;
 
 // --------------------------BlockPostings--------------------------
 
 template <typename DataType, BMPCompressType CompressType>
-SizeT BlockPostings<DataType, CompressType>::GetSizeInBytes() const {
+SizeT BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>::GetSizeInBytes() const {
     return sizeof(kth_) + sizeof(kth_score_) + data_.GetSizeInBytes();
 }
 
 template <typename DataType, BMPCompressType CompressType>
-void BlockPostings<DataType, CompressType>::WriteAdv(char *&p) const {
+void BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>::WriteAdv(char *&p) const {
     WriteBufAdv<i32>(p, kth_);
     WriteBufAdv<DataType>(p, kth_score_);
     data_.WriteAdv(p);
 }
 
 template <typename DataType, BMPCompressType CompressType>
-BlockPostings<DataType, CompressType> BlockPostings<DataType, CompressType>::ReadAdv(const char *&p) {
+BlockPostings<DataType, CompressType, BMPOwnMem::kTrue> BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>::ReadAdv(const char *&p) {
     BlockPostings res;
     res.kth_ = ReadBufAdv<i32>(p);
     res.kth_score_ = ReadBufAdv<DataType>(p);
-    res.data_ = BlockData<DataType, CompressType>::ReadAdv(p);
+    res.data_ = BlockData<DataType, CompressType, BMPOwnMem::kTrue>::ReadAdv(p);
     return res;
 }
 
 template <typename DataType, BMPCompressType CompressType>
-void BlockPostings<DataType, CompressType>::GetSizeToPtr(const char *&p, const Vector<BlockPostings<DataType, CompressType>> &postings) {
+void BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>::GetSizeToPtr(
+    const char *&p,
+    const Vector<BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>> &postings) {
     GetSizeInBytesAligned<SizeT>(p);
     GetSizeInBytesVecAligned<i32>(p, postings.size());
     GetSizeInBytesVecAligned<DataType>(p, postings.size());
-    Vector<const BlockData<DataType, CompressType> *> block_data_list;
+    Vector<const BlockData<DataType, CompressType, BMPOwnMem::kTrue> *> block_data_list;
     for (const auto &posting : postings) {
         block_data_list.push_back(&posting.data_);
     }
-    BlockData<DataType, CompressType>::GetSizeToPtr(p, block_data_list);
+    BlockData<DataType, CompressType, BMPOwnMem::kTrue>::GetSizeToPtr(p, block_data_list);
 }
 
 template <typename DataType, BMPCompressType CompressType>
-void BlockPostings<DataType, CompressType>::WriteToPtr(char *&p, const Vector<BlockPostings<DataType, CompressType>> &postings) {
+void BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>::WriteToPtr(
+    char *&p,
+    const Vector<BlockPostings<DataType, CompressType, BMPOwnMem::kTrue>> &postings) {
     WriteBufAdvAligned<SizeT>(p, postings.size());
     Vector<i32> kths;
     Vector<DataType> kth_scores;
@@ -189,16 +196,16 @@ void BlockPostings<DataType, CompressType>::WriteToPtr(char *&p, const Vector<Bl
     }
     WriteBufVecAdvAligned<i32>(p, kths.data(), kths.size());
     WriteBufVecAdvAligned<DataType>(p, kth_scores.data(), kth_scores.size());
-    Vector<const BlockData<DataType, CompressType> *> block_data_list;
+    Vector<const BlockData<DataType, CompressType, BMPOwnMem::kTrue> *> block_data_list;
     for (const auto &posting : postings) {
         block_data_list.push_back(&posting.data_);
     }
-    BlockData<DataType, CompressType>::WriteToPtr(p, block_data_list);
+    BlockData<DataType, CompressType, BMPOwnMem::kTrue>::WriteToPtr(p, block_data_list);
 }
 
-template struct BlockPostings<f32, BMPCompressType::kCompressed>;
-template struct BlockPostings<f32, BMPCompressType::kRaw>;
-template struct BlockPostings<f64, BMPCompressType::kCompressed>;
-template struct BlockPostings<f64, BMPCompressType::kRaw>;
+template struct BlockPostings<f32, BMPCompressType::kCompressed, BMPOwnMem::kTrue>;
+template struct BlockPostings<f32, BMPCompressType::kRaw, BMPOwnMem::kTrue>;
+template struct BlockPostings<f64, BMPCompressType::kCompressed, BMPOwnMem::kTrue>;
+template struct BlockPostings<f64, BMPCompressType::kRaw, BMPOwnMem::kTrue>;
 
 } // namespace infinity
