@@ -347,6 +347,11 @@ Status VirtualStore::Copy(const String &dst_path, const String &src_path) {
         UnrecoverableError(error_message);
     }
 
+    String dst_dir = GetParentPath(dst_path);
+    if (!VirtualStore::Exists(dst_dir)) {
+        VirtualStore::MakeDirectory(dst_dir);
+    }
+
     try {
         std::filesystem::copy(src_path, dst_path, fs::copy_options::update_existing);
     } catch (const std::filesystem::filesystem_error &e) {
