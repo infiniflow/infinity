@@ -23,7 +23,7 @@ import query_context;
 
 namespace infinity {
 
-class Snapshot {
+export class Snapshot {
 public:
     static Status CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String& table_name);
     static Status RestoreTableSnapshot();
