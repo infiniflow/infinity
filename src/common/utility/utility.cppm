@@ -40,4 +40,6 @@ IdentifierValidationStatus IdentifierValidation(const String &identifier);
 bool ParseIPPort(const String &str, String &ip, i64 &port);
 
 String StringTransform(const String &source, const String &from, const String &to);
+
+bool CompressDirectory(const String &source_dir, const String &dest_file);
 } // namespace infinity

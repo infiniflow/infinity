@@ -30,6 +30,9 @@ import local_file_handle;
 import infinity_exception;
 import infinity_context;
 import config;
+import persistence_manager;
+import persist_result_handler;
+import defer_op;
 
 namespace infinity {
 
@@ -66,16 +69,101 @@ nlohmann::json SegmentSnapshotInfo::Serialize() {
 void TableSnapshotInfo::Serialize(const String &save_dir) {
 
     Config *config = InfinityContext::instance().config();
-    String data_dir = config->DataDir();
+    PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
+
     // Get files
     Vector<String> original_files = GetFiles();
 
     // Copy files
-    for (const auto &file : original_files) {
-        String src_file_path = fmt::format("{}/{}", data_dir, file);
-        String dst_file_path = fmt::format("{}/{}/{}", save_dir, snapshot_name_, file);
-        LOG_INFO(fmt::format("Copy from: {} to {}", src_file_path, dst_file_path));
+    if (persistence_manager != nullptr) {
+        PersistResultHandler pm_handler(persistence_manager);
+        for (const auto &file : original_files) {
+            PersistReadResult result = persistence_manager->GetObjCache(file);
+            DeferFn defer_fn([&]() {
+                auto res = persistence_manager->PutObjCache(file);
+                pm_handler.HandleWriteResult(res);
+            });
+
+            const ObjAddr &obj_addr = pm_handler.HandleReadResult(result);
+            if (!obj_addr.Valid()) {
+                String error_message = fmt::format("Failed to find object for local path {}", file);
+                UnrecoverableError(error_message);
+            }
+            String read_path = persistence_manager->GetObjPath(obj_addr.obj_key_);
+            LOG_INFO(fmt::format("READ: {} from {}", file, read_path));
+
+            auto [reader_handle, reader_open_status] = VirtualStore::Open(read_path, FileAccessMode::kRead);
+            if (!reader_open_status.ok()) {
+                UnrecoverableError(reader_open_status.message());
+            }
+
+            auto seek_status = reader_handle->Seek(obj_addr.part_offset_);
+            if (!seek_status.ok()) {
+                UnrecoverableError(seek_status.message());
+            }
+
+            auto file_size = obj_addr.part_size_;
+            auto buffer = std::make_unique<char[]>(file_size);
+            auto [nread, read_status] = reader_handle->Read(buffer.get(), file_size);
+
+            String dst_file_path = fmt::format("{}/{}/{}", save_dir, snapshot_name_, file);
+            String dst_dir = VirtualStore::GetParentPath(dst_file_path);
+            if (!VirtualStore::Exists(dst_dir)) {
+                VirtualStore::MakeDirectory(dst_dir);
+            }
+
+            auto [write_file_handle, writer_open_status] = VirtualStore::Open(dst_file_path, FileAccessMode::kWrite);
+            if (!writer_open_status.ok()) {
+                UnrecoverableError(writer_open_status.message());
+            }
+
+            Status write_status = write_file_handle->Append(buffer.get(), file_size);
+            if (!write_status.ok()) {
+                UnrecoverableError(write_status.message());
+            }
+            write_file_handle->Sync();
+        }
+    } else {
+        String data_dir = config->DataDir();
+        for (const auto &file : original_files) {
+            String src_file_path = fmt::format("{}/{}", data_dir, file);
+            String dst_file_path = fmt::format("{}/{}/{}", save_dir, snapshot_name_, file);
+            //        LOG_INFO(fmt::format("Copy from: {} to {}", src_file_path, dst_file_path));
+            Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
+            if (!copy_status.ok()) {
+                RecoverableError(copy_status);
+            }
+        }
     }
+
+    // Compress the directory
+    String directory = fmt::format("{}/{}", save_dir, snapshot_name_);
+    String zip_filename = fmt::format("{}/{}.zip", save_dir, snapshot_name_);
+    String command = fmt::format("zip -r {} {}", directory, zip_filename);
+    int ret = system(command.c_str());
+    if (ret != 0) {
+        Status status = Status::IOError(fmt::format("Failed to compress directory: {}", directory));
+        RecoverableError(status);
+    }
+    // Get the MD5 of compress file
+    String md5_command = fmt::format("md5sum {}", zip_filename);
+    FILE *md5_fp = popen(md5_command.c_str(), "r");
+    if (md5_fp == nullptr) {
+        Status status = Status::IOError(fmt::format("Failed to get md5 of file: {}", zip_filename));
+        RecoverableError(status);
+    }
+    char md5_buf[1024];
+    if (fgets(md5_buf, sizeof(md5_buf), md5_fp) == nullptr) {
+        Status status = Status::IOError(fmt::format("Failed to read md5 of file: {}", zip_filename));
+        RecoverableError(status);
+    }
+    pclose(md5_fp);
+    String md5 = md5_buf;
+    md5 = md5.substr(0, md5.find(" "));
+    LOG_INFO(fmt::format("MD5: {}", md5));
+
+    // Remove the directory
+    VirtualStore::RemoveDirectory(directory);
 
     nlohmann::json json_res;
     json_res["version"] = version_;
@@ -84,6 +172,7 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     json_res["database_name"] = db_name_;
     json_res["table_name"] = table_name_;
     json_res["table_comment"] = table_comment_;
+    json_res["md5"] = md5;
 
     json_res["txn_id"] = txn_id_;
     json_res["begin_ts"] = begin_ts_;
