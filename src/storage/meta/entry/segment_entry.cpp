@@ -723,6 +723,21 @@ void SegmentEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore
     }
 }
 
+SharedPtr<SegmentSnapshotInfo> SegmentEntry::GetSnapshotInfo() const {
+    SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = MakeShared<SegmentSnapshotInfo>();
+    segment_snapshot_info->segment_id_ = segment_id_;
+    segment_snapshot_info->segment_dir_ = *segment_dir_;
+
+    std::shared_lock lock(rw_locker_);
+    SizeT block_count = block_entries_.size();
+    segment_snapshot_info->block_snapshots_.reserve(block_count);
+    for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+        SharedPtr<BlockSnapshotInfo> block_snapshot_info = block_entries_[block_id]->GetSnapshotInfo();
+        segment_snapshot_info->block_snapshots_.push_back(block_snapshot_info);
+    }
+    return segment_snapshot_info;
+}
+
 SizeT SegmentEntry::GetStorageSize() const {
     SizeT result = 0;
     std::shared_lock lock(rw_locker_);

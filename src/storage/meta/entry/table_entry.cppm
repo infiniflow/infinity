@@ -45,6 +45,7 @@ import block_entry;
 import column_index_reader;
 import value;
 import infinity_exception;
+import snapshot_info;
 
 namespace infinity {
 
@@ -399,6 +400,8 @@ public:
     void AddColumns(const Vector<SharedPtr<ColumnDef>> &columns, TxnTableStore *txn_store);
 
     void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
+
+    SharedPtr<TableSnapshotInfo> GetSnapshotInfo() const;
 };
 
 } // namespace infinity

@@ -36,6 +36,7 @@ import wal_entry;
 import column_def;
 import txn_store;
 import cleanup_scanner;
+import snapshot_info;
 
 namespace infinity {
 
@@ -194,6 +195,7 @@ public:
 
     void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 
+    SharedPtr<BlockSnapshotInfo> GetSnapshotInfo() const;
 public:
     // Setter, Used in import, segment append block, and block append block in compact
     inline void IncreaseRowCount(SizeT increased_row_count) { block_row_count_ += increased_row_count; }

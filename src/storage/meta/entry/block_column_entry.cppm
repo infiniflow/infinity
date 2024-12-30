@@ -94,7 +94,7 @@ public:
 
     ColumnVector GetConstColumnVector(BufferManager *buffer_mgr, SizeT row_count);
 
-    SharedPtr<BlockColumnSnapshotInfo> GetSnapshotInfo();
+    SharedPtr<BlockColumnSnapshotInfo> GetSnapshotInfo() const;
 private:
     ColumnVector GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe, SizeT row_count);
 
