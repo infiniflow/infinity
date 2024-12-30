@@ -37,6 +37,9 @@ public:
     void WriteAdv(char *&p) const;
     static BlockData<DataType, BMPCompressType::kCompressed> ReadAdv(const char *&p);
 
+    static void GetSizeToPtr(const char *&p, const Vector<const BlockData<DataType, BMPCompressType::kCompressed> *> &block_data_list);
+    static void WriteToPtr(char *&p, const Vector<const BlockData<DataType, BMPCompressType::kCompressed> *> &block_data_list);
+
 private:
     Vector<BMPBlockID> block_ids_;
     Vector<DataType> max_scores_;
@@ -56,6 +59,9 @@ public:
     void WriteAdv(char *&p) const;
     static BlockData<DataType, BMPCompressType::kRaw> ReadAdv(const char *&p);
 
+    static void GetSizeToPtr(const char *&p, const Vector<const BlockData<DataType, BMPCompressType::kRaw> *> &block_data_list);
+    static void WriteToPtr(char *&p, const Vector<const BlockData<DataType, BMPCompressType::kRaw> *> &block_data_list);
+
 public:
     Vector<DataType> max_scores_;
 };
@@ -70,6 +76,9 @@ public:
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
     static BlockPostings ReadAdv(const char *&p);
+
+    static void GetSizeToPtr(const char *&p, const Vector<BlockPostings<DataType, CompressType>> &postings);
+    static void WriteToPtr(char *&p, const Vector<BlockPostings<DataType, CompressType>> &postings);
 
 public:
     i32 kth_{-1};

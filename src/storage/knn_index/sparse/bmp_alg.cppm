@@ -50,6 +50,9 @@ public:
     void WriteAdv(char *&p) const;
     static BMPIvt ReadAdv(const char *&p);
 
+    void GetSizeToPtr(const char *&p) const;
+    void WriteToPtr(char *&p) const;
+
 private:
     Vector<BlockPostings<DataType, CompressType>> postings_;
 };

@@ -55,6 +55,16 @@ BMPIvt<DataType, CompressType> BMPIvt<DataType, CompressType>::ReadAdv(const cha
     return BMPIvt(std::move(postings));
 }
 
+template <typename DataType, BMPCompressType CompressType>
+void BMPIvt<DataType, CompressType>::GetSizeToPtr(const char *&p) const {
+    BlockPostings<DataType, CompressType>::GetSizeToPtr(p, postings_);
+}
+
+template <typename DataType, BMPCompressType CompressType>
+void BMPIvt<DataType, CompressType>::WriteToPtr(char *&p) const {
+    BlockPostings<DataType, CompressType>::WriteToPtr(p, postings_);
+}
+
 template class BMPIvt<f32, BMPCompressType::kCompressed>;
 template class BMPIvt<f32, BMPCompressType::kRaw>;
 template class BMPIvt<f64, BMPCompressType::kCompressed>;

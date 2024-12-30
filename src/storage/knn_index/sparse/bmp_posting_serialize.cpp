@@ -14,6 +14,8 @@
 
 module;
 
+#include <vector>
+
 module bm_posting;
 
 import stl;
@@ -51,6 +53,39 @@ BlockData<DataType, BMPCompressType::kCompressed> BlockData<DataType, BMPCompres
     return res;
 }
 
+template <typename DataType>
+void BlockData<DataType, BMPCompressType::kCompressed>::GetSizeToPtr(
+    const char *&p,
+    const Vector<const BlockData<DataType, BMPCompressType::kCompressed> *> &block_data_list) {
+    GetSizeInBytesVecAligned<SizeT>(p, block_data_list.size() + 1);
+    SizeT num_sum = 0;
+    for (const auto *block_data : block_data_list) {
+        num_sum += block_data->block_ids_.size();
+    }
+    GetSizeInBytesVecAligned<BMPBlockID>(p, num_sum);
+    GetSizeInBytesVecAligned<DataType>(p, num_sum);
+}
+
+template <typename DataType>
+void BlockData<DataType, BMPCompressType::kCompressed>::WriteToPtr(
+    char *&p,
+    const Vector<const BlockData<DataType, BMPCompressType::kCompressed> *> &block_data_list) {
+    SizeT num_sum = 0;
+    Vector<SizeT> block_data_prefix_sum;
+    block_data_prefix_sum.push_back(0);
+    for (const auto *block_data : block_data_list) {
+        num_sum += block_data->block_ids_.size();
+        block_data_prefix_sum.push_back(num_sum);
+    }
+    WriteBufVecAdvAligned<SizeT>(p, block_data_prefix_sum.data(), block_data_prefix_sum.size());
+    for (const auto *block_data : block_data_list) {
+        WriteBufVecAdvAligned<BMPBlockID>(p, block_data->block_ids_.data(), block_data->block_ids_.size());
+    }
+    for (const auto *block_data : block_data_list) {
+        WriteBufVecAdvAligned<DataType>(p, block_data->max_scores_.data(), block_data->max_scores_.size());
+    }
+}
+
 template struct BlockData<f32, BMPCompressType::kCompressed>;
 template struct BlockData<f64, BMPCompressType::kCompressed>;
 
@@ -79,6 +114,32 @@ BlockData<DataType, BMPCompressType::kRaw> BlockData<DataType, BMPCompressType::
     return res;
 }
 
+template <typename DataType>
+void BlockData<DataType, BMPCompressType::kRaw>::GetSizeToPtr(const char *&p,
+                                                              const Vector<const BlockData<DataType, BMPCompressType::kRaw> *> &block_data_list) {
+    GetSizeInBytesVecAligned<SizeT>(p, block_data_list.size());
+    SizeT num_sum = 0;
+    for (const auto *block_data : block_data_list) {
+        num_sum += block_data->max_scores_.size();
+    }
+    GetSizeInBytesVecAligned<DataType>(p, num_sum);
+}
+
+template <typename DataType>
+void BlockData<DataType, BMPCompressType::kRaw>::WriteToPtr(char *&p,
+                                                            const Vector<const BlockData<DataType, BMPCompressType::kRaw> *> &block_data_list) {
+    SizeT num_sum = 0;
+    Vector<SizeT> block_data_prefix_sum;
+    block_data_prefix_sum.push_back(0);
+    for (const auto *block_data : block_data_list) {
+        num_sum += block_data->max_scores_.size();
+        block_data_prefix_sum.push_back(num_sum);
+    }
+    for (const auto *block_data : block_data_list) {
+        WriteBufVecAdvAligned<DataType>(p, block_data->max_scores_.data(), block_data->max_scores_.size());
+    }
+}
+
 template struct BlockData<f32, BMPCompressType::kRaw>;
 template struct BlockData<f64, BMPCompressType::kRaw>;
 
@@ -103,6 +164,36 @@ BlockPostings<DataType, CompressType> BlockPostings<DataType, CompressType>::Rea
     res.kth_score_ = ReadBufAdv<DataType>(p);
     res.data_ = BlockData<DataType, CompressType>::ReadAdv(p);
     return res;
+}
+
+template <typename DataType, BMPCompressType CompressType>
+void BlockPostings<DataType, CompressType>::GetSizeToPtr(const char *&p, const Vector<BlockPostings<DataType, CompressType>> &postings) {
+    GetSizeInBytesAligned<SizeT>(p);
+    GetSizeInBytesVecAligned<i32>(p, postings.size());
+    GetSizeInBytesVecAligned<DataType>(p, postings.size());
+    Vector<const BlockData<DataType, CompressType> *> block_data_list;
+    for (const auto &posting : postings) {
+        block_data_list.push_back(&posting.data_);
+    }
+    BlockData<DataType, CompressType>::GetSizeToPtr(p, block_data_list);
+}
+
+template <typename DataType, BMPCompressType CompressType>
+void BlockPostings<DataType, CompressType>::WriteToPtr(char *&p, const Vector<BlockPostings<DataType, CompressType>> &postings) {
+    WriteBufAdvAligned<SizeT>(p, postings.size());
+    Vector<i32> kths;
+    Vector<DataType> kth_scores;
+    for (const auto &posting : postings) {
+        kths.push_back(posting.kth_);
+        kth_scores.push_back(posting.kth_score_);
+    }
+    WriteBufVecAdvAligned<i32>(p, kths.data(), kths.size());
+    WriteBufVecAdvAligned<DataType>(p, kth_scores.data(), kth_scores.size());
+    Vector<const BlockData<DataType, CompressType> *> block_data_list;
+    for (const auto &posting : postings) {
+        block_data_list.push_back(&posting.data_);
+    }
+    BlockData<DataType, CompressType>::WriteToPtr(p, block_data_list);
 }
 
 template struct BlockPostings<f32, BMPCompressType::kCompressed>;
