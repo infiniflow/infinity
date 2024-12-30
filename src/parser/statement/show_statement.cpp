@@ -180,6 +180,14 @@ std::string ShowStatement::ToString() const {
             ss << "Show function";
             break;
         }
+        case ShowStmtType::kListSnapshots: {
+            ss << "List snapshots";
+            break;
+        }
+        case ShowStmtType::kShowSnapshot: {
+            ss << "Show snapshot";
+            break;
+        }
     }
     return ss.str();
 }

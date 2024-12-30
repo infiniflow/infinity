@@ -56,6 +56,7 @@ import admin_statement;
 import global_resource_usage;
 import wal_manager;
 import defer_op;
+import snapshot_info;
 
 namespace infinity {
 
@@ -442,6 +443,12 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
 
 Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String &db_name, const String &table_name) {
     return catalog_->GetTableInfo(db_name, table_name, this);
+}
+
+Tuple<SharedPtr<TableSnapshotInfo>, Status> Txn::GetTableSnapshot(const String &db_name, const String &table_name) {
+    this->CheckTxn(db_name);
+    TxnTimeStamp begin_ts = this->BeginTS();
+    return catalog_->GetTableSnapshot(db_name, table_name, TxnID(), begin_ts);
 }
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {

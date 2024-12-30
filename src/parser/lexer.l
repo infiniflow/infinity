@@ -168,6 +168,7 @@ QUERIES         { return QUERIES; }
 QUERY           { return QUERY; }
 REAL            { return REAL; }
 RECOVER         { return RECOVER; }
+RESTORE         { return RESTORE; }
 RENAME          { return RENAME; }
 REMOVE          { return REMOVE; }
 RIGHT           { return RIGHT; }
@@ -186,6 +187,7 @@ SNAPSHOT        { return SNAPSHOT; }
 SNAPSHOTS       { return SNAPSHOTS; }
 SPARSE          { return SPARSE; }
 STANDALONE      { return STANDALONE; }
+SYSTEM          { return SYSTEM; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
 TENSOR          { return TENSOR; }

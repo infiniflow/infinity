@@ -243,6 +243,7 @@ TEST_F(ConfigTest, TestValidValues) {
     EXPECT_EQ(config.CleanupInterval(), 60);
     EXPECT_EQ(config.CompactInterval(), 120);
     EXPECT_EQ(config.MemIndexCapacity(), 1048576);
+    EXPECT_EQ(config.SnapshotDir(), "/var/infinity/snapshot");
 
     // buffer
     EXPECT_EQ(config.BufferManagerSize(), 4 * 1024l * 1024l * 1024l);

@@ -1824,6 +1824,42 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowStmtType::kListSnapshots: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW SNAPSHOTS ";
+            } else {
+                show_str = "SHOW SNAPSHOTS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, count, total_size]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowStmtType::kShowSnapshot: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW MEMORY ALLOCATION ";
+            } else {
+                show_str = "SHOW MEMORY ALLOCATION ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, count, total_size]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowStmtType::kFunction: {
             String show_str;
             if (intent_size != 0) {

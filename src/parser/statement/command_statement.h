@@ -32,6 +32,7 @@ enum class CommandType {
     kUnlockTable,
     kCleanup,
     kTestCommand,
+    kSnapshot,
 };
 
 class CommandInfo {
@@ -236,7 +237,7 @@ public:
 
 class TestCmd final : public CommandInfo {
 public:
-    TestCmd(std::string command_content) : CommandInfo(CommandType::kTestCommand), command_content_(command_content) {}
+    TestCmd(std::string command_content) : CommandInfo(CommandType::kTestCommand), command_content_(std::move(command_content)) {}
 
     [[nodiscard]] std::string ToString() const final;
 
@@ -244,6 +245,27 @@ public:
 
 private:
     std::string command_content_{};
+};
+
+enum class SnapshotOp { kCreate, kDrop, kRestore, kInvalid };
+enum class SnapshotScope { kTable, kDatabase, kSystem, kIgnore, kInvalid };
+
+class SnapshotCmd final : public CommandInfo {
+public:
+    SnapshotCmd(std::string name, SnapshotOp op, SnapshotScope scope, std::optional<std::string> object_name = std::nullopt)
+        : CommandInfo(CommandType::kSnapshot), name_(std::move(name)), operation_(op), scope_(scope), object_name_(std::move(object_name)) {}
+
+    [[nodiscard]] std::string ToString() const final;
+
+    const std::string &name() { return name_; }
+    SnapshotOp operation() { return operation_; }
+    SnapshotScope &scope() { return scope_; }
+
+private:
+    std::string name_{};
+    SnapshotOp operation_{SnapshotOp::kInvalid};
+    SnapshotScope scope_{SnapshotScope::kInvalid};
+    std::optional<std::string> object_name_{std::nullopt};
 };
 
 } // namespace infinity

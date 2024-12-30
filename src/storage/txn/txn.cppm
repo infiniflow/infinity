@@ -32,6 +32,7 @@ import extra_ddl_info;
 import internal_types;
 import column_def;
 import value;
+import snapshot_info;
 
 namespace infinity {
 
@@ -130,6 +131,8 @@ public:
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
+
+    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 
     // Index OPs
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)

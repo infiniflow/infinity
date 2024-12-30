@@ -35,6 +35,7 @@ import block_entry;
 import table_index_meta;
 import compaction_alg;
 import meta_map;
+import snapshot_info;
 
 import cleanup_scanner;
 import random;
@@ -123,6 +124,8 @@ public:
     Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetSnapshotInfo(TxnTimeStamp begin_ts);
 
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
