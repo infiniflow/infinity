@@ -68,6 +68,7 @@ import cast_expression;
 import expression_evaluator;
 import column_vector;
 import expression_state;
+import snapshot_info;
 
 namespace infinity {
 
@@ -1650,6 +1651,17 @@ void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *
     for (auto &[segment_id, segment_entry] : segment_map_) {
         segment_entry->DropColumns(column_ids, txn_table_store);
     }
+}
+
+SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo() const {
+    SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
+    table_snapshot_info->db_name_ = *GetDBName();
+    table_snapshot_info->table_name_ = *table_name_;
+    for (const auto &segment_pair : segment_map_) {
+        SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = segment_pair.second->GetSnapshotInfo();
+        table_snapshot_info->segment_snapshots_.emplace(segment_pair.first, segment_snapshot_info);
+    }
+    return table_snapshot_info;
 }
 
 } // namespace infinity

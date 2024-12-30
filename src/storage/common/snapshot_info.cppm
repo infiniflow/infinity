@@ -37,17 +37,19 @@ export struct OutlineSnapshotInfo {
 export struct BlockColumnSnapshotInfo {
     ColumnID column_id_;
     String filename_;
-    Vector<OutlineSnapshotInfo> outline_snapshots_;
+    Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots_;
 };
 
 export struct BlockSnapshotInfo {
     BlockID block_id_;
-    Vector<BlockColumnSnapshotInfo> column_block_snapshots_;
+    String block_dir_;
+    Vector<SharedPtr<BlockColumnSnapshotInfo>> column_block_snapshots_;
 };
 
 export struct SegmentSnapshotInfo {
     SegmentID segment_id_;
-    Vector<BlockSnapshotInfo> block_snapshots_;
+    String segment_dir_;
+    Vector<SharedPtr<BlockSnapshotInfo>> block_snapshots_;
 };
 
 export struct ChunkIndexSnapshot {
@@ -69,6 +71,7 @@ export struct TableIndexSnapshotInfo {
 export struct TableSnapshotInfo : public SnapshotInfo {
     String db_name_;
     String table_name_;
+    Map<SegmentID, SharedPtr<SegmentSnapshotInfo>> segment_snapshots_{};
 };
 
 } // namespace infinity
