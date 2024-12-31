@@ -6583,6 +6583,7 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+<<<<<<< HEAD
 
     Vector<SharedPtr<DataType>> column_types{
         varchar_type,
@@ -6591,6 +6592,9 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
         bigint_type,
         varchar_type
     };
+=======
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, varchar_type};
+>>>>>>> ca77d2962 (Finish show specific snapshot)
 
     output_block_ptr->Init(column_types);
 
@@ -6614,7 +6618,7 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
         {
             // scope
             String scope_str;
-            switch(snapshot_brief.scope_) {
+            switch (snapshot_brief.scope_) {
                 case SnapshotScope::kTable: {
                     scope_str = "Table";
                     break;
@@ -6687,37 +6691,125 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
 
     output_block_ptr->Init(column_types);
 
-    //    {
-    //        SizeT column_id = 0;
-    //        {
-    //            Value value = Value::MakeVarchar("memory_objects");
-    //            ValueExpression value_expr(value);
-    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //        }
-    //
-    //        ++column_id;
-    //        {
-    //            Value value = Value::MakeVarchar(GlobalResourceUsage::GetObjectCountInfo());
-    //            ValueExpression value_expr(value);
-    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //        }
-    //    }
-    //
-    //    {
-    //        SizeT column_id = 0;
-    //        {
-    //            Value value = Value::MakeVarchar("memory_allocation");
-    //            ValueExpression value_expr(value);
-    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //        }
-    //
-    //        ++column_id;
-    //        {
-    //            Value value = Value::MakeVarchar(GlobalResourceUsage::GetRawMemoryInfo());
-    //            ValueExpression value_expr(value);
-    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-    //        }
-    //    }
+    String snapshot_dir = query_context->global_config()->SnapshotDir();
+    Vector<SnapshotBrief> snapshot_list = SnapshotBrief::GetSnapshots(snapshot_dir);
+
+    SnapshotBrief snapshot_brief;
+    for (const auto &ss_brief : snapshot_list) {
+        if (ss_brief.snapshot_name_ == object_name_.value()) {
+            snapshot_brief = ss_brief;
+        }
+    }
+
+    if (snapshot_brief.scope_ == SnapshotScope::kInvalid) {
+        Status status = Status::Unknown(fmt::format("can't find snapshot: {}", object_name_.value()));
+        RecoverableError(status);
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("snapshot_name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(snapshot_brief.snapshot_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("snapshot_scope");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            String scope_str;
+            switch (snapshot_brief.scope_) {
+                case SnapshotScope::kTable: {
+                    scope_str = "Table";
+                    break;
+                }
+                case SnapshotScope::kDatabase: {
+                    scope_str = "Database";
+                    break;
+                }
+                case SnapshotScope::kSystem: {
+                    scope_str = "System";
+                    break;
+                }
+                case SnapshotScope::kIgnore: {
+                    scope_str = "Ignore";
+                    break;
+                }
+                default: {
+                    Status status = Status::Unknown("Invalid scope type");
+                    RecoverableError(status);
+                }
+            }
+
+            Value value = Value::MakeVarchar(scope_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("create_time");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(snapshot_brief.create_time_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("commit_timestamp");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(snapshot_brief.commit_ts_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("snapshot_size");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            String snapshot_size_str = Utility::FormatByteSize(snapshot_brief.size_);
+            Value value = Value::MakeVarchar(snapshot_size_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
