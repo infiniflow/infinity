@@ -35,7 +35,7 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     if (!table_status.ok()) {
         return table_status;
     }
-    SharedPtr<TableSnapshotInfo> table_snapshot = table_entry_ptr->GetSnapshotInfo();
+    SharedPtr<TableSnapshotInfo> table_snapshot = table_entry_ptr->GetSnapshotInfo(txn_ptr);
     table_snapshot->snapshot_name_ = snapshot_name;
     String snapshot_dir = query_context->global_config()->SnapshotDir();
     table_snapshot->Serialize(snapshot_dir);
@@ -44,6 +44,5 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
 }
 
 Status Snapshot::RestoreTableSnapshot() { return Status::OK(); }
-Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapshot_name) { return Status::OK(); }
 
 } // namespace infinity

@@ -447,8 +447,7 @@ Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String &db_name, con
 
 Tuple<SharedPtr<TableSnapshotInfo>, Status> Txn::GetTableSnapshot(const String &db_name, const String &table_name) {
     this->CheckTxn(db_name);
-    TxnTimeStamp begin_ts = this->BeginTS();
-    return catalog_->GetTableSnapshot(db_name, table_name, TxnID(), begin_ts);
+    return catalog_->GetTableSnapshot(db_name, table_name, this);
 }
 
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {

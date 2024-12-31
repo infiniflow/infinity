@@ -309,14 +309,16 @@ Tuple<TableEntry *, Status> Catalog::GetTableByName(const String &db_name, const
     return db_entry->GetTableCollection(table_name, txn_id, begin_ts);
 }
 
-Tuple<SharedPtr<TableSnapshotInfo>, Status> Catalog::GetTableSnapshot(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<TableSnapshotInfo>, Status> Catalog::GetTableSnapshot(const String &db_name, const String &table_name, Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
     auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
     if (!table_status.ok()) {
         // Error
         LOG_ERROR(fmt::format("Fail to get table {} from database: {}, error message: {}.", table_name, db_name, table_status.message()));
         return {nullptr, table_status};
     }
-    return table_entry->GetSnapshotInfo(begin_ts);
+    return {table_entry->GetSnapshotInfo(txn_ptr), Status::OK()};
 }
 
 Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name, const String &table_name, Txn *txn) {
