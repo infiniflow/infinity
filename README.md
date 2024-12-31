@@ -82,6 +82,8 @@ Infinity supports two working modes, embedded mode and client-server mode. Infin
    print(res)
    ```
 
+> 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/pysdk_api_reference).
+
 #### 🔧 Deploy Infinity in client-server mode
 
 If you wish to deploy Infinity with the server and client as separate processes, see the [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server) guide.
@@ -89,8 +91,6 @@ If you wish to deploy Infinity with the server and client as separate processes,
 #### 🔧 Build from Source
 
 See the [Build from Source](https://infiniflow.org/docs/dev/build_from_source) guide.
-
-> 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/pysdk_api_reference).
 
 ## 📚 Document
 
