@@ -32,9 +32,46 @@ export enum class BMPCompressType : i8 {
     kInvalid = 2,
 };
 
-export enum class BMPOwnMem: i8 {
+export enum class BMPOwnMem : i8 {
     kTrue = 0,
     kFalse = 1,
+};
+
+export template <typename T, BMPOwnMem OwnMem>
+class VecPtr {};
+
+export template <typename T>
+class VecPtr<T, BMPOwnMem::kTrue> {
+public:
+    VecPtr() = default;
+    VecPtr(Vector<T> ptr) : vec_(std::move(ptr)) {}
+
+    T &operator[](SizeT idx) { return vec_[idx]; }
+    const T &operator[](SizeT idx) const { return vec_[idx]; }
+
+    T *data() { return vec_.data(); }
+    const T *data() const { return vec_.data(); }
+    SizeT size() const { return vec_.size(); }
+
+    template<typename U>
+    void push_back(U&& val) { vec_.push_back(std::forward<U>(val)); }
+
+    Vector<T> exchange(Vector<T> vec) { return std::exchange(vec_, std::move(vec)); }
+
+private:
+    Vector<T> vec_;
+};
+
+export template <typename T>
+class VecPtr<T, BMPOwnMem::kFalse> {
+public:
+    VecPtr() = default;
+    VecPtr(const T *ptr) : ptr_(ptr) {}
+
+    const T &operator[](SizeT idx) const { return ptr_[idx]; }
+
+private:
+    const T *ptr_ = nullptr;
 };
 
 export BMPCompressType BMPCompressTypeFromString(const String &compress_type_str) {

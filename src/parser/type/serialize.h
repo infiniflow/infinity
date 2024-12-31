@@ -109,22 +109,22 @@ inline void WriteBufVecAdv(char *&buf, const T *data, size_t size) {
 }
 
 template <typename T>
-void GetSizeInBytesAligned(const char *&start) {
+void GetSizeInBytesAligned(char *&start) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
     auto ptr = reinterpret_cast<uintptr_t>(start);
     size_t t_align = std::alignment_of_v<T>;
     ptr = (ptr + t_align - 1) & ~(t_align - 1);
-    start = reinterpret_cast<const char *>(ptr);
+    start = reinterpret_cast<char *>(ptr);
     start += sizeof(T);
 }
 
 template <typename T>
-void GetSizeInBytesVecAligned(const char *&start, size_t size) {
+void GetSizeInBytesVecAligned(char *&start, size_t size) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
     auto ptr = reinterpret_cast<uintptr_t>(start);
     size_t t_align = std::alignment_of_v<T>;
     ptr = (ptr + t_align - 1) & ~(t_align - 1);
-    start = reinterpret_cast<const char *>(ptr);
+    start = reinterpret_cast<char *>(ptr);
     start += sizeof(T) * size;
 }
 
