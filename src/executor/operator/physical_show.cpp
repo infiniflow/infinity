@@ -703,7 +703,7 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             ExecuteShowTransactions(query_context, show_operator_state);
             break;
         }
-        case ShowStmtType::kTransactions: {
+        case ShowStmtType::kTransactionHistory: {
             ExecuteShowTransactionHistory(query_context, show_operator_state);
             break;
         }
@@ -5780,6 +5780,81 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
 }
 
 void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    TxnManager *txn_manager = query_context->storage()->txn_manager();
+    UniquePtr<TxnInfo> txn_info = txn_manager->GetTxnInfoByID(*txn_id_);
+    if (txn_info.get() == nullptr) {
+        Status status = Status::TransactionNotFound(*txn_id_);
+        RecoverableError(status);
+    }
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("transaction_id");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(*txn_id_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("session_id");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(*session_id_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("transaction_text");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            String txn_string;
+            if (txn_info->txn_text_.get() != nullptr) {
+                txn_string = *txn_info->txn_text_;
+            }
+            Value value = Value::MakeVarchar(txn_string);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state) {
 
     TxnManager *txn_manager = query_context->storage()->txn_manager();
     UniquePtr<TxnInfo> txn_info = txn_manager->GetTxnInfoByID(*txn_id_);
