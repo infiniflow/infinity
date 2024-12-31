@@ -33,6 +33,7 @@ import config;
 import persistence_manager;
 import persist_result_handler;
 import defer_op;
+import utility;
 
 namespace infinity {
 
@@ -70,6 +71,10 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
 
     Config *config = InfinityContext::instance().config();
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
+
+    // Create compressed file
+    String compressed_filename = fmt::format("{}/{}.lz4", save_dir, snapshot_name_);
+    std::ofstream output_stream = VirtualStore::BeginCompress(compressed_filename);
 
     // Get files
     Vector<String> original_files = GetFiles();
@@ -122,6 +127,11 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
                 UnrecoverableError(write_status.message());
             }
             write_file_handle->Sync();
+
+            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
+            if (!compress_status.ok()) {
+                RecoverableError(compress_status);
+            }
         }
     } else {
         String data_dir = config->DataDir();
@@ -133,36 +143,20 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
             if (!copy_status.ok()) {
                 RecoverableError(copy_status);
             }
+
+            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
+            if (!compress_status.ok()) {
+                RecoverableError(compress_status);
+            }
         }
     }
 
-    // Compress the directory
-    String directory = fmt::format("{}/{}", save_dir, snapshot_name_);
-    String zip_filename = fmt::format("{}/{}.zip", save_dir, snapshot_name_);
-    String command = fmt::format("zip -r {} {}", directory, zip_filename);
-    int ret = system(command.c_str());
-    if (ret != 0) {
-        Status status = Status::IOError(fmt::format("Failed to compress directory: {}", directory));
-        RecoverableError(status);
-    }
-    // Get the MD5 of compress file
-    String md5_command = fmt::format("md5sum {}", zip_filename);
-    FILE *md5_fp = popen(md5_command.c_str(), "r");
-    if (md5_fp == nullptr) {
-        Status status = Status::IOError(fmt::format("Failed to get md5 of file: {}", zip_filename));
-        RecoverableError(status);
-    }
-    char md5_buf[1024];
-    if (fgets(md5_buf, sizeof(md5_buf), md5_fp) == nullptr) {
-        Status status = Status::IOError(fmt::format("Failed to read md5 of file: {}", zip_filename));
-        RecoverableError(status);
-    }
-    pclose(md5_fp);
-    String md5 = md5_buf;
-    md5 = md5.substr(0, md5.find(" "));
-    LOG_INFO(fmt::format("MD5: {}", md5));
+    VirtualStore::EndCompress(output_stream);
+
+    String md5 = CalcMD5(compressed_filename);
 
     // Remove the directory
+    String directory = fmt::format("{}/{}", save_dir, snapshot_name_);
     VirtualStore::RemoveDirectory(directory);
 
     nlohmann::json json_res;

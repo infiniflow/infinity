@@ -70,6 +70,11 @@ public:
     static String GetParentPath(const String &path);
     static SizeT GetDirectorySize(const String &path);
     static String ConcatenatePath(const String &dir_path, const String &file_path);
+
+    static std::ofstream BeginCompress(const String& compressed_file);
+    static Status AddFileCompress(std::ofstream& ofstream, const String &filename);
+    static void EndCompress(std::ofstream& ofstream);
+
     static i32 MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len);
     static i32 MunmapFile(const String &file_path);
 
