@@ -35,8 +35,9 @@ export template <typename DataType, typename IdxType, BMPCompressType CompressTy
 class BMPAlgBase {
 public:
 protected:
-    BMPAlgBase(BMPIvt<DataType, CompressType, OwnMem> bm_ivt, BlockFwd<DataType, IdxType, OwnMem> block_fwd, Vector<BMPDocID> doc_ids)
+    BMPAlgBase(BMPIvt<DataType, CompressType, OwnMem> bm_ivt, BlockFwd<DataType, IdxType, OwnMem> block_fwd, VecPtr<BMPDocID, OwnMem> doc_ids)
         : bm_ivt_(std::move(bm_ivt)), block_fwd_(std::move(block_fwd)), doc_ids_(std::move(doc_ids)) {}
+    BMPAlgBase(SizeT term_num, SizeT block_size) : bm_ivt_(term_num), block_fwd_(block_size) {}
 
 public:
     BMPAlgBase() {}
@@ -82,7 +83,7 @@ public:
             DataType query_score = query_ref.data_[i];
             const auto &posting = bm_ivt_.GetPostings(query_term);
             threshold = std::max(threshold, query_score * posting.kth(topk));
-            posting.data().Calculate(upper_bounds, query_score);
+            Calculate2(upper_bounds, query_score, posting.data());
         }
 
         Vector<Pair<DataType, BMPBlockID>> block_scores;
@@ -122,7 +123,8 @@ public:
                 DataType score = scores[block_off];
                 add_result(score, doc_id);
             }
-            if (result_handler.GetSize(0) == u32(topk) && ub_score * options.alpha_ < result_handler.GetDistance0(0 /*query_id*/)) {
+            DataType min_score = result_handler.GetDistance0(0 /*query_id*/);
+            if (result_handler.GetSize(0) == u32(topk) && ub_score * options.alpha_ < min_score) {
                 break;
             }
         }
@@ -173,6 +175,27 @@ protected:
         }
     }
 
+    static void Calculate2(Vector<DataType> &upper_bounds, DataType query_score, const BlockData<DataType, CompressType, OwnMem> &block_data) {
+        if constexpr (CompressType == BMPCompressType::kCompressed) {
+            SizeT block_size = block_data.block_size();
+            const BMPBlockID *block_ids = block_data.block_ids();
+            const DataType *max_scores = block_data.max_scores();
+            for (SizeT i = 0; i < block_size; ++i) {
+                BMPBlockID block_id = block_ids[i];
+                DataType score = max_scores[i];
+                upper_bounds[block_id] += score * query_score;
+            }
+        } else {
+            SizeT block_size = block_data.block_size();
+            const DataType *max_scores = block_data.max_scores();
+            for (BMPBlockID block_id = 0; block_id < BMPBlockID(block_size); ++block_id) {
+                if (max_scores[block_id] > 0.0) {
+                    upper_bounds[block_id] += max_scores[block_id] * query_score;
+                }
+            }
+        }
+    }
+
 protected:
     BMPIvt<DataType, CompressType, OwnMem> bm_ivt_;
     BlockFwd<DataType, IdxType, OwnMem> block_fwd_;
@@ -189,11 +212,13 @@ public:
     using IdxT = IdxType;
 
 private:
-    BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kTrue> bm_ivt, BlockFwd<DataType, IdxType, BMPOwnMem::kTrue> block_fwd, Vector<BMPDocID> doc_ids)
+    BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kTrue> bm_ivt,
+           BlockFwd<DataType, IdxType, BMPOwnMem::kTrue> block_fwd,
+           VecPtr<BMPDocID, BMPOwnMem::kTrue> doc_ids)
         : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids)) {}
 
 public:
-    BMPAlg(SizeT term_num, SizeT block_size) {};
+    BMPAlg(SizeT term_num, SizeT block_size) : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>(term_num, block_size) {}
 
     void AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id, bool lck = true) {
         std::unique_lock<std::shared_mutex> lock;
@@ -322,17 +347,31 @@ public:
 
     inline SizeT MemoryUsage() const { return mem_usage_.load(); }
 
-    void SaveToPtr(LocalFileHandle &file_handle) const {
+    void SaveToPtr(LocalFileHandle &file_handle) {
+        this->block_fwd_.Finialize();
         char *p0 = nullptr;
         GetSizeToPtr(p0);
         char *p1 = nullptr;
         SizeT size = p0 - p1;
         auto buffer = MakeUnique<char[]>(size);
+        char *p = buffer.get();
+        WriteToPtr(p);
+        file_handle.Append(buffer.get(), size);
     }
 
 private:
     void GetSizeToPtr(char *&p) const {
-        //
+        this->bm_ivt_.GetSizeToPtr(p);
+        this->block_fwd_.GetSizeToPtr(p);
+        GetSizeInBytesAligned<SizeT>(p);
+        GetSizeInBytesVecAligned<BMPDocID>(p, this->doc_ids_.size());
+    }
+
+    void WriteToPtr(char *&p) const {
+        this->bm_ivt_.WriteToPtr(p);
+        this->block_fwd_.WriteToPtr(p);
+        WriteBufAdvAligned<SizeT>(p, this->doc_ids_.size());
+        WriteBufVecAdvAligned<BMPDocID>(p, this->doc_ids_.data(), this->doc_ids_.size());
     }
 
     void WriteAdv(char *&p) const {
@@ -364,10 +403,21 @@ private:
 
 export template <typename DataType, typename IdxType, BMPCompressType CompressType>
 class BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> : public BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kFalse> {
+private:
+    BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kFalse> bm_ivt,
+           BlockFwd<DataType, IdxType, BMPOwnMem::kFalse> block_fwd,
+           VecPtr<BMPDocID, BMPOwnMem::kFalse> doc_ids)
+        : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids)) {}
+
 public:
     static BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> LoadFromPtr(const char *&p, SizeT size) {
-        //
-        return {};
+        auto bm_ivt = BMPIvt<DataType, CompressType, BMPOwnMem::kFalse>::ReadFromPtr(p);
+        auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kFalse>::LoadFromPtr(p);
+        SizeT doc_num = ReadBufAdv<SizeT>(p);
+        const BMPDocID *doc_ids = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
+        return BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt),
+                                                                          std::move(block_fwd),
+                                                                          VecPtr<BMPDocID, BMPOwnMem::kFalse>(doc_ids, doc_num));
     }
 
 private:

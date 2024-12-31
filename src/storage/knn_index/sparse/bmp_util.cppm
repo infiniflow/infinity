@@ -66,12 +66,13 @@ export template <typename T>
 class VecPtr<T, BMPOwnMem::kFalse> {
 public:
     VecPtr() = default;
-    VecPtr(const T *ptr) : ptr_(ptr) {}
+    VecPtr(const T *ptr, SizeT size) : ptr_(ptr), size_(size) {}
 
     const T &operator[](SizeT idx) const { return ptr_[idx]; }
 
 private:
     const T *ptr_ = nullptr;
+    SizeT size_ = 0;
 };
 
 export BMPCompressType BMPCompressTypeFromString(const String &compress_type_str) {

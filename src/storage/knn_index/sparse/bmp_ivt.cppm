@@ -28,21 +28,12 @@ import serialize;
 
 namespace infinity {
 
-template <typename DataType, BMPCompressType CompressType, BMPOwnMem OwnMem>
+export template <typename DataType, BMPCompressType CompressType, BMPOwnMem OwnMem>
 struct BlockData {};
 
-template <typename DataType>
+export template <typename DataType>
 struct BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kTrue> {
 public:
-    void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
-        SizeT block_size = block_ids_.size();
-        for (SizeT i = 0; i < block_size; ++i) {
-            BMPBlockID block_id = block_ids_[i];
-            DataType score = max_scores_[i];
-            upper_bounds[block_id] += score * query_score;
-        }
-    }
-
     void AddBlock(BMPBlockID block_id, DataType max_score, SizeT &mem_usage) {
         block_ids_.push_back(block_id);
         max_scores_.push_back(max_score);
@@ -104,21 +95,20 @@ public:
         }
     }
 
+    SizeT block_size() const { return block_ids_.size(); }
+    const BMPBlockID *block_ids() const { return block_ids_.data(); }
+    const DataType *max_scores() const { return max_scores_.data(); }
+
 private:
     Vector<BMPBlockID> block_ids_;
     Vector<DataType> max_scores_;
 };
 
-template <typename DataType>
+export template <typename DataType>
 struct BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kFalse> {
 public:
-    void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
-        for (SizeT i = 0; i < block_size_; ++i) {
-            BMPBlockID block_id = block_ids_[i];
-            DataType score = max_scores_[i];
-            upper_bounds[block_id] += score * query_score;
-        }
-    }
+    BlockData(SizeT block_size, const BMPBlockID *block_ids, const DataType *max_scores)
+        : block_size_(block_size), block_ids_(block_ids), max_scores_(max_scores) {}
 
     void Prefetch() const {
         _mm_prefetch((const char *)block_ids_, _MM_HINT_T0);
@@ -133,24 +123,19 @@ public:
         return {block_data_prefix_sum, block_ids, max_scores};
     }
 
+    SizeT block_size() const { return block_size_; }
+    const BMPBlockID *block_ids() const { return block_ids_; }
+    const DataType *max_scores() const { return max_scores_; }
+
 private:
     SizeT block_size_;
     const BMPBlockID *block_ids_;
     const DataType *max_scores_;
 };
 
-template <typename DataType>
+export template <typename DataType>
 struct BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue> {
 public:
-    // template <bool UseSIMD = false>
-    void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
-        for (BMPBlockID block_id = 0; block_id < (BMPBlockID)max_scores_.size(); ++block_id) {
-            if (max_scores_[block_id] > 0.0) {
-                upper_bounds[block_id] += max_scores_[block_id] * query_score;
-            }
-        }
-    }
-
     void AddBlock(BMPBlockID block_id, DataType max_score, SizeT &mem_usage) {
         if (block_id >= (BMPBlockID)max_scores_.size()) {
             mem_usage += sizeof(BMPBlockID) * (block_id + 1 - max_scores_.size());
@@ -180,7 +165,7 @@ public:
     }
 
     static void GetSizeToPtr(char *&p, const Vector<const BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kTrue> *> &block_data_list) {
-        GetSizeInBytesVecAligned<SizeT>(p, block_data_list.size());
+        GetSizeInBytesVecAligned<SizeT>(p, block_data_list.size() + 1);
         SizeT num_sum = 0;
         for (const auto *block_data : block_data_list) {
             num_sum += block_data->max_scores_.size();
@@ -196,34 +181,35 @@ public:
             num_sum += block_data->max_scores_.size();
             block_data_prefix_sum.push_back(num_sum);
         }
+        WriteBufVecAdvAligned<SizeT>(p, block_data_prefix_sum.data(), block_data_prefix_sum.size());
         for (const auto *block_data : block_data_list) {
             WriteBufVecAdvAligned<DataType>(p, block_data->max_scores_.data(), block_data->max_scores_.size());
         }
     }
 
+    SizeT block_size() const { return max_scores_.size(); }
+    const DataType *max_scores() const { return max_scores_.data(); }
+
 public:
     Vector<DataType> max_scores_;
 };
 
-template <typename DataType>
+export template <typename DataType>
 struct BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse> {
 public:
-    void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
-        for (BMPBlockID block_id = 0; block_id < (BMPBlockID)block_size_; ++block_id) {
-            if (max_scores_[block_id] > 0.0) {
-                upper_bounds[block_id] += max_scores_[block_id] * query_score;
-            }
-        }
-    }
+    BlockData(SizeT block_size, const DataType *max_scores) : block_size_(block_size), max_scores_(max_scores) {}
 
     void Prefetch() const { _mm_prefetch((const char *)max_scores_, _MM_HINT_T0); }
 
-    static Tuple<const SizeT *, const DataType *> ReadToPtr(const char *&p, SizeT posting_num) {
+    static Tuple<const SizeT *, const DataType *> ReadFromPtr(const char *&p, SizeT posting_num) {
         const SizeT *block_data_prefix_sum = ReadBufVecAdvAligned<SizeT>(p, posting_num + 1);
         SizeT block_data_num = block_data_prefix_sum[posting_num];
         const DataType *max_scores = ReadBufVecAdvAligned<DataType>(p, block_data_num);
         return {block_data_prefix_sum, max_scores};
     }
+
+    SizeT block_size() const { return block_size_; }
+    const DataType *max_scores() const { return max_scores_; }
 
 private:
     SizeT block_size_;
@@ -233,6 +219,10 @@ private:
 template <typename DataType, BMPCompressType CompressType, BMPOwnMem OwnMem>
 struct BlockPostingsBase {
 public:
+    BlockPostingsBase() = default;
+    BlockPostingsBase(i32 kth, DataType kth_score, BlockData<DataType, CompressType, OwnMem> data)
+        : kth_(kth), kth_score_(kth_score), data_(std::move(data)) {}
+
     DataType kth(i32 topk) const { return topk == kth_ ? kth_score_ : 0.0; }
 
     const BlockData<DataType, CompressType, OwnMem> &data() const { return data_; }
@@ -243,9 +233,10 @@ public:
         kth_score_ = kth_score;
     }
 
+    i32 kth_ = -1;
+    DataType kth_score_ = 0.0;
+
 protected:
-    i32 kth_{-1};
-    DataType kth_score_;
     BlockData<DataType, CompressType, OwnMem> data_;
 };
 
@@ -309,6 +300,9 @@ public:
         const DataType *kth_scores = ReadBufVecAdvAligned<DataType>(p, posting_num);
         return {posting_num, kths, kth_scores};
     }
+
+    BlockPostings(i32 kth, DataType kth_score, BlockData<DataType, CompressType, BMPOwnMem::kFalse> data)
+        : BlockPostingsBase<DataType, CompressType, BMPOwnMem::kFalse>(kth, kth_score, std::move(data)) {}
 };
 
 export template <typename DataType, BMPCompressType CompressType, BMPOwnMem OwnMem>
@@ -406,12 +400,20 @@ public:
     BMPIvt() {}
 
     BlockPostings<DataType, BMPCompressType::kCompressed, BMPOwnMem::kFalse> GetPostings(SizeT term_id) const {
-        BlockPostings<DataType, BMPCompressType::kCompressed, BMPOwnMem::kFalse> ret;
-        return ret;
+        i32 kth = this->kth_[term_id];
+        DataType kth_score = this->kth_score_[term_id];
+        using BlockData = BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kFalse>;
+        SizeT block_data_size = this->block_data_prefix_sum_[term_id + 1] - this->block_data_prefix_sum_[term_id];
+        const BMPBlockID *block_ids = block_ids_ + this->block_data_prefix_sum_[term_id];
+        const DataType *max_scores = max_scores_ + this->block_data_prefix_sum_[term_id];
+        return BlockPostings<DataType, BMPCompressType::kCompressed, BMPOwnMem::kFalse>(kth,
+                                                                                        kth_score,
+                                                                                        BlockData(block_data_size, block_ids, max_scores));
     }
 
     void Prefetch(SizeT term_id) const {
-        //
+        _mm_prefetch((const char *)(block_ids_ + this->block_data_prefix_sum_[term_id]), _MM_HINT_T0);
+        _mm_prefetch((const char *)(max_scores_ + this->block_data_prefix_sum_[term_id]), _MM_HINT_T0);
     }
 
     static BMPIvt ReadFromPtr(const char *&p) {
@@ -419,7 +421,7 @@ public:
         std::tie(ret.posting_size_, ret.kth_, ret.kth_score_) =
             BlockPostings<DataType, BMPCompressType::kCompressed, BMPOwnMem::kFalse>::ReadFromPtr(p);
         std::tie(ret.block_data_prefix_sum_, ret.block_ids_, ret.max_scores_) =
-            BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kFalse>::ReadToPtr(p, ret.posting_size_);
+            BlockData<DataType, BMPCompressType::kCompressed, BMPOwnMem::kFalse>::ReadFromPtr(p, ret.posting_size_);
         return ret;
     }
 
@@ -434,19 +436,21 @@ public:
     BMPIvt() {}
 
     BlockPostings<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse> GetPostings(SizeT term_id) const {
-        BlockPostings<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse> ret;
-        return ret;
+        i32 kth = this->kth_[term_id];
+        DataType kth_score = this->kth_score_[term_id];
+        using BlockData = BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse>;
+        SizeT block_data_size = this->block_data_prefix_sum_[term_id + 1] - this->block_data_prefix_sum_[term_id];
+        const DataType *max_scores = max_scores_ + this->block_data_prefix_sum_[term_id];
+        return BlockPostings<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse>(kth, kth_score, BlockData(block_data_size, max_scores));
     }
 
-    void Prefetch(SizeT term_id) const {
-        //
-    }
+    void Prefetch(SizeT term_id) const { _mm_prefetch((const char *)(max_scores_ + this->block_data_prefix_sum_[term_id]), _MM_HINT_T0); }
 
     static BMPIvt ReadFromPtr(const char *&p) {
         BMPIvt ret{};
         std::tie(ret.posting_size_, ret.kth_, ret.kth_score_) = BlockPostings<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse>::ReadFromPtr(p);
         std::tie(ret.block_data_prefix_sum_, ret.max_scores_) =
-            BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse>::ReadToPtr(p, ret.posting_size_);
+            BlockData<DataType, BMPCompressType::kRaw, BMPOwnMem::kFalse>::ReadFromPtr(p, ret.posting_size_);
         return ret;
     }
 

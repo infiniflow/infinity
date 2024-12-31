@@ -183,10 +183,10 @@ public:
             }
         }
         WriteBufAdvAligned<SizeT>(p, term_ids.size());
-        WriteBufVecAdvAligned(p, block_size_prefix_sum.data(), block_size_prefix_sum.size());
-        WriteBufVecAdvAligned(p, term_ids.data(), term_ids.size());
-        WriteBufVecAdvAligned(p, block_offsets_vec.data(), block_offsets_vec.size());
-        WriteBufVecAdvAligned(p, values_vec.data(), values_vec.size());
+        WriteBufVecAdvAligned<SizeT>(p, block_size_prefix_sum.data(), block_size_prefix_sum.size());
+        WriteBufVecAdvAligned<IdxType>(p, term_ids.data(), term_ids.size());
+        WriteBufVecAdvAligned<BMPBlockOffset>(p, block_offsets_vec.data(), block_offsets_vec.size());
+        WriteBufVecAdvAligned<DataType>(p, values_vec.data(), values_vec.size());
     }
 
     void Prefetch() const {
@@ -382,6 +382,13 @@ public:
         return tail_fwd1;
     }
 
+    void Finialize() {
+        if (tail_fwd_.GetTailTerms().size() > 0) {
+            Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms = tail_fwd_.ToBlockFwd();
+            block_terms_list_.emplace_back(block_terms);
+        }
+    }
+
     Vector<Pair<Vector<IdxType>, Vector<DataType>>> GetFwd(SizeT doc_num, SizeT term_num) const {
         SizeT doc_n = doc_num / block_size_ * block_size_;
         Vector<Pair<Vector<IdxType>, Vector<DataType>>> fwd(doc_n);
@@ -459,23 +466,28 @@ public:
 
     void GetSizeToPtr(char *&p) const {
         GetSizeInBytesAligned<SizeT>(p);
-        GetSizeInBytesVecAligned<SizeT>(p, block_terms_list_.size());
         GetSizeInBytesAligned<SizeT>(p);
+        GetSizeInBytesVecAligned<SizeT>(p, block_terms_list_.size() + 1);
         for (const auto &block_terms : block_terms_list_) {
             block_terms.GetSizeToPtr(p);
         }
     }
 
     void WriteToPtr(char *&p) const {
+        WriteBufAdvAligned<SizeT>(p, block_size_);
         WriteBufAdvAligned<SizeT>(p, block_terms_list_.size());
         Vector<SizeT> offsets;
-        char *p0 = p;
-        for (const auto &block_terms : block_terms_list_) {
-            offsets.push_back(p - p0);
-            block_terms.GetSizeToPtr(p);
+        {
+            char *p1 = p;
+            GetSizeInBytesVecAligned<SizeT>(p1, block_terms_list_.size());
+            char *p2 = p1;
+            offsets.push_back(0);
+            for (const auto &block_terms : block_terms_list_) {
+                block_terms.GetSizeToPtr(p2);
+                offsets.push_back(p2 - p1);
+            }
         }
         WriteBufVecAdvAligned<SizeT>(p, offsets.data(), offsets.size());
-        WriteBufAdvAligned<SizeT>(p, p0 - p);
         for (const auto &block_terms : block_terms_list_) {
             block_terms.WriteToPtr(p);
         }
@@ -494,11 +506,11 @@ public:
 
     static BlockFwd LoadFromPtr(const char *&p) {
         BlockFwd<DataType, IdxType, BMPOwnMem::kFalse> ret;
+        ret.block_size_ = ReadBufAdvAligned<SizeT>(p);
         ret.block_num_ = ReadBufAdvAligned<SizeT>(p);
-        const char *p0 = p;
-        ret.offsets_ = ReadBufVecAdvAligned<SizeT>(p, ret.block_num_);
+        ret.offsets_ = ReadBufVecAdvAligned<SizeT>(p, ret.block_num_ + 1);
         ret.data_ = p;
-        p = p0 + ReadBufAdvAligned<SizeT>(p);
+        p += ret.offsets_[ret.block_num_];
         return ret;
     }
 
@@ -511,7 +523,9 @@ public:
     Vector<DataType> GetScoresTail(const SparseVecRef<DataType, IdxType> &query) const { return {}; }
 
     void Prefetch(BMPBlockID block_id) const {
-        //
+        SizeT offset = offsets_[block_id];
+        const char *ptr = data_ + offset;
+        BlockTerms<DataType, IdxType, BMPOwnMem::kFalse>::ReadFromPtr(ptr).Prefetch();
     }
 
     SizeT block_size() const { return block_size_; }
