@@ -444,6 +444,13 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kTransactionHistory: {
+            output_names_->reserve(1);
+            output_types_->reserve(1);
+            output_names_->emplace_back("transactions");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         case ShowStmtType::kLogs: {
             output_names_->reserve(4);
             output_types_->reserve(4);
@@ -694,6 +701,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kTransactions: {
             ExecuteShowTransactions(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kTransactions: {
+            ExecuteShowTransactionHistory(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kTransaction: {

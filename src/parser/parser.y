@@ -396,7 +396,7 @@ struct SQL_LTYPE {
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 %token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER RESTORE
-%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
+%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY
 
 %token NUMBER
 
@@ -1955,6 +1955,10 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kTransaction;
     $$->txn_id_ = $3;
+}
+| SHOW TRANSACTION HISTORY {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kTransactionHistory;
 }
 | SHOW SESSION VARIABLES {
     $$ = new infinity::ShowStatement();

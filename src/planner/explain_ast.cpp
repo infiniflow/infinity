@@ -709,6 +709,10 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             result->emplace_back(MakeShared<String>("SHOW TRANSACTION"));
             break;
         }
+        case ShowStmtType::kTransactionHistory: {
+            result->emplace_back(MakeShared<String>("SHOW TRANSACTION HISTORY"));
+            break;
+        }
         case ShowStmtType::kProfiles: {
             result->emplace_back(MakeShared<String>("SHOW QUERIES"));
             break;

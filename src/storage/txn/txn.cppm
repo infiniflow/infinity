@@ -33,6 +33,7 @@ import internal_types;
 import column_def;
 import value;
 import snapshot_info;
+import txn_context;
 
 namespace infinity {
 
@@ -277,6 +278,9 @@ private:
 
     // ADMIN command which allowed in follower and learner
     bool allowed_in_reader_{false};
+
+private:
+    UniquePtr<TxnContext> txn_context_ptr_{};
 };
 
 } // namespace infinity

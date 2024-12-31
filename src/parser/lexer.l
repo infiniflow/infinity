@@ -105,6 +105,7 @@ GROUP           { return GROUP; }
 HAVING          { return HAVING; }
 HEADER          { return HEADER; }
 HIGHLIGHT       { return HIGHLIGHT; }
+HISTORY         { return HISTORY; }
 HOUR            { return HOUR; }
 HOURS           { return HOURS; }
 HUGEINT         { return HUGEINT; }

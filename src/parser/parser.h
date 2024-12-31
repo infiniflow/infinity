@@ -330,7 +330,8 @@ struct SQL_LTYPE {
     FILES = 457,                   /* FILES  */
     MEMORY = 458,                  /* MEMORY  */
     ALLOCATION = 459,              /* ALLOCATION  */
-    NUMBER = 460                   /* NUMBER  */
+    HISTORY = 460,                 /* HISTORY  */
+    NUMBER = 461                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -418,7 +419,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 422 "parser.h"
+#line 423 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;
