@@ -85,6 +85,8 @@ import peer_task;
 import node_info;
 import txn_context;
 import txn_state;
+import snapshot_brief;
+import command_statement;
 
 namespace infinity {
 
@@ -583,7 +585,7 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
-            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
             break;
         }
         case ShowStmtType::kShowSnapshot: {
@@ -6581,9 +6583,95 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type};
+
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        bigint_type,
+        varchar_type
+    };
 
     output_block_ptr->Init(column_types);
+
+    String snapshot_dir = query_context->global_config()->SnapshotDir();
+    Vector<SnapshotBrief> snapshot_list = SnapshotBrief::GetSnapshots(snapshot_dir);
+
+    SizeT row_count = 0;
+    for (auto &snapshot_brief : snapshot_list) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // snapshot name
+            Value value = Value::MakeVarchar(snapshot_brief.snapshot_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // scope
+            String scope_str;
+            switch(snapshot_brief.scope_) {
+                case SnapshotScope::kTable: {
+                    scope_str = "Table";
+                    break;
+                }
+                case SnapshotScope::kDatabase: {
+                    scope_str = "Database";
+                    break;
+                }
+                case SnapshotScope::kSystem: {
+                    scope_str = "System";
+                    break;
+                }
+                case SnapshotScope::kIgnore: {
+                    scope_str = "Ignore";
+                    break;
+                }
+                default: {
+                    Status status = Status::Unknown("Invalid scope type");
+                    RecoverableError(status);
+                }
+            }
+            Value value = Value::MakeVarchar(scope_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // snapshot create time
+            Value value = Value::MakeVarchar(snapshot_brief.create_time_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // snapshot commit ts
+            Value value = Value::MakeBigInt(snapshot_brief.commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // snapshot size
+            String snapshot_size_str = Utility::FormatByteSize(snapshot_brief.size_);
+            Value value = Value::MakeVarchar(snapshot_size_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
     return;
