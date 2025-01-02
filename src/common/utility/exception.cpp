@@ -28,6 +28,18 @@ import cleanup_scanner;
 
 namespace infinity {
 
+void PrintTransactionHistory() {
+    TxnManager *txn_manager = InfinityContext::instance().storage()->txn_manager();
+
+    Vector<TxnHistory> txn_histories = txn_manager->GetTxnHistories();
+
+    SizeT history_count = txn_histories.size();
+    for(SizeT idx = 0; idx < history_count; ++ idx) {
+        TxnHistory txn_history = txn_histories[idx];
+        LOG_CRITICAL(txn_history.ToString());
+    }
+}
+
 void PrintStacktrace(const String &err_msg) {
     int trace_stack_depth = 256;
     void *array[256];
@@ -68,6 +80,7 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     // }
     String location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
     if (IS_LOGGER_INITIALIZED()) {
+        infinity::PrintTransactionHistory();
         PrintStacktrace(location_message);
     }
     Logger::Flush();

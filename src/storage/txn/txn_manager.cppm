@@ -42,6 +42,8 @@ export struct TxnHistory {
     TxnState state_{TxnState::kStarted};
     TxnType type_{TxnType::kInvalid};
     SharedPtr<TxnContext> txn_context_ptr_{};
+
+    String ToString() const;
 };
 
 export class TxnManager {

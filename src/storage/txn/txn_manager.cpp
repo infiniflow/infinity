@@ -37,6 +37,17 @@ import global_resource_usage;
 
 namespace infinity {
 
+String TxnHistory::ToString() const {
+    std::stringstream ss;
+    ss << "Txn ID: " << txn_id_ << ", Begin TS: " << begin_ts_ << ", Commit TS: " << commit_ts_ << ", State: " << ToString(state_)
+       << ", Type: " << ToString(type_) << "\n";
+    Vector<SharedPtr<String>> operations = txn_context_ptr_->GetOperations();
+    for (const auto &operation : operations) {
+        ss << *operation << "\n";
+    }
+    return ss.str();
+}
+
 TxnManager::TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts)
     : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), current_ts_(start_ts), max_committed_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
@@ -341,11 +352,11 @@ void TxnManager::CleanupTxn(Txn *txn) {
         case TxnType::kRead: {
             // For read-only Txn only remove txn from txn_map
             std::lock_guard guard(locker_);
-//            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
-//            if (txn_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
-//                txn_histories_.pop_front();
-//            }
-//            txn_histories_.push_back(txn_ptr);
+            //            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+            //            if (txn_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+            //                txn_histories_.pop_front();
+            //            }
+            //            txn_histories_.push_back(txn_ptr);
             txn_map_.erase(txn_id);
             break;
         }

@@ -102,7 +102,10 @@ Status Txn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entr
 
     // build WalCmd
     WalSegmentInfo segment_info(segment_entry.get());
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdImport>(db_name, table_name, std::move(segment_info)));
+
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdImport>(db_name, table_name, std::move(segment_info));
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
     TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
     table_store->Import(std::move(segment_entry), this);
@@ -117,7 +120,10 @@ Status Txn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_bl
     this->CheckTxn(db_name);
     TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdAppend>(db_name, table_name, input_block));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
     auto [err_msg, append_status] = table_store->Append(input_block);
     return append_status;
 }
@@ -135,7 +141,9 @@ Status Txn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool c
 
     TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdDelete>(db_name, table_name, row_ids));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     auto [err_msg, delete_status] = table_store->Delete(row_ids);
     return delete_status;
 }
@@ -156,7 +164,10 @@ Status Txn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitPa
     const String &table_name = *table_entry->GetTableName();
     table_index_entry->OptIndex(txn_table_store, init_params, false /*replay*/);
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdOptimize>(db_name_, table_name, index_name, std::move(init_params)));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimize>(db_name_, table_name, index_name, std::move(init_params));
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
     return Status::OK();
 }
 
@@ -263,7 +274,9 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     }
 
     txn_store_.AddTableStore(table_entry);
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateTable>(std::move(db_name), table_entry->GetPathNameTail(), table_def));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTable>(std::move(db_name), table_entry->GetPathNameTail(), table_def);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
     LOG_TRACE("Txn::CreateTable created table entry is inserted.");
     return Status::OK();
@@ -290,7 +303,10 @@ Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef
         return add_status;
     }
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdAddColumns>(*table_entry->GetDBName(), *table_entry->GetTableName(), column_defs));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAddColumns>(*table_entry->GetDBName(), *table_entry->GetTableName(), column_defs);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
     return Status::OK();
 }
 
@@ -310,7 +326,10 @@ Status Txn::DropColumns(TableEntry *table_entry, const Vector<String> &column_na
         return drop_status;
     }
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdDropColumns>(*table_entry->GetDBName(), *table_entry->GetTableName(), column_names));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropColumns>(*table_entry->GetDBName(), *table_entry->GetTableName(), column_names);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
     return Status::OK();
 }
 
@@ -327,7 +346,10 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     }
 
     txn_store_.DropTableStore(table_entry.get());
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
+
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropTable>(db_name, table_name);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
     LOG_TRACE("Txn::DropTableCollectionByName dropped table entry is inserted.");
     return Status::OK();
@@ -345,8 +367,12 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
     txn_table_store->AddIndexStore(table_index_entry);
 
     String index_dir_tail = table_index_entry->GetPathNameTail();
-    wal_entry_->cmds_.push_back(
-        MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(index_dir_tail), index_base));
+
+    SharedPtr<WalCmd> wal_command =
+        MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(index_dir_tail), index_base);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
     return {table_index_entry, index_status};
 }
 
@@ -435,7 +461,10 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
     auto *txn_table_store = this->GetTxnTableStore(table_entry);
     txn_table_store->DropIndexStore(table_index_entry.get());
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdDropIndex>(db_name, table_name, index_name));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
     return index_status;
 }
 
@@ -664,6 +693,7 @@ void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) {
         UnrecoverableError(fmt::format("Should add wal cmd in started state, begin_ts: {}", begin_ts));
     }
     wal_entry_->cmds_.push_back(cmd);
+    txn_context_ptr_->AddOperation(MakeShared<String>(cmd->ToString()));
 }
 
 // the max_commit_ts is determined by the max commit ts of flushed delta entry
@@ -674,7 +704,9 @@ bool Txn::DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts)
     if (!catalog_->SaveDeltaCatalog(last_ckp_ts, max_commit_ts, delta_path, delta_name)) {
         return false;
     }
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path, delta_name));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path, delta_name);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
     return true;
 }
@@ -684,7 +716,10 @@ void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
     String full_path, full_name;
 
     catalog_->SaveFullCatalog(max_commit_ts, full_path, full_name);
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, full_path, full_name));
+
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCheckpoint>(max_commit_ts, true, full_path, full_name);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 }
 
 void Txn::AddWriteTxnNum(TableEntry *table_entry) {
