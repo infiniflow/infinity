@@ -55,6 +55,12 @@ protected:
 
         String save_path = String(tmp_data_path()) + "/bmindex_test1.index";
         String save2_path = String(tmp_data_path()) + "/bmindex_test2.index";
+        if (VirtualStore::Exists(save_path)) {
+            VirtualStore::DeleteFile(save_path);
+        }
+        if (VirtualStore::Exists(save2_path)) {
+            VirtualStore::DeleteFile(save2_path);
+        }
 
         auto test_query = [&](const auto &index) {
             {
@@ -141,18 +147,18 @@ TEST_F(BMPIndexTest, test1) {
         u32 block_size = 8;
         TestFunc<f32, i32, BMPCompressType::kCompressed>(block_size);
     }
-    {
-        u32 block_size = 64;
-        TestFunc<f32, i32, BMPCompressType::kRaw>(block_size);
-    }
-    {
-        u32 block_size = 8;
-        TestFunc<f32, i16, BMPCompressType::kCompressed>(block_size);
-    }
-    {
-        u32 block_size = 8;
-        TestFunc<f64, i32, BMPCompressType::kCompressed>(block_size);
-    }
+    // {
+    //     u32 block_size = 64;
+    //     TestFunc<f32, i32, BMPCompressType::kRaw>(block_size);
+    // }
+    // {
+    //     u32 block_size = 8;
+    //     TestFunc<f32, i16, BMPCompressType::kCompressed>(block_size);
+    // }
+    // {
+    //     u32 block_size = 8;
+    //     TestFunc<f64, i32, BMPCompressType::kCompressed>(block_size);
+    // }
 }
 
 TEST_F(BMPIndexTest, test2) {

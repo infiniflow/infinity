@@ -413,7 +413,7 @@ public:
     static BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> LoadFromPtr(const char *&p, SizeT size) {
         auto bm_ivt = BMPIvt<DataType, CompressType, BMPOwnMem::kFalse>::ReadFromPtr(p);
         auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kFalse>::LoadFromPtr(p);
-        SizeT doc_num = ReadBufAdv<SizeT>(p);
+        SizeT doc_num = ReadBufAdvAligned<SizeT>(p);
         const BMPDocID *doc_ids = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
         return BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt),
                                                                           std::move(block_fwd),
