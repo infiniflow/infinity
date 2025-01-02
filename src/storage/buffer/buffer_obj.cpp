@@ -275,6 +275,9 @@ void BufferObj::CleanupTempFile() const {
 
 void BufferObj::ToMmap() {
     std::unique_lock<std::mutex> locker(w_locker_);
+    if (type_ == BufferType::kMmap) {
+        return;
+    }
     if (type_ != BufferType::kPersistent) {
         String error_message = fmt::format("Invalid buffer type: {}", BufferTypeToString(type_));
         UnrecoverableError(error_message);
