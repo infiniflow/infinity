@@ -210,6 +210,8 @@ class BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kTrue> : public BMPAlgB
 public:
     using DataT = DataType;
     using IdxT = IdxType;
+    constexpr static SizeT kAlign = 8;
+    constexpr static bool kOwnMem = true;
 
 private:
     BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kTrue> bm_ivt,
@@ -356,6 +358,9 @@ public:
         auto buffer = MakeUnique<char[]>(size);
         char *p = buffer.get();
         WriteToPtr(p);
+        if (SizeT write_n = p - buffer.get(); write_n != size) {
+            UnrecoverableError(fmt::format("BMPAlg::SaveToPtr: write_n != size: {} != {}", write_n, size));
+        }
         file_handle.Append(buffer.get(), size);
     }
 
@@ -368,10 +373,19 @@ private:
     }
 
     void WriteToPtr(char *&p) const {
+        if (reinterpret_cast<SizeT>(p) % kAlign != 0) {
+            UnrecoverableError(fmt::format("BMPAlg::WriteToPtr: p % kAlign != 0: {} % {} != 0", reinterpret_cast<SizeT>(p), kAlign));
+        }
+        char *start = p;
         this->bm_ivt_.WriteToPtr(p);
+        [[maybe_unused]] SizeT sz1 = p - start;
+        start = p;
         this->block_fwd_.WriteToPtr(p);
+        [[maybe_unused]] SizeT sz2 = p - start;
+        start = p;
         WriteBufAdvAligned<SizeT>(p, this->doc_ids_.size());
         WriteBufVecAdvAligned<BMPDocID>(p, this->doc_ids_.data(), this->doc_ids_.size());
+        [[maybe_unused]] SizeT sz3 = p - start;
     }
 
     void WriteAdv(char *&p) const {
@@ -403,6 +417,12 @@ private:
 
 export template <typename DataType, typename IdxType, BMPCompressType CompressType>
 class BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> : public BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kFalse> {
+public:
+    using DataT = DataType;
+    using IdxT = IdxType;
+    constexpr static bool kOwnMem = false;
+    constexpr static SizeT kAlign = 8;
+
 private:
     BMPAlg(BMPIvt<DataType, CompressType, BMPOwnMem::kFalse> bm_ivt,
            BlockFwd<DataType, IdxType, BMPOwnMem::kFalse> block_fwd,
@@ -411,10 +431,17 @@ private:
 
 public:
     static BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse> LoadFromPtr(const char *&p, SizeT size) {
+        if (reinterpret_cast<SizeT>(p) % kAlign != 0) {
+            UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p % kAlign != 0: {} % {} != 0", reinterpret_cast<SizeT>(p), kAlign));
+        }
+        const char *start = p;
         auto bm_ivt = BMPIvt<DataType, CompressType, BMPOwnMem::kFalse>::ReadFromPtr(p);
         auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kFalse>::LoadFromPtr(p);
         SizeT doc_num = ReadBufAdvAligned<SizeT>(p);
         const BMPDocID *doc_ids = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
+        if (SizeT(p - start) != size) {
+            UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - start != size: {} != {}", p - start, size));
+        }
         return BMPAlg<DataType, IdxType, CompressType, BMPOwnMem::kFalse>(std::move(bm_ivt),
                                                                           std::move(block_fwd),
                                                                           VecPtr<BMPDocID, BMPOwnMem::kFalse>(doc_ids, doc_num));
