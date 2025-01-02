@@ -84,6 +84,7 @@ import result_cache_manager;
 import peer_task;
 import node_info;
 import txn_context;
+import txn_state;
 
 namespace infinity {
 
@@ -5885,7 +5886,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    for (const auto& txn_history : txn_histories) {
+    for (const auto &txn_history : txn_histories) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -5894,7 +5895,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
         {
             // txn id
             String txn_id_str;
-            if(this_txn_id == txn_history.txn_id_) {
+            if (this_txn_id == txn_history.txn_id_) {
                 txn_id_str = fmt::format("{}(this txn)", this_txn_id);
             } else {
                 txn_id_str = fmt::format("{}", txn_history.txn_id_);
@@ -5920,14 +5921,14 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
 
         {
             // txn state
-            Value value = Value::MakeVarchar("transaction_state");
+            Value value = Value::MakeVarchar(ToString(txn_history.state_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }
 
         {
             // txn type
-            Value value = Value::MakeVarchar("transaction_type");
+            Value value = Value::MakeVarchar(ToString(txn_history.type_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
@@ -5936,10 +5937,10 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
             // txn operations
             std::stringstream ss;
             Vector<SharedPtr<String>> operations;
-            if(txn_history.txn_context_ptr_ != nullptr) {
+            if (txn_history.txn_context_ptr_ != nullptr) {
                 operations = txn_history.txn_context_ptr_->GetOperations();
             }
-            for(const auto& ops: operations) {
+            for (const auto &ops : operations) {
                 ss << *ops << std::endl;
             }
             Value value = Value::MakeVarchar(ss.str());
