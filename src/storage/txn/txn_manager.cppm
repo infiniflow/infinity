@@ -22,6 +22,7 @@ import buffer_manager;
 import txn_state;
 import wal_entry;
 import default_values;
+import txn_context;
 
 namespace infinity {
 
@@ -32,6 +33,15 @@ class CatalogDeltaEntry;
 export struct TxnInfo {
     TransactionID txn_id_;
     SharedPtr<String> txn_text_;
+};
+
+export struct TxnHistory {
+    TransactionID txn_id_;
+    TxnTimeStamp begin_ts_{};
+    TxnTimeStamp commit_ts_{};
+    TxnState state_{TxnState::kStarted};
+    TxnType type_{TxnType::kInvalid};
+    SharedPtr<TxnContext> txn_context_ptr_{};
 };
 
 export class TxnManager {
@@ -77,6 +87,8 @@ public:
     Vector<TxnInfo> GetTxnInfoArray() const;
 
     UniquePtr<TxnInfo> GetTxnInfoByID(TransactionID txn_id) const;
+
+    Vector<TxnHistory> GetTxnHistories() const;
 
     TxnTimeStamp CurrentTS() const;
 

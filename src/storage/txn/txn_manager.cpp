@@ -285,6 +285,25 @@ UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
     return MakeUnique<TxnInfo>(iter->first, iter->second->GetTxnText());
 }
 
+Vector<TxnHistory> TxnManager::GetTxnHistories() const {
+    std::unique_lock w_lock(locker_);
+    Vector<TxnHistory> txn_histories;
+    txn_histories.reserve(txn_map_.size());
+
+    for (const auto &txn_pair : txn_map_) {
+        TxnHistory txn_history;
+        txn_history.txn_id_ = txn_pair.second->TxnID();
+        txn_history.begin_ts_ = txn_pair.second->BeginTS();
+        txn_history.commit_ts_ = txn_pair.second->CommitTS();
+        txn_history.state_ = txn_pair.second->GetTxnState();
+        txn_history.type_ = txn_pair.second->GetTxnType();
+        txn_history.txn_context_ptr_ = txn_pair.second->txn_context();
+        txn_histories.emplace_back(txn_history);
+    }
+
+    return txn_histories;
+}
+
 TxnTimeStamp TxnManager::CurrentTS() const { return current_ts_; }
 
 TxnTimeStamp TxnManager::GetNewTimeStamp() { return current_ts_ + 1; }

@@ -83,6 +83,7 @@ import admin_statement;
 import result_cache_manager;
 import peer_task;
 import node_info;
+import txn_context;
 
 namespace infinity {
 
@@ -445,9 +446,19 @@ void PhysicalShow::Init() {
             break;
         }
         case ShowStmtType::kTransactionHistory: {
-            output_names_->reserve(1);
-            output_types_->reserve(1);
-            output_names_->emplace_back("transactions");
+            output_names_->reserve(6);
+            output_types_->reserve(6);
+            output_names_->emplace_back("txn_id");
+            output_names_->emplace_back("begin_ts");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("state");
+            output_names_->emplace_back("type");
+            output_names_->emplace_back("operations");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             break;
         }
@@ -5856,71 +5867,92 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
 
 void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state) {
 
+    TransactionID this_txn_id = query_context->GetTxn()->TxnID();
     TxnManager *txn_manager = query_context->storage()->txn_manager();
-    UniquePtr<TxnInfo> txn_info = txn_manager->GetTxnInfoByID(*txn_id_);
-    if (txn_info.get() == nullptr) {
-        Status status = Status::TransactionNotFound(*txn_id_);
-        RecoverableError(status);
-    }
+    Vector<TxnHistory> txn_histories = txn_manager->GetTxnHistories();
 
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
         varchar_type,
+        bigint_type,
+        bigint_type,
+        varchar_type,
+        varchar_type,
         varchar_type,
     };
-
     output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
 
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("transaction_id");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    for (const auto& txn_history : txn_histories) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
         }
 
-        ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(*txn_id_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("session_id");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            Value value = Value::MakeVarchar(std::to_string(*session_id_));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("transaction_text");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            String txn_string;
-            if (txn_info->txn_text_.get() != nullptr) {
-                txn_string = *txn_info->txn_text_;
+            // txn id
+            String txn_id_str;
+            if(this_txn_id == txn_history.txn_id_) {
+                txn_id_str = fmt::format("{}(this txn)", this_txn_id);
+            } else {
+                txn_id_str = fmt::format("{}", txn_history.txn_id_);
             }
-            Value value = Value::MakeVarchar(txn_string);
+            Value value = Value::MakeVarchar(txn_id_str);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // txn begin_ts
+            Value value = Value::MakeBigInt(txn_history.begin_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // txn commit_ts
+            Value value = Value::MakeBigInt(txn_history.commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // txn state
+            Value value = Value::MakeVarchar("transaction_state");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // txn type
+            Value value = Value::MakeVarchar("transaction_type");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        {
+            // txn operations
+            std::stringstream ss;
+            Vector<SharedPtr<String>> operations;
+            if(txn_history.txn_context_ptr_ != nullptr) {
+                operations = txn_history.txn_context_ptr_->GetOperations();
+            }
+            for(const auto& ops: operations) {
+                ss << *ops << std::endl;
+            }
+            Value value = Value::MakeVarchar(ss.str());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
         }
     }
 
@@ -6550,13 +6582,7 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        bigint_type,
-        bigint_type
-    };
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type};
 
     output_block_ptr->Init(column_types);
     output_block_ptr->Finalize();
@@ -6574,37 +6600,37 @@ void PhysicalShow::ExecuteShowSnapshot(QueryContext *query_context, ShowOperator
 
     output_block_ptr->Init(column_types);
 
-//    {
-//        SizeT column_id = 0;
-//        {
-//            Value value = Value::MakeVarchar("memory_objects");
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-//        }
-//
-//        ++column_id;
-//        {
-//            Value value = Value::MakeVarchar(GlobalResourceUsage::GetObjectCountInfo());
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-//        }
-//    }
-//
-//    {
-//        SizeT column_id = 0;
-//        {
-//            Value value = Value::MakeVarchar("memory_allocation");
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-//        }
-//
-//        ++column_id;
-//        {
-//            Value value = Value::MakeVarchar(GlobalResourceUsage::GetRawMemoryInfo());
-//            ValueExpression value_expr(value);
-//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-//        }
-//    }
+    //    {
+    //        SizeT column_id = 0;
+    //        {
+    //            Value value = Value::MakeVarchar("memory_objects");
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    //        }
+    //
+    //        ++column_id;
+    //        {
+    //            Value value = Value::MakeVarchar(GlobalResourceUsage::GetObjectCountInfo());
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    //        }
+    //    }
+    //
+    //    {
+    //        SizeT column_id = 0;
+    //        {
+    //            Value value = Value::MakeVarchar("memory_allocation");
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    //        }
+    //
+    //        ++column_id;
+    //        {
+    //            Value value = Value::MakeVarchar(GlobalResourceUsage::GetRawMemoryInfo());
+    //            ValueExpression value_expr(value);
+    //            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    //        }
+    //    }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));

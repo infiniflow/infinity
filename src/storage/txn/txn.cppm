@@ -238,6 +238,8 @@ public:
 
     TxnStore *txn_store() { return &txn_store_; }
 
+    SharedPtr<TxnContext> txn_context() const { return txn_context_ptr_; }
+
 private:
     void CheckTxnStatus();
 
@@ -280,7 +282,7 @@ private:
     bool allowed_in_reader_{false};
 
 private:
-    UniquePtr<TxnContext> txn_context_ptr_{};
+    SharedPtr<TxnContext> txn_context_ptr_{};
 };
 
 } // namespace infinity
