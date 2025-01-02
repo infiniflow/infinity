@@ -5922,14 +5922,14 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
 
         {
             // txn state
-            Value value = Value::MakeVarchar(ToString(txn_history.state_));
+            Value value = Value::MakeVarchar(TxnState2Str(txn_history.state_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }
 
         {
             // txn type
-            Value value = Value::MakeVarchar(ToString(txn_history.type_));
+            Value value = Value::MakeVarchar(TxnType2Str(txn_history.type_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }

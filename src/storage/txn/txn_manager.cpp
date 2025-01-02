@@ -39,8 +39,7 @@ namespace infinity {
 
 String TxnHistory::ToString() const {
     std::stringstream ss;
-    ss << "Txn ID: " << txn_id_ << ", Begin TS: " << begin_ts_ << ", Commit TS: " << commit_ts_ << ", State: " << ToString(state_)
-       << ", Type: " << ToString(type_) << "\n";
+    ss << "Txn ID: " << txn_id_ << ", Begin TS: " << begin_ts_ << ", Commit TS: " << commit_ts_ << ", State: " << TxnState2Str(state_) << "\n";
     Vector<SharedPtr<String>> operations = txn_context_ptr_->GetOperations();
     for (const auto &operation : operations) {
         ss << *operation << "\n";
@@ -373,7 +372,7 @@ void TxnManager::CleanupTxn(Txn *txn) {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid transaction status: {}", ToString(txn_state));
+                    String error_message = fmt::format("Invalid transaction status: {}", TxnState2Str(txn_state));
                     UnrecoverableError(error_message);
                 }
             }

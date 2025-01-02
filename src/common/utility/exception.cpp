@@ -25,6 +25,7 @@ import logger;
 import third_party;
 import infinity_context;
 import cleanup_scanner;
+import txn_manager;
 
 namespace infinity {
 

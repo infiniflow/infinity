@@ -527,7 +527,7 @@ TxnType Txn::GetTxnType() const { return type_; }
 void Txn::SetTxnRollbacking(TxnTimeStamp rollback_ts) {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
     if (state_ != TxnState::kCommitting && state_ != TxnState::kStarted) {
-        String error_message = fmt::format("Transaction is in {} status, which can't rollback.", ToString(state_));
+        String error_message = fmt::format("Transaction is in {} status, which can't rollback.", TxnState2Str(state_));
         UnrecoverableError(error_message);
     }
     state_ = TxnState::kRollbacking;
@@ -675,7 +675,7 @@ void Txn::Rollback() {
     } else if (state == TxnState::kCommitting) {
         abort_ts = this->CommitTS();
     } else {
-        String error_message = fmt::format("Transaction {} state is {}.", txn_id_, ToString(state));
+        String error_message = fmt::format("Transaction {} state is {}.", txn_id_, TxnState2Str(state));
         UnrecoverableError(error_message);
     }
     this->SetTxnRollbacking(abort_ts);
