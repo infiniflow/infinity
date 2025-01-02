@@ -140,6 +140,8 @@ export {
     constexpr std::string_view SYSTEM_CONFIG_TABLE_NAME = "config";
     constexpr SizeT DEFAULT_PROFILER_HISTORY_SIZE = 128;
 
+    constexpr SizeT DEFAULT_TXN_HISTORY_SIZE = 128;
+
     // default emvb parameter
     constexpr u32 EMVB_CENTROID_NPROBE = 3;
     constexpr f32 EMVB_THRESHOLD_FIRST = 0.0f;

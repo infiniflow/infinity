@@ -239,6 +239,8 @@ public:
     TxnStore *txn_store() { return &txn_store_; }
 
     SharedPtr<TxnContext> txn_context() const { return txn_context_ptr_; }
+    void AddOperation(const SharedPtr<String> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
+    Vector<SharedPtr<String>> GetOperations() const { return txn_context_ptr_->GetOperations(); }
 
 private:
     void CheckTxnStatus();

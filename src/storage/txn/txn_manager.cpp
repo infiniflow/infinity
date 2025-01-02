@@ -288,16 +288,16 @@ UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
 Vector<TxnHistory> TxnManager::GetTxnHistories() const {
     std::unique_lock w_lock(locker_);
     Vector<TxnHistory> txn_histories;
-    txn_histories.reserve(txn_map_.size());
+    txn_histories.reserve(txn_histories_.size());
 
-    for (const auto &txn_pair : txn_map_) {
+    for (const auto &txn_ptr : txn_histories_) {
         TxnHistory txn_history;
-        txn_history.txn_id_ = txn_pair.second->TxnID();
-        txn_history.begin_ts_ = txn_pair.second->BeginTS();
-        txn_history.commit_ts_ = txn_pair.second->CommitTS();
-        txn_history.state_ = txn_pair.second->GetTxnState();
-        txn_history.type_ = txn_pair.second->GetTxnType();
-        txn_history.txn_context_ptr_ = txn_pair.second->txn_context();
+        txn_history.txn_id_ = txn_ptr->TxnID();
+        txn_history.begin_ts_ = txn_ptr->BeginTS();
+        txn_history.commit_ts_ = txn_ptr->CommitTS();
+        txn_history.state_ = txn_ptr->GetTxnState();
+        txn_history.type_ = txn_ptr->GetTxnType();
+        txn_history.txn_context_ptr_ = txn_ptr->txn_context();
         txn_histories.emplace_back(txn_history);
     }
 
@@ -336,11 +336,17 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 
 void TxnManager::CleanupTxn(Txn *txn) {
     TxnType txn_type = txn->GetTxnType();
+    TransactionID txn_id = txn->TxnID();
     switch (txn_type) {
         case TxnType::kRead: {
             // For read-only Txn only remove txn from txn_map
             std::lock_guard guard(locker_);
-            txn_map_.erase(txn->TxnID());
+//            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+//            if (txn_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+//                txn_histories_.pop_front();
+//            }
+//            txn_histories_.push_back(txn_ptr);
+            txn_map_.erase(txn_id);
             break;
         }
         case TxnType::kWrite: {
@@ -360,7 +366,6 @@ void TxnManager::CleanupTxn(Txn *txn) {
                     UnrecoverableError(error_message);
                 }
             }
-            TransactionID txn_id = txn->TxnID();
             {
                 // cleanup the txn from committing_txn and txm_map
                 auto commit_ts = txn->CommitTS();
@@ -369,6 +374,11 @@ void TxnManager::CleanupTxn(Txn *txn) {
                 if (remove_n == 0) {
                     UnrecoverableError("Txn not found in committing_txns_");
                 }
+                SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+                if (txn_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+                    txn_histories_.pop_front();
+                }
+                txn_histories_.push_back(txn_ptr);
                 remove_n = txn_map_.erase(txn_id);
                 if (remove_n == 0) {
                     String error_message = fmt::format("Txn: {} not found in txn map", txn_id);

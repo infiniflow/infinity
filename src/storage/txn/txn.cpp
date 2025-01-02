@@ -67,6 +67,7 @@ Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID t
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Txn");
 #endif
+    txn_context_ptr_ = TxnContext::Make();
 }
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts)
@@ -76,6 +77,7 @@ Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, T
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("Txn");
 #endif
+    txn_context_ptr_ = TxnContext::Make();
 }
 
 UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts) {
@@ -191,7 +193,9 @@ Status Txn::CreateDatabase(const SharedPtr<String> &db_name, ConflictType confli
     }
     txn_store_.AddDBStore(db_entry);
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateDatabase>(*db_name, db_entry->GetPathNameTail(), *comment));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabase>(*db_name, db_entry->GetPathNameTail(), *comment);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
 }
 
@@ -205,7 +209,9 @@ Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     }
     txn_store_.DropDBStore(dropped_db_entry.get());
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdDropDatabase>(db_name));
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropDatabase>(db_name);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
 }
 

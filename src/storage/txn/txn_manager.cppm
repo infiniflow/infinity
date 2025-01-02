@@ -124,6 +124,8 @@ private:
     BufferManager *buffer_mgr_{};
 
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
+    Deque<SharedPtr<Txn>> txn_histories_{};
+
     WalManager *wal_mgr_;
 
     Deque<WeakPtr<Txn>> beginned_txns_;        // sorted by begin ts

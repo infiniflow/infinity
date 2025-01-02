@@ -5867,8 +5867,9 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
 }
 
 void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state) {
-
-    TransactionID this_txn_id = query_context->GetTxn()->TxnID();
+    Txn* txn = query_context->GetTxn();
+//    txn->AddOperation(MakeShared<String>("ShowTransactionHistory"));
+    TransactionID this_txn_id = txn->TxnID();
     TxnManager *txn_manager = query_context->storage()->txn_manager();
     Vector<TxnHistory> txn_histories = txn_manager->GetTxnHistories();
 

@@ -337,6 +337,7 @@ Status Storage::AdminToWriter() {
     auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
     bg_processor_->Submit(force_ckp_task);
     force_ckp_task->Wait();
+    txn->AddOperation(MakeShared<String>("ForceCheckpointTask"));
     txn->SetReaderAllowed(true);
     txn_mgr_->CommitTxn(txn);
 
