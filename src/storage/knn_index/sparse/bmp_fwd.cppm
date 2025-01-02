@@ -382,11 +382,13 @@ public:
         return tail_fwd1;
     }
 
-    void Finialize() {
-        if (tail_fwd_.GetTailTerms().size() > 0) {
-            Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms = tail_fwd_.ToBlockFwd();
-            block_terms_list_.emplace_back(block_terms);
+    Optional<TailFwd<DataType, IdxType>> Finalize() {
+        if (tail_fwd_.GetTailTerms().size() == 0) {
+            return None;
         }
+        Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms = tail_fwd_.ToBlockFwd();
+        block_terms_list_.emplace_back(block_terms);
+        return std::move(tail_fwd_);
     }
 
     Vector<Pair<Vector<IdxType>, Vector<DataType>>> GetFwd(SizeT doc_num, SizeT term_num) const {

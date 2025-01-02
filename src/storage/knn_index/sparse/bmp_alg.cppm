@@ -350,7 +350,8 @@ public:
     inline SizeT MemoryUsage() const { return mem_usage_.load(); }
 
     void SaveToPtr(LocalFileHandle &file_handle) {
-        this->block_fwd_.Finialize();
+        Finalize();
+
         char *p0 = nullptr;
         GetSizeToPtr(p0);
         char *p1 = nullptr;
@@ -365,6 +366,17 @@ public:
     }
 
 private:
+    void Finalize() {
+        auto tail_fwd = this->block_fwd_.Finalize();
+        if (tail_fwd.has_value()) {
+            SizeT mem_usage = 0;
+
+            BMPBlockID block_id = this->block_fwd_.block_num() - 1;
+            auto tail_terms = tail_fwd->GetTailTerms();
+            this->bm_ivt_.AddBlock(block_id, tail_terms, mem_usage);
+        }
+    }
+
     void GetSizeToPtr(char *&p) const {
         this->bm_ivt_.GetSizeToPtr(p);
         this->block_fwd_.GetSizeToPtr(p);
