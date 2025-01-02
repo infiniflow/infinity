@@ -136,7 +136,7 @@ TxnTimeStamp TxnManager::GetWriteCommitTS(Txn *txn) {
     return commit_ts;
 }
 
-bool TxnManager::CheckTxnConflict(Txn *txn) {
+Optional<String> TxnManager::CheckTxnConflict(Txn *txn) {
     TxnTimeStamp commit_ts = txn->CommitTS();
     Vector<SharedPtr<Txn>> candidate_txns;
     TxnTimeStamp min_checking_ts = UNCOMMIT_TS;
@@ -160,19 +160,19 @@ bool TxnManager::CheckTxnConflict(Txn *txn) {
         }
     });
     if (txn->CheckConflict()) {
-        return true;
+        return "Conflict in txn->CheckConflict()";
     }
-    for (SharedPtr<Txn> &candidate_txn : candidate_txns) {
+    for (const auto &candidate_txn : candidate_txns) {
         // LOG_INFO(fmt::format("Txn {}(commit_ts: {}) check conflict with txn {}(commit_ts: {})",
         //                      txn->TxnID(),
         //                      txn->CommitTS(),
         //                      candidate_txn->TxnID(),
         //                      candidate_txn->CommitTS()));
-        if (txn->CheckConflict(candidate_txn.get())) {
-            return true;
+        if (const auto conflict_reason = txn->CheckConflict(candidate_txn.get()); conflict_reason) {
+            return fmt::format("Conflict with candidate_txn {}: {}", candidate_txn->TxnID(), *conflict_reason);
         }
     }
-    return false;
+    return None;
 }
 
 void TxnManager::SendToWAL(Txn *txn) {
