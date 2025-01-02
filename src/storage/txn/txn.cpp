@@ -567,11 +567,11 @@ TxnTimeStamp Txn::Commit() {
     txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
-    if (txn_mgr_->CheckTxnConflict(this)) {
-        LOG_ERROR(fmt::format("Txn: {} is rolled back. rollback ts: {}", txn_id_, commit_ts));
+    if (const auto conflict_reason = txn_mgr_->CheckTxnConflict(this); conflict_reason) {
+        LOG_ERROR(fmt::format("Txn: {} is rolled back. rollback ts: {}. Txn conflict reason: {}.", txn_id_, commit_ts, *conflict_reason));
         wal_entry_ = nullptr;
         txn_mgr_->SendToWAL(this);
-        RecoverableError(Status::TxnConflict(txn_id_, "Txn conflict reason."));
+        RecoverableError(Status::TxnConflict(txn_id_, fmt::format("Txn conflict reason: {}.", *conflict_reason)));
     }
 
     // Put wal entry to the manager in the same order as commit_ts.
@@ -594,7 +594,7 @@ TxnTimeStamp Txn::Commit() {
 
 bool Txn::CheckConflict() { return txn_store_.CheckConflict(catalog_); }
 
-bool Txn::CheckConflict(Txn *other_txn) {
+Optional<String> Txn::CheckConflict(Txn *other_txn) {
     LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, other_txn->txn_id_));
 
     return txn_store_.CheckConflict(other_txn->txn_store_);

@@ -58,7 +58,7 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(Txn *txn);
 
-    bool CheckTxnConflict(Txn *txn);
+    Optional<String> CheckTxnConflict(Txn *txn);
 
     void SendToWAL(Txn *txn);
 
