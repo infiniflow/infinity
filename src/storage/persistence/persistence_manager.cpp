@@ -166,6 +166,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         if (int(src_size) > CurrentObjRoomNoLock()) {
             CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
         }
+        current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
         ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
         CurrentObjAppendNoLock(tmp_file_path, src_size);
         fs::remove(tmp_file_path, ec);
@@ -368,6 +369,14 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &tmp_file_path, Siz
     if (!dstFile.is_open()) {
         String error_message = fmt::format("Failed to open destination file {} {}", strerror(errno), dst_fp.string());
         UnrecoverableError(error_message);
+    }
+    {
+        dstFile.seekp(0, std::ios::end);
+        SizeT current_size = dstFile.tellp();
+        if (current_size < current_object_size_) {
+            std::vector<char> zero_padding(current_object_size_ - current_size, 0);
+            dstFile.write(zero_padding.data(), zero_padding.size());
+        }
     }
     char buffer[BUFFER_SIZE];
     while (srcFile.read(buffer, BUFFER_SIZE)) {
