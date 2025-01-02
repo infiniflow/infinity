@@ -918,7 +918,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
                 Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = table_index_entry->GetIndexBySegmentSnapshot(this, txn);
                 for (auto &[segment_id, segment_index_entry] : index_by_segment) {
-                    if (!segment_index_entry->TrySetOptimizing(txn)) {
+                    const auto [result_b, add_segment_optimizing] = segment_index_entry->TrySetOptimizing(txn);
+                    if (!result_b) {
                         LOG_INFO(fmt::format("Index {} segment {} is optimizing, skip optimize.", index_name, segment_id));
                         continue;
                     }
@@ -937,7 +938,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                         opt_success = true;
                         continue;
                     }
-
+                    add_segment_optimizing();
                     String msg = fmt::format("merging {}", index_name);
                     Vector<String> base_names;
                     Vector<RowID> base_rowids;
