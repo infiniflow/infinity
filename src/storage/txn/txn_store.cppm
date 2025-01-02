@@ -140,7 +140,7 @@ public:
 
     bool CheckConflict(Catalog *catalog, Txn *txn) const;
 
-    bool CheckConflict(const TxnTableStore *txn_table_store) const;
+    Optional<String> CheckConflict(const TxnTableStore *txn_table_store) const;
 
     void PrepareCommit1(const Vector<WalSegmentInfo *> &segment_infos) const;
 
@@ -241,7 +241,7 @@ public:
 
     bool CheckConflict(Catalog *catalog);
 
-    bool CheckConflict(const TxnStore &txn_store);
+    Optional<String> CheckConflict(const TxnStore &txn_store);
 
     void PrepareCommit1();
 

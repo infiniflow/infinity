@@ -93,7 +93,7 @@ public:
 
     bool CheckConflict();
 
-    bool CheckConflict(Txn *txn);
+    Optional<String> CheckConflict(Txn *txn);
 
     void CommitBottom();
 
