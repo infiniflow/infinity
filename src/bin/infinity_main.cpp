@@ -162,6 +162,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         }
         case SIGSEGV: {
             // Print back strace
+            infinity::PrintTransactionHistory();
             infinity::PrintStacktrace("SEGMENT FAULTS");
             exit(-1);
             break;
@@ -212,6 +213,7 @@ void TerminateHandler() {
     } catch (...) {
         message += "Unknown Unhandled Exception";
     }
+    infinity::PrintTransactionHistory();
     infinity::PrintStacktrace(message);
     std::abort();
 }
