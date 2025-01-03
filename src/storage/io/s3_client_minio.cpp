@@ -56,7 +56,7 @@ Status S3ClientMinio::UploadObject(const String &bucket_name, const String &obje
     if (resp) {
         LOG_INFO(fmt::format("{} uploaded to {}/{} successfully", file_path, bucket_name, object_name));
     } else {
-        UnrecoverableError(fmt::format("Unable to upload object: {}/{}, reason: {}", bucket_name, object_name, resp.Error().String()));
+        UnrecoverableError(fmt::format("Unable to upload object: {}/{}, code: {}, reason: {}", bucket_name, object_name, resp.code, resp.Error().String()));
     }
     return Status::OK();
 }
