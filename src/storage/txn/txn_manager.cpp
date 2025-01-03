@@ -294,6 +294,10 @@ Vector<SharedPtr<TxnContext>> TxnManager::GetTxnContextHistories() const {
         txn_context_histories.emplace_back(context_ptr);
     }
 
+    for (const auto& ongoing_txn_pair: txn_map_) {
+        txn_context_histories.push_back(ongoing_txn_pair.second->txn_context());
+    }
+
     return txn_context_histories;
 }
 
