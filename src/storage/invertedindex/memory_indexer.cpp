@@ -281,6 +281,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     while (GetInflightTasks() > 0) {
         CommitSync(100);
     }
+    std::unique_lock lock(mutex_commit_);
 
     String posting_file = Path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
     String dict_file = Path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));
