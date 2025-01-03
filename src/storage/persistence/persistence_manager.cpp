@@ -163,7 +163,7 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         return result;
     } else {
         std::lock_guard<std::mutex> lock(mtx_);
-        if (int(src_size) > CurrentObjRoomNoLock()) {
+        if (int(src_size) >= CurrentObjRoomNoLock()) {
             CurrentObjFinalizeNoLock(result.persist_keys_, result.drop_keys_);
         }
         current_object_size_ = (current_object_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
@@ -413,7 +413,9 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
             return;
         }
     }
-    Range orig_range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
+    SizeT range_end = object_addr.part_offset_ + object_addr.part_size_;
+    range_end = (range_end + ObjAlignment - 1) & ~(ObjAlignment - 1);
+    Range orig_range(object_addr.part_offset_, range_end);
     Range range(orig_range);
     auto inst_it = obj_stat->deleted_ranges_.lower_bound(range);
 
@@ -469,7 +471,8 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
     }
 
     LOG_TRACE(fmt::format("Deleted object {} range [{}, {})", object_addr.obj_key_, orig_range.start_, orig_range.end_));
-    if (range.start_ == 0 && range.end_ == obj_stat->obj_size_ && object_addr.obj_key_ != current_object_key_) {
+    SizeT obj_size = (obj_stat->obj_size_ + ObjAlignment - 1) & ~(ObjAlignment - 1);
+    if (range.start_ == 0 && range.end_ == obj_size && object_addr.obj_key_ != current_object_key_) {
         if (object_addr.obj_key_.empty()) {
             String error_message = fmt::format("Failed to find object key");
             UnrecoverableError(error_message);
