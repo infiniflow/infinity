@@ -17,18 +17,24 @@ module;
 export module txn_context;
 
 import stl;
+import txn_state;
 
 namespace infinity {
 
-export class TxnContext {
+export struct TxnContext {
     // This struct is used to store the operation history of a transaction. This history can be used for debugging purposes.
-public:
     static UniquePtr<TxnContext> Make() { return MakeUnique<TxnContext>(); }
 
     void AddOperation(const SharedPtr<String> &operation_text) { operations_.push_back(operation_text); }
     Vector<SharedPtr<String>> GetOperations() const { return operations_; }
+    String ToString();
 
-private:
+    TransactionID txn_id_{};
+    TxnTimeStamp begin_ts_{};
+    TxnTimeStamp commit_ts_{};
+    TxnState state_{TxnState::kStarted};
+    TxnType type_{TxnType::kInvalid};
+
     Vector<SharedPtr<String>> operations_;
 };
 

@@ -185,7 +185,7 @@ public:
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
-    inline TransactionID TxnID() const { return txn_id_; }
+    inline TransactionID TxnID() const { return txn_context_ptr_->txn_id_; }
 
     TxnTimeStamp CommitTS() const;
 
@@ -254,14 +254,9 @@ private:
     Catalog *catalog_{};
 
     TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
-    TransactionID txn_id_{};
 
     // Use as txn context;
     mutable std::shared_mutex rw_locker_{};
-    const TxnTimeStamp begin_ts_{};
-    TxnTimeStamp commit_ts_{};
-    TxnState state_{TxnState::kStarted};
-    TxnType type_{TxnType::kInvalid};
 
     // Handled database
     String db_name_{};

@@ -37,16 +37,6 @@ import global_resource_usage;
 
 namespace infinity {
 
-String TxnHistory::ToString() const {
-    std::stringstream ss;
-    ss << "Txn ID: " << txn_id_ << ", Begin TS: " << begin_ts_ << ", Commit TS: " << commit_ts_ << ", State: " << TxnState2Str(state_) << "\n";
-    Vector<SharedPtr<String>> operations = txn_context_ptr_->GetOperations();
-    for (const auto &operation : operations) {
-        ss << *operation << "\n";
-    }
-    return ss.str();
-}
-
 TxnManager::TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts)
     : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), current_ts_(start_ts), max_committed_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
@@ -295,23 +285,16 @@ UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
     return MakeUnique<TxnInfo>(iter->first, iter->second->GetTxnText());
 }
 
-Vector<TxnHistory> TxnManager::GetTxnHistories() const {
+Vector<SharedPtr<TxnContext>> TxnManager::GetTxnContextHistories() const {
     std::unique_lock w_lock(locker_);
-    Vector<TxnHistory> txn_histories;
-    txn_histories.reserve(txn_histories_.size());
+    Vector<SharedPtr<TxnContext>> txn_context_histories;
+    txn_context_histories.reserve(txn_context_histories_.size());
 
-    for (const auto &txn_ptr : txn_histories_) {
-        TxnHistory txn_history;
-        txn_history.txn_id_ = txn_ptr->TxnID();
-        txn_history.begin_ts_ = txn_ptr->BeginTS();
-        txn_history.commit_ts_ = txn_ptr->CommitTS();
-        txn_history.state_ = txn_ptr->GetTxnState();
-        txn_history.type_ = txn_ptr->GetTxnType();
-        txn_history.txn_context_ptr_ = txn_ptr->txn_context();
-        txn_histories.emplace_back(txn_history);
+    for (const auto &context_ptr : txn_context_histories_) {
+        txn_context_histories.emplace_back(context_ptr);
     }
 
-    return txn_histories;
+    return txn_context_histories;
 }
 
 TxnTimeStamp TxnManager::CurrentTS() const { return current_ts_; }
@@ -352,10 +335,10 @@ void TxnManager::CleanupTxn(Txn *txn) {
             // For read-only Txn only remove txn from txn_map
             std::lock_guard guard(locker_);
             //            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
-            //            if (txn_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
-            //                txn_histories_.pop_front();
+            //            if (txn_contexts_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+            //                txn_contexts_.pop_front();
             //            }
-            //            txn_histories_.push_back(txn_ptr);
+            //            txn_contexts_.push_back(txn_ptr);
             txn_map_.erase(txn_id);
             break;
         }
@@ -385,10 +368,10 @@ void TxnManager::CleanupTxn(Txn *txn) {
                     UnrecoverableError("Txn not found in committing_txns_");
                 }
                 SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
-                if (txn_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
-                    txn_histories_.pop_front();
+                if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+                    txn_context_histories_.pop_front();
                 }
-                txn_histories_.push_back(txn_ptr);
+                txn_context_histories_.push_back(txn_ptr->txn_context());
                 remove_n = txn_map_.erase(txn_id);
                 if (remove_n == 0) {
                     String error_message = fmt::format("Txn: {} not found in txn map", txn_id);

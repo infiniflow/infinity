@@ -35,17 +35,6 @@ export struct TxnInfo {
     SharedPtr<String> txn_text_;
 };
 
-export struct TxnHistory {
-    TransactionID txn_id_;
-    TxnTimeStamp begin_ts_{};
-    TxnTimeStamp commit_ts_{};
-    TxnState state_{TxnState::kStarted};
-    TxnType type_{TxnType::kInvalid};
-    SharedPtr<TxnContext> txn_context_ptr_{};
-
-    String ToString() const;
-};
-
 export class TxnManager {
 public:
     explicit TxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts);
@@ -90,7 +79,7 @@ public:
 
     UniquePtr<TxnInfo> GetTxnInfoByID(TransactionID txn_id) const;
 
-    Vector<TxnHistory> GetTxnHistories() const;
+    Vector<SharedPtr<TxnContext>> GetTxnContextHistories() const;
 
     TxnTimeStamp CurrentTS() const;
 
@@ -126,7 +115,7 @@ private:
     BufferManager *buffer_mgr_{};
 
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
-    Deque<SharedPtr<Txn>> txn_histories_{};
+    Deque<SharedPtr<TxnContext>> txn_context_histories_{};
 
     WalManager *wal_mgr_;
 

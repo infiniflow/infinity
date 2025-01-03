@@ -26,18 +26,19 @@ import third_party;
 import infinity_context;
 import cleanup_scanner;
 import txn_manager;
+import txn_context;
 
 namespace infinity {
 
 void PrintTransactionHistory() {
     TxnManager *txn_manager = InfinityContext::instance().storage()->txn_manager();
 
-    Vector<TxnHistory> txn_histories = txn_manager->GetTxnHistories();
+    Vector<SharedPtr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
 
-    SizeT history_count = txn_histories.size();
+    SizeT history_count = txn_contexts.size();
     for(SizeT idx = 0; idx < history_count; ++ idx) {
-        TxnHistory txn_history = txn_histories[idx];
-        LOG_CRITICAL(txn_history.ToString());
+        SharedPtr<TxnContext> txn_history = txn_contexts[idx];
+        LOG_CRITICAL(txn_history->ToString());
     }
 }
 
