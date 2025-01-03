@@ -61,6 +61,8 @@ export struct PersistReadResult {
 
 export class PersistenceManager {
 public:
+    constexpr static SizeT ObjAlignment = 8;
+
     // TODO: build cache from existing files under workspace
     PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit, bool local_storage = true);
 

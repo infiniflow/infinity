@@ -14,6 +14,9 @@
 
 module;
 
+#include <cerrno>
+#include <cstring>
+#include <sys/mman.h>
 #include <tuple>
 
 module file_worker;
@@ -207,28 +210,43 @@ void FileWorker::CleanupTempFile() const {
 }
 
 void FileWorker::Mmap() {
-    if (mmap_addr_ != nullptr || mmap_data_ != nullptr) {
-        UnrecoverableError("Mmap already exists");
+    if (mmap_addr_ != nullptr) {
+        return;
     }
     auto [defer_fn, read_path] = GetFilePathInner(false);
     bool use_object_cache = persistence_manager_ != nullptr;
-    SizeT file_size = VirtualStore::GetFileSize(read_path);
-    VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
     if (use_object_cache) {
-        const void *ptr = mmap_addr_ + obj_addr_.part_offset_;
-        this->ReadFromMmapImpl(ptr, obj_addr_.part_size_);
+        int ret = VirtualStore::MmapFilePart(read_path, obj_addr_.part_offset_, obj_addr_.part_size_, mmap_addr_);
+        if (ret < 0) {
+            UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
+        }
+        this->ReadFromMmapImpl(mmap_addr_, obj_addr_.part_size_);
     } else {
-        const void *ptr = mmap_addr_;
-        this->ReadFromMmapImpl(ptr, file_size);
+        SizeT file_size = VirtualStore::GetFileSize(read_path);
+        int ret = VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
+        if (ret < 0) {
+            UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
+        }
+        this->ReadFromMmapImpl(mmap_addr_, file_size);
     }
 }
 
 void FileWorker::Munmap() {
-    auto [defer_fn, read_path] = GetFilePathInner(false);
+    if (mmap_addr_ == nullptr) {
+        return;
+    }
     this->FreeFromMmapImpl();
-    VirtualStore::MunmapFile(read_path);
+    auto [defer_fn, read_path] = GetFilePathInner(false);
+    bool use_object_cache = persistence_manager_ != nullptr;
+    if (use_object_cache) {
+        VirtualStore::MunmapFilePart(mmap_addr_, obj_addr_.part_offset_, obj_addr_.part_size_);
+    } else {
+        VirtualStore::MunmapFile(read_path);
+    }
     mmap_addr_ = nullptr;
     mmap_data_ = nullptr;
 }
+
+void FileWorker::MmapNotNeed() {}
 
 } // namespace infinity

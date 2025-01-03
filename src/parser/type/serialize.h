@@ -66,6 +66,14 @@ inline std::string ReadBufAdv<std::string>(const char *&buf) {
 }
 
 template <typename T>
+const T *ReadBufVecAdv(const char *&buf, size_t size) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    T *data = reinterpret_cast<T *>(const_cast<char *>(buf));
+    buf += sizeof(T) * size;
+    return data;
+}
+
+template <typename T>
 inline void WriteBuf(char *const buf, const T &value) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
     std::memcpy(buf, &value, sizeof(T));
@@ -98,6 +106,67 @@ inline void WriteBufVecAdv(char *&buf, const T *data, size_t size) {
     static_assert(std::is_standard_layout_v<T>, "T must be POD");
     memcpy(buf, data, sizeof(T) * size);
     buf += sizeof(T) * size;
+}
+
+template <typename T>
+void GetSizeInBytesAligned(char *&start) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    auto ptr = reinterpret_cast<uintptr_t>(start);
+    size_t t_align = std::alignment_of_v<T>;
+    ptr = (ptr + t_align - 1) & ~(t_align - 1);
+    start = reinterpret_cast<char *>(ptr);
+    start += sizeof(T);
+}
+
+template <typename T>
+void GetSizeInBytesVecAligned(char *&start, size_t size) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    auto ptr = reinterpret_cast<uintptr_t>(start);
+    size_t t_align = std::alignment_of_v<T>;
+    ptr = (ptr + t_align - 1) & ~(t_align - 1);
+    start = reinterpret_cast<char *>(ptr);
+    start += sizeof(T) * size;
+}
+
+template <typename T>
+T ReadBufAdvAligned(const char *&buf) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    auto ptr = reinterpret_cast<uintptr_t>(buf);
+    size_t t_align = std::alignment_of_v<T>;
+    ptr = (ptr + t_align - 1) & ~(t_align - 1);
+    buf = reinterpret_cast<const char *>(ptr);
+    return ReadBufAdv<T>(buf);
+}
+
+template <typename T>
+const T *ReadBufVecAdvAligned(const char *&buf, size_t size) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    auto ptr = reinterpret_cast<uintptr_t>(buf);
+    size_t t_align = std::alignment_of_v<T>;
+    ptr = (ptr + t_align - 1) & ~(t_align - 1);
+    buf = reinterpret_cast<const char *>(ptr);
+    return ReadBufVecAdv<T>(buf, size);
+}
+
+template <typename T>
+void WriteBufAdvAligned(char *&buf, const T &value) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    auto ptr = reinterpret_cast<uintptr_t>(buf);
+    size_t t_align = std::alignment_of_v<T>;
+    ptr = (ptr + t_align - 1) & ~(t_align - 1);
+    buf = reinterpret_cast<char *>(ptr);
+    WriteBuf(buf, value);
+    buf += sizeof(T);
+}
+
+template <typename T>
+void WriteBufVecAdvAligned(char *&buf, const T *data, size_t size) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    auto ptr = reinterpret_cast<uintptr_t>(buf);
+    size_t t_align = std::alignment_of_v<T>;
+    ptr = (ptr + t_align - 1) & ~(t_align - 1);
+    buf = reinterpret_cast<char *>(ptr);
+    WriteBufVecAdv(buf, data, size);
 }
 
 } // namespace infinity
