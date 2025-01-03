@@ -84,6 +84,8 @@ String ToString(ShowStmtType type) {
             return "Show transactions";
         case ShowStmtType::kTransaction:
             return "Show transaction";
+        case ShowStmtType::kTransactionHistory:
+            return "Show transaction history";
         case ShowStmtType::kLogs:
             return "Show logs";
         case ShowStmtType::kDeltaLogs:

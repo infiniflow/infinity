@@ -85,6 +85,8 @@ import peer_task;
 import node_info;
 import snapshot_brief;
 import command_statement;
+import txn_context;
+import txn_state;
 
 namespace infinity {
 
@@ -446,6 +448,23 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowStmtType::kTransactionHistory: {
+            output_names_->reserve(6);
+            output_types_->reserve(6);
+            output_names_->emplace_back("txn_id");
+            output_names_->emplace_back("begin_ts");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("state");
+            output_names_->emplace_back("type");
+            output_names_->emplace_back("operations");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         case ShowStmtType::kLogs: {
             output_names_->reserve(4);
             output_types_->reserve(4);
@@ -696,6 +715,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowStmtType::kTransactions: {
             ExecuteShowTransactions(query_context, show_operator_state);
+            break;
+        }
+        case ShowStmtType::kTransactionHistory: {
+            ExecuteShowTransactionHistory(query_context, show_operator_state);
             break;
         }
         case ShowStmtType::kTransaction: {
@@ -5845,6 +5868,100 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
     return;
 }
 
+void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state) {
+    Txn* txn = query_context->GetTxn();
+//    txn->AddOperation(MakeShared<String>("ShowTransactionHistory"));
+    TransactionID this_txn_id = txn->TxnID();
+    TxnManager *txn_manager = query_context->storage()->txn_manager();
+    Vector<SharedPtr<TxnContext>> txn_context_histories = txn_manager->GetTxnContextHistories();
+
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        bigint_type,
+        bigint_type,
+        varchar_type,
+        varchar_type,
+        varchar_type,
+    };
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    for (const auto &txn_context : txn_context_histories) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // txn id
+            String txn_id_str;
+            if (this_txn_id == txn_context->txn_id_) {
+                txn_id_str = fmt::format("{}(this txn)", this_txn_id);
+            } else {
+                txn_id_str = fmt::format("{}", txn_context->txn_id_);
+            }
+            Value value = Value::MakeVarchar(txn_id_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // txn begin_ts
+            Value value = Value::MakeBigInt(txn_context->begin_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // txn commit_ts
+            Value value = Value::MakeBigInt(txn_context->commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // txn state
+            Value value = Value::MakeVarchar(TxnState2Str(txn_context->state_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // txn type
+            Value value = Value::MakeVarchar(TxnType2Str(txn_context->type_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        {
+            // txn operations
+            std::stringstream ss;
+            Vector<SharedPtr<String>> operations;
+            for (const auto &ops : txn_context->operations_) {
+                ss << *ops << std::endl;
+            }
+            Value value = Value::MakeVarchar(ss.str());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
 void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorState *operator_state) {
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -6466,7 +6583,11 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+<<<<<<< HEAD
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, varchar_type};
+=======
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, bigint_type};
+>>>>>>> upstream/main
 
     output_block_ptr->Init(column_types);
 

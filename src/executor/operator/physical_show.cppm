@@ -139,6 +139,8 @@ private:
 
     void ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state);
+
     void ExecuteShowLogs(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperatorState *operator_state);

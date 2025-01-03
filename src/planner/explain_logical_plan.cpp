@@ -1723,6 +1723,24 @@ Status ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowStmtType::kTransactionHistory: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW TRANSACTION HISTORY ";
+            } else {
+                show_str = "SHOW TRANSACTION HISTORY ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [transaction]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowStmtType::kIndexes: {
             String show_str;
             if (intent_size != 0) {

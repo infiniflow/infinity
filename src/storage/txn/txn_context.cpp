@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,23 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "gtest/gtest.h"
-import base_test;
+module;
 
-import infinity_exception;
+#include <sstream>
+
+module txn_context;
 
 import stl;
-import global_resource_usage;
-import third_party;
-import logger;
-import txn_state;
-import infinity_context;
 
-using namespace infinity;
+namespace infinity {
 
-class TxnContants : public BaseTest {};
+String TxnContext::ToString() {
+    std::stringstream ss;
+    ss << "Txn ID: " << txn_id_ << ", Begin TS: " << begin_ts_ << ", Commit TS: " << commit_ts_ << ", State: " << TxnState2Str(state_) << "\n";
+    for (const auto &operation : operations_) {
+        ss << *operation << "\n";
+    }
+    return ss.str();
+}
 
-TEST_F(TxnContants, test1) {
-    using namespace infinity;
-    EXPECT_EQ(TxnState2Str(TxnState::kStarted), "Started");
 }
