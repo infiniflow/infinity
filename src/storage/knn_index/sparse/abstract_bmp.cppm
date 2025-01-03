@@ -53,6 +53,20 @@ export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompr
                                         BMPAlg<f64, i16, BMPCompressType::kRaw> *,
                                         BMPAlg<f64, i8, BMPCompressType::kCompressed> *,
                                         BMPAlg<f64, i8, BMPCompressType::kRaw> *,
+
+                                        BMPAlg<f32, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f32, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f32, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f32, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f32, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f32, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f64, i32, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f64, i32, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f64, i16, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f64, i16, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f64, i8, BMPCompressType::kCompressed, BMPOwnMem::kFalse> *,
+                                        BMPAlg<f64, i8, BMPCompressType::kRaw, BMPOwnMem::kFalse> *,
+
                                         std::nullptr_t>;
 
 export struct BMPIndexInMem final : public BaseMemIndex {
@@ -66,15 +80,15 @@ public:
     TableIndexEntry *table_index_entry() const override;
 
 private:
-    template <typename DataType, typename IndexType>
+    template <typename DataType, typename IndexType, BMPOwnMem OwnMem>
     static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp) {
         switch (index_bmp->compress_type_) {
             case BMPCompressType::kCompressed: {
-                using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kCompressed>;
+                using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kCompressed, OwnMem>;
                 return static_cast<BMPIndex *>(nullptr);
             }
             case BMPCompressType::kRaw: {
-                using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kRaw>;
+                using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kRaw, OwnMem>;
                 return static_cast<BMPIndex *>(nullptr);
             }
             default: {
@@ -83,17 +97,35 @@ private:
         }
     }
 
-    template <typename DataType>
+    template <typename DataType, BMPOwnMem OwnMem>
     static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info) {
         switch (sparse_info->IndexType()) {
             case EmbeddingDataType::kElemInt8: {
-                return InitAbstractIndex<DataType, i8>(index_bmp);
+                return InitAbstractIndex<DataType, i8, OwnMem>(index_bmp);
             }
             case EmbeddingDataType::kElemInt16: {
-                return InitAbstractIndex<DataType, i16>(index_bmp);
+                return InitAbstractIndex<DataType, i16, OwnMem>(index_bmp);
             }
             case EmbeddingDataType::kElemInt32: {
-                return InitAbstractIndex<DataType, i32>(index_bmp);
+                return InitAbstractIndex<DataType, i32, OwnMem>(index_bmp);
+            }
+            default: {
+                return nullptr;
+            }
+        }
+    }
+
+    template <BMPOwnMem OwnMem>
+    static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
+        const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
+        const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
+
+        switch (sparse_info->DataType()) {
+            case EmbeddingDataType::kElemFloat: {
+                return InitAbstractIndex<f32, OwnMem>(index_bmp, sparse_info);
+            }
+            case EmbeddingDataType::kElemDouble: {
+                return InitAbstractIndex<f64, OwnMem>(index_bmp, sparse_info);
             }
             default: {
                 return nullptr;
@@ -102,7 +134,13 @@ private:
     }
 
 public:
-    static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def);
+    static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true) {
+        if (own_mem) {
+            return InitAbstractIndex<BMPOwnMem::kTrue>(index_base, column_def);
+        } else {
+            return InitAbstractIndex<BMPOwnMem::kFalse>(index_base, column_def);
+        }
+    }
 
     BMPIndexInMem(const BMPIndexInMem &) = delete;
     BMPIndexInMem &operator=(const BMPIndexInMem &) = delete;

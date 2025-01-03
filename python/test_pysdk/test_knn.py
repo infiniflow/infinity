@@ -1069,7 +1069,7 @@ class TestInfinity:
                                                index.IndexType.BMP,
                                                {"block_size": "8", "compress_type": "compress"}), ConflictType.Error)
 
-        table_obj.optimize("idx1", {"topk": "3"})
+        # table_obj.optimize("idx1", {"topk": "3"})
 
         res, extra_result = (table_obj
                              .output(["*", "_row_id", "_similarity"])
@@ -1592,7 +1592,7 @@ class TestInfinity:
                                                index.IndexType.BMP,
                                                {"block_size": "8", "compress_type": "compress"}), ConflictType.Error)
 
-        table_obj.optimize("idx1", {"topk": "3"})
+        # table_obj.optimize("idx1", {"topk": "3"})
 
         with pytest.raises(InfinityException) as e:
             res, extra_result = (table_obj
@@ -1910,7 +1910,7 @@ class TestInfinity:
                                                index.IndexType.BMP,
                                                {"block_size": "8", "compress_type": "raww"}), ConflictType.Error)
 
-        table_obj.optimize("idx1", {"topk": "3"})
+        # table_obj.optimize("idx1", {"topk": "3"})
 
         res, extra_result = (table_obj
                              .output(["*", "_row_id", "_similarity"])

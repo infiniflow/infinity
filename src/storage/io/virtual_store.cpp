@@ -446,6 +446,30 @@ i32 VirtualStore::MunmapFile(const String &file_path) {
     return 0;
 }
 
+i32 VirtualStore::MmapFilePart(const String &file_path, SizeT offset, SizeT length, u8 *&data_ptr) {
+    SizeT align_offset = offset / getpagesize() * getpagesize();
+    SizeT diff = offset - align_offset;
+    SizeT align_length = length + diff;
+    int fd = open(file_path.c_str(), O_RDONLY);
+    if (fd < 0) {
+        return -1;
+    }
+    void *ret = mmap(NULL, align_length, PROT_READ, MAP_SHARED, fd, align_offset);
+    close(fd);
+    if (ret == MAP_FAILED) {
+        return -1;
+    }
+    data_ptr = reinterpret_cast<u8 *>(ret) + diff;
+    return 0;
+}
+
+i32 VirtualStore::MunmapFilePart(u8 *data_ptr, SizeT offset, SizeT length) {
+    SizeT align_offset = offset / getpagesize() * getpagesize();
+    u8 *aligned_ptr = data_ptr - offset + align_offset;
+    SizeT align_length = length + data_ptr - aligned_ptr;
+    return munmap(aligned_ptr, align_length);
+}
+
 // Remote storage
 StorageType VirtualStore::storage_type_ = StorageType::kInvalid;
 String VirtualStore::bucket_ = "infinity";

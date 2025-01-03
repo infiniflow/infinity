@@ -720,7 +720,12 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                         if constexpr (std::is_same_v<T, std::nullptr_t>) {
                             UnrecoverableError("Invalid index type.");
                         } else {
-                            index->Optimize(options);
+                            using IndexT = typename std::remove_pointer_t<T>;
+                            if constexpr (IndexT::kOwnMem) {
+                                index->Optimize(options);
+                            } else {
+                                UnrecoverableError("Invalid index type.");
+                            }
                         }
                     },
                     index);
@@ -937,12 +942,20 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                         UnrecoverableError("Invalid index type.");
                     } else {
                         using IndexT = std::decay_t<decltype(*index)>;
-                        using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+                        if constexpr (IndexT::kOwnMem) {
+                            using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
 
-                        CappedOneColumnIterator<SparseRefT, true /*check_ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
-                        index->AddDocs(std::move(iter));
+                            CappedOneColumnIterator<SparseRefT, true /*check_ts*/> iter(segment_entry,
+                                                                                        buffer_mgr,
+                                                                                        column_def->id(),
+                                                                                        begin_ts,
+                                                                                        row_count);
+                            index->AddDocs(std::move(iter));
+                        } else {
+                            UnrecoverableError("Invalid index type.");
+                        }
                     }
-                },
+                    },
                 abstract_bmp);
             merged_chunk_index_entry = memory_bmp_index->Dump(this, buffer_mgr);
             break;
