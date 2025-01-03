@@ -21,6 +21,7 @@ import status;
 namespace infinity {
 
 export void PrintStacktrace(const String &err_msg);
+export void PrintTransactionHistory();
 
 export class RecoverableException : public std::exception {
 public:

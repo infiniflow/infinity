@@ -48,6 +48,7 @@ enum class ShowStmtType {
     kQuery,
     kTransactions,
     kTransaction,
+    kTransactionHistory,
     kIndexSegment,
     kIndexChunk,
     kLogs,

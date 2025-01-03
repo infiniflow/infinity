@@ -1515,6 +1515,14 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           statement->txn_id_);
             break;
         }
+        case ShowStmtType::kTransactionHistory: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kTransactionHistory,
+                                                          statement->schema_name_,
+                                                          statement->table_name_,
+                                                          bind_context_ptr->GenerateTableIndex());
+            break;
+        }
         case ShowStmtType::kSegments: {
             this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                           ShowStmtType::kSegments,

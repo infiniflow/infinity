@@ -285,6 +285,18 @@ UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
     return MakeUnique<TxnInfo>(iter->first, iter->second->GetTxnText());
 }
 
+Vector<SharedPtr<TxnContext>> TxnManager::GetTxnContextHistories() const {
+    std::unique_lock w_lock(locker_);
+    Vector<SharedPtr<TxnContext>> txn_context_histories;
+    txn_context_histories.reserve(txn_context_histories_.size());
+
+    for (const auto &context_ptr : txn_context_histories_) {
+        txn_context_histories.emplace_back(context_ptr);
+    }
+
+    return txn_context_histories;
+}
+
 TxnTimeStamp TxnManager::CurrentTS() const { return current_ts_; }
 
 TxnTimeStamp TxnManager::GetNewTimeStamp() { return current_ts_ + 1; }
@@ -317,11 +329,17 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 
 void TxnManager::CleanupTxn(Txn *txn) {
     TxnType txn_type = txn->GetTxnType();
+    TransactionID txn_id = txn->TxnID();
     switch (txn_type) {
         case TxnType::kRead: {
             // For read-only Txn only remove txn from txn_map
             std::lock_guard guard(locker_);
-            txn_map_.erase(txn->TxnID());
+            //            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+            //            if (txn_contexts_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+            //                txn_contexts_.pop_front();
+            //            }
+            //            txn_contexts_.push_back(txn_ptr);
+            txn_map_.erase(txn_id);
             break;
         }
         case TxnType::kWrite: {
@@ -337,11 +355,10 @@ void TxnManager::CleanupTxn(Txn *txn) {
                     break;
                 }
                 default: {
-                    String error_message = fmt::format("Invalid transaction status: {}", ToString(txn_state));
+                    String error_message = fmt::format("Invalid transaction status: {}", TxnState2Str(txn_state));
                     UnrecoverableError(error_message);
                 }
             }
-            TransactionID txn_id = txn->TxnID();
             {
                 // cleanup the txn from committing_txn and txm_map
                 auto commit_ts = txn->CommitTS();
@@ -350,6 +367,11 @@ void TxnManager::CleanupTxn(Txn *txn) {
                 if (remove_n == 0) {
                     UnrecoverableError("Txn not found in committing_txns_");
                 }
+                SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+                if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+                    txn_context_histories_.pop_front();
+                }
+                txn_context_histories_.push_back(txn_ptr->txn_context());
                 remove_n = txn_map_.erase(txn_id);
                 if (remove_n == 0) {
                     String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
