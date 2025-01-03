@@ -20,14 +20,16 @@ import stl;
 import status;
 import command_statement;
 import index_base;
+import third_party;
+import column_def;
 
 namespace infinity {
 
 export struct SnapshotInfo {
     // structure to represent the snapshot
     String snapshot_name_;
-    String filename_;
     SnapshotScope scope_;
+    SizeT version_{1}; // version 1, start from 0.6.0
 };
 
 export struct OutlineSnapshotInfo {
@@ -37,17 +39,25 @@ export struct OutlineSnapshotInfo {
 export struct BlockColumnSnapshotInfo {
     ColumnID column_id_;
     String filename_;
-    Vector<OutlineSnapshotInfo> outline_snapshots_;
+    Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots_;
+
+    nlohmann::json Serialize();
 };
 
 export struct BlockSnapshotInfo {
     BlockID block_id_;
-    Vector<BlockColumnSnapshotInfo> column_block_snapshots_;
+    String block_dir_;
+    Vector<SharedPtr<BlockColumnSnapshotInfo>> column_block_snapshots_;
+
+    nlohmann::json Serialize();
 };
 
 export struct SegmentSnapshotInfo {
     SegmentID segment_id_;
-    Vector<BlockSnapshotInfo> block_snapshots_;
+    String segment_dir_;
+    Vector<SharedPtr<BlockSnapshotInfo>> block_snapshots_;
+
+    nlohmann::json Serialize();
 };
 
 export struct ChunkIndexSnapshot {
@@ -69,6 +79,19 @@ export struct TableIndexSnapshotInfo {
 export struct TableSnapshotInfo : public SnapshotInfo {
     String db_name_;
     String table_name_;
+    String table_comment_{};
+
+    TxnTimeStamp txn_id_{};
+    TxnTimeStamp begin_ts_{};
+    TxnTimeStamp commit_ts_{};
+    TxnTimeStamp max_commit_ts_{};
+    ColumnID next_column_id_{};
+    SegmentID next_segment_id_{};
+    Vector<SharedPtr<ColumnDef>> columns_{};
+
+    Map<SegmentID, SharedPtr<SegmentSnapshotInfo>> segment_snapshots_{};
+    Vector<String> GetFiles() const;
+    void Serialize(const String& save_path);
 };
 
 } // namespace infinity

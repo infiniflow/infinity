@@ -337,6 +337,29 @@ Status VirtualStore::Merge(const String &dst_path, const String &src_path) {
     return Status::OK();
 }
 
+Status VirtualStore::Copy(const String &dst_path, const String &src_path) {
+    if (!std::filesystem::path(dst_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", dst_path);
+        UnrecoverableError(error_message);
+    }
+    if (!std::filesystem::path(src_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", src_path);
+        UnrecoverableError(error_message);
+    }
+
+    String dst_dir = GetParentPath(dst_path);
+    if (!VirtualStore::Exists(dst_dir)) {
+        VirtualStore::MakeDirectory(dst_dir);
+    }
+
+    try {
+        std::filesystem::copy(src_path, dst_path, fs::copy_options::update_existing);
+    } catch (const std::filesystem::filesystem_error &e) {
+        return Status::IOError(fmt::format("Failed to copy file: {}", e.what()));
+    }
+    return Status::OK();
+}
+
 Tuple<Vector<SharedPtr<DirEntry>>, Status> VirtualStore::ListDirectory(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
