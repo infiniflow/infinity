@@ -42,7 +42,7 @@ protected:
         const SparseMatrix dataset = SparseTestUtil<DataType, IdxType>::GenerateDataset(nrow, ncol, sparsity, 0.0, 10.0);
 
         String save_path = String(tmp_data_path()) + "/bmpfwd_test1.index";
-        String save2_path = String(tmp_data_path()) + "/bmpfwd_test2.index";
+        // String save2_path = String(tmp_data_path()) + "/bmpfwd_test2.index";
 
         auto check = [&](const BMPFwd1 &fwd1, const BMPFwd2 &fwd2) {
             EXPECT_EQ(fwd1.block_size(), fwd2.block_size());
@@ -90,6 +90,7 @@ protected:
             }
             file_handle->Append(buffer.get(), filesize1);
         }
+        UniquePtr<BMPFwd1> fwd1;
         {
             auto [file_handle, status] = VirtualStore::Open(save_path, FileAccessMode::kRead);
             if (!status.ok()) {
@@ -98,51 +99,37 @@ protected:
             auto buffer = MakeUnique<char[]>(filesize1);
             file_handle->Read(buffer.get(), filesize1);
             const char *p = buffer.get();
-            [[maybe_unused]] auto fwd1 = BMPFwd1::ReadAdv(p);
+            fwd1 = MakeUnique<BMPFwd1>(BMPFwd1::ReadAdv(p));
             EXPECT_EQ(p - buffer.get(), filesize1);
-
-            auto [file_handle2, status2] = VirtualStore::Open(save2_path, FileAccessMode::kWrite);
-            if (!status2.ok()) {
-                UnrecoverableError(fmt::format("Failed to open file: {}", save2_path));
-            }
-
+        }
+        UniquePtr<char[]> buffer2;
+        {
             {
                 char *p0 = nullptr;
-                fwd1.GetSizeToPtr(p0);
+                fwd1->GetSizeToPtr(p0);
                 char *p1 = nullptr;
                 filesize2 = p0 - p1;
             }
-            auto buffer2 = MakeUnique<char[]>(filesize2);
+            buffer2 = MakeUnique<char[]>(filesize2);
             char *p2 = buffer2.get();
-            fwd1.WriteToPtr(p2);
+            fwd1->WriteToPtr(p2);
             EXPECT_EQ(p2 - buffer2.get(), filesize2);
-            file_handle2->Append(buffer2.get(), filesize2);
+        }
+        UniquePtr<BMPFwd2> fwd2;
+        {
+            const char *p = buffer2.get();
 
-// #define USE_MMAP
-#ifdef USE_MMAP
-            unsigned char *data_ptr;
-            int ret = VirtualStore::MmapFile(save2_path, data_ptr, filesize2);
-            if (ret < 0) {
-                UnrecoverableError("mmap failed");
-            }
-            p = reinterpret_cast<const char *>(data_ptr);
-#else
-            std::tie(file_handle2, status2) = VirtualStore::Open(save2_path, FileAccessMode::kRead);
-            if (!status2.ok()) {
-                UnrecoverableError(fmt::format("Failed to open file: {}", save2_path));
-            }
-            file_handle2->Read(buffer2.get(), filesize2);
-            p = buffer2.get();
-#endif
-            const char *start_p = p;
-            auto fwd2 = BMPFwd2::LoadFromPtr(p);
-            EXPECT_EQ(p - start_p, filesize2);
+            fwd2 = MakeUnique<BMPFwd2>(BMPFwd2::LoadFromPtr(p));
+            EXPECT_EQ(p - buffer2.get(), filesize2);
 
-            check(fwd1, fwd2);
+            check(*fwd1, *fwd2);
+        }
+        {
+            const char *p = buffer2.get();
+            fwd1 = MakeUnique<BMPFwd1>(BMPFwd1::LoadFromPtr(p));
+            EXPECT_EQ(p - buffer2.get(), filesize2);
 
-#ifdef USE_MMAP
-            VirtualStore::MunmapFile(save2_path);
-#endif
+            check(*fwd1, *fwd2);
         }
     };
 };

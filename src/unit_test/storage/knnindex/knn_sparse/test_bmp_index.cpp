@@ -139,6 +139,16 @@ protected:
             test_query(index);
             VirtualStore::MunmapFile(save2_path);
         }
+        {
+            SizeT file_size = VirtualStore::GetFileSize(save2_path);
+            auto [file_handle, status] = VirtualStore::Open(save2_path, FileAccessMode::kRead);
+            if (!status.ok()) {
+                UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
+            }
+            auto index = BMPAlg1::LoadFromPtr(*file_handle, file_size);
+
+            test_query(index);
+        }
     }
 };
 
@@ -147,18 +157,18 @@ TEST_F(BMPIndexTest, test1) {
         u32 block_size = 8;
         TestFunc<f32, i32, BMPCompressType::kCompressed>(block_size);
     }
-    // {
-    //     u32 block_size = 64;
-    //     TestFunc<f32, i32, BMPCompressType::kRaw>(block_size);
-    // }
-    // {
-    //     u32 block_size = 8;
-    //     TestFunc<f32, i16, BMPCompressType::kCompressed>(block_size);
-    // }
-    // {
-    //     u32 block_size = 8;
-    //     TestFunc<f64, i32, BMPCompressType::kCompressed>(block_size);
-    // }
+    {
+        u32 block_size = 64;
+        TestFunc<f32, i32, BMPCompressType::kRaw>(block_size);
+    }
+    {
+        u32 block_size = 8;
+        TestFunc<f32, i16, BMPCompressType::kCompressed>(block_size);
+    }
+    {
+        u32 block_size = 8;
+        TestFunc<f64, i32, BMPCompressType::kCompressed>(block_size);
+    }
 }
 
 TEST_F(BMPIndexTest, test2) {
