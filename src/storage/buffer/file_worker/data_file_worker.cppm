@@ -46,7 +46,7 @@ public:
 protected:
     bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(SizeT file_size) override;
+    void ReadFromFileImpl(SizeT file_size, bool from_spill) override;
 
     bool ReadFromMmapImpl(const void *ptr, SizeT size) override;
 

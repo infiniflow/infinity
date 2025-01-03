@@ -121,7 +121,7 @@ bool HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     return true;
 }
 
-void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {
+void HnswFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }

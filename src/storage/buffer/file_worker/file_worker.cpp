@@ -123,7 +123,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
     }
     file_handle_ = std::move(file_handle);
     DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
-    ReadFromFileImpl(file_size);
+    ReadFromFileImpl(file_size, from_spill);
 }
 
 void FileWorker::MoveFile() {
