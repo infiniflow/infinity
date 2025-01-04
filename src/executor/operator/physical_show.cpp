@@ -5869,8 +5869,8 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
 }
 
 void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state) {
-    Txn* txn = query_context->GetTxn();
-//    txn->AddOperation(MakeShared<String>("ShowTransactionHistory"));
+    Txn *txn = query_context->GetTxn();
+    //    txn->AddOperation(MakeShared<String>("ShowTransactionHistory"));
     TransactionID this_txn_id = txn->TxnID();
     TxnManager *txn_manager = query_context->storage()->txn_manager();
     Vector<SharedPtr<TxnContext>> txn_context_histories = txn_manager->GetTxnContextHistories();
@@ -6583,18 +6583,8 @@ void PhysicalShow::ExecuteListSnapshots(QueryContext *query_context, ShowOperato
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
-<<<<<<< HEAD
 
-    Vector<SharedPtr<DataType>> column_types{
-        varchar_type,
-        varchar_type,
-        varchar_type,
-        bigint_type,
-        varchar_type
-    };
-=======
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type, varchar_type, bigint_type, varchar_type};
->>>>>>> ca77d2962 (Finish show specific snapshot)
 
     output_block_ptr->Init(column_types);
 
