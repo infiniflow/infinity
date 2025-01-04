@@ -494,6 +494,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 }
                 case SnapshotOp::kDrop: {
                     LOG_INFO(fmt::format("Execute snapshot drop"));
+                    Status snapshot_status = Snapshot::DropSnapshot(query_context, snapshot_name);
+                    if (!snapshot_status.ok()) {
+                        RecoverableError(snapshot_status);
+                    }
                     break;
                 }
                 case SnapshotOp::kRestore: {
