@@ -15,6 +15,7 @@
 module;
 
 #include <iomanip>
+#include <openssl/md5.h>
 #include <regex>
 #include <sstream>
 
@@ -122,6 +123,34 @@ String StringTransform(const String &source, const String &from, const String &t
         start_pos += to.length();
     }
     return ret;
+}
+
+String CalcMD5(const char *input_str, SizeT length) {
+    MD5_CTX ctx;
+    MD5_Init(&ctx);
+    MD5_Update(&ctx, input_str, length);
+
+    unsigned char md[MD5_DIGEST_LENGTH];
+    MD5_Final(md, &ctx);
+
+    std::stringstream hex_stream;
+    for (int i = 0; i < MD5_DIGEST_LENGTH; ++i) {
+        hex_stream << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(md[i]);
+    }
+
+    return hex_stream.str();
+}
+
+String CalcMD5(const String& input_file) {
+    std::ifstream input(input_file, std::ios::binary);
+    input.seekg(0, input.end);
+    size_t raw_file_size = input.tellg();
+    input.seekg(0, input.beg);
+    std::vector<char> raw_data(raw_file_size);
+    input.read(raw_data.data(), raw_file_size);
+    input.close();
+    String md5 = CalcMD5(raw_data.data(), raw_file_size);
+    return md5;
 }
 
 } // namespace infinity
