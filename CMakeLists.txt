@@ -68,15 +68,25 @@ execute_process(
         OUTPUT_VARIABLE GIT_BRANCH_NAME
         OUTPUT_STRIP_TRAILING_WHITESPACE)
 execute_process(
-        COMMAND "${GIT_EXECUTABLE}" describe --tags --match=v* --first-parent --always
-        OUTPUT_VARIABLE GIT_COMMIT_ID
+        COMMAND "${GIT_EXECUTABLE}" describe --tags --abbrev=0
+        OUTPUT_VARIABLE GIT_TAG
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-list --count "${GIT_TAG}..HEAD"
+        OUTPUT_VARIABLE COMMIT_COUNT
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
+        OUTPUT_VARIABLE HEAD_COMMIT_ID
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+set(GIT_COMMIT_ID "${GIT_TAG}-${COMMIT_COUNT}-${HEAD_COMMIT_ID}")
 if("${GIT_BRANCH_NAME}" STREQUAL "")
     message(WARNING "Branch name not found.")
 else()
     message(STATUS "Branch name = ${GIT_BRANCH_NAME}")
 endif()
-if("${GIT_COMMIT_ID}" STREQUAL "")
+if("${HEAD_COMMIT_ID}" STREQUAL "")
     message(WARNING "Commit id not found.")
 else()
     message(STATUS "Commit-id = ${GIT_COMMIT_ID}")
