@@ -88,8 +88,9 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     ColumnID next_column_id_{};
     SegmentID next_segment_id_{};
     Vector<SharedPtr<ColumnDef>> columns_{};
-
     Map<SegmentID, SharedPtr<SegmentSnapshotInfo>> segment_snapshots_{};
+    Map<String, SharedPtr<TableIndexSnapshotInfo>> table_index_snapshots_{};
+
     Vector<String> GetFiles() const;
     void Serialize(const String& save_path);
 };

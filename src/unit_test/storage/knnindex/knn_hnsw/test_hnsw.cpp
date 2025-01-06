@@ -81,6 +81,7 @@ public:
             EXPECT_GE(correct_rate, 0.95);
         };
 
+        String filepath = save_dir_ + "/test_hnsw.bin";
         {
             auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
@@ -88,7 +89,7 @@ public:
 
             test_func(hnsw_index);
 
-            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kWrite);
+            auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -96,7 +97,7 @@ public:
         }
 
         {
-            auto [file_handle, status] = VirtualStore::Open(save_dir_ + "/test_hnsw.bin", FileAccessMode::kRead);
+            auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
@@ -104,6 +105,82 @@ public:
             auto hnsw_index = Hnsw::Load(*file_handle);
 
             test_func(hnsw_index);
+        }
+    }
+
+    template <typename Hnsw, typename LoadHnsw>
+    void TestLoad() {
+        int dim = 16;
+        int M = 8;
+        int ef_construction = 200;
+        int chunk_size = 128;
+        int max_chunk_n = 10;
+        int element_size = max_chunk_n * chunk_size;
+
+        std::mt19937 rng;
+        rng.seed(0);
+        std::uniform_real_distribution<float> distrib_real;
+
+        auto data = MakeUnique<float[]>(dim * element_size);
+        for (int i = 0; i < dim * element_size; ++i) {
+            data[i] = distrib_real(rng);
+        }
+
+        auto test_func = [&](auto &hnsw_index) {
+            hnsw_index->Check();
+
+            KnnSearchOption search_option{.ef_ = 10};
+            int correct = 0;
+            for (int i = 0; i < element_size; ++i) {
+                const float *query = data.get() + i * dim;
+                auto result = hnsw_index->KnnSearchSorted(query, 1, search_option);
+                if (result[0].second == (LabelT)i) {
+                    ++correct;
+                }
+            }
+            float correct_rate = float(correct) / element_size;
+            // std::printf("correct rage: %f\n", correct_rate);
+            EXPECT_GE(correct_rate, 0.95);
+        };
+
+        String filepath = save_dir_ + "/test_hnsw.bin";
+        {
+            auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
+            auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
+            hnsw_index->InsertVecs(std::move(iter));
+
+            auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kWrite);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            hnsw_index->SaveToPtr(*file_handle);
+        }
+        {
+            SizeT file_size = VirtualStore::GetFileSize(filepath);
+#define USE_MMAP
+#ifdef USE_MMAP
+            unsigned char *data_ptr = nullptr;
+            int ret = VirtualStore::MmapFile(filepath, data_ptr, file_size);
+            if (ret < 0) {
+                UnrecoverableError("mmap failed");
+            }
+            const char *ptr = reinterpret_cast<const char *>(data_ptr);
+#else
+            auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            auto buffer = MakeUnique<char[]>(file_size);
+            file_handle->Read(buffer.get(), file_size);
+            const char *ptr = buffer.get();
+#endif
+            auto hnsw_index = LoadHnsw::LoadFromPtr(ptr, file_size);
+
+            test_func(hnsw_index);
+
+#ifdef USE_MMAP
+            VirtualStore::MunmapFile(filepath);
+#endif
         }
     }
 
@@ -317,4 +394,16 @@ TEST_F(HnswAlgTest, test6) {
     using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
     using CompressedHnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
     TestCompress<Hnsw, CompressedHnsw>();
+}
+
+TEST_F(HnswAlgTest, test7) {
+    using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
+    using HnswLoad = KnnHnsw<PlainL2VecStoreType<float>, LabelT, false>;
+    TestLoad<Hnsw, HnswLoad>();
+}
+
+TEST_F(HnswAlgTest, test8) {
+    using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+    using HnswLoad = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT, false>;
+    TestLoad<Hnsw, HnswLoad>();
 }

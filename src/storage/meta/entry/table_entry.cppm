@@ -126,8 +126,6 @@ public:
 
     Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetSnapshotInfo(TxnTimeStamp begin_ts);
-
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() const { return index_meta_map_.GetMetaMap(); }
@@ -401,7 +399,7 @@ public:
 
     void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
 
-    SharedPtr<TableSnapshotInfo> GetSnapshotInfo() const;
+    SharedPtr<TableSnapshotInfo> GetSnapshotInfo(Txn* txn_ptr) const;
 };
 
 } // namespace infinity

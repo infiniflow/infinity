@@ -265,8 +265,6 @@ Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const Str
     return index_meta->GetTableIndexInfo(std::move(r_lock), txn_id, begin_ts);
 }
 
-Tuple<SharedPtr<TableSnapshotInfo>, Status> TableEntry::GetSnapshotInfo(TxnTimeStamp begin_ts) { return {nullptr, Status::OK()}; }
-
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
@@ -1654,7 +1652,7 @@ void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *
     }
 }
 
-SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo() const {
+SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo(Txn* txn_ptr) const {
     SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
     table_snapshot_info->db_name_ = *GetDBName();
     table_snapshot_info->table_name_ = *table_name_;
