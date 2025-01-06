@@ -22,6 +22,7 @@ import buffer_manager;
 import txn_state;
 import wal_entry;
 import default_values;
+import txn_context;
 
 namespace infinity {
 
@@ -58,7 +59,7 @@ public:
 
     TxnTimeStamp GetWriteCommitTS(Txn *txn);
 
-    bool CheckTxnConflict(Txn *txn);
+    Optional<String> CheckTxnConflict(Txn *txn);
 
     void SendToWAL(Txn *txn);
 
@@ -77,6 +78,8 @@ public:
     Vector<TxnInfo> GetTxnInfoArray() const;
 
     UniquePtr<TxnInfo> GetTxnInfoByID(TransactionID txn_id) const;
+
+    Vector<SharedPtr<TxnContext>> GetTxnContextHistories() const;
 
     TxnTimeStamp CurrentTS() const;
 
@@ -112,6 +115,8 @@ private:
     BufferManager *buffer_mgr_{};
 
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
+    Deque<SharedPtr<TxnContext>> txn_context_histories_{};
+
     WalManager *wal_mgr_;
 
     Deque<WeakPtr<Txn>> beginned_txns_;        // sorted by begin ts

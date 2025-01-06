@@ -171,6 +171,19 @@ ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr, S
     return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadOnly, row_count);
 }
 
+SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() const {
+    SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
+    block_column_snapshot_info->column_id_ = column_id_;
+    block_column_snapshot_info->filename_ = *file_name_;
+    SizeT outline_count = outline_buffers_.size();
+    for (SizeT file_idx = 0; file_idx < outline_count; ++file_idx) {
+        String outline_file_path = *OutlineFilename(file_idx);
+        SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
+        outline_snapshot_info->filename_ = outline_file_path;
+    }
+    return block_column_snapshot_info;
+}
+
 ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe, SizeT row_count) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager

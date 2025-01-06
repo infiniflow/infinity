@@ -32,6 +32,8 @@ import extra_ddl_info;
 import internal_types;
 import column_def;
 import value;
+import snapshot_info;
+import txn_context;
 
 namespace infinity {
 
@@ -91,7 +93,7 @@ public:
 
     bool CheckConflict();
 
-    bool CheckConflict(Txn *txn);
+    Optional<String> CheckConflict(Txn *txn);
 
     void CommitBottom();
 
@@ -130,6 +132,8 @@ public:
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
+
+    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 
     // Index OPs
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
@@ -181,7 +185,7 @@ public:
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
-    inline TransactionID TxnID() const { return txn_id_; }
+    inline TransactionID TxnID() const { return txn_context_ptr_->txn_id_; }
 
     TxnTimeStamp CommitTS() const;
 
@@ -234,6 +238,10 @@ public:
 
     TxnStore *txn_store() { return &txn_store_; }
 
+    SharedPtr<TxnContext> txn_context() const { return txn_context_ptr_; }
+    void AddOperation(const SharedPtr<String> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
+    Vector<SharedPtr<String>> GetOperations() const { return txn_context_ptr_->GetOperations(); }
+
 private:
     void CheckTxnStatus();
 
@@ -246,14 +254,9 @@ private:
     Catalog *catalog_{};
 
     TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
-    TransactionID txn_id_{};
 
     // Use as txn context;
     mutable std::shared_mutex rw_locker_{};
-    const TxnTimeStamp begin_ts_{};
-    TxnTimeStamp commit_ts_{};
-    TxnState state_{TxnState::kStarted};
-    TxnType type_{TxnType::kInvalid};
 
     // Handled database
     String db_name_{};
@@ -274,6 +277,9 @@ private:
 
     // ADMIN command which allowed in follower and learner
     bool allowed_in_reader_{false};
+
+private:
+    SharedPtr<TxnContext> txn_context_ptr_{};
 };
 
 } // namespace infinity

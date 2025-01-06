@@ -101,6 +101,7 @@ public:
     i64 OptimizeIndexInterval();
     void SetOptimizeInterval(i64);
 
+    String SnapshotDir();
     i64 MemIndexCapacity();
     i64 DenseIndexBuildingWorker();
     i64 SparseIndexBuildingWorker();

@@ -120,6 +120,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show transaction";
             break;
         }
+        case ShowStmtType::kTransactionHistory: {
+            ss << "Show transaction history";
+            break;
+        }
         case ShowStmtType::kGlobalVariable: {
             ss << "Show global variable";
             break;
@@ -178,6 +182,14 @@ std::string ShowStatement::ToString() const {
         }
         case ShowStmtType::kFunction: {
             ss << "Show function";
+            break;
+        }
+        case ShowStmtType::kListSnapshots: {
+            ss << "List snapshots";
+            break;
+        }
+        case ShowStmtType::kShowSnapshot: {
+            ss << "Show snapshot";
             break;
         }
     }

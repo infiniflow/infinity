@@ -42,6 +42,7 @@ import base_entry;
 import column_def;
 import cleanup_scanner;
 import log_file;
+import snapshot_info;
 
 namespace infinity {
 
@@ -150,6 +151,8 @@ public:
     Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array, Txn *txn);
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name, Txn* txn_ptr);
 
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, Txn *txn);
 

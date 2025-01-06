@@ -709,6 +709,10 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             result->emplace_back(MakeShared<String>("SHOW TRANSACTION"));
             break;
         }
+        case ShowStmtType::kTransactionHistory: {
+            result->emplace_back(MakeShared<String>("SHOW TRANSACTION HISTORY"));
+            break;
+        }
         case ShowStmtType::kProfiles: {
             result->emplace_back(MakeShared<String>("SHOW QUERIES"));
             break;
@@ -771,6 +775,14 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
         }
         case ShowStmtType::kFunction: {
             result->emplace_back(MakeShared<String>("SHOW FUNCTION"));
+            break;
+        }
+        case ShowStmtType::kListSnapshots: {
+            result->emplace_back(MakeShared<String>("LIST SNAPSHOTS"));
+            break;
+        }
+        case ShowStmtType::kShowSnapshot: {
+            result->emplace_back(MakeShared<String>("SHOW SNAPSHOT"));
             break;
         }
         case ShowStmtType::kInvalid: {

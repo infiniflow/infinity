@@ -35,6 +35,7 @@ import block_entry;
 import table_index_meta;
 import compaction_alg;
 import meta_map;
+import snapshot_info;
 
 import cleanup_scanner;
 import random;
@@ -44,6 +45,7 @@ import block_entry;
 import column_index_reader;
 import value;
 import infinity_exception;
+import snapshot_info;
 
 namespace infinity {
 
@@ -396,6 +398,8 @@ public:
     void AddColumns(const Vector<SharedPtr<ColumnDef>> &columns, TxnTableStore *txn_store);
 
     void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
+
+    SharedPtr<TableSnapshotInfo> GetSnapshotInfo(Txn* txn_ptr) const;
 };
 
 } // namespace infinity

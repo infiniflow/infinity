@@ -39,6 +39,7 @@ import buffer_obj;
 import logical_type;
 import infinity_context;
 import virtual_store;
+import snapshot_info;
 
 namespace infinity {
 
@@ -462,6 +463,21 @@ void BlockEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *
         table_store->AddBlockColumnStore(const_cast<SegmentEntry *>(segment_entry_), this, dropped_column.get());
         dropped_columns_.emplace_back(std::move(dropped_column));
     }
+}
+
+SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
+    SharedPtr<BlockSnapshotInfo> block_snapshot_info = MakeShared<BlockSnapshotInfo>();
+    block_snapshot_info->block_id_ = block_id_;
+    block_snapshot_info->block_dir_ = *block_dir_;
+
+    SizeT column_count = this->columns_.size();
+    block_snapshot_info->column_block_snapshots_.reserve(column_count);
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+        SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = columns_[column_id]->GetSnapshotInfo();
+        block_snapshot_info->column_block_snapshots_.push_back(block_column_snapshot_info);
+    }
+
+    return block_snapshot_info;
 }
 
 void BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts, bool &flush_column, bool &flush_version, bool check_commit) const {

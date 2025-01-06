@@ -123,6 +123,53 @@ String LogicalCommand::ToString(i64 &space) const {
             ss << String(space, ' ') << arrow_str << "Test command: " << test_command_info->command_content();
             break;
         }
+        case CommandType::kSnapshot: {
+            auto *snapshot_info = static_cast<SnapshotCmd *>(command_info_.get());
+            ss << String(space, ' ') << arrow_str << "Snapshot command: ";
+            switch(snapshot_info->operation()) {
+                case SnapshotOp::kCreate: {
+                    ss << "CREATE ";
+                    break;
+                }
+                case SnapshotOp::kDrop: {
+                    ss << "DROP ";
+                    break;
+                }
+                case SnapshotOp::kRestore: {
+                    ss << "RESTORE ";
+                    break;
+                }
+                case SnapshotOp::kInvalid: {
+                    String error_message = "Invalid snapshot operation type.";
+                    UnrecoverableError(error_message);
+                }
+            }
+
+            switch(snapshot_info->scope()) {
+                case SnapshotScope::kSystem: {
+                    ss << "SYSTEM ";
+                    break;
+                }
+                case SnapshotScope::kDatabase: {
+                    ss << "DATABASE ";
+                    break;
+                }
+                case SnapshotScope::kTable: {
+                    ss << "TABLE ";
+                    break;
+                }
+                case SnapshotScope::kIgnore: {
+                    break;
+                }
+                case SnapshotScope::kInvalid: {
+                    String error_message = "Invalid snapshot scope.";
+                    UnrecoverableError(error_message);
+                }
+            }
+
+            ss << snapshot_info->name();
+            break;
+        }
         case CommandType::kInvalid: {
             String error_message = "Invalid command type.";
             UnrecoverableError(error_message);

@@ -48,6 +48,7 @@ enum class ShowStmtType {
     kQuery,
     kTransactions,
     kTransaction,
+    kTransactionHistory,
     kIndexSegment,
     kIndexChunk,
     kLogs,
@@ -59,7 +60,9 @@ enum class ShowStmtType {
     kMemory,
     kMemoryObjects,
     kMemoryAllocation,
-    kFunction
+    kFunction,
+    kListSnapshots,
+    kShowSnapshot
 };
 
 class ShowStatement : public BaseStatement {
@@ -81,6 +84,7 @@ public:
     std::optional<u_int64_t> session_id_{};
     std::optional<u_int64_t> txn_id_{};
     std::string var_name_{};
+    std::optional<std::string> snapshot_name_{};
 };
 
 } // namespace infinity
