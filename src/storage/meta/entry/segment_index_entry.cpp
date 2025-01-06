@@ -783,7 +783,7 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
 
             const auto [chunk_index_entries, memory_index_entry] = this->GetHnswIndexSnapshot();
             for (const auto &chunk_index_entry : chunk_index_entries) {
-                BufferHandle buffer_handle = chunk_index_entry->GetBufferObj()->Load(true /*no mmap*/);
+                BufferHandle buffer_handle = chunk_index_entry->GetBufferObj()->Load();
                 auto *abstract_hnsw = reinterpret_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
                 optimize_index(abstract_hnsw);
                 chunk_index_entry->SaveIndexFile();

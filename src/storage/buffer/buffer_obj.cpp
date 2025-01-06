@@ -67,18 +67,12 @@ void BufferObj::UpdateFileWorkerInfo(UniquePtr<FileWorker> new_file_worker) {
     }
 }
 
-BufferHandle BufferObj::Load(bool no_mmap) {
+BufferHandle BufferObj::Load() {
     buffer_mgr_->AddRequestCount();
     std::unique_lock<std::mutex> locker(w_locker_);
-    if (type_ == BufferType::kMmap && no_mmap) {
-        if (rc_ > 0) {
-            String error_message = fmt::format("Buffer {} is mmaped, but has {} references", GetFilename(), rc_);
-            UnrecoverableError(error_message);
-        }
-        type_ = BufferType::kPersistent;
-    }
     if (type_ == BufferType::kMmap) {
         switch (status_) {
+            case BufferStatus::kUnloaded:
             case BufferStatus::kLoaded: {
                 break;
             }
@@ -353,7 +347,7 @@ void BufferObj::UnloadInner() {
             type_ = BufferType::kMmap;
         } else if (type_ == BufferType::kMmap) {
             file_worker_->MmapNotNeed();
-            status_ = BufferStatus::kFreed;
+            status_ = BufferStatus::kUnloaded;
         } else {
             buffer_mgr_->PushGCQueue(this);
             status_ = BufferStatus::kUnloaded;
