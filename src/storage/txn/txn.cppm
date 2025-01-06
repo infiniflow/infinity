@@ -101,6 +101,8 @@ public:
 
     void Rollback();
 
+    void PutDeltaOps();
+
     // Database OPs
     Status CreateDatabase(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
 

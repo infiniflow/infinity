@@ -247,13 +247,13 @@ bool TxnManager::Stopped() { return !is_running_.load(); }
 
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp commit_ts = txn->Commit();
-    this->CleanupTxn(txn);
+    this->CleanupTxn(txn, true);
     return commit_ts;
 }
 
 void TxnManager::RollBackTxn(Txn *txn) {
     txn->Rollback();
-    this->CleanupTxn(txn);
+    this->CleanupTxn(txn, false);
 }
 
 SizeT TxnManager::ActiveTxnCount() {
@@ -331,7 +331,7 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
     return least_ts;
 }
 
-void TxnManager::CleanupTxn(Txn *txn) {
+void TxnManager::CleanupTxn(Txn *txn, bool commit) {
     TxnType txn_type = txn->GetTxnType();
     TransactionID txn_id = txn->TxnID();
     switch (txn_type) {
@@ -384,6 +384,9 @@ void TxnManager::CleanupTxn(Txn *txn) {
 
                 if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
                     max_committed_ts_ = commit_ts;
+                }
+                if (commit) {
+                    txn->PutDeltaOps();
                 }
             }
             break;
