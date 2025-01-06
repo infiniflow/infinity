@@ -480,10 +480,14 @@ SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
     return block_snapshot_info;
 }
 
-void BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts, bool &flush_column, bool &flush_version, bool check_commit) const {
+void BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts, bool &flush_column, bool &flush_version, bool check_commit, bool need_lock) const {
     // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
     flush_column = false;
     flush_version = false;
+    std::shared_lock lock(rw_locker_, std::defer_lock);
+    if (need_lock) {
+        lock.lock();
+    }
     if (check_commit && commit_ts_ > checkpoint_ts) {
         return;
     }
@@ -519,7 +523,7 @@ void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_cou
 bool BlockEntry::FlushVersionNoLock(TxnTimeStamp checkpoint_ts, bool check_commit) {
     bool flush_column = false;
     bool flush_version = false;
-    CheckFlush(checkpoint_ts, flush_column, flush_version, check_commit);
+    CheckFlush(checkpoint_ts, flush_column, flush_version, check_commit, false);
     if (flush_version) {
         version_buffer_object_->Save(VersionFileWorkerSaveCtx(checkpoint_ts));
     }
