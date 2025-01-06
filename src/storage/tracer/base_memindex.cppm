@@ -23,8 +23,10 @@ namespace infinity {
 
 struct TableIndexEntry;
 
-export class BaseMemIndex {
+export class BaseMemIndex : public EnableSharedFromThis<BaseMemIndex> {
 public:
+    virtual ~BaseMemIndex() = default;
+
     virtual MemIndexTracerInfo GetInfo() const = 0;
 
     virtual TableIndexEntry *table_index_entry() const = 0;
