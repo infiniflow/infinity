@@ -210,8 +210,8 @@ void FileWorker::CleanupTempFile() const {
 }
 
 void FileWorker::Mmap() {
-    if (mmap_addr_ != nullptr) {
-        return;
+    if (mmap_addr_ != nullptr || mmap_data_ != nullptr) {
+        this->Munmap();
     }
     auto [defer_fn, read_path] = GetFilePathInner(false);
     bool use_object_cache = persistence_manager_ != nullptr;

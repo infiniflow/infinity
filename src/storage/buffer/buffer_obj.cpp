@@ -315,12 +315,20 @@ void BufferObj::LoadInner() {
     ++rc_;
 }
 
-void BufferObj::GetMutPointer() {
+void *BufferObj::GetMutPointer() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kTemp) {
         buffer_mgr_->RemoveTemp(this);
+    } else if (type_ == BufferType::kMmap) {
+        bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
+        if (!free_success) {
+            String error_message = "Out of memory.";
+            UnrecoverableError(error_message);
+        }
+        file_worker_->ReadFromFile(false);
     }
     type_ = BufferType::kEphemeral;
+    return file_worker_->GetData();
 }
 
 void BufferObj::UnloadInner() {
