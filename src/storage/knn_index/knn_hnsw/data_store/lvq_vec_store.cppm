@@ -230,6 +230,18 @@ public:
         return meta;
     }
 
+    static This LoadFromPtr(const char *&ptr) {
+        SizeT dim = ReadBufAdv<SizeT>(ptr);
+        This meta(dim);
+        std::memcpy(meta.mean_.get(), ptr, sizeof(MeanType) * dim);
+        ptr += sizeof(MeanType) * dim;
+        if constexpr (!std::is_same_v<GlobalCacheType, Tuple<>>) {
+            std::memcpy(&meta.global_cache_, ptr, sizeof(GlobalCacheType));
+            ptr += sizeof(GlobalCacheType);
+        }
+        return meta;
+    }
+
     template <typename LabelType, DataIteratorConcept<const DataType *, LabelType> Iterator>
     void Optimize(Iterator &&query_iter, const Vector<Pair<Inner *, SizeT>> &inners, SizeT &mem_usage) {
         auto new_mean = MakeUnique<MeanType[]>(this->dim_);
@@ -374,6 +386,14 @@ public:
         assert(cur_vec_num <= max_vec_num);
         This ret(max_vec_num, meta);
         file_handle.Read(ret.ptr_.get(), cur_vec_num * meta.compress_data_size());
+        mem_usage += max_vec_num * meta.compress_data_size();
+        return ret;
+    }
+
+    static This LoadFromPtr(const char *&ptr, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+        This ret(max_vec_num, meta);
+        std::memcpy(ret.ptr_.get(), ptr, cur_vec_num * meta.compress_data_size());
+        ptr += cur_vec_num * meta.compress_data_size();
         mem_usage += max_vec_num * meta.compress_data_size();
         return ret;
     }

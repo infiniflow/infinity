@@ -152,6 +152,14 @@ public:
         return ret;
     }
 
+    static This LoadFromPtr(const char *&ptr, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+        This ret(max_vec_num, meta);
+        std::memcpy(ret.ptr_.get(), ptr, sizeof(DataType) * cur_vec_num * meta.dim());
+        ptr += sizeof(DataType) * cur_vec_num * meta.dim();
+        mem_usage += sizeof(DataType) * max_vec_num * meta.dim();
+        return ret;
+    }
+
     void SetVec(SizeT idx, const DataType *vec, const Meta &meta, SizeT &mem_usage) { Copy(vec, vec + meta.dim(), GetVecMut(idx, meta)); }
 
 private:

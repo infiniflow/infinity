@@ -383,6 +383,32 @@ public:
         return graph_store;
     }
 
+    static GraphStoreInner LoadFromPtr(const char *&ptr, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
+        SizeT layer_sum = ReadBufAdv<SizeT>(ptr);
+        GraphStoreInner graph_store(max_vertex, meta, cur_vertex_n);
+        const char *graph = ptr;
+        ptr += cur_vertex_n * meta.level0_size();
+        std::memcpy(graph_store.graph_.get(), graph, cur_vertex_n * meta.level0_size());
+
+        auto loaded_layers = MakeUnique<char[]>(layer_sum * meta.levelx_size());
+        char *loaded_layers_p = loaded_layers.get();
+        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
+            VertexL0 *v = graph_store.GetLevel0(vertex_i, meta);
+            if (v->layer_n_) {
+                std::memcpy(loaded_layers_p, ptr, meta.levelx_size() * v->layer_n_);
+                v->layers_p_ = loaded_layers_p;
+                loaded_layers_p += meta.levelx_size() * v->layer_n_;
+                ptr += meta.levelx_size() * v->layer_n_;
+            } else {
+                v->layers_p_ = nullptr;
+            }
+        }
+        graph_store.loaded_layers_ = std::move(loaded_layers);
+
+        mem_usage += max_vertex * meta.level0_size() + layer_sum * meta.levelx_size();
+        return graph_store;
+    }
+
     void AddVertex(VertexType vertex_i, i32 layer_n, const GraphStoreMeta &meta, SizeT &mem_usage) {
         VertexL0 *v = GetLevel0(vertex_i, meta);
         v->neighbor_n_ = 0;

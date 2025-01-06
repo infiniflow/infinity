@@ -140,7 +140,11 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = IndexT::Load(*file_handle_).release();
+                    if (from_spill) {
+                        index = IndexT::Load(*file_handle_).release();
+                    } else {
+                        index = IndexT::LoadFromPtr(*file_handle_, file_size).release();
+                    }
                 } else {
                     UnrecoverableError("Invalid index type.");
                 }

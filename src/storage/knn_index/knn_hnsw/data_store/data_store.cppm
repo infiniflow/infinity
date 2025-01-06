@@ -215,6 +215,24 @@ public:
         return ret;
     }
 
+    static This LoadFromPtr(const char *&ptr) {
+        SizeT cur_vec_num = ReadBufAdv<SizeT>(ptr);
+        VecStoreMeta vec_store_meta = VecStoreMeta::LoadFromPtr(ptr);
+        GraphStoreMeta graph_store_meta = GraphStoreMeta::LoadFromPtr(ptr);
+
+        SizeT chunk_size = 1;
+        while (chunk_size < cur_vec_num) {
+            chunk_size <<= 1;
+        }
+        This ret = This(chunk_size, 1 /*max_chunk_n*/, std::move(vec_store_meta), std::move(graph_store_meta));
+        ret.cur_vec_num_ = cur_vec_num;
+
+        SizeT mem_usage = 0;
+        ret.inners_[0] = Inner::LoadFromPtr(ptr, cur_vec_num, chunk_size, ret.vec_store_meta_, ret.graph_store_meta_, mem_usage);
+        ret.mem_usage_.store(mem_usage);
+        return ret;
+    }
+
     void SetGraph(GraphStoreMeta &&graph_meta, Vector<GraphStoreInner<OwnMem>> &&graph_inners) {
         this->graph_store_meta_ = std::move(graph_meta);
         for (SizeT i = 0; i < graph_inners.size(); ++i) {
@@ -612,6 +630,20 @@ public:
         auto graph_store_iner = GraphStoreInner::Load(file_handle, cur_vec_num, chunk_size, graph_store_meta, mem_usage);
         This ret(chunk_size, std::move(vec_store_inner), std::move(graph_store_iner));
         file_handle.Read(ret.labels_.get(), sizeof(LabelType) * cur_vec_num);
+        return ret;
+    }
+
+    static This LoadFromPtr(const char *&ptr,
+                            SizeT cur_vec_num,
+                            SizeT chunk_size,
+                            VecStoreMeta &vec_store_meta,
+                            GraphStoreMeta &graph_store_meta,
+                            SizeT &mem_usage) {
+        auto vec_store_inner = VecStoreInner::LoadFromPtr(ptr, cur_vec_num, chunk_size, vec_store_meta, mem_usage);
+        auto graph_store_inner = GraphStoreInner::LoadFromPtr(ptr, cur_vec_num, chunk_size, graph_store_meta, mem_usage);
+        This ret(chunk_size, std::move(vec_store_inner), std::move(graph_store_inner));
+        std::memcpy(ret.labels_.get(), ptr, sizeof(LabelType) * cur_vec_num);
+        ptr += sizeof(LabelType) * cur_vec_num;
         return ret;
     }
 

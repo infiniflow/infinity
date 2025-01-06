@@ -484,6 +484,20 @@ public:
         return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance));
     }
 
+    static UniquePtr<This> LoadFromPtr(LocalFileHandle &file_handle, SizeT size) {
+        auto buffer = MakeUnique<char []>(size);
+        file_handle.Read(buffer.get(), size);
+        const char *ptr = buffer.get();
+        SizeT M = ReadBufAdv<SizeT>(ptr);
+        SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
+        auto data_store = DataStore::LoadFromPtr(ptr);
+        Distance distance(data_store.dim());
+        if (SizeT diff = ptr - buffer.get(); diff != size) {
+            UnrecoverableError("LoadFromPtr failed");
+        }
+        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance));
+    }
+
     UniquePtr<KnnHnsw<CompressVecStoreType, LabelType>> CompressToLVQ() && {
         if constexpr (std::is_same_v<VecStoreType, CompressVecStoreType>) {
             return MakeUnique<This>(std::move(*this));
