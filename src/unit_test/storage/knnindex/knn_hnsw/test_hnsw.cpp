@@ -184,30 +184,10 @@ public:
         }
         {
             SizeT file_size = VirtualStore::GetFileSize(filepath);
-#define USE_MMAP
-#ifdef USE_MMAP
-            unsigned char *data_ptr = nullptr;
-            int ret = VirtualStore::MmapFile(filepath, data_ptr, file_size);
-            if (ret < 0) {
-                UnrecoverableError("mmap failed");
-            }
-            const char *ptr = reinterpret_cast<const char *>(data_ptr);
-#else
             auto [file_handle, status] = VirtualStore::Open(filepath, FileAccessMode::kRead);
-            if (!status.ok()) {
-                UnrecoverableError(status.message());
-            }
-            auto buffer = MakeUnique<char[]>(file_size);
-            file_handle->Read(buffer.get(), file_size);
-            const char *ptr = buffer.get();
-#endif
-            auto hnsw_index = Hnsw::LoadFromPtr(ptr, file_size);
+            auto hnsw_index = Hnsw::LoadFromPtr(*file_handle, file_size);
 
             test_func(hnsw_index);
-
-#ifdef USE_MMAP
-            VirtualStore::MunmapFile(filepath);
-#endif
         }
     }
 
