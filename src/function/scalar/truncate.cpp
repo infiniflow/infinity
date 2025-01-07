@@ -39,7 +39,7 @@ inline void TruncateFunction::Run(FloatT left, IntegerT right, VarcharT &result,
     std::string truncated_str;
     if (right < static_cast<IntegerT>(0) || std::isnan(left) || std::isinf(left) || std::isnan(right) || std::isinf(right)) {
         truncated_str = str;
-    } else if (right > static_cast<IntegerT>(7)  || str.size() - i < static_cast<size_t>(right)) {
+    } else if (right > static_cast<IntegerT>(7)  || str.size() - i < static_cast<size_t>(right) || right == static_cast<IntegerT>(0)) {
         truncated_str = str.substr(0, i);
     } else {
         truncated_str = str.substr(0, i + right);
@@ -58,8 +58,7 @@ inline void TruncateFunction::Run(DoubleT left, IntegerT right, VarcharT &result
     size_t i = str.find_first_of('.');
     if (right < static_cast<IntegerT>(0) || std::isnan(left) || std::isinf(left) || std::isnan(right) || std::isinf(right)) {
         truncated_str = str;
-    } else if (right > static_cast<IntegerT>(17) || str.size() - i < static_cast<size_t>(right)) {
-    
+    } else if (right > static_cast<IntegerT>(17) || str.size() - i < static_cast<size_t>(right) || right == static_cast<IntegerT>(0)) {
         truncated_str = str.substr(0, i);
     } else {
         truncated_str = str.substr(0, i + right);
