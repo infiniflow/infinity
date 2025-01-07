@@ -8,6 +8,6 @@ namespace infinity {
 
 class Catalog;
 
-export void RegisterSqrtFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterStrlenFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 } // namespace infinity
