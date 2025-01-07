@@ -202,7 +202,7 @@ public:
 
     SizeT GetStorageSize() const;
 
-    void CheckFlush(TxnTimeStamp ts, bool &flush_column, bool &flush_version, bool check_commit = true) const;
+    void CheckFlush(TxnTimeStamp ts, bool &flush_column, bool &flush_version, bool check_commit, bool need_lock) const;
 
     bool TryToMmap();
 

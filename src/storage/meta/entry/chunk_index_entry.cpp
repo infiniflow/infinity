@@ -276,7 +276,9 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                           index_base,
                                                           column_def,
                                                           buffer_mgr->persistence_manager());
-            chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            BufferObj *buffer_obj = buffer_mgr->GetBufferObject(std::move(file_worker));
+            buffer_obj->ToMmap();
+            chunk_index_entry->buffer_obj_ = buffer_obj;
             break;
         }
         case IndexType::kFullText: {
@@ -458,6 +460,7 @@ void ChunkIndexEntry::SaveIndexFile() {
     }
     buffer_obj_->Save();
     switch (segment_index_entry_->table_index_entry()->index_base()->index_type_) {
+        case IndexType::kHnsw:
         case IndexType::kBMP: {
             buffer_obj_->ToMmap();
             break;

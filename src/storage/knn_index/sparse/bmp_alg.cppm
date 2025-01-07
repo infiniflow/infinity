@@ -220,6 +220,7 @@ private:
         : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids)) {}
 
 public:
+    BMPAlg() = default;
     BMPAlg(SizeT term_num, SizeT block_size) : BMPAlgBase<DataType, IdxType, CompressType, BMPOwnMem::kTrue>(term_num, block_size) {}
 
     void AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id, bool lck = true) {
@@ -363,6 +364,21 @@ public:
             UnrecoverableError(fmt::format("BMPAlg::SaveToPtr: write_n != size: {} != {}", write_n, size));
         }
         file_handle.Append(buffer.get(), size);
+    }
+
+    static BMPAlg<DataType, IdxType, CompressType> LoadFromPtr(LocalFileHandle &file_handle, SizeT file_size) {
+        auto buffer = MakeUnique<char[]>(file_size);
+        file_handle.Read(buffer.get(), file_size);
+        const char *p = buffer.get();
+        auto bm_ivt = BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>::ReadFromPtr(p);
+        auto block_fwd = BlockFwd<DataType, IdxType, BMPOwnMem::kTrue>::LoadFromPtr(p);
+        SizeT doc_num = ReadBufAdvAligned<SizeT>(p);
+        const BMPDocID *doc_ids_ptr = ReadBufVecAdvAligned<BMPDocID>(p, doc_num);
+        Vector<BMPDocID> doc_ids(doc_ids_ptr, doc_ids_ptr + doc_num);
+        if (SizeT(p - buffer.get()) != file_size) {
+            UnrecoverableError(fmt::format("BMPAlg::LoadFromPtr: p - buffer.get() != file_size: {} != {}", p - buffer.get(), file_size));
+        }
+        return BMPAlg(std::move(bm_ivt), std::move(block_fwd), std::move(doc_ids));
     }
 
 private:

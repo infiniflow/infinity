@@ -113,7 +113,7 @@ public:
 
     void AddChunkIndexStore(TableIndexEntry *table_index_entry, ChunkIndexEntry *chunk_index_entry);
 
-    TxnIndexStore *GetIndexStore(TableIndexEntry *table_index_entry);
+    TxnIndexStore *GetIndexStore(TableIndexEntry *table_index_entry, bool need_lock);
 
     void DropIndexStore(TableIndexEntry *table_index_entry);
 
@@ -151,7 +151,7 @@ public:
     void MaintainCompactionAlg();
 
 public: // Setter, Getter
-    const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
+    Pair<std::shared_lock<std::shared_mutex>, const HashMap<String, UniquePtr<TxnIndexStore>> &> txn_indexes_store() const;
 
     const HashMap<SegmentID, TxnSegmentStore> &txn_segments() const { return txn_segments_store_; }
 
@@ -178,7 +178,7 @@ public: // Setter, Getter
     bool AddedTxnNum() const { return added_txn_num_; }
 
 private:
-    std::mutex mtx_{};
+    mutable std::shared_mutex txn_table_store_mtx_{};
 
     HashMap<SegmentID, TxnSegmentStore> txn_segments_store_{};
     Vector<SegmentEntry *> flushed_segments_{};

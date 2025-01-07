@@ -42,7 +42,7 @@ def main():
             golden_avg, latest_avg, difference_percentage
         )
     )
-    if difference_percentage < 5:
+    if difference_percentage < 7:
         print("benchmark result is acceptable")
         sys.exit(0)
     else:

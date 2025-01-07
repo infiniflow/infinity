@@ -120,9 +120,9 @@ export template <typename DataType, typename CompressType>
 class LVQL2Dist {
 public:
     using This = LVQL2Dist<DataType, CompressType>;
-    using VecStoreMeta = LVQVecStoreMeta<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
-    using StoreType = typename VecStoreMeta::StoreType;
-    using DistanceType = typename VecStoreMeta::DistanceType;
+    using VecStoreMetaType = LVQVecStoreMetaType<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
+    using StoreType = typename VecStoreMetaType::StoreType;
+    using DistanceType = typename VecStoreMetaType::DistanceType;
 
 private:
     using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);
@@ -153,6 +153,7 @@ public:
         }
     }
 
+    template <typename VecStoreMeta>
     DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
         SizeT dim = vec_store_meta.dim();
         i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);

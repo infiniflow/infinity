@@ -121,7 +121,7 @@ bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
     return true;
 }
 
-void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
+void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
@@ -135,7 +135,11 @@ void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
                 if constexpr (IndexT::kOwnMem) {
-                    index = new IndexT(IndexT::Load(*file_handle_));
+                    if (from_spill) {
+                        index = new IndexT(IndexT::Load(*file_handle_));
+                    } else {
+                        index = new IndexT(IndexT::LoadFromPtr(*file_handle_, file_size));
+                    }
                 } else {
                     UnrecoverableError("BMPIndexFileWorker::ReadFromFileImpl: index does not own memory");
                 }

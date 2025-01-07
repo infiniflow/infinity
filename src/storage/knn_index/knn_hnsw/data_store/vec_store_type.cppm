@@ -42,11 +42,13 @@ class PlainCosVecStoreType {
 public:
     using DataType = DataT;
     using CompressType = void;
+    template <bool OwnMem>
     using Meta = PlainVecStoreMeta<DataType>;
-    using Inner = PlainVecStoreInner<DataType>;
+    template <bool OwnMem>
+    using Inner = PlainVecStoreInner<DataType, OwnMem>;
     using QueryVecType = const DataType *;
-    using StoreType = typename Meta::StoreType;
-    using QueryType = typename Meta::QueryType;
+    using StoreType = typename Meta<true>::StoreType;
+    using QueryType = typename Meta<true>::QueryType;
     using Distance = PlainCosDist<DataType>;
 
     static constexpr bool HasOptimize = false;
@@ -62,11 +64,13 @@ class PlainL2VecStoreType {
 public:
     using DataType = DataT;
     using CompressType = void;
+    template <bool OwnMem>
     using Meta = PlainVecStoreMeta<DataType>;
-    using Inner = PlainVecStoreInner<DataType>;
+    template <bool OwnMem>
+    using Inner = PlainVecStoreInner<DataType, OwnMem>;
     using QueryVecType = const DataType *;
-    using StoreType = typename Meta::StoreType;
-    using QueryType = typename Meta::QueryType;
+    using StoreType = typename Meta<true>::StoreType;
+    using QueryType = typename Meta<true>::QueryType;
     using Distance = PlainL2Dist<DataType>;
 
     static constexpr bool HasOptimize = false;
@@ -82,11 +86,13 @@ class PlainIPVecStoreType {
 public:
     using DataType = DataT;
     using CompressType = void;
+    template <bool OwnMem>
     using Meta = PlainVecStoreMeta<DataType>;
-    using Inner = PlainVecStoreInner<DataType>;
+    template <bool OwnMem>
+    using Inner = PlainVecStoreInner<DataType, OwnMem>;
     using QueryVecType = const DataType *;
-    using StoreType = typename Meta::StoreType;
-    using QueryType = typename Meta::QueryType;
+    using StoreType = typename Meta<true>::StoreType;
+    using QueryType = typename Meta<true>::QueryType;
     using Distance = PlainIPDist<DataType>;
 
     static constexpr bool HasOptimize = false;
@@ -102,11 +108,13 @@ class SparseIPVecStoreType {
 public:
     using DataType = DataT;
     using CompressType = void;
+    template <bool OwnMem>
     using Meta = SparseVecStoreMeta<DataT, IndexT>;
+    template <bool OwnMem>
     using Inner = SparseVecStoreInner<DataT, IndexT>;
     using QueryVecType = SparseVecRef<DataT, IndexT>;
-    using StoreType = typename Meta::StoreType;
-    using QueryType = typename Meta::QueryType;
+    using StoreType = typename Meta<true>::StoreType;
+    using QueryType = typename Meta<true>::QueryType;
     using Distance = SparseIPDist<DataT, IndexT>;
 
     static constexpr bool HasOptimize = false;
@@ -122,11 +130,14 @@ class LVQCosVecStoreType {
 public:
     using DataType = DataT;
     using CompressType = CompressT;
-    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
-    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
+    template <bool OwnMem>
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCosCache<DataType, CompressType>, OwnMem>;
+    template <bool OwnMem>
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCosCache<DataType, CompressType>, OwnMem>;
     using QueryVecType = const DataType *;
-    using StoreType = typename Meta::StoreType;
-    using QueryType = typename Meta::QueryType;
+    using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
+    using StoreType = typename MetaType::StoreType;
+    using QueryType = typename MetaType::QueryType;
     using Distance = LVQCosDist<DataType, CompressType>;
 
     static constexpr bool HasOptimize = true;
@@ -142,11 +153,14 @@ class LVQL2VecStoreType {
 public:
     using DataType = DataT;
     using CompressType = CompressT;
-    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
-    using Inner = LVQVecStoreInner<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
+    template <bool OwnMem>
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQL2Cache<DataType, CompressType>, OwnMem>;
+    template <bool OwnMem>
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQL2Cache<DataType, CompressType>, OwnMem>;
     using QueryVecType = const DataType *;
-    using StoreType = typename Meta::StoreType;
-    using QueryType = typename Meta::QueryType;
+    using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
+    using StoreType = typename MetaType::StoreType;
+    using QueryType = typename MetaType::QueryType;
     using Distance = LVQL2Dist<DataType, CompressType>;
 
     static constexpr bool HasOptimize = true;
@@ -162,11 +176,14 @@ class LVQIPVecStoreType {
 public:
     using DataType = DataT;
     using CompressType = CompressT;
-    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQIPCache<DataType, CompressType>>;
-    using Inner = LVQVecStoreInner<DataType, CompressType, LVQIPCache<DataType, CompressType>>;
+    template <bool OwnMem>
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQIPCache<DataType, CompressType>, OwnMem>;
+    template <bool OwnMem>
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQIPCache<DataType, CompressType>, OwnMem>;
     using QueryVecType = const DataType *;
-    using StoreType = typename Meta::StoreType;
-    using QueryType = typename Meta::QueryType;
+    using MetaType = LVQVecStoreMetaType<DataType, CompressType, LVQIPCache<DataType, CompressType>>;
+    using StoreType = typename MetaType::StoreType;
+    using QueryType = typename MetaType::QueryType;
     using Distance = LVQIPDist<DataType, CompressType>;
 
     static constexpr bool HasOptimize = true;

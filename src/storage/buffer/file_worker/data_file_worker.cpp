@@ -98,7 +98,7 @@ bool DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const
     return true;
 }
 
-void DataFileWorker::ReadFromFileImpl(SizeT file_size) {
+void DataFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
 
     if (file_size < sizeof(u64) * 3) {
         Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
@@ -116,7 +116,7 @@ void DataFileWorker::ReadFromFileImpl(SizeT file_size) {
         RecoverableError(status);
     }
     if (magic_number != 0x00dd3344) {
-        Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", nbytes1));
+        Status status = Status::DataIOError(fmt::format("Read magic error, {} != 0x00dd3344.", magic_number));
         RecoverableError(status);
     }
 
@@ -153,7 +153,7 @@ bool DataFileWorker::ReadFromMmapImpl(const void *p, SizeT file_size) {
     const char *ptr = static_cast<const char *>(p);
     u64 magic_number = ReadBufAdv<u64>(ptr);
     if (magic_number != 0x00dd3344) {
-        Status status = Status::DataIOError(fmt::format("Read magic number which length isn't {}.", magic_number));
+        Status status = Status::DataIOError(fmt::format("Read magic error: {} != 0x00dd3344.", magic_number));
         RecoverableError(status);
     }
     u64 buffer_size = ReadBufAdv<u64>(ptr);
