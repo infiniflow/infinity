@@ -58,6 +58,16 @@ inline std::string ReadBuf<std::string>(const char *buf) {
 }
 
 template <>
+inline std::tuple<> ReadBuf<std::tuple<>>(const char *buf) {
+    return {};
+}
+
+template <>
+inline std::tuple<> ReadBufAdv<std::tuple<>>(const char *&buf) {
+    return {};
+}
+
+template <>
 inline std::string ReadBufAdv<std::string>(const char *&buf) {
     int32_t size = ReadBufAdv<int32_t>(buf);
     std::string str(buf, size);
@@ -100,6 +110,12 @@ inline void WriteBufAdv<std::string>(char *&buf, const std::string &value) {
     memcpy(buf, value.c_str(), len);
     buf += len;
 }
+
+template <>
+inline void WriteBuf<std::tuple<>>(char *const buf, const std::tuple<> &) {}
+
+template <>
+inline void WriteBufAdv<std::tuple<>>(char *&buf, const std::tuple<> &) {}
 
 template <typename T>
 inline void WriteBufVecAdv(char *&buf, const T *data, size_t size) {

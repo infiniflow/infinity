@@ -43,6 +43,7 @@ private:
     SparseVecStoreMeta(SizeT max_dim) : max_dim_(max_dim) {}
 
 public:
+    SparseVecStoreMeta() = default;
     static This Make(SizeT max_dim) { return This(max_dim); }
     static This Make(SizeT max_dim, bool) { return This(max_dim); }
 

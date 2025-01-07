@@ -758,18 +758,23 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                         if constexpr (std::is_same_v<T, std::nullptr_t>) {
                             UnrecoverableError("Invalid index type.");
                         } else {
-                            using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
-                            if (params->compress_to_lvq) {
-                                if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
-                                    UnrecoverableError("Invalid index type.");
-                                } else {
-                                    auto *p = std::move(*index).CompressToLVQ().release();
-                                    delete index;
-                                    *abstract_hnsw = p;
+                            using IndexT = typename std::remove_pointer_t<T>;
+                            if constexpr (IndexT::kOwnMem) {
+                                using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
+                                if (params->compress_to_lvq) {
+                                    if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
+                                        UnrecoverableError("Invalid index type.");
+                                    } else {
+                                        auto *p = std::move(*index).CompressToLVQ().release();
+                                        delete index;
+                                        *abstract_hnsw = p;
+                                    }
                                 }
-                            }
-                            if (params->lvq_avg) {
-                                index->Optimize();
+                                if (params->lvq_avg) {
+                                    index->Optimize();
+                                }
+                            } else {
+                                UnrecoverableError("Invalid index type.");
                             }
                         }
                     },
@@ -778,7 +783,7 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
 
             const auto [chunk_index_entries, memory_index_entry] = this->GetHnswIndexSnapshot();
             for (const auto &chunk_index_entry : chunk_index_entries) {
-                BufferHandle buffer_handle = chunk_index_entry->GetIndex();
+                BufferHandle buffer_handle = chunk_index_entry->GetBufferObj()->Load();
                 auto *abstract_hnsw = reinterpret_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
                 optimize_index(abstract_hnsw);
                 chunk_index_entry->SaveIndexFile();
@@ -920,11 +925,15 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                         return;
                     } else {
                         using IndexT = std::decay_t<decltype(*index)>;
-                        using DataType = typename IndexT::DataType;
-                        CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
-                        HnswInsertConfig insert_config;
-                        insert_config.optimize_ = true;
-                        index->InsertVecs(std::move(iter), insert_config);
+                        if constexpr (IndexT::kOwnMem) {
+                            using DataType = typename IndexT::DataType;
+                            CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
+                            HnswInsertConfig insert_config;
+                            insert_config.optimize_ = true;
+                            index->InsertVecs(std::move(iter), insert_config);
+                        } else {
+                            UnrecoverableError("Invalid index type.");
+                        }
                     }
                 },
                 abstract_hnsw);

@@ -171,13 +171,13 @@ def generate(generate_if_exists: bool, copy_dir: str):
         )
         bmp_knn_slt_file.write("\n")
 
-        # bmp_knn_slt_file.write("statement ok\n")
-        # bmp_knn_slt_file.write(
-        #     "OPTIMIZE {} ON {} WITH (bp_reorder, topk = {});\n".format(
-        #         index_name, table_name, topk
-        #     )
-        # )
-        # bmp_knn_slt_file.write("\n")
+        bmp_knn_slt_file.write("statement ok\n")
+        bmp_knn_slt_file.write(
+            "OPTIMIZE {} ON {} WITH (bp_reorder, topk = {});\n".format(
+                index_name, table_name, topk
+            )
+        )
+        bmp_knn_slt_file.write("\n")
 
         for i in range(0, query_n):
             bmp_knn_slt_file.write("query I\n")

@@ -31,6 +31,7 @@ public:
     using DistanceType = typename VecStoreMeta::DistanceType;
 
 public:
+    SparseIPDist() = default;
     SparseIPDist(SizeT dim) {}
 
     DataType operator()(const SparseVecRef &v1, const SparseVecRef &v2, const VecStoreMeta &vec_store_meta) const {
