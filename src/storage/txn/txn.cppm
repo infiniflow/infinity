@@ -63,6 +63,7 @@ class CatalogDeltaOperation;
 class BaseTableRef;
 enum class CompactStatementType;
 struct SegmentIndexEntry;
+struct AddDeltaEntryTask;
 
 export class Txn : public EnableSharedFromThis<Txn> {
 public:
@@ -101,7 +102,7 @@ public:
 
     void Rollback();
 
-    void PutDeltaOps();
+    SharedPtr<AddDeltaEntryTask> MakeAddDeltaEntryTask();
 
     // Database OPs
     Status CreateDatabase(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);

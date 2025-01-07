@@ -687,11 +687,12 @@ void Txn::Rollback() {
     LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_context_ptr_->txn_id_));
 }
 
-void Txn::PutDeltaOps() {
+SharedPtr<AddDeltaEntryTask> Txn::MakeAddDeltaEntryTask() {
     if (!txn_delta_ops_entry_->operations().empty()) {
         LOG_TRACE(txn_delta_ops_entry_->ToStringSimple());
-        InfinityContext::instance().storage()->bg_processor()->Submit(MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_)));
+        return MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_));
     }
+    return nullptr;
 }
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) {

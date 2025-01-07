@@ -34,6 +34,7 @@ import wal_manager;
 import defer_op;
 import infinity_context;
 import global_resource_usage;
+import bg_task;
 
 namespace infinity {
 
@@ -363,6 +364,7 @@ void TxnManager::CleanupTxn(Txn *txn, bool commit) {
                     UnrecoverableError(error_message);
                 }
             }
+            SharedPtr<AddDeltaEntryTask> add_delta_entry_task = txn->MakeAddDeltaEntryTask();
             {
                 // cleanup the txn from committing_txn and txm_map
                 auto commit_ts = txn->CommitTS();
@@ -381,13 +383,12 @@ void TxnManager::CleanupTxn(Txn *txn, bool commit) {
                     String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
                     UnrecoverableError(error_message);
                 }
-
                 if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
                     max_committed_ts_ = commit_ts;
                 }
-                if (commit) {
-                    txn->PutDeltaOps();
-                }
+            }
+            if (commit && add_delta_entry_task) {
+                InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
             }
             break;
         }
