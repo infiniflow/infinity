@@ -1023,3 +1023,34 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_select_round" + suffix)
         assert res.error_code == ErrorCode.OK
+    
+    def test_select_truncate(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_truncate" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_truncate" + suffix,
+                            {"c1": {"type": "integer"},
+                             "c2": {"type": "double"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_truncate" + suffix)
+        table_obj.insert(
+            [{"c1": '1', "c2": '2.14'}, {"c1": '1', "c2": '-2.14'}, {"c1": '2', "c2": '2.53'}, {"c1": '0', "c2": '-2.5'}])
+
+        res, extra_res = table_obj.output(["truncate(c2, c1)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'truncate(c2, c1)': (2.1, -2.1, 2, -2.5)})
+                                      .astype({'truncate(c2, c1)': dtype('double')}))
+
+        # res, extra_res = table_obj.output(["c1", "ceil(c2)"]).to_df()
+        # print(res)
+        # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
+        #                                                  'ceil(c2)': (3, -2, 3, -2)})
+        #                               .astype({'c1': dtype('int32'), 'ceil(c2)': dtype('double')}))
+
+        # res, extra_res = table_obj.output(["c1", "floor(c2)"]).to_df()
+        # print(res)
+        # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 4, 9, 16),
+        #                                                  'floor(c2)': (2, -3, 2, -3)})
+        #                               .astype({'c1': dtype('int32'), 'floor(c2)': dtype('double')}))
+
+        res = db_obj.drop_table("test_select_truncate" + suffix)
+        assert res.error_code == ErrorCode.OK
+
