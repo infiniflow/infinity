@@ -1162,7 +1162,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     table_index_entry->CreateIndexPrepare(base_table_ref.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
-    for (const auto &[index_name, txn_index_store] : txn_store->txn_indexes_store()) {
+    for (const auto &[lock, txn_indexes_store] = txn_store->txn_indexes_store(); const auto &[index_name, txn_index_store] : txn_indexes_store) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts, true /*is_replay*/);
     }
     table_index_entry->Commit(commit_ts);

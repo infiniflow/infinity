@@ -867,7 +867,7 @@ void SegmentIndexEntry::PickCleanup(CleanupScanner *scanner) {
 void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
                                                  SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
                                                  Vector<ChunkIndexEntry *> old_chunks) {
-    TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_);
+    TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_, true);
     chunk_index_entries_.push_back(merged_chunk_index_entry);
     txn_index_store->optimize_data_.emplace_back(this, merged_chunk_index_entry.get(), std::move(old_chunks));
 }
@@ -1258,7 +1258,7 @@ Pair<bool, std::function<void()>> SegmentIndexEntry::TrySetOptimizing(Txn *txn) 
     return {true, [this, txn] {
         TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
         TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
-        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_);
+        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_, true);
         txn_index_store->AddSegmentOptimizing(this);
     }};
 }
