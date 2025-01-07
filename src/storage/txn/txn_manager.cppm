@@ -98,7 +98,7 @@ public:
     WalManager *wal_manager() const { return wal_mgr_; }
 
 private:
-    void CleanupTxn(Txn *txn);
+    void CleanupTxn(Txn *txn, bool commit);
 
 public:
     u64 NextSequence() { return ++sequence_; }
