@@ -1652,7 +1652,8 @@ void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *
     }
 }
 
-SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo(Txn* txn_ptr) const {
+SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo(Txn *txn_ptr) const {
+    std::shared_lock lock(rw_locker_);
     SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
     table_snapshot_info->db_name_ = *GetDBName();
     table_snapshot_info->table_name_ = *table_name_;
@@ -1667,6 +1668,19 @@ SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo(Txn* txn_ptr) const {
     for (const auto &segment_pair : segment_map_) {
         SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = segment_pair.second->GetSnapshotInfo();
         table_snapshot_info->segment_snapshots_.emplace(segment_pair.first, segment_snapshot_info);
+    }
+
+    {
+        auto map_guard = this->IndexMetaMap();
+        for (const auto &[index_name, index_meta] : *map_guard) {
+            auto [table_index_entry, status] = index_meta->GetEntryNolock(txn_ptr->TxnID(), txn_ptr->BeginTS());
+            if (!status.ok()) {
+                // Index isn't found.
+                continue;
+            }
+            SharedPtr<TableIndexSnapshotInfo> table_index_snapshot_info = table_index_entry->GetSnapshotInfo(txn_ptr);
+            table_snapshot_info->table_index_snapshots_.emplace(index_name, table_index_snapshot_info);
+        }
     }
     return table_snapshot_info;
 }

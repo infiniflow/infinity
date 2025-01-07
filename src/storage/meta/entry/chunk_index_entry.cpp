@@ -47,6 +47,7 @@ import internal_types;
 import infinity_context;
 import persistence_manager;
 import persist_result_handler;
+import snapshot_info;
 
 namespace infinity {
 
@@ -479,6 +480,13 @@ bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
     }
     TxnTimeStamp begin_ts = txn->BeginTS();
     return begin_ts < deprecate_ts_.load() && BaseEntry::CheckVisible(txn);
+}
+
+SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexEntry::GetSnapshotInfo(Txn *txn_ptr) const {
+    SharedPtr<ChunkIndexSnapshotInfo> chunk_index_snapshot_info = MakeShared<ChunkIndexSnapshotInfo>();
+    chunk_index_snapshot_info->chunk_id_ = chunk_id_;
+    chunk_index_snapshot_info->filename_ = base_name_;
+    return chunk_index_snapshot_info;
 }
 
 } // namespace infinity

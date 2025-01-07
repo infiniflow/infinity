@@ -235,6 +235,14 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
             }
         }
     }
+
+    for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
+        for (const auto &segment_index_snapshot_pair : table_index_snapshot_pair.second->index_by_segment_) {
+            for (const auto &chunk_index_snapshot : segment_index_snapshot_pair.second->chunk_index_snapshots_) {
+                files.emplace_back(VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, chunk_index_snapshot->filename_));
+            }
+        }
+    }
     return files;
 }
 

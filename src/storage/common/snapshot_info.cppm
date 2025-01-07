@@ -60,19 +60,18 @@ export struct SegmentSnapshotInfo {
     nlohmann::json Serialize();
 };
 
-export struct ChunkIndexSnapshot {
+export struct ChunkIndexSnapshotInfo {
     ChunkID chunk_id_;
     String filename_;
 };
 
 export struct SegmentIndexSnapshotInfo {
-    Vector<ChunkIndexSnapshot> chunk_index_snapshots_{};
+    Vector<SharedPtr<ChunkIndexSnapshotInfo>> chunk_index_snapshots_{};
 };
 
 export struct TableIndexSnapshotInfo {
-    String table_index_name_;
-    const SharedPtr<IndexBase> index_base_{};
-    const SharedPtr<String> index_dir_{};
+    SharedPtr<IndexBase> index_base_{};
+    SharedPtr<String> index_dir_{};
     Map<SegmentID, SharedPtr<SegmentIndexSnapshotInfo>> index_by_segment_{};
 };
 
@@ -92,7 +91,7 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     Map<String, SharedPtr<TableIndexSnapshotInfo>> table_index_snapshots_{};
 
     Vector<String> GetFiles() const;
-    void Serialize(const String& save_path);
+    void Serialize(const String &save_path);
 };
 
 } // namespace infinity

@@ -955,7 +955,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                             UnrecoverableError("Invalid index type.");
                         }
                     }
-                    },
+                },
                 abstract_bmp);
             merged_chunk_index_entry = memory_bmp_index->Dump(this, buffer_mgr);
             break;
@@ -1247,11 +1247,11 @@ Pair<bool, std::function<void()>> SegmentIndexEntry::TrySetOptimizing(Txn *txn) 
         return {false, nullptr};
     }
     return {true, [this, txn] {
-        TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
-        TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
-        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_);
-        txn_index_store->AddSegmentOptimizing(this);
-    }};
+                TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
+                TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
+                TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_);
+                txn_index_store->AddSegmentOptimizing(this);
+            }};
 }
 
 void SegmentIndexEntry::ResetOptimizing() { optimizing_.store(false); }
@@ -1273,6 +1273,18 @@ void SegmentIndexEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
     }
     this->deleted_ = true;
     this->deprecate_ts_ = deprecate_ts;
+}
+
+SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexEntry::GetSnapshotInfo(Txn *txn_ptr) const {
+    SharedPtr<SegmentIndexSnapshotInfo> segment_index_snapshot = MakeShared<SegmentIndexSnapshotInfo>();
+
+    std::shared_lock lock(rw_locker_);
+    segment_index_snapshot->chunk_index_snapshots_.reserve(chunk_index_entries_.size());
+    for (const auto &chunk_index_entry : chunk_index_entries_) {
+        auto chunk_index_snapshot_info = chunk_index_entry->GetSnapshotInfo(txn_ptr);
+        segment_index_snapshot->chunk_index_snapshots_.emplace_back(chunk_index_snapshot_info);
+    }
+    return segment_index_snapshot;
 }
 
 } // namespace infinity

@@ -31,7 +31,7 @@ import statement_common;
 import cleanup_scanner;
 import index_file_worker;
 import column_def;
-
+import snapshot_info;
 import block_entry;
 
 namespace infinity {
@@ -180,6 +180,8 @@ public:
     void PickCleanup(CleanupScanner *scanner) override;
 
     void PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner);
+
+    SharedPtr<TableIndexSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
 };
 
 } // namespace infinity
