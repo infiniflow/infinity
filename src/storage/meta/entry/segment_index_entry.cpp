@@ -1139,7 +1139,6 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
     }
     LOG_INFO(fmt::format("AddChunkIndexEntryReplay chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
                          chunk_id,
-
                          deprecate_ts,
                          base_rowid.ToUint64(),
                          row_count,
