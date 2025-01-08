@@ -110,20 +110,22 @@ public:
     }
 
     void CompressTo(const DataType *src, LVQData *dest) const {
+        UniquePtr<DataType[]> normalized;
         if (normalize_) {
+            normalized = MakeUniqueForOverwrite<DataType[]>(this->dim_);
             DataType norm = 0;
-            DataType *src_without_const = const_cast<DataType *>(src);
             for (SizeT j = 0; j < this->dim_; ++j) {
-                norm += src_without_const[j] * src_without_const[j];
+                norm += src[j] * src[j];
             }
             norm = std::sqrt(norm);
             if (norm == 0) {
-                std::fill(dest->compress_vec_, dest->compress_vec_ + this->dim_, 0);
+                std::fill(normalized.get(), normalized.get() + this->dim_, 0);
             } else {
                 for (SizeT j = 0; j < this->dim_; ++j) {
-                    src_without_const[j] /= norm;
+                    normalized[j] = src[j] / norm;
                 }
             }
+            src = normalized.get();
         }
 
         CompressType *compress = dest->compress_vec_;
