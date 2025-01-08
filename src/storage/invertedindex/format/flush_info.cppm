@@ -14,9 +14,16 @@ private:
 public:
     FlushInfo() { Reset(); }
 
-    FlushInfo(const FlushInfo &other) { flush_info_ = other.flush_info_; }
+    FlushInfo(const FlushInfo &other) { flush_info_ = other.flush_info_.load(); }
 
     ~FlushInfo() = default;
+
+    FlushInfo &operator=(const FlushInfo &other) {
+        if (this != &other) {
+            flush_info_ = other.flush_info_.load();
+        }
+        return *this;
+    }
 
     bool IsValidPostingBuffer() const { return GET_BIT_VALUE(MASK_IS_VALID, OFFSET_IS_VALID); }
     void SetIsValidPostingBuffer(bool is_valid) {
@@ -38,7 +45,7 @@ public:
     static const u64 MASK_FLUSH_LENGTH = 0xFFFFFFFE;
     static const u64 MASK_FLUSH_COUNT = 0xFFFFFFFF00000000;
 
-    u64 volatile flush_info_;
+    Atomic<u64> flush_info_{};
 };
 
 } // namespace infinity
