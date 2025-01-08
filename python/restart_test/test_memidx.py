@@ -131,6 +131,59 @@ class TestMemIdx:
     # select count(*) from test_memidx1;
     # # result: 13
 
+    # recover cose hnsw from mmap column
+    def test_mem_hnsw_cos(self, infinity_runner: InfinityRunner):
+        # 100M quota in 7.toml not dump index when insert 8192 rows
+        row_n = 8192
+        config1 = "test/data/config/restart_test/test_memidx/7.toml"
+        uri = common_values.TEST_LOCAL_HOST
+        infinity_runner.clear()
+
+        decorator1 = infinity_runner_decorator_factory(config1, uri, infinity_runner)
+
+        @decorator1
+        def part1(infinity_obj):
+            db_obj = infinity_obj.get_database("default_db")
+            table_obj = db_obj.create_table(
+                "test_memidx1",
+                {"c1": {"type": "int"}, "c2": {"type": "vector,4,float"}},
+            )
+            res = table_obj.create_index(
+                "idx1",
+                index.IndexInfo(
+                    "c2",
+                    index.IndexType.Hnsw,
+                    {
+                        "M": "16",
+                        "ef_construction": "20",
+                        "metric": "cosine",
+                        "block_size": "1",
+                        "encode": "lvq",
+                    },
+                ),
+            )
+            table_obj.insert([{"c1": 2, "c2": [0.1, 0.2, 0.3, -0.2]} for i in range(row_n)])
+            # wait for 8192 lines to dump
+            time.sleep(3)
+
+        @decorator1
+        def part2(infinity_obj):
+            time.sleep(2)
+
+        part1()
+
+        data_dir = "/var/infinity/data"
+        cnt = 0
+        for path in pathlib.Path(data_dir).rglob("*.col"):
+            print(path)
+            cnt += 1
+        assert cnt == 2
+        if cnt != 2:
+            print("Warning: memidx dump not triggered. skip this test")
+            return
+
+        part2()
+
     def test_mem_ivf(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_memidx/1.toml"
         config2 = "test/data/config/restart_test/test_memidx/2.toml"

@@ -165,6 +165,7 @@ private:
     std::condition_variable cv_;
     std::mutex mutex_;
     std::mutex mutex_commit_;
+    std::shared_mutex mutex_commit_sync_share_;
 
     u32 num_runs_{0};                  // For offline index building
     FILE *spill_file_handle_{nullptr}; // Temp file for offline external merge sort

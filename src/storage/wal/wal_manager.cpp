@@ -158,7 +158,10 @@ void WalManager::PutEntries(Vector<WalEntry *> wal_entries) {
     wait_flush_.EnqueueBulk(wal_entries);
 }
 
-TxnTimeStamp WalManager::LastCheckpointTS() { return last_ckp_ts_ == UNCOMMIT_TS ? 0 : last_ckp_ts_; }
+TxnTimeStamp WalManager::LastCheckpointTS() const {
+    const TxnTimeStamp last_ckp_ts = last_ckp_ts_;
+    return last_ckp_ts == UNCOMMIT_TS ? 0 : last_ckp_ts;
+}
 
 Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
 
@@ -1162,7 +1165,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
     table_index_entry->CreateIndexPrepare(base_table_ref.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
-    for (const auto &[index_name, txn_index_store] : txn_store->txn_indexes_store()) {
+    for (const auto &[lock, txn_indexes_store] = txn_store->txn_indexes_store(); const auto &[index_name, txn_index_store] : txn_indexes_store) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts, true /*is_replay*/);
     }
     table_index_entry->Commit(commit_ts);

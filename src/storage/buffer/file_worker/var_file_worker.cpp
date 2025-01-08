@@ -92,7 +92,7 @@ bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const 
     return true;
 }
 
-void VarFileWorker::ReadFromFileImpl(SizeT file_size) {
+void VarFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     if (data_ != nullptr) {
         String error_message = "Data is not allocated.";
         UnrecoverableError(error_message);
