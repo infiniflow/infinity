@@ -1296,6 +1296,7 @@ SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexEntry::GetSnapshotInfo(Txn *txn_
         auto chunk_index_snapshot_info = chunk_index_entry->GetSnapshotInfo(txn_ptr);
         segment_index_snapshot->chunk_index_snapshots_.emplace_back(chunk_index_snapshot_info);
     }
+    segment_index_snapshot->segment_id_ = segment_id_;
     return segment_index_snapshot;
 }
 

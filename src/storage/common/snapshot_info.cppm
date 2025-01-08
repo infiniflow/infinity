@@ -62,17 +62,22 @@ export struct SegmentSnapshotInfo {
 
 export struct ChunkIndexSnapshotInfo {
     ChunkID chunk_id_;
-    String filename_;
+    String base_name_;
+    Vector<String> files_;
+    nlohmann::json Serialize();
 };
 
 export struct SegmentIndexSnapshotInfo {
+    SegmentID segment_id_;
     Vector<SharedPtr<ChunkIndexSnapshotInfo>> chunk_index_snapshots_{};
+    nlohmann::json Serialize();
 };
 
 export struct TableIndexSnapshotInfo {
     SharedPtr<IndexBase> index_base_{};
     SharedPtr<String> index_dir_{};
     Map<SegmentID, SharedPtr<SegmentIndexSnapshotInfo>> index_by_segment_{};
+    nlohmann::json Serialize();
 };
 
 export struct TableSnapshotInfo : public SnapshotInfo {
