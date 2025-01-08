@@ -47,13 +47,22 @@ inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, Co
     std::string str = ss.str();
     std::string truncated_str;
     size_t i = str.find_first_of('.');
-    if (right < static_cast<BigIntT>(0) || std::isnan(left) || std::isinf(left) || std::isnan(right) || std::isinf(right)) {
-        truncated_str = str;
+    if (right < static_cast<BigIntT>(0) || std::isnan(right) || std::isinf(right)) {
+        Status status = Status::InvalidDataType();
+        RecoverableError(status);
+        return;
+    } else if (std::isnan(left)) {
+        truncated_str = "NaN";
+    } else if (std::isinf(left)) {
+        truncated_str = "Inf";
     } else if (right > static_cast<BigIntT>(17) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
         truncated_str = str.substr(0, i);
     } else {
-        truncated_str = str.substr(0, i + right);
+        
+        truncated_str = str.substr(0, i + right + 1);
+        std::cout << truncated_str << std::endl;
     }
+    // std::cout << truncated_str << std::endl;
     result_ptr->AppendVarcharInner(truncated_str, result);
 }
 
