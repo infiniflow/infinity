@@ -273,9 +273,9 @@ Status ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vect
 }
 
 Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
-                             SharedPtr<Vector<SharedPtr<String>>> &result,
-                             i64 intent_size,
-                             SharedPtr<String> alias_ptr) {
+                               SharedPtr<Vector<SharedPtr<String>>> &result,
+                               i64 intent_size,
+                               SharedPtr<String> alias_ptr) {
     Status status = Status::OK();
     if (alias_ptr.get() != nullptr) {
         String select_str = String(intent_size, ' ') + "SELECT AS " + *alias_ptr;
@@ -298,7 +298,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
                 auto *with_expr = select_statement->with_exprs_->at(idx);
                 SharedPtr<String> alias_str = MakeShared<String>(with_expr->alias_);
                 status = BuildSelect((SelectStatement *)with_expr->select_, result, intent_size, alias_ptr);
-                if(!status.ok()) {
+                if (!status.ok()) {
                     return status;
                 }
             }
@@ -326,7 +326,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         String highlight_str = String(intent_size, ' ') + "highlight: ";
         SizeT highlight_count = select_statement->highlight_list_->size();
         if (highlight_count == 0) {
-            String error_message = "No select list";
+            String error_message = "No highlight expression";
             UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < highlight_count - 1; ++idx) {
@@ -338,8 +338,24 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
         result->emplace_back(MakeShared<String>(highlight_str));
     }
 
+    if (select_statement->unnest_expr_list_ != nullptr) {
+        String unnest_str = String(intent_size, ' ') + "unnest: ";
+        SizeT unnest_count = select_statement->unnest_expr_list_->size();
+        if (unnest_count == 0) {
+            String error_message = "No unnest expression";
+            UnrecoverableError(error_message);
+        }
+        for (SizeT idx = 0; idx < unnest_count - 1; ++idx) {
+            ParsedExpr *expr = select_statement->unnest_expr_list_->at(idx);
+            unnest_str += expr->ToString() + ", ";
+        }
+        unnest_str += select_statement->unnest_expr_list_->back()->ToString();
+
+        result->emplace_back(MakeShared<String>(unnest_str));
+    }
+
     status = BuildBaseTableRef(select_statement->table_ref_, result, intent_size);
-    if(!status.ok()) {
+    if (!status.ok()) {
         return status;
     }
 
@@ -420,7 +436,7 @@ Status ExplainAST::BuildSelect(const SelectStatement *select_statement,
             }
         }
         status = BuildSelect(select_statement->nested_select_, result, intent_size);
-        if(!status.ok()) {
+        if (!status.ok()) {
             return status;
         }
     }
@@ -693,6 +709,10 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             result->emplace_back(MakeShared<String>("SHOW TRANSACTION"));
             break;
         }
+        case ShowStmtType::kTransactionHistory: {
+            result->emplace_back(MakeShared<String>("SHOW TRANSACTION HISTORY"));
+            break;
+        }
         case ShowStmtType::kProfiles: {
             result->emplace_back(MakeShared<String>("SHOW QUERIES"));
             break;
@@ -757,6 +777,14 @@ Status ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vect
             result->emplace_back(MakeShared<String>("SHOW FUNCTION"));
             break;
         }
+        case ShowStmtType::kListSnapshots: {
+            result->emplace_back(MakeShared<String>("LIST SNAPSHOTS"));
+            break;
+        }
+        case ShowStmtType::kShowSnapshot: {
+            result->emplace_back(MakeShared<String>("SHOW SNAPSHOT"));
+            break;
+        }
         case ShowStmtType::kInvalid: {
             String error_message = "Invalid show statement type";
             UnrecoverableError(error_message);
@@ -816,7 +844,7 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
 
             SharedPtr<String> delimiter = MakeShared<String>(String(intent_size, ' ') + "delimiter: " + copy_statement->delimiter_);
             result->emplace_back(delimiter);
-            if(!copy_statement->copy_from_) {
+            if (!copy_statement->copy_from_) {
                 // export
                 SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
@@ -830,7 +858,7 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
         case CopyFileType::kJSON: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSON");
             result->emplace_back(file_type);
-            if(!copy_statement->copy_from_) {
+            if (!copy_statement->copy_from_) {
                 // export
                 SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
@@ -844,7 +872,7 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
         case CopyFileType::kFVECS: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: FVECS");
             result->emplace_back(file_type);
-            if(!copy_statement->copy_from_) {
+            if (!copy_statement->copy_from_) {
                 // export
                 SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);
@@ -858,7 +886,7 @@ Status ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vect
         case CopyFileType::kJSONL: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSONL");
             result->emplace_back(file_type);
-            if(!copy_statement->copy_from_) {
+            if (!copy_statement->copy_from_) {
                 // export
                 SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
                 result->emplace_back(offset);

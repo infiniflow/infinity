@@ -19,7 +19,6 @@ import stl;
 import expression_type;
 import aggregate_function;
 
-
 module aggregate_expression;
 
 namespace infinity {

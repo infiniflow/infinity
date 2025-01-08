@@ -27,19 +27,24 @@ public:
     void TearDown() override { skiplist_writer_.reset(); }
 
 protected:
-    void InitSkiplistWriter(PostingFields& posting_fields, SizeT doc_num, Vector<u32>& doc_ids, Vector<u32>& tfs, Vector<u32>& deltas, Vector<u32>& offsets);
+    void InitSkiplistWriter(PostingFields &posting_fields,
+                            SizeT doc_num,
+                            Vector<u32> &doc_ids,
+                            Vector<u32> &tfs,
+                            Vector<u32> &deltas,
+                            Vector<u32> &offsets);
 
 protected:
     SharedPtr<SkipListWriter> skiplist_writer_ = nullptr;
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
 
-void SkiplistReaderTest::InitSkiplistWriter(PostingFields& posting_fields,
+void SkiplistReaderTest::InitSkiplistWriter(PostingFields &posting_fields,
                                             SizeT doc_num,
-                                            Vector<infinity::u32>& doc_ids,
-                                            Vector<infinity::u32>& tfs,
-                                            Vector<infinity::u32>& deltas,
-                                            Vector<infinity::u32>& offsets) {
+                                            Vector<infinity::u32> &doc_ids,
+                                            Vector<infinity::u32> &tfs,
+                                            Vector<infinity::u32> &deltas,
+                                            Vector<infinity::u32> &offsets) {
     u8 row_count = 0;
     u32 offset = 0;
 

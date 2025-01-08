@@ -23,8 +23,15 @@ namespace infinity {
 export using infinity::GetSizeInBytes;
 export using infinity::ReadBuf;
 export using infinity::ReadBufAdv;
+export using infinity::ReadBufVecAdv;
 export using infinity::WriteBuf;
 export using infinity::WriteBufAdv;
 export using infinity::WriteBufVecAdv;
+export using infinity::GetSizeInBytesAligned;
+export using infinity::GetSizeInBytesVecAligned;
+export using infinity::ReadBufAdvAligned;
+export using infinity::ReadBufVecAdvAligned;
+export using infinity::WriteBufAdvAligned;
+export using infinity::WriteBufVecAdvAligned;
 
-}
+} // namespace infinity

@@ -61,7 +61,8 @@ export struct BaseObjectStorageTask {
 };
 
 export struct DownloadTask final : public BaseObjectStorageTask {
-    DownloadTask(const String &_file_dir, const String& _object_name) : BaseObjectStorageTask(ObjectStorageTaskType::kDownload) , file_dir(_file_dir), object_name(_object_name){}
+    DownloadTask(const String &_file_dir, const String &_object_name)
+        : BaseObjectStorageTask(ObjectStorageTaskType::kDownload), file_dir(_file_dir), object_name(_object_name) {}
 
     ~DownloadTask() = default;
 
@@ -71,7 +72,8 @@ export struct DownloadTask final : public BaseObjectStorageTask {
 };
 
 export struct UploadTask final : public BaseObjectStorageTask {
-    UploadTask(const String &_file_dir, const String& _object_name) : BaseObjectStorageTask(ObjectStorageTaskType::kUpload), file_dir(_file_dir), object_name(_object_name){}
+    UploadTask(const String &_file_dir, const String &_object_name)
+        : BaseObjectStorageTask(ObjectStorageTaskType::kUpload), file_dir(_file_dir), object_name(_object_name) {}
 
     ~UploadTask() = default;
 
@@ -81,7 +83,8 @@ export struct UploadTask final : public BaseObjectStorageTask {
 };
 
 export struct CopyTask final : public BaseObjectStorageTask {
-    CopyTask(const String &_src_object_name, const String &_dst_object_name) : BaseObjectStorageTask(ObjectStorageTaskType::kCopy), src_object_name(_src_object_name), dst_object_name(_dst_object_name) {}
+    CopyTask(const String &_src_object_name, const String &_dst_object_name)
+        : BaseObjectStorageTask(ObjectStorageTaskType::kCopy), src_object_name(_src_object_name), dst_object_name(_dst_object_name) {}
 
     ~CopyTask() = default;
 

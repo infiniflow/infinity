@@ -42,6 +42,8 @@ import logical_match;
 import logical_match_tensor_scan;
 import logical_match_scan_base;
 import logical_fusion;
+import logical_unnest;
+import logical_unnest_aggregate;
 import aggregate_expression;
 import between_expression;
 import case_expression;
@@ -103,6 +105,26 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
         case LogicalNodeType::kFilter: {
             auto &node = (LogicalFilter &)op;
             VisitExpression(node.expression());
+            break;
+        }
+        case LogicalNodeType::kUnnest: {
+            auto &node = (LogicalUnnest &)op;
+            for (auto &expression : node.expression_list()) {
+                VisitExpression(expression);
+            }
+            break;
+        }
+        case LogicalNodeType::kUnnestAggregate: {
+            auto &node = (LogicalUnnestAggregate &)op;
+            for (auto &expression : node.unnest_expression_list()) {
+                VisitExpression(expression);
+            }
+            for (auto &expression : node.groups()) {
+                VisitExpression(expression);
+            }
+            for (auto &expression : node.aggregates()) {
+                VisitExpression(expression);
+            }
             break;
         }
         case LogicalNodeType::kProjection: {
@@ -168,7 +190,7 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
             break;
         }
         default: {
-//            LOG_TRACE(fmt::format("Visit logical node: {}", op.name()));
+            //            LOG_TRACE(fmt::format("Visit logical node: {}", op.name()));
         }
     }
 }

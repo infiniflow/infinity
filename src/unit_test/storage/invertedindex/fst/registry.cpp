@@ -22,7 +22,7 @@ using namespace infinity;
 struct Key {
     int k_{0};
     Key() = default;
-    Key(int k) : k_(k){}
+    Key(int k) : k_(k) {}
     bool operator==(const Key &rhs) const { return k_ == rhs.k_; }
     SizeT Hash() const { return SizeT(k_); }
 };

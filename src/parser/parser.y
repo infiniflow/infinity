@@ -384,9 +384,9 @@ struct SQL_LTYPE {
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT LOCK UNLOCK ADD RENAME
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
-%token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK
+%token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK SYSTEM
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
-%token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN
+%token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN UNNEST
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TEXT MULTIVECTOR TENSOR SPARSE TENSORARRAY IGNORE
 %token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT COMMENT
@@ -395,8 +395,8 @@ struct SQL_LTYPE {
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
 %token USING SESSION GLOBAL OFF EXPORT CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
-%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER
-%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION
+%token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER RESTORE
+%token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY
 
 %token NUMBER
 
@@ -451,7 +451,7 @@ struct SQL_LTYPE {
 %type <const_expr_t>            empty_array_expr common_sparse_array_expr
 %type <int_sparse_ele_t>        int_sparse_ele
 %type <float_sparse_ele_t>      float_sparse_ele
-%type <expr_array_t>            expr_array group_by_clause sub_search_array highlight_clause
+%type <expr_array_t>            expr_array group_by_clause sub_search_array highlight_clause unnest_clause
 %type <insert_row_list_t>       insert_row_list
 %type <update_expr_t>           update_expr;
 %type <update_expr_array_t>     update_expr_array;
@@ -1607,16 +1607,17 @@ select_clause_without_modifier_paren: '(' select_clause_without_modifier ')' {
 };
 
 select_clause_without_modifier:
-SELECT distinct expr_array highlight_clause from_clause search_clause where_clause group_by_clause having_clause {
+SELECT distinct expr_array highlight_clause from_clause unnest_clause search_clause where_clause group_by_clause having_clause {
     $$ = new infinity::SelectStatement();
     $$->select_distinct_ = $2;
     $$->select_list_ = $3;
     $$->highlight_list_ = $4;
     $$->table_ref_ = $5;
-    $$->search_expr_ = $6;
-    $$->where_expr_ = $7;
-    $$->group_by_list_ = $8;
-    $$->having_expr_ = $9;
+    $$->unnest_expr_list_ = $6;
+    $$->search_expr_ = $7;
+    $$->where_expr_ = $8;
+    $$->group_by_list_ = $9;
+    $$->having_expr_ = $10;
 
     if($$->group_by_list_ == nullptr && $$->having_expr_ != nullptr) {
         yyerror(&yyloc, scanner, result, "HAVING clause should follow after GROUP BY clause");
@@ -1673,6 +1674,13 @@ distinct : DISTINCT {
 }
 | {
     $$ = false;
+}
+
+unnest_clause: UNNEST expr_array {
+    $$ = $2;
+}
+| {
+    $$ = nullptr;
 }
 
 highlight_clause: HIGHLIGHT expr_array {
@@ -1948,6 +1956,10 @@ show_statement: SHOW DATABASES {
     $$->show_type_ = infinity::ShowStmtType::kTransaction;
     $$->txn_id_ = $3;
 }
+| SHOW TRANSACTION HISTORY {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kTransactionHistory;
+}
 | SHOW SESSION VARIABLES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kSessionVariables;
@@ -2159,7 +2171,17 @@ show_statement: SHOW DATABASES {
       $$->show_type_ = infinity::ShowStmtType::kFunction;
       $$->function_name_ = $2;
       free($2);
-};
+}
+| SHOW SNAPSHOTS {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kListSnapshots;
+}
+| SHOW SNAPSHOT IDENTIFIER {
+     $$ = new infinity::ShowStatement();
+     $$->show_type_ = infinity::ShowStmtType::kShowSnapshot;
+     $$->snapshot_name_ = $3;
+     free($3);
+}
 
 /*
  * FLUSH STATEMENT
@@ -2338,6 +2360,46 @@ command_statement: USE IDENTIFIER {
     free($3->schema_name_ptr_);
     free($3->table_name_ptr_);
     delete $3;
+}
+| CREATE SNAPSHOT IDENTIFIER ON TABLE IDENTIFIER {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($6);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($3, infinity::SnapshotOp::kCreate, infinity::SnapshotScope::kTable, $6);
+    free($3);
+    free($6);
+}
+| CREATE SNAPSHOT IDENTIFIER ON DATABASE IDENTIFIER {
+    ParserHelper::ToLower($3);
+    ParserHelper::ToLower($6);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($3, infinity::SnapshotOp::kCreate, infinity::SnapshotScope::kDatabase, $6);
+    free($3);
+    free($6);
+}
+| CREATE SNAPSHOT IDENTIFIER ON SYSTEM {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($3, infinity::SnapshotOp::kCreate, infinity::SnapshotScope::kSystem);
+    free($3);
+}
+| DROP SNAPSHOT IDENTIFIER {
+    ParserHelper::ToLower($3);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($3, infinity::SnapshotOp::kDrop, infinity::SnapshotScope::kIgnore);
+    free($3);
+}
+| RESTORE DATABASE SNAPSHOT IDENTIFIER {
+    ParserHelper::ToLower($4);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($4, infinity::SnapshotOp::kRestore, infinity::SnapshotScope::kDatabase);
+    free($4);
+}
+| RESTORE TABLE SNAPSHOT IDENTIFIER {
+    ParserHelper::ToLower($4);
+    $$ = new infinity::CommandStatement();
+    $$->command_info_ = std::make_shared<infinity::SnapshotCmd>($4, infinity::SnapshotOp::kRestore, infinity::SnapshotScope::kTable);
+    free($4);
 }
 
 compact_statement: COMPACT TABLE table_name {
@@ -2546,7 +2608,7 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListSnapshots;
 }
-| ADMIN SHOW SNAPSHOT STRING {
+| ADMIN SHOW SNAPSHOT IDENTIFIER {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowSnapshot;
      $$->snapshot_name_ = $4;

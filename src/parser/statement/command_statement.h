@@ -32,6 +32,7 @@ enum class CommandType {
     kUnlockTable,
     kCleanup,
     kTestCommand,
+    kSnapshot,
 };
 
 class CommandInfo {
@@ -188,9 +189,7 @@ public:
     const std::string &db_name() const { return db_name_; }
     const std::string &table_name() const { return table_name_; }
 
-    void SetDBName(const std::string &db_name) {
-        db_name_ = db_name;
-    }
+    void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
 private:
     std::string db_name_;
@@ -209,9 +208,7 @@ public:
     const std::string &db_name() const { return db_name_; }
     const std::string &table_name() const { return table_name_; }
 
-    void SetDBName(const std::string &db_name) {
-        db_name_ = db_name;
-    }
+    void SetDBName(const std::string &db_name) { db_name_ = db_name; }
 
 private:
     std::string db_name_;
@@ -240,7 +237,7 @@ public:
 
 class TestCmd final : public CommandInfo {
 public:
-    TestCmd(std::string command_content) : CommandInfo(CommandType::kTestCommand), command_content_(command_content) {}
+    TestCmd(std::string command_content) : CommandInfo(CommandType::kTestCommand), command_content_(std::move(command_content)) {}
 
     [[nodiscard]] std::string ToString() const final;
 
@@ -248,6 +245,28 @@ public:
 
 private:
     std::string command_content_{};
+};
+
+enum class SnapshotOp { kCreate, kDrop, kRestore, kInvalid };
+enum class SnapshotScope : uint8_t { kTable = 0, kDatabase, kSystem, kIgnore, kInvalid };
+
+class SnapshotCmd final : public CommandInfo {
+public:
+    SnapshotCmd(std::string name, SnapshotOp op, SnapshotScope scope, std::optional<std::string> object_name = std::nullopt)
+        : CommandInfo(CommandType::kSnapshot), name_(std::move(name)), operation_(op), scope_(scope), object_name_(std::move(object_name)) {}
+
+    [[nodiscard]] std::string ToString() const final;
+
+    const std::string &name() { return name_; }
+    const std::string &object_name() { return object_name_.value(); }
+    SnapshotOp operation() { return operation_; }
+    SnapshotScope &scope() { return scope_; }
+
+private:
+    std::string name_{};
+    SnapshotOp operation_{SnapshotOp::kInvalid};
+    SnapshotScope scope_{SnapshotScope::kInvalid};
+    std::optional<std::string> object_name_{std::nullopt};
 };
 
 } // namespace infinity

@@ -18,6 +18,9 @@ module;
 #include <cstring>
 #include <fcntl.h>
 #include <filesystem>
+#include <lz4.h>
+#include <lz4hc.h>
+#include <openssl/md5.h>
 #include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -35,6 +38,7 @@ import s3_client_minio;
 import infinity_context;
 import object_storage_task;
 import admin_statement;
+import utility;
 
 namespace fs = std::filesystem;
 
@@ -337,6 +341,29 @@ Status VirtualStore::Merge(const String &dst_path, const String &src_path) {
     return Status::OK();
 }
 
+Status VirtualStore::Copy(const String &dst_path, const String &src_path) {
+    if (!std::filesystem::path(dst_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", dst_path);
+        UnrecoverableError(error_message);
+    }
+    if (!std::filesystem::path(src_path).is_absolute()) {
+        String error_message = fmt::format("{} isn't absolute path.", src_path);
+        UnrecoverableError(error_message);
+    }
+
+    String dst_dir = GetParentPath(dst_path);
+    if (!VirtualStore::Exists(dst_dir)) {
+        VirtualStore::MakeDirectory(dst_dir);
+    }
+
+    try {
+        std::filesystem::copy(src_path, dst_path, fs::copy_options::update_existing);
+    } catch (const std::filesystem::filesystem_error &e) {
+        return Status::IOError(fmt::format("Failed to copy file: {}", e.what()));
+    }
+    return Status::OK();
+}
+
 Tuple<Vector<SharedPtr<DirEntry>>, Status> VirtualStore::ListDirectory(const String &path) {
     if (!std::filesystem::path(path).is_absolute()) {
         String error_message = fmt::format("{} isn't absolute path.", path);
@@ -409,9 +436,9 @@ i32 VirtualStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_l
         return -1;
     i32 f = open(file_path.c_str(), O_RDONLY);
     void *tmpd = mmap(NULL, len_f, PROT_READ, MAP_SHARED, f, 0);
+    close(f);
     if (tmpd == MAP_FAILED)
         return -1;
-    close(f);
     i32 rc = madvise(tmpd,
                      len_f,
                      MADV_NORMAL
@@ -426,6 +453,57 @@ i32 VirtualStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_l
     mapped_files_.emplace(file_path, MmapInfo{data_ptr, data_len, 1});
     return 0;
 }
+
+std::ofstream VirtualStore::BeginCompress(const String &compressed_file) {
+    std::ofstream output(compressed_file, std::ios::binary);
+    return output;
+}
+
+Status VirtualStore::AddFileCompress(std::ofstream &ofstream, const String &input_file) {
+    std::ifstream input(input_file, std::ios::binary);
+    if (!input.is_open()) {
+        return Status::IOError(fmt::format("Unable to open input file: {}", input_file));
+    }
+
+    input.seekg(0, input.end);
+    size_t raw_file_size = input.tellg();
+    input.seekg(0, input.beg);
+
+    std::vector<char> raw_data(raw_file_size);
+    input.read(raw_data.data(), raw_file_size);
+    input.close();
+
+    // Write the filename size
+    SizeT filename_size = input_file.size();
+    ofstream.write(reinterpret_cast<char *>(&filename_size), sizeof(filename_size));
+
+    // Write filename
+    ofstream.write(input_file.c_str(), input_file.size());
+
+    // Write raw file size
+    ofstream.write(reinterpret_cast<char *>(&raw_file_size), sizeof(raw_file_size));
+
+    // Write raw file md5
+    String md5 = CalcMD5(raw_data.data(), raw_file_size);
+    ofstream.write(md5.c_str(), MD5_DIGEST_LENGTH);
+
+    size_t max_compressed_size = LZ4_compressBound(raw_file_size);
+    std::vector<char> compressed_data(max_compressed_size);
+
+    i32 compressed_size = LZ4_compress_default(raw_data.data(), compressed_data.data(), raw_file_size, max_compressed_size);
+    if (compressed_size < 0) {
+        return Status::IOError("Compression failed");
+    }
+
+    // Write compressed file size
+    ofstream.write(reinterpret_cast<char *>(&compressed_size), sizeof(compressed_size));
+
+    // Write compressed data
+    ofstream.write(compressed_data.data(), compressed_size);
+    return Status::OK();
+}
+
+void VirtualStore::EndCompress(std::ofstream &ofstream) { ofstream.close(); }
 
 i32 VirtualStore::MunmapFile(const String &file_path) {
     if (!std::filesystem::path(file_path).is_absolute()) {
@@ -444,6 +522,30 @@ i32 VirtualStore::MunmapFile(const String &file_path) {
         mapped_files_.erase(it);
     }
     return 0;
+}
+
+i32 VirtualStore::MmapFilePart(const String &file_path, SizeT offset, SizeT length, u8 *&data_ptr) {
+    SizeT align_offset = offset / getpagesize() * getpagesize();
+    SizeT diff = offset - align_offset;
+    SizeT align_length = length + diff;
+    int fd = open(file_path.c_str(), O_RDONLY);
+    if (fd < 0) {
+        return -1;
+    }
+    void *ret = mmap(NULL, align_length, PROT_READ, MAP_SHARED, fd, align_offset);
+    close(fd);
+    if (ret == MAP_FAILED) {
+        return -1;
+    }
+    data_ptr = reinterpret_cast<u8 *>(ret) + diff;
+    return 0;
+}
+
+i32 VirtualStore::MunmapFilePart(u8 *data_ptr, SizeT offset, SizeT length) {
+    SizeT align_offset = offset / getpagesize() * getpagesize();
+    u8 *aligned_ptr = data_ptr - offset + align_offset;
+    SizeT align_length = length + data_ptr - aligned_ptr;
+    return munmap(aligned_ptr, align_length);
 }
 
 // Remote storage

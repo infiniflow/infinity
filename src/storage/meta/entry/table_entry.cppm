@@ -35,6 +35,7 @@ import block_entry;
 import table_index_meta;
 import compaction_alg;
 import meta_map;
+import snapshot_info;
 
 import cleanup_scanner;
 import random;
@@ -44,6 +45,7 @@ import block_entry;
 import column_index_reader;
 import value;
 import infinity_exception;
+import snapshot_info;
 
 namespace infinity {
 
@@ -215,7 +217,7 @@ public:
 
     inline const SharedPtr<String> &GetTableComment() const { return table_comment_; }
 
-    TxnTimeStamp max_commit_ts() const { 
+    TxnTimeStamp max_commit_ts() const {
         std::shared_lock lock(rw_locker_);
         return max_commit_ts_;
     }
@@ -369,7 +371,7 @@ public:
 
     void SetUnlock();
 
-    enum struct TableStatus: u8 {
+    enum struct TableStatus : u8 {
         kNone = 0,
         kCreatingIndex,
         kCompacting,
@@ -396,6 +398,8 @@ public:
     void AddColumns(const Vector<SharedPtr<ColumnDef>> &columns, TxnTableStore *txn_store);
 
     void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
+
+    SharedPtr<TableSnapshotInfo> GetSnapshotInfo(Txn* txn_ptr) const;
 };
 
 } // namespace infinity

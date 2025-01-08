@@ -25,8 +25,22 @@ import logger;
 import third_party;
 import infinity_context;
 import cleanup_scanner;
+import txn_manager;
+import txn_context;
 
 namespace infinity {
+
+void PrintTransactionHistory() {
+    TxnManager *txn_manager = InfinityContext::instance().storage()->txn_manager();
+
+    Vector<SharedPtr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
+
+    SizeT history_count = txn_contexts.size();
+    for (SizeT idx = 0; idx < history_count; ++idx) {
+        SharedPtr<TxnContext> txn_history = txn_contexts[idx];
+        LOG_CRITICAL(txn_history->ToString());
+    }
+}
 
 void PrintStacktrace(const String &err_msg) {
     int trace_stack_depth = 256;
@@ -60,7 +74,12 @@ std::string_view GetErrorMsg(const String &message) {
 }
 
 void UnrecoverableError(const String &message, const char *file_name, u32 line) {
-    // auto *storage = InfinityContext::instance().storage();
+    auto *storage = InfinityContext::instance().storage();
+    if (storage != nullptr) {
+        if (storage->txn_manager() != nullptr) {
+            infinity::PrintTransactionHistory();
+        }
+    }
     // if (storage != nullptr) {
     //     CleanupInfoTracer *cleanup_tracer = storage->cleanup_info_tracer();
     //     String error_msg = cleanup_tracer->GetCleanupInfo();
@@ -68,6 +87,7 @@ void UnrecoverableError(const String &message, const char *file_name, u32 line) 
     // }
     String location_message = fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line);
     if (IS_LOGGER_INITIALIZED()) {
+
         PrintStacktrace(location_message);
     }
     Logger::Flush();
@@ -91,9 +111,7 @@ void UnrecoverableError(const String &message) {
     throw UnrecoverableException(message);
 }
 
-std::string_view GetErrorMsg(const String &message) {
-    return message;
-}
+std::string_view GetErrorMsg(const String &message) { return message; }
 
 #endif
 

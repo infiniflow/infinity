@@ -14,8 +14,8 @@
 
 module;
 
-#include <sstream>
 #include <algorithm>
+#include <sstream>
 #include <string>
 
 module index_secondary;
@@ -37,8 +37,8 @@ void IndexSecondary::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_
         Status status = Status::ColumnNotExist(column_name);
         RecoverableError(status);
     } else if (auto &data_type = column_types_vector[column_id]; !(data_type->CanBuildSecondaryIndex())) {
-        Status status = Status::InvalidIndexDefinition(
-            fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString()));
+        Status status =
+            Status::InvalidIndexDefinition(fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString()));
         RecoverableError(status);
     }
 }

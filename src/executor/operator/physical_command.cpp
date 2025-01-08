@@ -49,6 +49,7 @@ import periodic_trigger;
 import bg_task;
 import wal_manager;
 import result_cache_manager;
+import snapshot;
 
 namespace infinity {
 
@@ -64,10 +65,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         case CommandType::kSet: {
             SetCmd *set_command = (SetCmd *)(command_info_.get());
-            switch(set_command->scope()) {
+            switch (set_command->scope()) {
                 case SetScope::kSession: {
                     SessionVariable session_var = VarUtil::GetSessionVarByName(set_command->var_name());
-                    switch(session_var) {
+                    switch (session_var) {
                         case SessionVariable::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("Unknown session variable: {}", set_command->var_name()));
                             RecoverableError(status);
@@ -81,7 +82,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 }
                 case SetScope::kGlobal: {
                     GlobalVariable global_var = VarUtil::GetGlobalVarByName(set_command->var_name());
-                    switch(global_var) {
+                    switch (global_var) {
                         case GlobalVariable::kEnableProfile: {
                             if (set_command->value_type() != SetVarType::kBool) {
                                 Status status = Status::DataTypeMismatch("Boolean", set_command->value_type_str());
@@ -96,8 +97,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 RecoverableError(status);
                             }
                             i32 value_int = set_command->value_int();
-                            if(value_int < 0) {
-                                Status status = Status::InvalidCommand(fmt::format("Try to set profile record capacity with invalid value {}", value_int));
+                            if (value_int < 0) {
+                                Status status =
+                                    Status::InvalidCommand(fmt::format("Try to set profile record capacity with invalid value {}", value_int));
                                 RecoverableError(status);
                             }
                             query_context->storage()->catalog()->ResizeProfileHistory(value_int);
@@ -123,12 +125,15 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case GlobalVariable::kFollowerNum: {
                             i64 value_int = set_command->value_int();
-                            if(value_int < 0) {
-                                Status status = Status::InvalidCommand(fmt::format("Attempt to set global variable: {} value as {}, which should >= 0", set_command->var_name(), value_int));
+                            if (value_int < 0) {
+                                Status status =
+                                    Status::InvalidCommand(fmt::format("Attempt to set global variable: {} value as {}, which should >= 0",
+                                                                       set_command->var_name(),
+                                                                       value_int));
                                 RecoverableError(status);
                             }
                             Status status = InfinityContext::instance().cluster_manager()->SetFollowerNumber(value_int);
-                            if(!status.ok()) {
+                            if (!status.ok()) {
                                 RecoverableError(status);
                             }
                             return true;
@@ -141,9 +146,9 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                     break;
                 }
                 case SetScope::kConfig: {
-                    Config* config = query_context->global_config();
+                    Config *config = query_context->global_config();
                     GlobalOptionIndex config_index = config->GetOptionIndex(set_command->var_name());
-                    switch(config_index) {
+                    switch (config_index) {
                         case GlobalOptionIndex::kResultCache: {
                             if (set_command->value_type() != SetVarType::kString) {
                                 Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
@@ -247,7 +252,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 RecoverableError(status);
                             }
                             bool flag = set_command->value_bool();
-                            if(config->RecordRunningQuery() && !flag) {
+                            if (config->RecordRunningQuery() && !flag) {
                                 // turn off the query recording and clean all query record.
                                 query_context->session_manager()->ClearQueryRecord();
                             }
@@ -260,7 +265,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 RecoverableError(status);
                             }
                             i64 interval = set_command->value_int();
-                            if(interval < 0) {
+                            if (interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set cleanup interval: {}", interval));
                                 RecoverableError(status);
                             }
@@ -274,7 +279,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 RecoverableError(status);
                             }
                             i64 interval = set_command->value_int();
-                            if(interval < 0) {
+                            if (interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set full checkpoint interval: {}", interval));
                                 RecoverableError(status);
                             }
@@ -288,7 +293,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 RecoverableError(status);
                             }
                             i64 interval = set_command->value_int();
-                            if(interval < 0) {
+                            if (interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set delta checkpoint interval: {}", interval));
                                 RecoverableError(status);
                             }
@@ -302,7 +307,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 RecoverableError(status);
                             }
                             i64 interval = set_command->value_int();
-                            if(interval < 0) {
+                            if (interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set compact segment interval: {}", interval));
                                 RecoverableError(status);
                             }
@@ -316,7 +321,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 RecoverableError(status);
                             }
                             i64 interval = set_command->value_int();
-                            if(interval < 0) {
+                            if (interval < 0) {
                                 Status status = Status::InvalidCommand(fmt::format("Attempt to set optimize interval interval: {}", interval));
                                 RecoverableError(status);
                             }
@@ -442,8 +447,70 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 auto *compact_processor = query_context->storage()->compaction_processor();
                 compact_processor->AddTestCommand(BGTaskType::kTestCommand, "stuck for 3 seconds");
             } else if (test_command->command_content() == "delta checkpoint") {
-                
+                LOG_INFO(fmt::format("test command: delta checkpoint"));
+            } else {
+                LOG_INFO(fmt::format("test command: other"));
             }
+            break;
+        }
+        case CommandType::kSnapshot: {
+            SnapshotCmd *snapshot_cmd = static_cast<SnapshotCmd *>(command_info_.get());
+            LOG_INFO(fmt::format("Execute snapshot command"));
+            SnapshotOp snapshot_operation = snapshot_cmd->operation();
+            SnapshotScope snapshot_scope = snapshot_cmd->scope();
+            const String &snapshot_name = snapshot_cmd->name();
+            switch (snapshot_operation) {
+                case SnapshotOp::kCreate: {
+                    LOG_INFO(fmt::format("Execute snapshot create"));
+                    switch (snapshot_scope) {
+                        case SnapshotScope::kSystem: {
+                            LOG_INFO(fmt::format("Execute snapshot system"));
+                            break;
+                        }
+                        case SnapshotScope::kDatabase: {
+                            LOG_INFO(fmt::format("Execute snapshot database"));
+                            break;
+                        }
+                        case SnapshotScope::kTable: {
+                            const String &table_name = snapshot_cmd->object_name();
+                            Status snapshot_status = Snapshot::CreateTableSnapshot(query_context, snapshot_name, table_name);
+                            if (!snapshot_status.ok()) {
+                                RecoverableError(snapshot_status);
+                            }
+                            LOG_INFO(fmt::format("Execute snapshot table"));
+                            break;
+                        }
+                        case SnapshotScope::kIgnore: {
+                            LOG_INFO(fmt::format("Execute snapshot ignore"));
+                            break;
+                        }
+                        default: {
+                            String error_message = "Invalid snapshot scope";
+                            UnrecoverableError(error_message);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case SnapshotOp::kDrop: {
+                    LOG_INFO(fmt::format("Execute snapshot drop"));
+                    Status snapshot_status = Snapshot::DropSnapshot(query_context, snapshot_name);
+                    if (!snapshot_status.ok()) {
+                        RecoverableError(snapshot_status);
+                    }
+                    break;
+                }
+                case SnapshotOp::kRestore: {
+                    LOG_INFO(fmt::format("Execute snapshot restore"));
+                    break;
+                }
+                default: {
+                    String error_message = "Invalid snapshot operation type";
+                    UnrecoverableError(error_message);
+                    break;
+                }
+            }
+
             break;
         }
         default: {

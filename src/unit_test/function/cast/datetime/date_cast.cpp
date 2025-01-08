@@ -24,7 +24,6 @@ import logger;
 import stl;
 import infinity_context;
 
-
 import function_set;
 import aggregate_function_set;
 import aggregate_function;
@@ -44,13 +43,9 @@ import data_type;
 using namespace infinity;
 
 class DateCastTest : public BaseTest {
-    void SetUp() override {
-        BaseTest::SetUp();
-    }
+    void SetUp() override { BaseTest::SetUp(); }
 
-    void TearDown() override {
-        BaseTest::TearDown();
-    }
+    void TearDown() override { BaseTest::TearDown(); }
 };
 
 TEST_F(DateCastTest, date_cast0) {

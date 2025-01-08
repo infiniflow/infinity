@@ -215,10 +215,9 @@ void CompactionProcessor::DoDumpByline(DumpIndexBylineTask *dump_task) {
             RecoverableError(Status::TxnRollback(txn->TxnID(), fmt::format("Dumped chunk {} is deleted.", dumped_chunk->encode())));
         }
 
-        SharedPtr<SegmentIndexEntry> segment_index_entry;
-        bool created = table_index_entry->GetOrCreateSegment(dump_task->segment_id_, txn, segment_index_entry);
-        if (created) {
-            UnrecoverableError(fmt::format("DumpByline: Cannot find segment index entry with id: {}", dump_task->segment_id_));
+        SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->GetSegment(dump_task->segment_id_, txn);
+        if (!segment_index_entry) {
+            RecoverableError(Status::TxnRollback(txn->TxnID(), fmt::format("Cannot find segment index entry with id: {}", dump_task->segment_id_)));
         }
         segment_index_entry->AddWalIndexDump(dumped_chunk, txn);
 

@@ -24,4 +24,4 @@ export using infinity::CreateIndexInfo;
 export using infinity::IndexInfo;
 export using infinity::IndexType;
 
-}
+} // namespace infinity

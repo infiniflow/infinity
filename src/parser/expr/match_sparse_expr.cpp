@@ -36,9 +36,7 @@ void MatchSparseExpr::SetMetricType(char *&raw_metric_type) {
     SetMetricTypeInner(metric_type);
 }
 
-void MatchSparseExpr::SetMetricType(const std::string &metric_type) {
-    SetMetricTypeInner(metric_type);
-}
+void MatchSparseExpr::SetMetricType(const std::string &metric_type) { SetMetricTypeInner(metric_type); }
 
 void MatchSparseExpr::SetOptParams(size_t topn, std::vector<InitParameter *> *&opt_params) {
     topn_ = topn;

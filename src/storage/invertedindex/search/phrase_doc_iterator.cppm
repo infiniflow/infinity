@@ -26,7 +26,7 @@ public:
 
     float GetPhraseFreq() const { return phrase_freq_; }
 
-    void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader);
+    void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, float delta, float k1, float b) override;
 
     DocIteratorType GetType() const override { return DocIteratorType::kPhraseIterator; }
     String Name() const override { return "PhraseDocIterator"; }
@@ -97,6 +97,7 @@ private:
     float f1 = 0.0f;
     float f2 = 0.0f;
     float f3 = 0.0f;
+    float f4 = 0.0f;
     float bm25_common_score_ = 0.0f;
     UniquePtr<FullTextColumnLengthReader> column_length_reader_ = nullptr;
     float block_max_bm25_score_cache_ = 0.0f;
@@ -114,4 +115,4 @@ private:
     // debug statistics
     u32 calc_score_cnt_ = 0;
 };
-}
+} // namespace infinity

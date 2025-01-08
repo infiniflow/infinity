@@ -26,4 +26,4 @@ export using infinity::WithExpr;
 export using infinity::OrderType;
 export using infinity::SetOperatorType;
 
-}
+} // namespace infinity

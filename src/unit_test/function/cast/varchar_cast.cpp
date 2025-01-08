@@ -45,7 +45,7 @@ class VarcharTest : public BaseTest {};
 
 using namespace infinity;
 
-void InitVarcharAsInline(VarcharT& varchar, const std::string_view sv) {
+void InitVarcharAsInline(VarcharT &varchar, const std::string_view sv) {
     varchar.length_ = sv.size();
     if (sv.size() <= VARCHAR_INLINE_LEN) {
         std::memcpy(varchar.short_.data_, sv.data(), sv.size());
@@ -159,7 +159,6 @@ TEST_F(VarcharTest, varchar_cast0) {
 TEST_F(VarcharTest, varchar_cast1) {
     using namespace infinity;
 
-
     {
         SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
@@ -170,7 +169,7 @@ TEST_F(VarcharTest, varchar_cast1) {
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
-        VarcharT* varchar_ptr = (VarcharT*)(input_column_vector->buffer_.get()->GetDataMut());
+        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetDataMut());
 
         BigIntT target{0};
         bool result = TryCastVarcharVector::Run(varchar_ptr[0], input_column_vector.get(), target);
@@ -218,7 +217,7 @@ TEST_F(VarcharTest, varchar_cast1) {
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
-        VarcharT* varchar_ptr = (VarcharT*)(input_column_vector->buffer_.get()->GetDataMut());
+        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetDataMut());
 
         FloatT target{0};
         bool result = TryCastVarcharVector::Run(varchar_ptr[0], input_column_vector.get(), target);
@@ -256,7 +255,6 @@ TEST_F(VarcharTest, varchar_cast1) {
         EXPECT_FLOAT_EQ(target, -1000000000.4565544);
     }
 
-
     {
         SharedPtr<DataType> source_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnVector> input_column_vector = MakeShared<ColumnVector>(source_type);
@@ -267,7 +265,7 @@ TEST_F(VarcharTest, varchar_cast1) {
         Value v = Value::MakeVarchar(s1);
         input_column_vector->AppendValue(v);
 
-        VarcharT* varchar_ptr = (VarcharT*)(input_column_vector->buffer_.get()->GetDataMut());
+        VarcharT *varchar_ptr = (VarcharT *)(input_column_vector->buffer_.get()->GetDataMut());
 
         DoubleT target{0};
         bool result = TryCastVarcharVector::Run(varchar_ptr[0], input_column_vector.get(), target);

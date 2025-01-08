@@ -26,7 +26,7 @@ struct TimeType {
 
     TimeType() = default;
 
-    explicit constexpr TimeType(int32_t time_value) : value(time_value){};
+    explicit constexpr TimeType(int32_t time_value) : value(time_value) {};
 
     inline int32_t GetValue() const { return value; }
 

@@ -34,6 +34,8 @@ export enum class LogicalNodeType : u8 {
     kProjection,
     kSort,
     kTop,
+    kUnnest,
+    kUnnestAggregate,
 
     // DML
     kDelete,
@@ -84,4 +86,4 @@ export enum class LogicalNodeType : u8 {
     kReadCache,
     kMock,
 };
-}
+} // namespace infinity

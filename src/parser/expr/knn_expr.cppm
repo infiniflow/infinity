@@ -23,4 +23,4 @@ namespace infinity {
 export using infinity::KnnExpr;
 export using infinity::KnnDistanceType;
 
-}
+} // namespace infinity

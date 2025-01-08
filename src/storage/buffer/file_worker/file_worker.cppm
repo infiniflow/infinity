@@ -77,9 +77,8 @@ public:
 protected:
     virtual bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx = {}) = 0;
 
-    virtual void ReadFromFileImpl(SizeT file_size) = 0;
+    virtual void ReadFromFileImpl(SizeT file_size, bool from_spill) = 0;
 
-private:
     String ChooseFileDir(bool spill) const;
 
     Pair<Optional<DeferFn<std::function<void()>>>, String> GetFilePathInner(bool spill);
@@ -102,6 +101,8 @@ public:
     void Mmap();
 
     void Munmap();
+
+    void MmapNotNeed();
 
 protected:
     virtual bool ReadFromMmapImpl([[maybe_unused]] const void *ptr, [[maybe_unused]] SizeT size) {

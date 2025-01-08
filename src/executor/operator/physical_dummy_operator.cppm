@@ -32,7 +32,8 @@ namespace infinity {
 
 export class PhysicalDummyOperator final : public PhysicalOperator {
 public:
-    explicit PhysicalDummyOperator(u64 id, SharedPtr<Vector<LoadMeta>> load_metas) : PhysicalOperator(PhysicalOperatorType::kInvalid, nullptr, nullptr, id, load_metas) {}
+    explicit PhysicalDummyOperator(u64 id, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kInvalid, nullptr, nullptr, id, load_metas) {}
 
     ~PhysicalDummyOperator() override = default;
 

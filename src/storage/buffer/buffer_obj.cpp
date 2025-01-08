@@ -72,6 +72,7 @@ BufferHandle BufferObj::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kMmap) {
         switch (status_) {
+            case BufferStatus::kUnloaded:
             case BufferStatus::kLoaded: {
                 break;
             }
@@ -220,6 +221,12 @@ void BufferObj::PickForCleanup() {
         LOG_INFO(fmt::format("BufferObj::PickForCleanup: obj_rc_ is {}, buffer: {}", obj_rc_, GetFilename()));
         return;
     }
+    if (type_ == BufferType::kMmap) {
+        file_worker_->Munmap();
+        buffer_mgr_->AddToCleanList(this, false /*do_free*/);
+        status_ = BufferStatus::kClean;
+        return;
+    }
     switch (status_) {
         // when insert data into table with index, the index buffer_obj
         // will remain BufferStatus::kNew, so we should allow this situation
@@ -269,6 +276,9 @@ void BufferObj::CleanupTempFile() const {
 
 void BufferObj::ToMmap() {
     std::unique_lock<std::mutex> locker(w_locker_);
+    if (type_ == BufferType::kMmap) {
+        return;
+    }
     if (type_ != BufferType::kPersistent) {
         String error_message = fmt::format("Invalid buffer type: {}", BufferTypeToString(type_));
         UnrecoverableError(error_message);
@@ -285,7 +295,6 @@ void BufferObj::ToMmap() {
             status_ = BufferStatus::kFreed;
             type_ = BufferType::kMmap;
             break;
-
         }
         case BufferStatus::kFreed: {
             type_ = BufferType::kMmap;
@@ -307,12 +316,20 @@ void BufferObj::LoadInner() {
     ++rc_;
 }
 
-void BufferObj::GetMutPointer() {
+void *BufferObj::GetMutPointer() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kTemp) {
         buffer_mgr_->RemoveTemp(this);
+    } else if (type_ == BufferType::kMmap) {
+        bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
+        if (!free_success) {
+            String error_message = "Out of memory.";
+            UnrecoverableError(error_message);
+        }
+        file_worker_->ReadFromFile(false);
     }
     type_ = BufferType::kEphemeral;
+    return file_worker_->GetData();
 }
 
 void BufferObj::UnloadInner() {
@@ -329,8 +346,8 @@ void BufferObj::UnloadInner() {
             status_ = BufferStatus::kFreed;
             type_ = BufferType::kMmap;
         } else if (type_ == BufferType::kMmap) {
-            file_worker_->Munmap();
-            status_ = BufferStatus::kFreed;
+            file_worker_->MmapNotNeed();
+            status_ = BufferStatus::kUnloaded;
         } else {
             buffer_mgr_->PushGCQueue(this);
             status_ = BufferStatus::kUnloaded;

@@ -23,9 +23,9 @@ namespace infinity {
 struct RegexFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA &left, TB &right, TC &result) {
-        const char * origin_str;
+        const char *origin_str;
         SizeT origin_len;
-        const char * pattern_str;
+        const char *pattern_str;
         SizeT pattern_len;
         GetReaderValue(left, origin_str, origin_len);
         GetReaderValue(right, pattern_str, pattern_len);
@@ -36,19 +36,18 @@ struct RegexFunction {
     }
 };
 
-
-void RegisterRegexFunction(const UniquePtr<Catalog> &catalog_ptr){
+void RegisterRegexFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "regex";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction regex_function(func_name,
-                                     {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
-                                     DataType(LogicalType::kBoolean),
-                                     &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, RegexFunction>);
+                                  {DataType(LogicalType::kVarchar), DataType(LogicalType::kVarchar)},
+                                  DataType(LogicalType::kBoolean),
+                                  &ScalarFunction::BinaryFunction<VarcharT, VarcharT, BooleanT, RegexFunction>);
     function_set_ptr->AddFunction(regex_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

@@ -14,6 +14,7 @@
 
 module;
 
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -132,7 +133,6 @@ void TxnIndexStore::AddSegmentOptimizing(SegmentIndexEntry *segment_index_entry)
     index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
 }
 
-
 bool TxnIndexStore::TryRevert() {
     if (status_ == TxnStoreStatus::kNone) {
         return false;
@@ -144,7 +144,6 @@ bool TxnIndexStore::TryRevert() {
     return true;
 }
 
-
 ///-----------------------------------------------------------------------------
 
 TxnCompactStore::TxnCompactStore() : type_(CompactStatementType::kInvalid) {}
@@ -152,6 +151,11 @@ TxnCompactStore::TxnCompactStore() : type_(CompactStatementType::kInvalid) {}
 TxnCompactStore::TxnCompactStore(CompactStatementType type) : type_(type) {}
 
 ///-----------------------------------------------------------------------------
+
+Pair<std::shared_lock<std::shared_mutex>, const HashMap<String, UniquePtr<TxnIndexStore>> &> TxnTableStore::txn_indexes_store() const {
+    std::shared_lock lock{txn_table_store_mtx_};
+    return std::make_pair(std::move(lock), std::cref(txn_indexes_store_));
+}
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
     this->AddSegmentStore(segment_entry.get());
@@ -211,16 +215,16 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Append(const SharedPtr<DataBlock
 }
 
 void TxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) {
-    std::lock_guard lock(mtx_);
+    std::lock_guard lock(txn_table_store_mtx_);
 
     txn_indexes_.emplace(table_index_entry, ptr_seq_n_++);
     has_update_ = true;
 }
 
 void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries) {
-    std::lock_guard lock(mtx_);
+    std::lock_guard lock(txn_table_store_mtx_);
 
-    auto *txn_index_store = this->GetIndexStore(table_index_entry);
+    auto *txn_index_store = this->GetIndexStore(table_index_entry, false);
     for (auto *segment_index_entry : segment_index_entries) {
         auto [iter, insert_ok] = txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
         if (!insert_ok) {
@@ -233,9 +237,9 @@ void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, c
 }
 
 void TxnTableStore::AddChunkIndexStore(TableIndexEntry *table_index_entry, ChunkIndexEntry *chunk_index_entry) {
-    std::lock_guard lock(mtx_);
+    std::lock_guard lock(txn_table_store_mtx_);
 
-    auto *txn_index_store = this->GetIndexStore(table_index_entry);
+    auto *txn_index_store = this->GetIndexStore(table_index_entry, false);
     SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
     txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
     txn_index_store->chunk_index_entries_.emplace(chunk_index_entry->encode(), chunk_index_entry);
@@ -244,7 +248,7 @@ void TxnTableStore::AddChunkIndexStore(TableIndexEntry *table_index_entry, Chunk
 }
 
 void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
-    std::lock_guard lock(mtx_);
+    std::lock_guard lock(txn_table_store_mtx_);
 
     if (txn_indexes_.contains(table_index_entry)) {
         table_index_entry->Cleanup();
@@ -257,7 +261,11 @@ void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
     has_update_ = true;
 }
 
-TxnIndexStore *TxnTableStore::GetIndexStore(TableIndexEntry *table_index_entry) {
+TxnIndexStore *TxnTableStore::GetIndexStore(TableIndexEntry *table_index_entry, bool need_lock) {
+    std::unique_lock lock(txn_table_store_mtx_, std::defer_lock);
+    if (need_lock) {
+        lock.lock();
+    }
     const String &index_name = *table_index_entry->GetIndexName();
     if (auto iter = txn_indexes_store_.find(index_name); iter != txn_indexes_store_.end()) {
         return iter->second.get();
@@ -313,6 +321,7 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
 }
 
 void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
+    std::shared_lock lock(txn_table_store_mtx_);
     if (append_state_.get() != nullptr) {
         // Rollback the data already been appended.
         Catalog::RollbackAppend(table_entry_, txn_id, abort_ts, this);
@@ -337,6 +346,7 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
 }
 
 bool TxnTableStore::CheckConflict(Catalog *catalog, Txn *txn) const {
+    std::shared_lock lock(txn_table_store_mtx_);
     const String &db_name = txn->db_name();
     const String &table_name = *table_entry_->GetTableName();
     for (const auto &[index_name, index_store] : txn_indexes_store_) {
@@ -359,11 +369,45 @@ bool TxnTableStore::CheckConflict(Catalog *catalog, Txn *txn) const {
     return false;
 }
 
-bool TxnTableStore::CheckConflict(const TxnTableStore *other_table_store) const {
-    for (const auto &[index_name, _] : txn_indexes_store_) {
-        for (const auto [index_entry, _] : other_table_store->txn_indexes_) {
-            if (index_name == *index_entry->GetIndexName()) {
-                return true;
+Optional<String> TxnTableStore::CheckConflict(const TxnTableStore *other_table_store) const {
+    std::shared_lock lock_this(txn_table_store_mtx_, std::defer_lock);
+    std::shared_lock lock_other(other_table_store->txn_table_store_mtx_, std::defer_lock);
+    std::lock(lock_this, lock_other);
+    {
+        Set<std::string_view> other_txn_indexes_set;
+        Map<std::string_view, Set<SegmentID>> other_txn_indexes_store_map;
+        for (const auto &index_entry : std::views::keys(other_table_store->txn_indexes_)) {
+            other_txn_indexes_set.insert(*index_entry->GetIndexName());
+        }
+        for (const auto &[index_name, index_store] : other_table_store->txn_indexes_store_) {
+            auto &segment_set = other_txn_indexes_store_map[index_name];
+            for (const auto segment_id : std::views::keys(index_store->index_entry_map_)) {
+                segment_set.insert(segment_id);
+            }
+        }
+        for (const auto &index_entry : std::views::keys(txn_indexes_)) {
+            if (const auto &index_name = *index_entry->GetIndexName(); other_txn_indexes_set.contains(index_name)) {
+                return fmt::format("{}: txn_indexes_ containing Index {} conflict with other_table_store->txn_indexes_",
+                                   __func__,
+                                   index_name);
+            }
+        }
+        for (const auto &[index_name, index_store] : txn_indexes_store_) {
+            if (other_txn_indexes_set.contains(index_name)) {
+                return fmt::format("{}: txn_indexes_store_ containing Index {} conflict with other_table_store->txn_indexes_",
+                                   __func__,
+                                   index_name);
+            }
+            if (const auto iter = other_txn_indexes_store_map.find(index_name); iter != other_txn_indexes_store_map.end()) {
+                for (const auto &other_segment_set = iter->second; const auto segment_id : std::views::keys(index_store->index_entry_map_)) {
+                    if (other_segment_set.contains(segment_id)) {
+                        return fmt::format(
+                            "{}: txn_indexes_store_ containing Index {} Segment {} conflict with other_table_store->txn_indexes_store_",
+                            __func__,
+                            index_name,
+                            segment_id);
+                    }
+                }
             }
         }
     }
@@ -371,7 +415,7 @@ bool TxnTableStore::CheckConflict(const TxnTableStore *other_table_store) const 
     const auto &delete_state = delete_state_;
     const auto &other_delete_state = other_table_store->delete_state_;
     if (delete_state.rows_.empty() || other_delete_state.rows_.empty()) {
-        return false;
+        return None;
     }
     for (const auto &[segment_id, block_map] : delete_state.rows_) {
         auto other_iter = other_delete_state.rows_.find(segment_id);
@@ -393,12 +437,12 @@ bool TxnTableStore::CheckConflict(const TxnTableStore *other_table_store) const 
                     break;
                 }
                 if (other_block_offsets[j] == block_offset) {
-                    return true;
+                    return fmt::format("Delete conflict: segment_id: {}, block_id: {}, block_offset: {}", segment_id, block_id, block_offset);
                 }
             }
         }
     }
-    return false;
+    return None;
 }
 
 void TxnTableStore::PrepareCommit1(const Vector<WalSegmentInfo *> &segment_infos) const {
@@ -450,6 +494,7 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
  * @brief Call for really commit the data to disk.
  */
 void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
+    std::shared_lock lock(txn_table_store_mtx_);
     Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_store_, &delete_state_);
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
@@ -513,6 +558,7 @@ void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) {
 }
 
 void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts, bool added) const {
+    std::shared_lock lock(txn_table_store_mtx_);
     if (!has_update_) {
         // No any option
         LOG_TRACE("Not update on txn table store, no need to add delta op");
@@ -538,6 +584,7 @@ void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *t
 }
 
 void TxnTableStore::TryRevert() {
+    std::shared_lock lock(txn_table_store_mtx_);
     if (table_status_ == TxnStoreStatus::kCompacting) {
         table_status_ = TxnStoreStatus::kNone;
         table_entry_->SetCompactDone();
@@ -637,11 +684,11 @@ bool TxnStore::CheckConflict(Catalog *catalog) {
     return false;
 }
 
-bool TxnStore::CheckConflict(const TxnStore &other_txn_store) {
+Optional<String> TxnStore::CheckConflict(const TxnStore &other_txn_store) {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
         for (const auto [table_entry, _] : other_txn_store.txn_tables_) {
             if (table_name == *table_entry->GetTableName()) {
-                return true;
+                return fmt::format("txn_tables_store_ containing table_name {} conflict with other_txn_store.txn_tables_", table_name);
             }
         }
 
@@ -651,11 +698,13 @@ bool TxnStore::CheckConflict(const TxnStore &other_txn_store) {
         }
 
         const TxnTableStore *other_table_store = other_iter->second.get();
-        if (table_store->CheckConflict(other_table_store)) {
-            return true;
+        if (const auto conflict_reason = table_store->CheckConflict(other_table_store); conflict_reason) {
+            return fmt::format("txn_tables_store_ containing table_name {} conflict with other_txn_store.txn_tables_store_: {}",
+                               table_name,
+                               *conflict_reason);
         }
     }
-    return false;
+    return None;
 }
 
 void TxnStore::PrepareCommit1() {
@@ -721,7 +770,7 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
         Catalog::RemoveTableEntry(table_entry, txn_id);
     }
 
-    Catalog* catalog_ptr = InfinityContext::instance().storage()->catalog();
+    Catalog *catalog_ptr = InfinityContext::instance().storage()->catalog();
     for (auto [db_entry, ptr_seq_n] : txn_dbs_) {
         db_entry->Cleanup();
 

@@ -37,7 +37,7 @@ public:
                                  SharedPtr<IndexBase> index_base,
                                  SharedPtr<ColumnDef> column_def,
                                  const u32 start_segment_offset,
-                                 PersistenceManager* persistence_manager)
+                                 PersistenceManager *persistence_manager)
         : IndexFileWorker(std::move(data_dir),
                           std::move(temp_dir),
                           std::move(file_dir),
@@ -59,7 +59,7 @@ public:
 protected:
     bool WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) override;
 
-    void ReadFromFileImpl(SizeT file_size) override;
+    void ReadFromFileImpl(SizeT file_size, bool from_spill) override;
 
 private:
     const EmbeddingInfo *GetEmbeddingInfo() const;

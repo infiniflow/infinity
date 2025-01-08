@@ -39,18 +39,18 @@ SELECT * FROM cached_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR
 10004 20 1
 19990 22 5
 
-query I
-EXPLAIN SELECT * FROM cached_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
-----
- PROJECT (5)
-  - table index: #4
-  - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
- -> SORT (4)
-    - expressions: [c1 (#0) ASC]
-    - output columns: [c1, __rowid]
-   -> Read cache (7)
-      - table name: (default_db.cached_index_scan)
-      - output columns: [__rowid]
+# query I
+# EXPLAIN SELECT * FROM cached_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;
+#----
+# PROJECT (5)
+#  - table index: #4
+#  - expressions: [c1 (#0), mod_256_min_128 (#1), mod_7 (#2)]
+# -> SORT (4)
+#    - expressions: [c1 (#0) ASC]
+#    - output columns: [c1, __rowid]
+#   -> Read cache (7)
+#      - table name: (default_db.cached_index_scan)
+#       - output columns: [__rowid]
 
 query I
 SELECT * FROM cached_index_scan WHERE (c1 < 5) OR (c1 > 10000 AND c1 < 10005) OR c1 = 19990 ORDER BY c1;

@@ -155,7 +155,7 @@ TEST_F(BPReorderingTest, test1) {
     i64 old_cost = cost_func(data_n, query_n, fwd);
     i64 new_cost = cost_func(data_n, query_n, fwd, reorder);
 
-//    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
+    //    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
     ASSERT_LE(new_cost, old_cost);
 }
 
@@ -194,6 +194,6 @@ TEST_F(BPReorderingTest, test2) {
     Vector<i32> reorder = bp();
     i64 new_cost = cost_func(data_n, dataset.ncol_, fwd, reorder);
 
-//    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
+    //    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
     EXPECT_LE(new_cost, old_cost);
 }

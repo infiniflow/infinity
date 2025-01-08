@@ -13,6 +13,6 @@
 
 extern volatile sig_atomic_t zsv_signal_interrupted;
 
-void zsv_handle_ctrl_c_signal();
+void zsv_handle_ctrl_c_signal(void);
 
 #endif

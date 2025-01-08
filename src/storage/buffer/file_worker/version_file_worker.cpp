@@ -31,7 +31,7 @@ VersionFileWorker::VersionFileWorker(SharedPtr<String> data_dir,
                                      SharedPtr<String> file_dir,
                                      SharedPtr<String> file_name,
                                      SizeT capacity,
-                                     PersistenceManager* persistence_manager)
+                                     PersistenceManager *persistence_manager)
     : FileWorker(std::move(data_dir), std::move(temp_dir), std::move(file_dir), std::move(file_name), persistence_manager), capacity_(capacity) {}
 
 VersionFileWorker::~VersionFileWorker() {
@@ -85,7 +85,7 @@ bool VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, co
     }
 }
 
-void VersionFileWorker::ReadFromFileImpl(SizeT file_size) {
+void VersionFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     if (data_ != nullptr) {
         String error_message = "Data is already allocated.";
         UnrecoverableError(error_message);

@@ -139,6 +139,8 @@ private:
 
     void ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state);
+
     void ExecuteShowLogs(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperatorState *operator_state);
@@ -158,6 +160,10 @@ private:
     void ExecuteShowMemoryAllocation(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowFunction(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteListSnapshots(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowSnapshot(QueryContext *query_context, ShowOperatorState *operator_state);
 
 private:
     ShowStmtType show_type_{ShowStmtType::kInvalid};

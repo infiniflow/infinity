@@ -176,7 +176,7 @@ PostingMerger::PostingMerger(optionflag_t flag, VectorWithLock<u32> &column_leng
 
 PostingMerger::~PostingMerger() {}
 
-void PostingMerger::Merge(const Vector<SegmentTermPosting *>& segment_term_postings, const RowID& merge_base_rowid) {
+void PostingMerger::Merge(const Vector<SegmentTermPosting *> &segment_term_postings, const RowID &merge_base_rowid) {
     // segment_term_postings is already sorted by base_row_id
     for (u32 i = 0; i < segment_term_postings.size(); ++i) {
         SegmentTermPosting *term_posting = segment_term_postings[i];

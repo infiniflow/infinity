@@ -583,7 +583,8 @@ Value Value::MakeMultiVector(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, Shared
     const SizeT len = embedding_info->Size();
     for (const auto [_, bytes] : ptr_bytes) {
         if (bytes == 0 || bytes % len != 0) {
-            auto status = Status::SyntaxError(fmt::format("Value::MakeMultiVector(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
+            auto status =
+                Status::SyntaxError(fmt::format("Value::MakeMultiVector(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
             RecoverableError(std::move(status));
         }
     }

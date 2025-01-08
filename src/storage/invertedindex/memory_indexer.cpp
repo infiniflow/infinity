@@ -175,11 +175,16 @@ void MemoryIndexer::InsertGap(u32 row_count) {
 }
 
 void MemoryIndexer::Commit(bool offline) {
-    if (offline) {
-        commiting_thread_pool_.push([this](int id) { this->CommitOffline(); });
-    } else {
-        commiting_thread_pool_.push([this](int id) { this->CommitSync(); });
-    }
+    commiting_thread_pool_.push([offline, weak_ptr = weak_from_this()](int id) {
+        if (const auto shared_ptr = weak_ptr.lock(); shared_ptr) {
+            auto *memory_indexer = static_cast<MemoryIndexer *>(shared_ptr.get());
+            if (offline) {
+                memory_indexer->CommitOffline();
+            } else {
+                memory_indexer->CommitSync();
+            }
+        }
+    });
 }
 
 SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
@@ -213,6 +218,7 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
 }
 
 SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
+    std::shared_lock commit_sync_lock(mutex_commit_sync_share_);
     Vector<SharedPtr<ColumnInverter>> inverters;
     // LOG_INFO("MemoryIndexer::CommitSync begin");
     u64 seq_commit = this->ring_inverted_.GetBatch(inverters);
@@ -270,6 +276,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         while (GetInflightTasks() > 0) {
             CommitOffline(100);
         }
+        std::unique_lock lock(mutex_commit_);
         OfflineDump();
         return;
     }
@@ -281,6 +288,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     while (GetInflightTasks() > 0) {
         CommitSync(100);
     }
+    std::unique_lock commit_sync_lock(mutex_commit_sync_share_);
 
     String posting_file = Path(index_dir_) / (base_name_ + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : ""));
     String dict_file = Path(index_dir_) / (base_name_ + DICT_SUFFIX + (spill ? SPILL_SUFFIX : ""));

@@ -1328,6 +1328,16 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             this->logical_plan_ = logical_command;
             break;
         }
+        case CommandType::kSnapshot: {
+            StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+            if (storage_mode == StorageMode::kUnInitialized) {
+                UnrecoverableError("Uninitialized storage mode");
+            }
+
+            auto logical_command = MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+            this->logical_plan_ = logical_command;
+            break;
+        }
         default: {
             String error_message = "Invalid command type.";
             UnrecoverableError(error_message);
@@ -1503,6 +1513,14 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           None,
                                                           None,
                                                           statement->txn_id_);
+            break;
+        }
+        case ShowStmtType::kTransactionHistory: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kTransactionHistory,
+                                                          statement->schema_name_,
+                                                          statement->table_name_,
+                                                          bind_context_ptr->GenerateTableIndex());
             break;
         }
         case ShowStmtType::kSegments: {
@@ -1697,6 +1715,38 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
                                                           ShowStmtType::kFunction,
                                                           "",
                                                           "",
+                                                          bind_context_ptr->GenerateTableIndex(),
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          statement->function_name_);
+            break;
+        }
+        case ShowStmtType::kListSnapshots: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kListSnapshots,
+                                                          "",
+                                                          "",
+                                                          bind_context_ptr->GenerateTableIndex(),
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          None,
+                                                          statement->function_name_);
+            break;
+        }
+        case ShowStmtType::kShowSnapshot: {
+            this->logical_plan_ = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                          ShowStmtType::kShowSnapshot,
+                                                          "",
+                                                          statement->snapshot_name_,
                                                           bind_context_ptr->GenerateTableIndex(),
                                                           None,
                                                           None,

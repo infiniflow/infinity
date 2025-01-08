@@ -153,6 +153,15 @@ String TableIndexEntry::GetPathNameTail() const {
     return index_dir_->substr(delimiter_i + 1);
 }
 
+SharedPtr<SegmentIndexEntry> TableIndexEntry::GetSegment(SegmentID segment_id, Txn *txn) {
+    std::unique_lock w_lock(rw_locker_);
+    auto iter = index_by_segment_.find(segment_id);
+    if (iter == index_by_segment_.end() || !iter->second->CheckDeprecate(txn->BeginTS())) {
+        return nullptr;
+    }
+    return iter->second;
+}
+
 bool TableIndexEntry::GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedPtr<SegmentIndexEntry> &segment_index_entry) {
     bool created = false;
     std::unique_lock w_lock(rw_locker_);
@@ -227,7 +236,6 @@ void TableIndexEntry::CommitCompact([[maybe_unused]] TransactionID txn_id, TxnTi
         }
     }
 }
-
 
 nlohmann::json TableIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json;

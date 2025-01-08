@@ -105,6 +105,7 @@ GROUP           { return GROUP; }
 HAVING          { return HAVING; }
 HEADER          { return HEADER; }
 HIGHLIGHT       { return HIGHLIGHT; }
+HISTORY         { return HISTORY; }
 HOUR            { return HOUR; }
 HOURS           { return HOURS; }
 HUGEINT         { return HUGEINT; }
@@ -168,6 +169,7 @@ QUERIES         { return QUERIES; }
 QUERY           { return QUERY; }
 REAL            { return REAL; }
 RECOVER         { return RECOVER; }
+RESTORE         { return RESTORE; }
 RENAME          { return RENAME; }
 REMOVE          { return REMOVE; }
 RIGHT           { return RIGHT; }
@@ -186,6 +188,7 @@ SNAPSHOT        { return SNAPSHOT; }
 SNAPSHOTS       { return SNAPSHOTS; }
 SPARSE          { return SPARSE; }
 STANDALONE      { return STANDALONE; }
+SYSTEM          { return SYSTEM; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
 TENSOR          { return TENSOR; }
@@ -202,6 +205,7 @@ TRUE            { return TRUE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
 UNLOCK          { return UNLOCK; }
+UNNEST          { return UNNEST; }
 UNSIGNED        { return UNSIGNED; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }

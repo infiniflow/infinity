@@ -16,7 +16,7 @@
 #define RTLD_LAZY 0
 void *dlopen(const char *dll_name, int flags);
 
-#define dlsym(x, y) (GetProcAddress((HINSTANCE)(x), (y)))
+void *dlsym(void *handle, const char *symbol);
 
 int dlclose(void *handle);
 

@@ -2,8 +2,8 @@
 #include "fusion_expr.h"
 #include "knn_expr.h"
 #include "match_expr.h"
-#include "match_tensor_expr.h"
 #include "match_sparse_expr.h"
+#include "match_tensor_expr.h"
 #include "spdlog/fmt/fmt.h"
 #include <cmath>
 #include <sstream>

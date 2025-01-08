@@ -27,7 +27,6 @@ struct IsinfFunction {
     }
 };
 
-
 template <>
 inline void IsinfFunction::Run(FloatT &left, BooleanT &result) {
     result = std::isinf(left);
@@ -48,37 +47,36 @@ inline void IsinfFunction::Run(BFloat16T &left, BooleanT &result) {
     result = std::isinf(static_cast<float>(left));
 }
 
-
-void RegisterIsinfFunction(const UniquePtr<Catalog> &catalog_ptr){
+void RegisterIsinfFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "isinf";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction isinf_function_float(func_name,
-                                      {DataType(LogicalType::kFloat)},
-                                      {DataType(LogicalType::kBoolean)},
-                                      &ScalarFunction::UnaryFunction<FloatT, BooleanT, IsinfFunction>);
+                                        {DataType(LogicalType::kFloat)},
+                                        {DataType(LogicalType::kBoolean)},
+                                        &ScalarFunction::UnaryFunction<FloatT, BooleanT, IsinfFunction>);
     function_set_ptr->AddFunction(isinf_function_float);
 
     ScalarFunction isinf_function_double(func_name,
-                                       {DataType(LogicalType::kDouble)},
-                                       {DataType(LogicalType::kBoolean)},
-                                       &ScalarFunction::UnaryFunction<DoubleT, BooleanT, IsinfFunction>);
+                                         {DataType(LogicalType::kDouble)},
+                                         {DataType(LogicalType::kBoolean)},
+                                         &ScalarFunction::UnaryFunction<DoubleT, BooleanT, IsinfFunction>);
     function_set_ptr->AddFunction(isinf_function_double);
 
     ScalarFunction isinf_function_float16(func_name,
-                                        {DataType(LogicalType::kFloat16)},
-                                        {DataType(LogicalType::kBoolean)},
-                                        &ScalarFunction::UnaryFunction<Float16T, BooleanT, IsinfFunction>);
+                                          {DataType(LogicalType::kFloat16)},
+                                          {DataType(LogicalType::kBoolean)},
+                                          &ScalarFunction::UnaryFunction<Float16T, BooleanT, IsinfFunction>);
     function_set_ptr->AddFunction(isinf_function_float16);
 
     ScalarFunction isinf_function_bfloat16(func_name,
-                                         {DataType(LogicalType::kBFloat16)},
-                                         {DataType(LogicalType::kBoolean)},
-                                         &ScalarFunction::UnaryFunction<BFloat16T, BooleanT, IsinfFunction>);
+                                           {DataType(LogicalType::kBFloat16)},
+                                           {DataType(LogicalType::kBoolean)},
+                                           &ScalarFunction::UnaryFunction<BFloat16T, BooleanT, IsinfFunction>);
     function_set_ptr->AddFunction(isinf_function_bfloat16);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

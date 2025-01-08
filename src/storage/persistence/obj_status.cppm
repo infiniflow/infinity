@@ -39,8 +39,8 @@ export enum class ObjCached {
 };
 
 export struct ObjStat {
-    SizeT obj_size_{}; // footer (if present) is excluded
-    SizeT parts_{};    // an object attribute
+    SizeT obj_size_{};  // footer (if present) is excluded
+    SizeT parts_{};     // an object attribute
     SizeT ref_count_{}; // the number of user (R and W) of some part of this object
     Set<Range> deleted_ranges_{};
 
@@ -48,9 +48,12 @@ export struct ObjStat {
 
     ObjStat() = default;
 
-    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count, ObjCached cached = ObjCached::kCached) : obj_size_(obj_size), parts_(parts), ref_count_(ref_count), cached_(cached) {}
+    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count, ObjCached cached = ObjCached::kCached)
+        : obj_size_(obj_size), parts_(parts), ref_count_(ref_count), cached_(cached) {}
 
-    ObjStat(const ObjStat &other) : obj_size_(other.obj_size_), parts_(other.parts_), ref_count_(other.ref_count_), deleted_ranges_(other.deleted_ranges_), cached_(other.cached_.load()) {}
+    ObjStat(const ObjStat &other)
+        : obj_size_(other.obj_size_), parts_(other.parts_), ref_count_(other.ref_count_), deleted_ranges_(other.deleted_ranges_),
+          cached_(other.cached_.load()) {}
 
     ObjStat &operator=(const ObjStat &other) {
         if (this != &other) {
@@ -63,7 +66,9 @@ export struct ObjStat {
         return *this;
     }
 
-    ObjStat(ObjStat &&other) : obj_size_(other.obj_size_), parts_(other.parts_), ref_count_(other.ref_count_), deleted_ranges_(std::move(other.deleted_ranges_)), cached_(other.cached_.load()) {}
+    ObjStat(ObjStat &&other)
+        : obj_size_(other.obj_size_), parts_(other.parts_), ref_count_(other.ref_count_), deleted_ranges_(std::move(other.deleted_ranges_)),
+          cached_(other.cached_.load()) {}
 
     ObjStat &operator=(ObjStat &&other) {
         if (this != &other) {
@@ -89,4 +94,4 @@ export struct ObjStat {
     void CheckValid(const String &obj_key, SizeT current_object_size) const;
 };
 
-}
+} // namespace infinity

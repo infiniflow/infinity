@@ -74,7 +74,7 @@ public:
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    Operator::template Execute(left_ptr[i], right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr,state_ptr);
+                    Operator::template Execute(left_ptr[i], right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left, right, result, count, state_ptr);
@@ -89,7 +89,7 @@ public:
                 auto right_ptr = ColumnValueReader<RightType>(right);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    Operator::template Execute(left_c, right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr,state_ptr);
+                    Operator::template Execute(left_c, right_ptr[i], result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left_c, right, result, count, state_ptr);
@@ -104,7 +104,7 @@ public:
                 auto left_ptr = ColumnValueReader<LeftType>(left);
                 BooleanColumnWriter result_ptr(result);
                 for (SizeT i = 0; i < count; ++i) {
-                    Operator::template Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr,state_ptr);
+                    Operator::template Execute(left_ptr[i], right_c, result_ptr[i], result_null.get(), 0, nullptr, nullptr, state_ptr);
                 }
             } else {
                 ResultBooleanExecuteWithNull(left, right_c, result, count, state_ptr);
@@ -131,7 +131,14 @@ private:
             if (row_index >= count) {
                 return false;
             }
-            Operator::template Execute(left_ptr[row_index], right_ptr[row_index], result_ptr[row_index], result_null.get(), row_index, nullptr, nullptr, state_ptr);
+            Operator::template Execute(left_ptr[row_index],
+                                       right_ptr[row_index],
+                                       result_ptr[row_index],
+                                       result_null.get(),
+                                       row_index,
+                                       nullptr,
+                                       nullptr,
+                                       state_ptr);
             return row_index + 1 < count;
         });
     }
@@ -150,7 +157,14 @@ private:
             if (row_index >= count) {
                 return false;
             }
-            Operator::template Execute(left_constant, right_ptr[row_index], result_ptr[row_index], result_null.get(), row_index, nullptr, nullptr, state_ptr);
+            Operator::template Execute(left_constant,
+                                       right_ptr[row_index],
+                                       result_ptr[row_index],
+                                       result_null.get(),
+                                       row_index,
+                                       nullptr,
+                                       nullptr,
+                                       state_ptr);
             return row_index + 1 < count;
         });
     }
@@ -169,7 +183,14 @@ private:
             if (row_index >= count) {
                 return false;
             }
-            Operator::template Execute(left_ptr[row_index], right_constant, result_ptr[row_index], result_null.get(), row_index, nullptr, nullptr, state_ptr);
+            Operator::template Execute(left_ptr[row_index],
+                                       right_constant,
+                                       result_ptr[row_index],
+                                       result_null.get(),
+                                       row_index,
+                                       nullptr,
+                                       nullptr,
+                                       state_ptr);
             return row_index + 1 < count;
         });
     }
@@ -198,7 +219,9 @@ public:
                                            right->buffer_->GetCompactBit(0),
                                            answer,
                                            result_null.get(),
-                                           0, nullptr, nullptr,
+                                           0,
+                                           nullptr,
+                                           nullptr,
                                            state_ptr);
                 result->buffer_->SetCompactBit(0, answer);
                 result_null->SetAllTrue();
@@ -304,7 +327,9 @@ private:
                                        right->buffer_->GetCompactBit(row_index),
                                        answer,
                                        result_null.get(),
-                                       row_index, nullptr, nullptr,
+                                       row_index,
+                                       nullptr,
+                                       nullptr,
                                        state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
@@ -325,7 +350,14 @@ private:
                 return false;
             }
             BooleanT answer;
-            Operator::template Execute(left->buffer_->GetCompactBit(row_index), right_boolean, answer, result_null.get(), row_index, nullptr, nullptr, state_ptr);
+            Operator::template Execute(left->buffer_->GetCompactBit(row_index),
+                                       right_boolean,
+                                       answer,
+                                       result_null.get(),
+                                       row_index,
+                                       nullptr,
+                                       nullptr,
+                                       state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });
@@ -345,7 +377,14 @@ private:
                 return false;
             }
             BooleanT answer;
-            Operator::template Execute(left_boolean, right->buffer_->GetCompactBit(row_index), answer, result_null.get(), row_index, nullptr, nullptr, state_ptr);
+            Operator::template Execute(left_boolean,
+                                       right->buffer_->GetCompactBit(row_index),
+                                       answer,
+                                       result_null.get(),
+                                       row_index,
+                                       nullptr,
+                                       nullptr,
+                                       state_ptr);
             result->buffer_->SetCompactBit(row_index, answer);
             return row_index + 1 < count;
         });
@@ -402,13 +441,34 @@ public:
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
-                return ExecuteFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteFlat<LeftType, RightType, ResultType, Operator>(left,
+                                                                              right,
+                                                                              result,
+                                                                              count,
+                                                                              state_ptr_left,
+                                                                              state_ptr_right,
+                                                                              state_ptr,
+                                                                              nullable);
             }
             case ColumnVectorType::kConstant: {
-                return ExecuteConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteConstant<LeftType, RightType, ResultType, Operator>(left,
+                                                                                  right,
+                                                                                  result,
+                                                                                  count,
+                                                                                  state_ptr_left,
+                                                                                  state_ptr_right,
+                                                                                  state_ptr,
+                                                                                  nullable);
             }
             case ColumnVectorType::kHeterogeneous: {
-                return ExecuteHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteHeterogeneous<LeftType, RightType, ResultType, Operator>(left,
+                                                                                       right,
+                                                                                       result,
+                                                                                       count,
+                                                                                       state_ptr_left,
+                                                                                       state_ptr_right,
+                                                                                       state_ptr,
+                                                                                       nullable);
             }
         }
     }
@@ -426,18 +486,39 @@ private:
                                    bool nullable) {
 
         switch (right->vector_type()) {
-            case ColumnVectorType::kInvalid:{
+            case ColumnVectorType::kInvalid: {
                 String error_message = "Invalid column vector type.";
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
-                return ExecuteFlatFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteFlatFlat<LeftType, RightType, ResultType, Operator>(left,
+                                                                                  right,
+                                                                                  result,
+                                                                                  count,
+                                                                                  state_ptr_left,
+                                                                                  state_ptr_right,
+                                                                                  state_ptr,
+                                                                                  nullable);
             }
             case ColumnVectorType::kConstant: {
-                return ExecuteFlatConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteFlatConstant<LeftType, RightType, ResultType, Operator>(left,
+                                                                                      right,
+                                                                                      result,
+                                                                                      count,
+                                                                                      state_ptr_left,
+                                                                                      state_ptr_right,
+                                                                                      state_ptr,
+                                                                                      nullable);
             }
             case ColumnVectorType::kHeterogeneous: {
-                return ExecuteFlatHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteFlatHeterogeneous<LeftType, RightType, ResultType, Operator>(left,
+                                                                                           right,
+                                                                                           result,
+                                                                                           count,
+                                                                                           state_ptr_left,
+                                                                                           state_ptr_right,
+                                                                                           state_ptr,
+                                                                                           nullable);
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "CompactBit isn't implemented.";
@@ -462,18 +543,39 @@ private:
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
-                return ExecuteConstantFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteConstantFlat<LeftType, RightType, ResultType, Operator>(left,
+                                                                                      right,
+                                                                                      result,
+                                                                                      count,
+                                                                                      state_ptr_left,
+                                                                                      state_ptr_right,
+                                                                                      state_ptr,
+                                                                                      nullable);
             }
             case ColumnVectorType::kConstant: {
-                return ExecuteConstantConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteConstantConstant<LeftType, RightType, ResultType, Operator>(left,
+                                                                                          right,
+                                                                                          result,
+                                                                                          count,
+                                                                                          state_ptr_left,
+                                                                                          state_ptr_right,
+                                                                                          state_ptr,
+                                                                                          nullable);
             }
             case ColumnVectorType::kHeterogeneous: {
-                return ExecuteConstantHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteConstantHeterogeneous<LeftType, RightType, ResultType, Operator>(left,
+                                                                                               right,
+                                                                                               result,
+                                                                                               count,
+                                                                                               state_ptr_left,
+                                                                                               state_ptr_right,
+                                                                                               state_ptr,
+                                                                                               nullable);
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "CompactBit isn't implemented.";
                 UnrecoverableError(error_message);
-                return ;
+                return;
             }
         }
     }
@@ -495,13 +597,34 @@ private:
                 break;
             }
             case ColumnVectorType::kFlat: {
-                return ExecuteHeterogeneousFlat<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteHeterogeneousFlat<LeftType, RightType, ResultType, Operator>(left,
+                                                                                           right,
+                                                                                           result,
+                                                                                           count,
+                                                                                           state_ptr_left,
+                                                                                           state_ptr_right,
+                                                                                           state_ptr,
+                                                                                           nullable);
             }
             case ColumnVectorType::kConstant: {
-                return ExecuteHeterogeneousConstant<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteHeterogeneousConstant<LeftType, RightType, ResultType, Operator>(left,
+                                                                                               right,
+                                                                                               result,
+                                                                                               count,
+                                                                                               state_ptr_left,
+                                                                                               state_ptr_right,
+                                                                                               state_ptr,
+                                                                                               nullable);
             }
             case ColumnVectorType::kHeterogeneous: {
-                return ExecuteHeterogeneousHeterogeneous<LeftType, RightType, ResultType, Operator>(left, right, result, count, state_ptr_left, state_ptr_right, state_ptr, nullable);
+                return ExecuteHeterogeneousHeterogeneous<LeftType, RightType, ResultType, Operator>(left,
+                                                                                                    right,
+                                                                                                    result,
+                                                                                                    count,
+                                                                                                    state_ptr_left,
+                                                                                                    state_ptr_right,
+                                                                                                    state_ptr,
+                                                                                                    nullable);
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "CompactBit isn't implemented.";
@@ -760,7 +883,14 @@ private:
             result_null->SetAllFalse();
         } else {
             result_null->SetAllTrue();
-            Operator::template Execute<LeftType, RightType, ResultType>(left_ptr[0], right_ptr[0], result_ptr[0], result_null.get(), 0, state_ptr_left, state_ptr_right, state_ptr);
+            Operator::template Execute<LeftType, RightType, ResultType>(left_ptr[0],
+                                                                        right_ptr[0],
+                                                                        result_ptr[0],
+                                                                        result_null.get(),
+                                                                        0,
+                                                                        state_ptr_left,
+                                                                        state_ptr_right,
+                                                                        state_ptr);
         }
         result->Finalize(1);
     }

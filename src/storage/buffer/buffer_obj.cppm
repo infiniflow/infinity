@@ -125,7 +125,7 @@ private:
     void LoadInner();
 
     // called when BufferHandle needs mutable pointer.
-    void GetMutPointer();
+    void *GetMutPointer();
 
     // called when BufferHandle destructs, to decrease rc_ by 1.
     void UnloadInner();

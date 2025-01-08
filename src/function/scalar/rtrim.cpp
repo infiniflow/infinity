@@ -1,6 +1,6 @@
 module;
 
-#include<cctype>
+#include <cctype>
 
 module rtrim;
 
@@ -35,28 +35,27 @@ inline void RtrimFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *l
     Span<const char> left_v = left_ptr->GetVarcharInner(left);
     input = left_v.data();
     input_len = left_v.size();
-    long pos = input_len-1;
+    long pos = input_len - 1;
     while (pos > -1 && std::isspace(static_cast<unsigned char>(input[pos]))) {
         pos--;
     }
 
-    Span<const char> res_span = Span<const char>(input, pos+1);
+    Span<const char> res_span = Span<const char>(input, pos + 1);
     result_ptr->AppendVarcharInner(res_span, result);
 }
 
-
-void RegisterRtrimFunction(const UniquePtr<Catalog> &catalog_ptr){
+void RegisterRtrimFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "rtrim";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction rtrim_function(func_name,
-                                     {DataType(LogicalType::kVarchar)},
-                                     {DataType(LogicalType::kVarchar)},
-                                     &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, RtrimFunction>);
+                                  {DataType(LogicalType::kVarchar)},
+                                  {DataType(LogicalType::kVarchar)},
+                                  &ScalarFunction::UnaryFunctionVarlenToVarlen<VarcharT, VarcharT, RtrimFunction>);
     function_set_ptr->AddFunction(rtrim_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }
 
-}
+} // namespace infinity

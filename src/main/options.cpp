@@ -93,22 +93,24 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(DELTA_CHECKPOINT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kDeltaCheckpointThreshold;
     name2index_[String(WAL_FLUSH_OPTION_NAME)] = GlobalOptionIndex::kFlushMethodAtCommit;
     name2index_[String(RESOURCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kResourcePath;
+    name2index_[String(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
 
     name2index_[String(RECORD_RUNNING_QUERY_OPTION_NAME)] = GlobalOptionIndex::kRecordRunningQuery;
 }
 
 Status GlobalOptions::AddOption(UniquePtr<BaseOption> option) {
     GlobalOptionIndex global_option_index = GetOptionIndex(option->name_);
-    if(global_option_index == GlobalOptionIndex::kInvalid) {
+    if (global_option_index == GlobalOptionIndex::kInvalid) {
         return Status::InvalidConfig(fmt::format("Attempt to insert option: {}, which isn't supported", option->name_));
     }
 
     SizeT option_index = static_cast<SizeT>(global_option_index);
     if (option_index >= options_.size()) {
-        return Status::InvalidConfig(fmt::format("Attempt to insert option: {} with index {} at index: {}", option->name_, option_index, options_.size()));
+        return Status::InvalidConfig(
+            fmt::format("Attempt to insert option: {} with index {} at index: {}", option->name_, option_index, options_.size()));
     }
 
-    if(options_[option_index].get() != nullptr) {
+    if (options_[option_index].get() != nullptr) {
         return Status::InvalidConfig(fmt::format("Attempt to add an existed option", option->name_));
     }
 
@@ -119,7 +121,7 @@ Status GlobalOptions::AddOption(UniquePtr<BaseOption> option) {
 
 GlobalOptionIndex GlobalOptions::GetOptionIndex(const String &option_name) const {
     auto iter = name2index_.find(option_name);
-    if(iter == name2index_.end()) {
+    if (iter == name2index_.end()) {
         return GlobalOptionIndex::kInvalid;
     }
     return iter->second;
@@ -141,33 +143,33 @@ BaseOption *GlobalOptions::GetOptionByIndex(GlobalOptionIndex global_option_inde
 }
 
 String GlobalOptions::GetStringValue(GlobalOptionIndex option_index) {
-    BaseOption* base_option = GetOptionByIndex(option_index);
-    if(base_option->data_type_ != BaseOptionDataType::kString) {
+    BaseOption *base_option = GetOptionByIndex(option_index);
+    if (base_option->data_type_ != BaseOptionDataType::kString) {
         String error_message = "Attempt to fetch string value from non-string data type option";
         UnrecoverableError(error_message);
     }
-    StringOption* string_option = static_cast<StringOption*>(base_option);
+    StringOption *string_option = static_cast<StringOption *>(base_option);
     return string_option->value_;
 }
 
 i64 GlobalOptions::GetIntegerValue(GlobalOptionIndex option_index) {
-    BaseOption* base_option = GetOptionByIndex(option_index);
-    if(base_option->data_type_ != BaseOptionDataType::kInteger) {
+    BaseOption *base_option = GetOptionByIndex(option_index);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
         String error_message = "Attempt to fetch integer value from non-integer data type option";
         UnrecoverableError(error_message);
     }
-    IntegerOption* integer_option = static_cast<IntegerOption*>(base_option);
+    IntegerOption *integer_option = static_cast<IntegerOption *>(base_option);
     return integer_option->value_;
 }
 
 bool GlobalOptions::GetBoolValue(GlobalOptionIndex option_index) {
-    BaseOption* base_option = GetOptionByIndex(option_index);
-    if(base_option->data_type_ != BaseOptionDataType::kBoolean) {
+    BaseOption *base_option = GetOptionByIndex(option_index);
+    if (base_option->data_type_ != BaseOptionDataType::kBoolean) {
         String error_message = "Attempt to fetch bool value from non-bool data type option";
         UnrecoverableError(error_message);
     }
-    BooleanOption* boolean_option = static_cast<BooleanOption*>(base_option);
+    BooleanOption *boolean_option = static_cast<BooleanOption *>(base_option);
     return boolean_option->value_;
 }
 
-}
+} // namespace infinity

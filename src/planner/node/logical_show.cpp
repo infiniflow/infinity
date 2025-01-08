@@ -84,6 +84,8 @@ String ToString(ShowStmtType type) {
             return "Show transactions";
         case ShowStmtType::kTransaction:
             return "Show transaction";
+        case ShowStmtType::kTransactionHistory:
+            return "Show transaction history";
         case ShowStmtType::kLogs:
             return "Show logs";
         case ShowStmtType::kDeltaLogs:
@@ -106,6 +108,10 @@ String ToString(ShowStmtType type) {
             return "Show function";
         case ShowStmtType::kCollections:
             return "Show collection";
+        case ShowStmtType::kListSnapshots:
+            return "List snapshots";
+        case ShowStmtType::kShowSnapshot:
+            return "Show snapshot";
         case ShowStmtType::kInvalid: {
             String error_message = "Invalid chunk scan type";
             UnrecoverableError(error_message);

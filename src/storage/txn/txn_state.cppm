@@ -32,7 +32,7 @@ export enum class TxnState {
     kInvalid,
 };
 
-export inline String ToString(TxnState txn_state) {
+export inline String TxnState2Str(TxnState txn_state) {
     switch (txn_state) {
         case TxnState::kNotStarted: {
             return "Not Started";
@@ -66,5 +66,19 @@ export enum class TxnType : i8 {
     kWrite,
     kInvalid,
 };
+
+export inline String TxnType2Str(TxnType txn_type) {
+    switch (txn_type) {
+        case TxnType::kRead: {
+            return "Read";
+        }
+        case TxnType::kWrite: {
+            return "Write";
+        }
+        default: {
+            return "Not decided";
+        }
+    }
+}
 
 } // namespace infinity

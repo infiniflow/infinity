@@ -64,14 +64,14 @@ BufferHandle::~BufferHandle() {
 const void *BufferHandle::GetData() const { return data_; }
 
 void *BufferHandle::GetDataMut() {
-    buffer_obj_->GetMutPointer();
+    data_ = buffer_obj_->GetMutPointer();
     return data_;
 }
 
 const FileWorker *BufferHandle::GetFileWorker() const { return buffer_obj_->file_worker(); }
 
 FileWorker *BufferHandle::GetFileWorkerMut() {
-    buffer_obj_->GetMutPointer();
+    data_ = buffer_obj_->GetMutPointer();
     return buffer_obj_->file_worker();
 }
 

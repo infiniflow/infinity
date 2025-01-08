@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module ;
+module;
 
 #include "peer_server_thrift/PeerService.h"
 
@@ -40,4 +40,4 @@ export using infinity_peer_server::ChangeRoleResponse;
 export using infinity_peer_server::NewLeaderRequest;
 export using infinity_peer_server::NewLeaderResponse;
 export using infinity_peer_server::to_string;
-}
+} // namespace infinity_peer_server

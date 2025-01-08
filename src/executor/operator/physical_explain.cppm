@@ -38,7 +38,8 @@ public:
                              SharedPtr<Vector<SharedPtr<String>>> text_array,
                              UniquePtr<PhysicalOperator> left,
                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kExplain, std::move(left), nullptr, id, load_metas), explain_type_(type), texts_(std::move(text_array)) {}
+        : PhysicalOperator(PhysicalOperatorType::kExplain, std::move(left), nullptr, id, load_metas), explain_type_(type),
+          texts_(std::move(text_array)) {}
 
     ~PhysicalExplain() override = default;
 

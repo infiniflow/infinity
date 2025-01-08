@@ -27,7 +27,7 @@
  *   - your library would be named zsvextmy.dll (or .so or .dylib)
  */
 ZSV_EXT_EXPORT
-const char *zsv_ext_id();
+const char *zsv_ext_id(void);
 
 /**
  * Initialize your module
@@ -84,7 +84,7 @@ void zsv_ext_errfree(char *errstr);
  * @return Zero on success, non-zero on fail
  */
 ZSV_EXT_EXPORT
-enum zsv_ext_status zsv_ext_exit();
+enum zsv_ext_status zsv_ext_exit(void);
 
 /**
  * Help message. Displayed when user enters any command beginning with
@@ -94,7 +94,7 @@ enum zsv_ext_status zsv_ext_exit();
  * @param argv Arguments
  */
 ZSV_EXT_EXPORT
-const char * const *zsv_ext_help(int argc, const char *argv[]);
+const char *const *zsv_ext_help(int argc, const char *argv[]);
 
 /**
  * License message. Displayed when user enters any command beginning with
@@ -102,7 +102,7 @@ const char * const *zsv_ext_help(int argc, const char *argv[]);
  *
  */
 ZSV_EXT_EXPORT
-const char * const *zsv_ext_license();
+const char *const *zsv_ext_license(void);
 
 /**
  * Version message. Displayed when user enters any command beginning with
@@ -110,4 +110,4 @@ const char * const *zsv_ext_license();
  *
  */
 ZSV_EXT_EXPORT
-const char * const *zsv_ext_version();
+const char *const *zsv_ext_version(void);

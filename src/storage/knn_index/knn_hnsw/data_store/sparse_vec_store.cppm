@@ -43,6 +43,7 @@ private:
     SparseVecStoreMeta(SizeT max_dim) : max_dim_(max_dim) {}
 
 public:
+    SparseVecStoreMeta() = default;
     static This Make(SizeT max_dim) { return This(max_dim); }
     static This Make(SizeT max_dim, bool) { return This(max_dim); }
 
@@ -149,8 +150,8 @@ public:
 
     void Prefetch(SizeT idx, const Meta &meta) const {
         const SparseVecEle &vec = vecs_[idx];
-        _mm_prefetch((const char*)vec.indices_.get(), _MM_HINT_T0);
-        _mm_prefetch((const char*)vec.data_.get(), _MM_HINT_T0);
+        _mm_prefetch((const char *)vec.indices_.get(), _MM_HINT_T0);
+        _mm_prefetch((const char *)vec.data_.get(), _MM_HINT_T0);
     }
 
 private:

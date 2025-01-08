@@ -104,7 +104,16 @@ bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                index->Save(*file_handle_);
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    if (to_spill) {
+                        index->Save(*file_handle_);
+                    } else {
+                        index->SaveToPtr(*file_handle_);
+                    }
+                } else {
+                    UnrecoverableError("BMPIndexFileWorker::WriteToFileImpl: index does not own memory");
+                }
             }
         },
         *bmp_index);
@@ -112,7 +121,7 @@ bool BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, c
     return true;
 }
 
-void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
+void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size, bool from_spill) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
@@ -125,10 +134,65 @@ void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
                 UnrecoverableError("Invalid index type.");
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                index = new IndexT(IndexT::Load(*file_handle_));
+                if constexpr (IndexT::kOwnMem) {
+                    if (from_spill) {
+                        index = new IndexT(IndexT::Load(*file_handle_));
+                    } else {
+                        index = new IndexT(IndexT::LoadFromPtr(*file_handle_, file_size));
+                    }
+                } else {
+                    UnrecoverableError("BMPIndexFileWorker::ReadFromFileImpl: index does not own memory");
+                }
             }
         },
         *bmp_index);
+}
+
+bool BMPIndexFileWorker::ReadFromMmapImpl(const void *ptr, SizeT size) {
+    if (mmap_data_ != nullptr) {
+        UnrecoverableError("Data is already allocated.");
+    }
+    mmap_data_ = reinterpret_cast<u8 *>(new AbstractBMP(BMPIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get(), false)));
+    auto *bmp_index = reinterpret_cast<AbstractBMP *>(mmap_data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (!IndexT::kOwnMem) {
+                    const auto *p = static_cast<const char *>(ptr);
+                    index = new IndexT(IndexT::LoadFromPtr(p, size));
+                } else {
+                    UnrecoverableError("BMPIndexFileWorker::ReadFromMmapImpl: index own memory");
+                }
+            }
+        },
+        *bmp_index);
+    return true;
+}
+
+void BMPIndexFileWorker::FreeFromMmapImpl() {
+    if (mmap_data_ == nullptr) {
+        return;
+    }
+    auto *bmp_index = reinterpret_cast<AbstractBMP *>(mmap_data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (!IndexT::kOwnMem) {
+                    delete index;
+                } else {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+        },
+        *bmp_index);
+    delete bmp_index;
+    mmap_data_ = nullptr;
 }
 
 } // namespace infinity

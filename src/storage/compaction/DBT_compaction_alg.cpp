@@ -63,9 +63,7 @@ Vector<SegmentEntry *> SegmentLayer::PickCompacting(TransactionID txn_id, SizeT 
         }
         Vector<int> idx(segment_n);
         std::iota(idx.begin(), idx.end(), 0);
-        std::nth_element(idx.begin(), idx.begin() + M, idx.end(), [&](int i, int j) {
-            return segments[i].second < segments[j].second;
-        });
+        std::nth_element(idx.begin(), idx.begin() + M, idx.end(), [&](int i, int j) { return segments[i].second < segments[j].second; });
         SizeT total_row_cnt = 0;
         for (SizeT i = 0; i < M; ++i) {
             ret.push_back(segments[idx[i]].first);

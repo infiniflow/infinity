@@ -64,13 +64,22 @@ public:
     static Status Rename(const String &old_path, const String &new_path);
     static Status Truncate(const String &file_name, SizeT new_length);
     static Status Merge(const String &dst_file, const String &src_file);
+    static Status Copy(const String &dst_file, const String &src_file);
     static Tuple<Vector<SharedPtr<DirEntry>>, Status> ListDirectory(const String &path);
     static SizeT GetFileSize(const String &path);
     static String GetParentPath(const String &path);
     static SizeT GetDirectorySize(const String &path);
     static String ConcatenatePath(const String &dir_path, const String &file_path);
+
+    static std::ofstream BeginCompress(const String& compressed_file);
+    static Status AddFileCompress(std::ofstream& ofstream, const String &filename);
+    static void EndCompress(std::ofstream& ofstream);
+
     static i32 MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_len);
     static i32 MunmapFile(const String &file_path);
+
+    static i32 MmapFilePart(const String &file_path, SizeT offset, SizeT length, u8 *&data_ptr);
+    static i32 MunmapFilePart(u8 *data_ptr, SizeT offset, SizeT length);
 
     static Status InitRemoteStore(StorageType storage_type = StorageType::kMinio,
                                   const String &URL = "http://localhost:9000",

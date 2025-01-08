@@ -67,9 +67,8 @@ public:
 
     DBEntry *db_entry() { return db_entry_; }
 
-    List<SharedPtr<TableEntry>> GetAllEntries() const {
-        return table_entry_list_.GetAllEntries();
-    }
+    List<SharedPtr<TableEntry>> GetAllEntries() const { return table_entry_list_.GetAllEntries(); }
+
 private:
     Tuple<TableEntry *, Status> CreateEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                             TableEntryType table_entry_type,
@@ -119,7 +118,7 @@ private:
 
     TableEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    void PushBackEntry(const SharedPtr<TableEntry>& new_table_entry);
+    void PushBackEntry(const SharedPtr<TableEntry> &new_table_entry);
 
     void Sort();
 

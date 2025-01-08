@@ -114,7 +114,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
                 unsafe_column_lengths.resize(id_offset + file_read_array_len);
             }
             auto [read_count, read_status] = file_handle->Read(unsafe_column_lengths.data() + id_offset, file_size);
-            if(!read_status.ok()) {
+            if (!read_status.ok()) {
                 UnrecoverableError(read_status.message());
             }
             if (read_count != file_size) {

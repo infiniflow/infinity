@@ -14,6 +14,9 @@
 
 module;
 
+#include <cerrno>
+#include <cstring>
+#include <sys/mman.h>
 #include <tuple>
 
 module file_worker;
@@ -46,7 +49,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
         UnrecoverableError(error_message);
     }
 
-    if(persistence_manager_ != nullptr && !to_spill) {
+    if (persistence_manager_ != nullptr && !to_spill) {
         String write_dir = *file_dir_;
         String write_path = Path(*data_dir_) / write_dir / *file_name_;
         String tmp_write_path = Path(*temp_dir_) / StringTransform(write_path, "/", "_");
@@ -56,9 +59,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
             UnrecoverableError(status.message());
         }
         file_handle_ = std::move(file_handle);
-        DeferFn defer_fn([&]() {
-            file_handle_ = nullptr;
-        });
+        DeferFn defer_fn([&]() { file_handle_ = nullptr; });
 
         bool prepare_success = false;
 
@@ -88,9 +89,7 @@ bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
             UnrecoverableError(status.message());
         }
         file_handle_ = std::move(file_handle);
-        DeferFn defer_fn([&]() {
-            file_handle_ = nullptr;
-        });
+        DeferFn defer_fn([&]() { file_handle_ = nullptr; });
 
         if (to_spill) {
             LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, file_handle_->FileDescriptor()));
@@ -123,10 +122,8 @@ void FileWorker::ReadFromFile(bool from_spill) {
         file_size = file_handle->FileSize();
     }
     file_handle_ = std::move(file_handle);
-    DeferFn defer_fn2([&]() {
-        file_handle_ = nullptr;
-    });
-    ReadFromFileImpl(file_size);
+    DeferFn defer_fn2([&]() { file_handle_ = nullptr; });
+    ReadFromFileImpl(file_size, from_spill);
 }
 
 void FileWorker::MoveFile() {
@@ -157,10 +154,7 @@ void FileWorker::MoveFile() {
 // Get absolute file path. As key of buffer handle.
 String FileWorker::GetFilePath() const { return Path(*data_dir_) / *file_dir_ / *file_name_; }
 
-String FileWorker::ChooseFileDir(bool spill) const {
-    return spill ? (Path(*temp_dir_) / *file_dir_)
-                 : (Path(*data_dir_) / *file_dir_);
-}
+String FileWorker::ChooseFileDir(bool spill) const { return spill ? (Path(*temp_dir_) / *file_dir_) : (Path(*data_dir_) / *file_dir_); }
 
 Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathInner(bool from_spill) {
     bool use_object_cache = !from_spill && persistence_manager_ != nullptr;
@@ -187,7 +181,6 @@ Pair<Optional<DeferFn<std::function<void()>>>, String> FileWorker::GetFilePathIn
     }
     return {std::move(defer_fn), std::move(read_path)};
 }
-
 
 void FileWorker::CleanupFile() const {
     if (persistence_manager_ != nullptr) {
@@ -218,27 +211,42 @@ void FileWorker::CleanupTempFile() const {
 
 void FileWorker::Mmap() {
     if (mmap_addr_ != nullptr || mmap_data_ != nullptr) {
-        UnrecoverableError("Mmap already exists");
+        this->Munmap();
     }
     auto [defer_fn, read_path] = GetFilePathInner(false);
     bool use_object_cache = persistence_manager_ != nullptr;
-    SizeT file_size = VirtualStore::GetFileSize(read_path);
-    VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
     if (use_object_cache) {
-        const void *ptr = mmap_addr_ + obj_addr_.part_offset_;
-        this->ReadFromMmapImpl(ptr, obj_addr_.part_size_);
+        int ret = VirtualStore::MmapFilePart(read_path, obj_addr_.part_offset_, obj_addr_.part_size_, mmap_addr_);
+        if (ret < 0) {
+            UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
+        }
+        this->ReadFromMmapImpl(mmap_addr_, obj_addr_.part_size_);
     } else {
-        const void *ptr = mmap_addr_;
-        this->ReadFromMmapImpl(ptr, file_size);
+        SizeT file_size = VirtualStore::GetFileSize(read_path);
+        int ret = VirtualStore::MmapFile(read_path, mmap_addr_, file_size);
+        if (ret < 0) {
+            UnrecoverableError(fmt::format("Mmap file {} failed. {}", read_path, strerror(errno)));
+        }
+        this->ReadFromMmapImpl(mmap_addr_, file_size);
     }
 }
 
 void FileWorker::Munmap() {
-    auto [defer_fn, read_path] = GetFilePathInner(false);
+    if (mmap_addr_ == nullptr) {
+        return;
+    }
     this->FreeFromMmapImpl();
-    VirtualStore::MunmapFile(read_path);
+    auto [defer_fn, read_path] = GetFilePathInner(false);
+    bool use_object_cache = persistence_manager_ != nullptr;
+    if (use_object_cache) {
+        VirtualStore::MunmapFilePart(mmap_addr_, obj_addr_.part_offset_, obj_addr_.part_size_);
+    } else {
+        VirtualStore::MunmapFile(read_path);
+    }
     mmap_addr_ = nullptr;
     mmap_data_ = nullptr;
 }
+
+void FileWorker::MmapNotNeed() {}
 
 } // namespace infinity

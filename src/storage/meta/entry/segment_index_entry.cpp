@@ -720,7 +720,12 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                         if constexpr (std::is_same_v<T, std::nullptr_t>) {
                             UnrecoverableError("Invalid index type.");
                         } else {
-                            index->Optimize(options);
+                            using IndexT = typename std::remove_pointer_t<T>;
+                            if constexpr (IndexT::kOwnMem) {
+                                index->Optimize(options);
+                            } else {
+                                UnrecoverableError("Invalid index type.");
+                            }
                         }
                     },
                     index);
@@ -753,18 +758,23 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                         if constexpr (std::is_same_v<T, std::nullptr_t>) {
                             UnrecoverableError("Invalid index type.");
                         } else {
-                            using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
-                            if (params->compress_to_lvq) {
-                                if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
-                                    UnrecoverableError("Invalid index type.");
-                                } else {
-                                    auto *p = std::move(*index).CompressToLVQ().release();
-                                    delete index;
-                                    *abstract_hnsw = p;
+                            using IndexT = typename std::remove_pointer_t<T>;
+                            if constexpr (IndexT::kOwnMem) {
+                                using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
+                                if (params->compress_to_lvq) {
+                                    if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
+                                        UnrecoverableError("Invalid index type.");
+                                    } else {
+                                        auto *p = std::move(*index).CompressToLVQ().release();
+                                        delete index;
+                                        *abstract_hnsw = p;
+                                    }
                                 }
-                            }
-                            if (params->lvq_avg) {
-                                index->Optimize();
+                                if (params->lvq_avg) {
+                                    index->Optimize();
+                                }
+                            } else {
+                                UnrecoverableError("Invalid index type.");
                             }
                         }
                     },
@@ -773,7 +783,7 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
 
             const auto [chunk_index_entries, memory_index_entry] = this->GetHnswIndexSnapshot();
             for (const auto &chunk_index_entry : chunk_index_entries) {
-                BufferHandle buffer_handle = chunk_index_entry->GetIndex();
+                BufferHandle buffer_handle = chunk_index_entry->GetBufferObj()->Load();
                 auto *abstract_hnsw = reinterpret_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
                 optimize_index(abstract_hnsw);
                 chunk_index_entry->SaveIndexFile();
@@ -857,7 +867,7 @@ void SegmentIndexEntry::PickCleanup(CleanupScanner *scanner) {
 void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
                                                  SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
                                                  Vector<ChunkIndexEntry *> old_chunks) {
-    TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_);
+    TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_, true);
     chunk_index_entries_.push_back(merged_chunk_index_entry);
     txn_index_store->optimize_data_.emplace_back(this, merged_chunk_index_entry.get(), std::move(old_chunks));
 }
@@ -865,7 +875,8 @@ void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
 ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry) {
     const auto &index_name = *table_index_entry_->GetIndexName();
     Txn *txn = txn_table_store->GetTxn();
-    if (!TrySetOptimizing(txn)) {
+    const auto [result_b, add_segment_optimizing] = TrySetOptimizing(txn);
+    if (!result_b) {
         LOG_INFO(fmt::format("Index {} segment {} is optimizing, skip optimize.", index_name, segment_id_));
         return nullptr;
     }
@@ -899,6 +910,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             return nullptr;
         }
     }
+    add_segment_optimizing();
     RowID base_rowid(segment_id_, 0);
     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = nullptr;
     switch (index_base->index_type_) {
@@ -913,11 +925,15 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                         return;
                     } else {
                         using IndexT = std::decay_t<decltype(*index)>;
-                        using DataType = typename IndexT::DataType;
-                        CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
-                        HnswInsertConfig insert_config;
-                        insert_config.optimize_ = true;
-                        index->InsertVecs(std::move(iter), insert_config);
+                        if constexpr (IndexT::kOwnMem) {
+                            using DataType = typename IndexT::DataType;
+                            CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
+                            HnswInsertConfig insert_config;
+                            insert_config.optimize_ = true;
+                            index->InsertVecs(std::move(iter), insert_config);
+                        } else {
+                            UnrecoverableError("Invalid index type.");
+                        }
                     }
                 },
                 abstract_hnsw);
@@ -935,12 +951,20 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                         UnrecoverableError("Invalid index type.");
                     } else {
                         using IndexT = std::decay_t<decltype(*index)>;
-                        using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+                        if constexpr (IndexT::kOwnMem) {
+                            using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
 
-                        CappedOneColumnIterator<SparseRefT, true /*check_ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
-                        index->AddDocs(std::move(iter));
+                            CappedOneColumnIterator<SparseRefT, true /*check_ts*/> iter(segment_entry,
+                                                                                        buffer_mgr,
+                                                                                        column_def->id(),
+                                                                                        begin_ts,
+                                                                                        row_count);
+                            index->AddDocs(std::move(iter));
+                        } else {
+                            UnrecoverableError("Invalid index type.");
+                        }
                     }
-                },
+                    },
                 abstract_bmp);
             merged_chunk_index_entry = memory_bmp_index->Dump(this, buffer_mgr);
             break;
@@ -1225,17 +1249,18 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     return segment_index_entry;
 }
 
-bool SegmentIndexEntry::TrySetOptimizing(Txn *txn) {
+Pair<bool, std::function<void()>> SegmentIndexEntry::TrySetOptimizing(Txn *txn) {
     bool expected = false;
     bool success = optimizing_.compare_exchange_strong(expected, true);
     if (!success) {
-        return false;
+        return {false, nullptr};
     }
-    TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
-    TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
-    TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_);
-    txn_index_store->AddSegmentOptimizing(this);
-    return true;
+    return {true, [this, txn] {
+        TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
+        TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
+        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_, true);
+        txn_index_store->AddSegmentOptimizing(this);
+    }};
 }
 
 void SegmentIndexEntry::ResetOptimizing() { optimizing_.store(false); }

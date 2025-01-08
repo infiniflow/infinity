@@ -23,11 +23,7 @@ namespace infinity {
 struct TableEntry;
 struct SegmentEntry;
 
-enum class CompactStatementType {
-    kManual,
-    kAuto,
-    kInvalid
-};
+enum class CompactStatementType { kManual, kAuto, kInvalid };
 
 class CompactStatement : public BaseStatement {
 public:

@@ -91,7 +91,7 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
 
 Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::ParseCheckpointFilenames(const String &catalog_dir) {
     auto [entries, status] = VirtualStore::ListDirectory(Path(InfinityContext::instance().config()->DataDir()) / catalog_dir);
-    if(!status.ok()) {
+    if (!status.ok()) {
         String error_message = fmt::format("Can't list directory: {}/{}", InfinityContext::instance().config()->DataDir(), catalog_dir);
         UnrecoverableError(error_message);
     }
@@ -159,7 +159,7 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
     }
 
     auto [entries, status] = VirtualStore::ListDirectory(wal_dir);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 

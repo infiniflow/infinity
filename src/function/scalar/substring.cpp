@@ -40,7 +40,8 @@ struct SubstrFunction {
 };
 
 template <>
-inline bool SubstrFunction::Run(VarcharT &first, BigIntT &second, BigIntT &third, VarcharT &result, ColumnVector *first_ptr, ColumnVector * result_ptr) {
+inline bool
+SubstrFunction::Run(VarcharT &first, BigIntT &second, BigIntT &third, VarcharT &result, ColumnVector *first_ptr, ColumnVector *result_ptr) {
     if (second < 0) {
         UnrecoverableError(fmt::format("substring start offset should >= 0, currently it is {}", second));
     }
@@ -60,7 +61,8 @@ inline bool SubstrFunction::Run(VarcharT &first, BigIntT &second, BigIntT &third
     SizeT source_len = first_v.size();
     if ((SizeT)second >= source_len) {
         // Construct empty varchar value;
-        Span<const char> substr_span = Span<const char>(first_v.data(), 0);;
+        Span<const char> substr_span = Span<const char>(first_v.data(), 0);
+        ;
         result_ptr->AppendVarcharInner(substr_span, result);
         return true;
     }

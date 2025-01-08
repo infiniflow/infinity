@@ -39,6 +39,7 @@ import buffer_obj;
 import logical_type;
 import infinity_context;
 import virtual_store;
+import snapshot_info;
 
 namespace infinity {
 
@@ -168,9 +169,7 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
     }
 }
 
-BlockColumnEntry *BlockEntry::GetColumnBlockEntry(SizeT column_idx) const {
-    return columns_[column_idx].get();
-}
+BlockColumnEntry *BlockEntry::GetColumnBlockEntry(SizeT column_idx) const { return columns_[column_idx].get(); }
 
 ColumnVector BlockEntry::GetColumnVector(BufferManager *buffer_mgr, ColumnID column_id) const {
     auto *block_column_entry = GetColumnBlockEntry(column_id);
@@ -466,10 +465,29 @@ void BlockEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *
     }
 }
 
-void BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts, bool &flush_column, bool &flush_version, bool check_commit) const {
+SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
+    SharedPtr<BlockSnapshotInfo> block_snapshot_info = MakeShared<BlockSnapshotInfo>();
+    block_snapshot_info->block_id_ = block_id_;
+    block_snapshot_info->block_dir_ = *block_dir_;
+
+    SizeT column_count = this->columns_.size();
+    block_snapshot_info->column_block_snapshots_.reserve(column_count);
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+        SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = columns_[column_id]->GetSnapshotInfo();
+        block_snapshot_info->column_block_snapshots_.push_back(block_column_snapshot_info);
+    }
+
+    return block_snapshot_info;
+}
+
+void BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts, bool &flush_column, bool &flush_version, bool check_commit, bool need_lock) const {
     // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
     flush_column = false;
     flush_version = false;
+    std::shared_lock lock(rw_locker_, std::defer_lock);
+    if (need_lock) {
+        lock.lock();
+    }
     if (check_commit && commit_ts_ > checkpoint_ts) {
         return;
     }
@@ -505,7 +523,7 @@ void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_cou
 bool BlockEntry::FlushVersionNoLock(TxnTimeStamp checkpoint_ts, bool check_commit) {
     bool flush_column = false;
     bool flush_version = false;
-    CheckFlush(checkpoint_ts, flush_column, flush_version, check_commit);
+    CheckFlush(checkpoint_ts, flush_column, flush_version, check_commit, false);
     if (flush_version) {
         version_buffer_object_->Save(VersionFileWorkerSaveCtx(checkpoint_ts));
     }
@@ -580,7 +598,7 @@ Vector<String> BlockEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     Vector<String> res;
     res.reserve(columns_.size());
-    for(const auto& block_column_entry: columns_) {
+    for (const auto &block_column_entry : columns_) {
         Vector<String> files = block_column_entry->GetFilePath(txn_id, begin_ts);
         res.insert(res.end(), files.begin(), files.end());
     }
@@ -672,7 +690,9 @@ SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID blo
 }
 
 void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id) {
-    auto iter = std::lower_bound(columns_.begin(), columns_.end(), column_id, [&](const auto &column, ColumnID column_id) { return column->column_id() < column_id; });
+    auto iter = std::lower_bound(columns_.begin(), columns_.end(), column_id, [&](const auto &column, ColumnID column_id) {
+        return column->column_id() < column_id;
+    });
     if (iter != columns_.end() && (*iter)->column_id() == column_id) {
         *iter = std::move(column_entry);
     } else {

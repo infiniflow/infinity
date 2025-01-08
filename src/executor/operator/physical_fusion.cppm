@@ -54,9 +54,7 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
 
-    SizeT TaskletCount() override {
-        return 1;
-    }
+    SizeT TaskletCount() override { return 1; }
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});

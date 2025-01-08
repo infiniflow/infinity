@@ -102,13 +102,13 @@ public:
             case LogicalType::kBigInt:
             case LogicalType::kFloat:
             case LogicalType::kDouble:
-            case LogicalType::kFloat16: // need to be converted to float and keep order
+            case LogicalType::kFloat16:  // need to be converted to float and keep order
             case LogicalType::kBFloat16: // need to be converted to float and keep order
             case LogicalType::kDate:
             case LogicalType::kTime:
             case LogicalType::kDateTime:  // need to be converted to int64 and keep order
             case LogicalType::kTimestamp: // need to be converted to int64 and keep order
-            case LogicalType::kVarchar:  // need to be converted to int64 by hash
+            case LogicalType::kVarchar:   // need to be converted to int64 by hash
             {
                 return true;
             }

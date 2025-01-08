@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 module;
 
 #include "column_def.h"
@@ -28,4 +27,4 @@ export using infinity::TableConstraint;
 export using infinity::ConstrainTypeToString;
 export using infinity::StringToConstraintType;
 
-}
+} // namespace infinity

@@ -30,8 +30,7 @@ namespace infinity {
 export class SkipListReader {
 public:
     explicit SkipListReader(const DocListFormatOption &doc_list_format_option)
-        : has_tf_list_(doc_list_format_option.HasTfList()),
-          has_block_max_(doc_list_format_option.HasBlockMax()) {
+        : has_tf_list_(doc_list_format_option.HasTfList()), has_block_max_(doc_list_format_option.HasBlockMax()) {
         if (has_tf_list_) {
             ttf_buffer_ = MakeUnique<u32[]>(SKIP_LIST_BUFFER_SIZE);
         }

@@ -454,6 +454,11 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Snapshots Dir
+        String snapshot_dir = DEFAULT_SNAPSHOT_DIR.data();
+        UniquePtr<StringOption> snapshot_dir_option = MakeUnique<StringOption>(SNAPSHOT_DIR_OPTION_NAME, snapshot_dir);
+        global_options_.AddOption(std::move(snapshot_dir_option));
+
         // Buffer Manager Size
         i64 buffer_manager_size = DEFAULT_BUFFER_MANAGER_SIZE;
         UniquePtr<IntegerOption> buffer_manager_size_option =
@@ -1653,6 +1658,17 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kSnapshotDir: {
+                            String snapshot_dir;
+                            if (elem.second.is_string()) {
+                                snapshot_dir = elem.second.value_or(DEFAULT_SNAPSHOT_DIR.data());
+                            } else {
+                                return Status::InvalidConfig("'snapshot_dir' field isn't string, such as \"snapshot\"");
+                            }
+                            UniquePtr<StringOption> snapshot_dir_option = MakeUnique<StringOption>(SNAPSHOT_DIR_OPTION_NAME, snapshot_dir);
+                            global_options_.AddOption(std::move(snapshot_dir_option));
+                            break;
+                        }
                         case GlobalOptionIndex::kStorageType: {
                             // File System Type
                             String storage_type_str = String(DEFAULT_STORAGE_TYPE);
@@ -1915,6 +1931,12 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kSnapshotDir) == nullptr) {
+                    String snapshot_dir = DEFAULT_SNAPSHOT_DIR.data();
+                    UniquePtr<StringOption> snapshot_dir_option = MakeUnique<StringOption>(SNAPSHOT_DIR_OPTION_NAME, snapshot_dir);
+                    global_options_.AddOption(std::move(snapshot_dir_option));
                 }
 
                 if (BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kStorageType); base_option == nullptr) {
@@ -2680,6 +2702,11 @@ void Config::SetOptimizeInterval(i64 interval) {
     return;
 }
 
+String Config::SnapshotDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kSnapshotDir);
+}
+
 i64 Config::MemIndexCapacity() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexCapacity);
@@ -2918,6 +2945,7 @@ void Config::PrintAll() {
             break;
         }
     }
+    fmt::print(" - snapshot_dir: {}\n", SnapshotDir());
 
     // Buffer manager
     fmt::print(" - buffer_manager_size: {}\n", Utility::FormatByteSize(BufferManagerSize()));

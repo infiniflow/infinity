@@ -58,6 +58,7 @@ import logical_import;
 import logical_dummy_scan;
 import logical_match;
 import logical_fusion;
+import logical_unnest;
 
 import subquery_unnest;
 
@@ -99,6 +100,12 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             SharedPtr<LogicalNode> filter = BuildFilter(root, where_conditions_, query_context, bind_context);
             filter->set_left_node(root);
             root = filter;
+        }
+
+        if (!unnest_expressions_.empty()) {
+            SharedPtr<LogicalNode> unnest = BuildUnnest(root, unnest_expressions_, query_context, bind_context);
+            unnest->set_left_node(root);
+            root = unnest;
         }
 
         if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
@@ -143,7 +150,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                 root = top;
             }
         } else if (limit_expression_.get() != nullptr) {
-            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), std::static_pointer_cast<BaseTableRef>(table_ref_ptr_), limit_expression_, offset_expression_, total_hits_count_flag_);
+            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+                                                  std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                  limit_expression_,
+                                                  offset_expression_,
+                                                  total_hits_count_flag_);
             limit->set_left_node(root);
             root = limit;
         }
@@ -281,6 +292,43 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                             RecoverableError(Status::SyntaxError(R"(similarity option must be "BM25" or "boolean".)"));
                         }
                     }
+                    // option: bm25_params
+                    if (iter = search_ops.options_.find("bm25_param_k1"); iter != search_ops.options_.end()) {
+                        const auto k1_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (k1_v < 0.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_k1 must be a non-negative float. default value: 1.2"));
+                        }
+                        match_node->bm25_params_.k1 = k1_v;
+                    }
+                    if (iter = search_ops.options_.find("bm25_param_b"); iter != search_ops.options_.end()) {
+                        const auto b_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (b_v < 0.0f || b_v > 1.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_b must be in the range [0.0f, 1.0f]. default value: 0.75"));
+                        }
+                        match_node->bm25_params_.b = b_v;
+                    }
+                    if (iter = search_ops.options_.find("bm25_param_delta"); iter != search_ops.options_.end()) {
+                        const auto delta_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (delta_v < 0.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_delta must be a non-negative float. default value: 0.0"));
+                        }
+                        match_node->bm25_params_.delta_term = delta_v;
+                        match_node->bm25_params_.delta_phrase = delta_v;
+                    }
+                    if (iter = search_ops.options_.find("bm25_param_delta_term"); iter != search_ops.options_.end()) {
+                        const auto delta_term_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (delta_term_v < 0.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_delta_term must be a non-negative float. default value: 0.0"));
+                        }
+                        match_node->bm25_params_.delta_term = delta_term_v;
+                    }
+                    if (iter = search_ops.options_.find("bm25_param_delta_phrase"); iter != search_ops.options_.end()) {
+                        const auto delta_phrase_v = DataType::StringToValue<FloatT>(iter->second);
+                        if (delta_phrase_v < 0.0f) {
+                            RecoverableError(Status::SyntaxError("bm25_param_delta_phrase must be a non-negative float. default value: 0.0"));
+                        }
+                        match_node->bm25_params_.delta_phrase = delta_phrase_v;
+                    }
 
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     UniquePtr<QueryNode> query_tree =
@@ -389,7 +437,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         }
 
         if (limit_expression_.get() != nullptr) {
-            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(), base_table_ref, limit_expression_, offset_expression_, total_hits_count_flag_);
+            auto limit = MakeShared<LogicalLimit>(bind_context->GetNewLogicalNodeId(),
+                                                  base_table_ref,
+                                                  limit_expression_,
+                                                  offset_expression_,
+                                                  total_hits_count_flag_);
             limit->set_left_node(root);
             root = limit;
         }
@@ -563,6 +615,15 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildFilter(SharedPtr<LogicalNode> 
     auto filter = MakeShared<LogicalFilter>(bind_context->GetNewLogicalNodeId(), filter_expr);
 
     return filter;
+}
+
+SharedPtr<LogicalNode> BoundSelectStatement::BuildUnnest(SharedPtr<LogicalNode> &root,
+                                                         Vector<SharedPtr<BaseExpression>> &expressions,
+                                                         QueryContext *query_context,
+                                                         const SharedPtr<BindContext> &bind_context) {
+    // SharedPtr<LogicalUnnest> unnest
+    auto unnest = MakeShared<LogicalUnnest>(bind_context->GetNewLogicalNodeId(), expressions);
+    return unnest;
 }
 
 void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,

@@ -171,6 +171,19 @@ ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr, S
     return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadOnly, row_count);
 }
 
+SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() const {
+    SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
+    block_column_snapshot_info->column_id_ = column_id_;
+    block_column_snapshot_info->filename_ = *file_name_;
+    SizeT outline_count = outline_buffers_.size();
+    for (SizeT file_idx = 0; file_idx < outline_count; ++file_idx) {
+        String outline_file_path = *OutlineFilename(file_idx);
+        SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
+        outline_snapshot_info->filename_ = outline_file_path;
+    }
+    return block_column_snapshot_info;
+}
+
 ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe, SizeT row_count) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
@@ -279,7 +292,7 @@ void BlockColumnEntry::FlushColumnCheck(TxnTimeStamp checkpoint_ts) {
     }
     bool flush_column = false;
     bool flush_version = false;
-    block_entry_->CheckFlush(checkpoint_ts, flush_column, flush_version);
+    block_entry_->CheckFlush(checkpoint_ts, flush_column, flush_version, true, true);
     if (!flush_column) {
         return;
     }
@@ -322,9 +335,7 @@ void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] 
     }
 }
 
-Vector<String> BlockColumnEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
-    return FilePaths();
-}
+Vector<String> BlockColumnEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const { return FilePaths(); }
 
 nlohmann::json BlockColumnEntry::Serialize() {
     nlohmann::json json_res;

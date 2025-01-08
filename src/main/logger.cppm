@@ -35,14 +35,12 @@ export struct LoggerConfig {
 
 export class Logger {
 public:
-    static Status
-    Initialize(Config* config_ptr);
+    static Status Initialize(Config *config_ptr);
 
     static void Initialize(const LoggerConfig &config);
     static void Flush();
 
-    static void
-    Shutdown();
+    static void Shutdown();
 };
 
 export inline bool IS_LOGGER_INITIALIZED() { return infinity_logger.get() != nullptr; }
@@ -53,8 +51,7 @@ export inline bool SHOULD_LOG_DEBUG() { return IS_LOGGER_INITIALIZED() && infini
 
 export inline bool SHOULD_LOG_INFO() { return IS_LOGGER_INITIALIZED() && infinity_logger->should_log(spdlog::level::level_enum::info); }
 
-export inline void
-LOG_TRACE(const String& msg) {
+export inline void LOG_TRACE(const String &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->trace(msg);
     } else {
@@ -62,8 +59,7 @@ LOG_TRACE(const String& msg) {
     }
 }
 
-export inline void
-LOG_DEBUG(const String& msg) {
+export inline void LOG_DEBUG(const String &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->debug(msg);
     } else {
@@ -71,8 +67,7 @@ LOG_DEBUG(const String& msg) {
     }
 }
 
-export inline void
-LOG_INFO(const String& msg) {
+export inline void LOG_INFO(const String &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->info(msg);
     } else {
@@ -80,8 +75,7 @@ LOG_INFO(const String& msg) {
     }
 }
 
-export inline void
-LOG_WARN(const String& msg) {
+export inline void LOG_WARN(const String &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->warn(msg);
     } else {
@@ -89,8 +83,7 @@ LOG_WARN(const String& msg) {
     }
 }
 
-export inline void
-LOG_ERROR(const String& msg) {
+export inline void LOG_ERROR(const String &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->error(msg);
     } else {
@@ -98,8 +91,7 @@ LOG_ERROR(const String& msg) {
     }
 }
 
-export inline void
-LOG_CRITICAL(const String& msg) {
+export inline void LOG_CRITICAL(const String &msg) {
     if (IS_LOGGER_INITIALIZED()) {
         infinity_logger->critical(msg);
     } else {
@@ -107,4 +99,4 @@ LOG_CRITICAL(const String& msg) {
     }
 }
 
-}
+} // namespace infinity

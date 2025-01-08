@@ -62,8 +62,20 @@ export using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, Se
                                          KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset> *,
                                          KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset> *,
                                          KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset> *,
-                                         std::nullptr_t>;
 
+                                         KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainL2VecStoreType<float>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainCosVecStoreType<u8>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainIPVecStoreType<u8>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainL2VecStoreType<u8>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainCosVecStoreType<i8>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainIPVecStoreType<i8>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainL2VecStoreType<i8>, SegmentOffset, false> *,
+                                         KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset, false> *,
+                                         KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset, false> *,
+                                         KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset, false> *,
+                                         std::nullptr_t>;
 export struct HnswIndexInMem : public BaseMemIndex {
 public:
     HnswIndexInMem() : hnsw_(nullptr) {}
@@ -74,21 +86,21 @@ public:
     HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace);
 
 private:
-    template <typename DataType>
+    template <typename DataType, bool OwnMem>
     static AbstractHnsw InitAbstractIndex(const IndexHnsw *index_hnsw) {
         switch (index_hnsw->encode_type_) {
             case HnswEncodeType::kPlain: {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
-                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset>;
+                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
                         return static_cast<HnswIndex *>(nullptr);
                     }
                     case MetricType::kMetricInnerProduct: {
-                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset>;
+                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
                         return static_cast<HnswIndex *>(nullptr);
                     }
                     case MetricType::kMetricCosine: {
-                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset>;
+                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
                         return static_cast<HnswIndex *>(nullptr);
                     }
                     default: {
@@ -102,15 +114,15 @@ private:
                 } else {
                     switch (index_hnsw->metric_type_) {
                         case MetricType::kMetricL2: {
-                            using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset>;
+                            using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
                             return static_cast<HnswIndex *>(nullptr);
                         }
                         case MetricType::kMetricInnerProduct: {
-                            using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset>;
+                            using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
                             return static_cast<HnswIndex *>(nullptr);
                         }
                         case MetricType::kMetricCosine: {
-                            using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset>;
+                            using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
                             return static_cast<HnswIndex *>(nullptr);
                         }
                         default: {
@@ -118,6 +130,27 @@ private:
                         }
                     }
                 }
+            }
+            default: {
+                return nullptr;
+            }
+        }
+    }
+
+    template <bool OwnMem>
+    static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
+        const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+        const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+
+        switch (embedding_info->Type()) {
+            case EmbeddingDataType::kElemFloat: {
+                return InitAbstractIndex<float, OwnMem>(index_hnsw);
+            }
+            case EmbeddingDataType::kElemUInt8: {
+                return InitAbstractIndex<u8, OwnMem>(index_hnsw);
+            }
+            case EmbeddingDataType::kElemInt8: {
+                return InitAbstractIndex<i8, OwnMem>(index_hnsw);
             }
             default: {
                 return nullptr;
@@ -133,32 +166,43 @@ private:
         }
         using T = std::decay_t<decltype(index)>;
         if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-            SizeT mem1 = index->mem_usage();
-            auto [start, end] = index->StoreData(std::forward<Iter>(iter), config);
-            SizeT bucket_size = std::max(kBuildBucketSize, SizeT(end - start - 1) / thread_pool.size() + 1);
-            SizeT bucket_n = (end - start - 1) / bucket_size + 1;
+            using IndexT = std::decay_t<decltype(*index)>;
+            if constexpr (!IndexT::kOwnMem) {
+                UnrecoverableError("HnswIndexInMem::InsertVecs: index does not own memory");
+            } else {
+                SizeT mem1 = index->mem_usage();
+                auto [start, end] = index->StoreData(std::forward<Iter>(iter), config);
+                SizeT bucket_size = std::max(kBuildBucketSize, SizeT(end - start - 1) / thread_pool.size() + 1);
+                SizeT bucket_n = (end - start - 1) / bucket_size + 1;
 
-            Vector<std::future<void>> futs;
-            futs.reserve(bucket_n);
-            for (SizeT i = 0; i < bucket_n; ++i) {
-                SizeT i1 = start + i * bucket_size;
-                SizeT i2 = std::min(i1 + bucket_size, SizeT(end));
-                futs.emplace_back(thread_pool.push([&index, i1, i2](int id) {
-                    for (SizeT j = i1; j < i2; ++j) {
-                        index->Build(j);
-                    }
-                }));
+                Vector<std::future<void>> futs;
+                futs.reserve(bucket_n);
+                for (SizeT i = 0; i < bucket_n; ++i) {
+                    SizeT i1 = start + i * bucket_size;
+                    SizeT i2 = std::min(i1 + bucket_size, SizeT(end));
+                    futs.emplace_back(thread_pool.push([&index, i1, i2](int id) {
+                        for (SizeT j = i1; j < i2; ++j) {
+                            index->Build(j);
+                        }
+                    }));
+                }
+                for (auto &fut : futs) {
+                    fut.get();
+                }
+                SizeT mem2 = index->mem_usage();
+                mem_usage = mem2 - mem1;
             }
-            for (auto &fut : futs) {
-                fut.get();
-            }
-            SizeT mem2 = index->mem_usage();
-            mem_usage = mem2 - mem1;
         }
     }
 
 public:
-    static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def);
+    static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem = true) {
+        if (own_mem) {
+            return InitAbstractIndex<true>(index_base, column_def);
+        } else {
+            return InitAbstractIndex<false>(index_base, column_def);
+        }
+    }
 
     HnswIndexInMem(const HnswIndexInMem &) = delete;
     HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;

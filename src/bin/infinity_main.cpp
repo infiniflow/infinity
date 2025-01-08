@@ -15,6 +15,7 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 #ifdef ENABLE_JEMALLOC_PROF
 #include <jemalloc/jemalloc.h>
 #endif
@@ -161,6 +162,7 @@ void SignalHandler(int signal_number, siginfo_t *, void *) {
         }
         case SIGSEGV: {
             // Print back strace
+            infinity::PrintTransactionHistory();
             infinity::PrintStacktrace("SEGMENT FAULTS");
             exit(-1);
             break;
@@ -194,6 +196,26 @@ void RegisterSignal() {
     sigaction(SIGQUIT, &sig_action, NULL);
     sigaction(SIGTERM, &sig_action, NULL);
     sigaction(SIGSEGV, &sig_action, NULL);
+}
+
+void TerminateHandler() {
+    infinity::String message = "TerminateHandler: ";
+    try {
+        std::exception_ptr eptr{std::current_exception()};
+        if (eptr) {
+            std::rethrow_exception(eptr);
+        } else {
+            message += "Exiting without exception";
+        }
+    } catch (const std::exception &ex) {
+        message += "Unhandled Exception: ";
+        message += ex.what();
+    } catch (...) {
+        message += "Unknown Unhandled Exception";
+    }
+    infinity::PrintTransactionHistory();
+    infinity::PrintStacktrace(message);
+    std::abort();
 }
 
 } // namespace
@@ -253,6 +275,8 @@ auto main(int argc, char **argv) -> int {
     shutdown_thread = infinity::Thread([&]() { ShutdownServer(); });
 
     RegisterSignal();
+
+    std::set_terminate(TerminateHandler);
 
     InfinityContext::instance().InitPhase2();
 

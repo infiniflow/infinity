@@ -44,7 +44,7 @@ public:
 
     // Return the elapsed time from begin, if the profiler is ended, it will return total elapsed time.
     [[nodiscard]] inline i64 Elapsed() const {
-        if(name_.empty()) {
+        if (name_.empty()) {
             return 0;
         }
         return ElapsedInternal().count();
@@ -58,9 +58,7 @@ public:
     void set_name(const String &name) { name_ = name; }
 
 private:
-    [[nodiscard]] static inline TimePoint<Clock> Now() {
-        return Clock::now();
-    }
+    [[nodiscard]] static inline TimePoint<Clock> Now() { return Clock::now(); }
 
     [[nodiscard]] NanoSeconds ElapsedInternal() const;
 
@@ -91,22 +89,19 @@ export enum class QueryPhase : i8 {
 struct OperatorInformation {
     OperatorInformation() = default;
 
-    OperatorInformation(const OperatorInformation& other)
+    OperatorInformation(const OperatorInformation &other)
         : name_(other.name_), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_),
-          output_data_size_(other.output_data_size_), output_rows_(other.output_rows_) {
+          output_data_size_(other.output_data_size_), output_rows_(other.output_rows_) {}
 
-    }
-
-    OperatorInformation(OperatorInformation&& other)
+    OperatorInformation(OperatorInformation &&other)
         : name_(std::move(other.name_)), start_(other.start_), end_(other.end_), elapsed_(other.elapsed_), input_rows_(other.input_rows_),
-          output_data_size_(other.output_data_size_), output_rows_(other.output_rows_) {
-    }
+          output_data_size_(other.output_data_size_), output_rows_(other.output_rows_) {}
 
     OperatorInformation(String name, i64 start, i64 end, i64 elapsed, u16 input_rows, i32 output_data_size, u16 output_rows)
-        : name_(std::move(name)), start_(start), end_(end), elapsed_(elapsed), input_rows_(input_rows), output_data_size_(output_data_size), output_rows_(output_rows) {
-    }
+        : name_(std::move(name)), start_(start), end_(end), elapsed_(elapsed), input_rows_(input_rows), output_data_size_(output_data_size),
+          output_rows_(output_rows) {}
 
-    OperatorInformation& operator=(OperatorInformation&& other) {
+    OperatorInformation &operator=(OperatorInformation &&other) {
         if (this != &other) {
             name_ = std::move(other.name_);
             start_ = std::move(other.start_);
@@ -119,19 +114,19 @@ struct OperatorInformation {
         return *this;
     }
 
-    String name_ {};
+    String name_{};
 
-    i64 start_ {};
-    i64 end_ {};
+    i64 start_{};
+    i64 end_{};
     i64 elapsed_{};
-    u16 input_rows_ {};
-    i32 output_data_size_ {};
-    u16 output_rows_ {};
+    u16 input_rows_{};
+    i32 output_data_size_{};
+    u16 output_rows_{};
 };
 
 export struct TaskBinding {
-    u64 fragment_id_ {};
-    i64 task_id_ {};
+    u64 fragment_id_{};
+    i64 task_id_{};
 };
 
 export class OptimizerProfiler {
@@ -152,22 +147,21 @@ class OperatorState;
 
 export class TaskProfiler {
 public:
-    TaskProfiler(TaskBinding binding, bool enable, SizeT operators_len)
-        : binding_(binding), enable_(enable){
-        if(!enable_) {
+    TaskProfiler(TaskBinding binding, bool enable, SizeT operators_len) : binding_(binding), enable_(enable) {
+        if (!enable_) {
             return;
         }
         timings_.reserve(operators_len);
     }
 
     void Begin() {
-        if(enable_) {
+        if (enable_) {
             task_profiler_.Begin();
         }
     }
 
     void End() {
-        if(enable_) {
+        if (enable_) {
             task_profiler_.End();
         }
     }
@@ -176,12 +170,12 @@ public:
 
     void StopOperator(const OperatorState *output_state);
 
-
     TaskBinding binding_;
     Vector<OperatorInformation> timings_{};
     BaseProfiler task_profiler_;
+
 private:
-    bool enable_ {};
+    bool enable_{};
 
     BaseProfiler profiler_;
     const PhysicalOperator *active_operator_ = nullptr;
@@ -201,9 +195,7 @@ public:
 
     void Flush(TaskProfiler &&profiler);
 
-    i64 ElapsedAt(SizeT index) {
-        return profilers_[index].Elapsed();
-    }
+    i64 ElapsedAt(SizeT index) { return profilers_[index].Elapsed(); }
 
     OptimizerProfiler &optimizer() { return optimizer_; }
 
@@ -214,7 +206,7 @@ public:
     static nlohmann::json Serialize(const QueryProfiler *profiler);
 
 private:
-    bool enable_ {};
+    bool enable_{};
 
     std::mutex flush_lock_{};
     HashMap<u64, HashMap<i64, Vector<TaskProfiler>>> records_{};

@@ -92,6 +92,7 @@ private:
     ByteSliceReader doc_list_reader_;
     InDocPositionIterator *in_doc_pos_iterator_ = nullptr;
     InDocStateKeeper in_doc_state_keeper_;
+
 private:
     ByteSliceReader doc_reader_;
     ByteSliceReader pos_reader_;

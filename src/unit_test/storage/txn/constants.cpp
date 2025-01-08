@@ -30,5 +30,5 @@ class TxnContants : public BaseTest {};
 
 TEST_F(TxnContants, test1) {
     using namespace infinity;
-    EXPECT_EQ(ToString(TxnState::kStarted), "Started");
+    EXPECT_EQ(TxnState2Str(TxnState::kStarted), "Started");
 }

@@ -23,7 +23,7 @@
 namespace arrow {
 class FixedSizeListType;
 class ListType;
-}
+} // namespace arrow
 
 namespace infinity {
 

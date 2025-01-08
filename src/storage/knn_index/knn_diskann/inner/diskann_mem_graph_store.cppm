@@ -44,8 +44,7 @@ public:
     DiskAnnMemGraphStore(This &&other)
         : capacity_(std::exchange(other.capacity_, 0)), reserve_graph_degree_(std::exchange(other.reserve_graph_degree_, 0)),
           graph_(std::move(other.graph_)), max_range_of_graph_(std::exchange(other.max_range_of_graph_, 0)),
-          max_observecd_degree_(std::exchange(other.max_observecd_degree_, 0)) 
-          {}
+          max_observecd_degree_(std::exchange(other.max_observecd_degree_, 0)) {}
 
     DiskAnnMemGraphStore &operator=(This &&other) {
         if (this != &other) {
@@ -58,12 +57,10 @@ public:
         return *this;
     }
 
-    static This Make(SizeT capacity, SizeT reserve_graph_degree) {
-        return This(capacity, reserve_graph_degree);
-    }
+    static This Make(SizeT capacity, SizeT reserve_graph_degree) { return This(capacity, reserve_graph_degree); }
 
     // return Tuple of (load_point_num, enterpoint, frozen_pts)
-    Tuple<SizeT, SizeT, SizeT> Load(LocalFileHandle &load_handle, SizeT expected_num_points){
+    Tuple<SizeT, SizeT, SizeT> Load(LocalFileHandle &load_handle, SizeT expected_num_points) {
         SizeT expected_file_size = 0;
         SizeT start = 0; // enterpoint
         SizeT file_frozen_pts = 0;
@@ -77,7 +74,7 @@ public:
         }
 
         SizeT bytes_read = 28; // meta data size
-        SizeT nodes_read = 0; // number of nodes read
+        SizeT nodes_read = 0;  // number of nodes read
         while (bytes_read != expected_file_size) {
             u32 k; // number of neighbors
             load_handle.Read(&k, sizeof(u32));
@@ -91,7 +88,7 @@ public:
                 max_range_of_graph_ = k;
             }
         }
-        
+
         return Tuple<SizeT, SizeT, SizeT>(nodes_read, start, file_frozen_pts);
     }
 
@@ -115,13 +112,9 @@ public:
         }
     }
 
-    SizeT GetTotalPoints() const {
-        return this->capacity_;
-    }
-    
-    VectorStruct &GetNeighbours(const SizeT vertex_id) {
-        return graph_[vertex_id];
-    }
+    SizeT GetTotalPoints() const { return this->capacity_; }
+
+    VectorStruct &GetNeighbours(const SizeT vertex_id) { return graph_[vertex_id]; }
 
     void AddNeighbour(const SizeT vertex_id, const SizeT neighbour_id) {
         graph_[vertex_id].emplace_back(neighbour_id);
@@ -130,17 +123,13 @@ public:
         }
     }
 
-    void ClearNeighbours(const SizeT vertex_id) {
-        graph_[vertex_id].clear();
-    }
+    void ClearNeighbours(const SizeT vertex_id) { graph_[vertex_id].clear(); }
 
-    void SwapNeighbours(const SizeT vertex_a, const SizeT vertex_b) {
-        graph_[vertex_a].swap(graph_[vertex_b]);
-    }
+    void SwapNeighbours(const SizeT vertex_a, const SizeT vertex_b) { graph_[vertex_a].swap(graph_[vertex_b]); }
 
     void SetNeighbours(const SizeT vertex_id, const VectorStruct &neighbours) {
         graph_[vertex_id].assign(neighbours.begin(), neighbours.end());
-        if (neighbours.size() > max_observecd_degree_){
+        if (neighbours.size() > max_observecd_degree_) {
             max_observecd_degree_ = static_cast<u32>(neighbours.size());
         }
     }
@@ -151,19 +140,13 @@ public:
         return graph_.size();
     }
 
-    void ClearGraph() {
-        graph_.clear();
-    }
+    void ClearGraph() { graph_.clear(); }
 
-    SizeT GetMaxRangeOfGraph() const {
-        return max_range_of_graph_;
-    }
+    SizeT GetMaxRangeOfGraph() const { return max_range_of_graph_; }
 
-    SizeT GetMaxObservedDegree() const {
-        return max_observecd_degree_;
-    }
+    SizeT GetMaxObservedDegree() const { return max_observecd_degree_; }
 
-    void InitRandomKnn(SizeT num_points){
+    void InitRandomKnn(SizeT num_points) {
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<SizeT> dis(0, num_points - 1);
@@ -178,12 +161,10 @@ public:
                 graph_[i].emplace_back(neighbor_id);
             }
         }
-
     }
 
-
 private:
-    SizeT capacity_; // point num in graph
+    SizeT capacity_;             // point num in graph
     SizeT reserve_graph_degree_; // max degree to reserve
 
     GraphStruct graph_;

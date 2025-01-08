@@ -16,7 +16,6 @@ module;
 
 export module bool_cast;
 
-
 import stl;
 import bound_cast_func;
 import column_vector_cast;
@@ -34,7 +33,8 @@ namespace infinity {
 export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        String error_message = fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        String error_message =
+            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
         RecoverableError(Status::NotSupport(error_message));
         return false;
     }

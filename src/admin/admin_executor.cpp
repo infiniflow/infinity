@@ -3402,6 +3402,28 @@ QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminS
     {
         {
             // option name
+            Value value = Value::MakeVarchar(SNAPSHOT_DIR_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(std::to_string(global_config->CleanupInterval()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Snapshots store directory");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+
+    {
+        {
+            // option name
             Value value = Value::MakeVarchar(CLEANUP_INTERVAL_OPTION_NAME);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
@@ -3478,6 +3500,27 @@ QueryResult AdminExecutor::ListConfigs(QueryContext *query_context, const AdminS
         {
             // option name type
             Value value = Value::MakeVarchar("Real-time index building row capacity");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(SNAPSHOT_DIR_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar(global_config->SnapshotDir());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("Snapshot storage directory");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
@@ -4254,7 +4297,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
 
             status = InfinityContext::instance().ChangeServerRole(NodeRole::kFollower, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
-                if(status.code() != ErrorCode::kCantSwitchRole) {
+                if (status.code() != ErrorCode::kCantSwitchRole) {
                     LOG_INFO("Fail to change to FOLLOWER role");
                     Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
                     if (!restore_status.ok()) {
@@ -4299,7 +4342,7 @@ QueryResult AdminExecutor::SetRole(QueryContext *query_context, const AdminState
 
             status = InfinityContext::instance().ChangeServerRole(NodeRole::kLearner, false, node_name, leader_ip, leader_port);
             if (!status.ok()) {
-                if(status.code() != ErrorCode::kCantSwitchRole) {
+                if (status.code() != ErrorCode::kCantSwitchRole) {
                     LOG_INFO("Fail to change to LEARNER role");
                     Status restore_status = InfinityContext::instance().ChangeServerRole(NodeRole::kAdmin);
                     if (!restore_status.ok()) {

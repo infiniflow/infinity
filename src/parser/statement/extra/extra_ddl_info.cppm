@@ -25,4 +25,4 @@ export using infinity::DDLType;
 export using infinity::ConflictType;
 export using infinity::ConflictTypeToStr;
 
-}
+} // namespace infinity

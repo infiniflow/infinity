@@ -13,16 +13,16 @@
 
 /* Maximum length of file name */
 #if !defined(FILENAME_MAX)
-#   define FILENAME_MAX MAX_PATH
+#define FILENAME_MAX MAX_PATH
 #endif
 
 /* file slash */
 #if !defined(FILESLASH)
-# ifdef _WIN32
-#  define FILESLASH '\\'
-# else
-#  define FILESLASH '/'
-# endif
+#ifdef _WIN32
+#define FILESLASH '\\'
+#else
+#define FILESLASH '/'
+#endif
 #endif
 
 /**
@@ -30,18 +30,34 @@
  * prefix should be determined at compile time e.g. /usr/local or ""
  * @return length written to buff, or 0 if failed
  */
-size_t zsv_get_config_dir(char* buff, size_t buffsize, const char *prefix);
+size_t zsv_get_config_dir(char *buff, size_t buffsize, const char *prefix);
 
 /**
  * Get the path of the current executable
  */
-size_t zsv_get_executable_path(char* buff, size_t buffsize);
+size_t zsv_get_executable_path(char *buff, size_t buffsize);
+
+/**
+ * Get current user's home dir, without trailing slash
+ * On win, any backslashes are replaced with fwd slash
+ *   ex: zsv_get_home_dir(char[MAX_PATH], MAX_PATH)
+ * returns 0 if no home dir could be found
+ * returns > 0 and < bufflen on success
+ * returns > 0 and >= bufflen if buffer was too small
+ */
+int zsv_get_home_dir(char *buff, size_t bufflen);
 
 /**
  * Check if a directory exists
  * return true (non-zero) or false (zero)
  */
 int zsv_dir_exists(const char *path);
+
+/**
+ * mkdir that works with UNC paths on Win
+ * if fail, use zsv_perror() instead of perror()
+ */
+int zsv_mkdir(const char *path);
 
 /**
  * Make a directory, as well as any intermediate dirs
@@ -63,12 +79,12 @@ struct zsv_foreach_dirent_handle {
   const char *parent_and_entry; /* parent + entry separated by file separator */
   const struct stat stat;       /* stat of current entry */
 
-  void *ctx;                    /* caller-provided context to pass to handler */
+  void *ctx; /* caller-provided context to pass to handler */
 
-  unsigned char verbose:1;
-  unsigned char is_dir:1;       /* non-zero if this entry is a directory */
-  unsigned char no_recurse:1;        /* set to 1 when handling a dir to prevent recursing into it */
-  unsigned char _:5;
+  unsigned char verbose : 1;
+  unsigned char is_dir : 1;     /* non-zero if this entry is a directory */
+  unsigned char no_recurse : 1; /* set to 1 when handling a dir to prevent recursing into it */
+  unsigned char _ : 5;
 };
 
 typedef int (*zsv_foreach_dirent_handler)(struct zsv_foreach_dirent_handle *h, size_t depth);
@@ -84,17 +100,14 @@ typedef int (*zsv_foreach_dirent_handler)(struct zsv_foreach_dirent_handle *h, s
  *
  * returns error
  */
-int zsv_foreach_dirent(const char *dir_path,
-                       size_t max_depth,
-                       zsv_foreach_dirent_handler handler,
-                       void *ctx,
-                       char verbose
-                       );
+int zsv_foreach_dirent(const char *dir_path, size_t max_depth, zsv_foreach_dirent_handler handler, void *ctx,
+                       char verbose);
 
 struct zsv_dir_filter {
-  zsv_foreach_dirent_handler filter; /* filter function; return 1 to process this node. if node is dir, return 0 to skip entirely */
-  size_t max_depth;                  /* max depth to recurse */
-  void *ctx;                         /* pointer to pass to filter function */
+  zsv_foreach_dirent_handler
+    filter;         /* filter function; return 1 to process this node. if node is dir, return 0 to skip entirely */
+  size_t max_depth; /* max depth to recurse */
+  void *ctx;        /* pointer to pass to filter function */
 };
 
 /**
@@ -107,11 +120,8 @@ struct zsv_dir_filter {
  * @param output_filename : file path to output to, or NULL to output to stdout
  * @param file_filter     : filter determining which files to export
  */
-int zsv_dir_to_json(const unsigned char *parent_dir,
-                    const unsigned char *output_filename,
-                    struct zsv_dir_filter *file_filter,
-                    unsigned char verbose
-                    );
+int zsv_dir_to_json(const unsigned char *parent_dir, const unsigned char *output_filename,
+                    struct zsv_dir_filter *file_filter, unsigned char verbose);
 
 /**
  * Convert a JSON stream into file and directory contents
@@ -128,12 +138,10 @@ int zsv_dir_to_json(const unsigned char *parent_dir,
  */
 
 #define ZSV_DIR_FLAG_FORCE 1 /* overwrite target files if they already exist */
-#define ZSV_DIR_FLAG_DRY   2 /* dry run, output names of files that would be created/overwritten */
+#define ZSV_DIR_FLAG_DRY 2   /* dry run, output names of files that would be created/overwritten */
 
-int zsv_dir_from_json(const unsigned char *target_dir,
-                      FILE *fsrc,
+int zsv_dir_from_json(const unsigned char *target_dir, FILE *fsrc,
                       unsigned int flags, // ZSV_DIR_FLAG_XX
-                      unsigned char verbose
-                      );
+                      unsigned char verbose);
 
 #endif

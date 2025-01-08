@@ -29,8 +29,7 @@ import buffer_handle;
 namespace infinity {
 
 FullTextColumnLengthReader::FullTextColumnLengthReader(ColumnIndexReader *reader)
-    : index_dir_(reader->index_dir_), chunk_index_entries_(reader->chunk_index_entries_),
-      memory_indexer_(reader->memory_indexer_) {
+    : index_dir_(reader->index_dir_), chunk_index_entries_(reader->chunk_index_entries_), memory_indexer_(reader->memory_indexer_) {
     Pair<u64, float> df_and_avg_column_len = reader->GetTotalDfAndAvgColumnLength();
     total_df_ = df_and_avg_column_len.first;
     avg_column_len_ = df_and_avg_column_len.second;

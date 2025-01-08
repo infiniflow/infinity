@@ -50,29 +50,18 @@ String ToString(PeerTaskType type) {
     }
 }
 
-String TerminatePeerTask::ToString() const {
-    return fmt::format("{}", infinity::ToString(type_));
-}
+String TerminatePeerTask::ToString() const { return fmt::format("{}", infinity::ToString(type_)); }
 
 String RegisterPeerTask::ToString() const {
     return fmt::format("{}@{}, {}:{}, {}", infinity::ToString(type_), node_name_, node_ip_, node_port_, infinity::ToString(node_role_));
 }
 
-String UnregisterPeerTask::ToString() const {
-    return fmt::format("{}@{}", infinity::ToString(type_), node_name_);
-}
+String UnregisterPeerTask::ToString() const { return fmt::format("{}@{}", infinity::ToString(type_), node_name_); }
 
-String HeartBeatPeerTask::ToString() const {
-    return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, txn_ts_);
-}
+String HeartBeatPeerTask::ToString() const { return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, txn_ts_); }
 
-String SyncLogTask::ToString() const {
-    return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, log_strings_.size());
-}
+String SyncLogTask::ToString() const { return fmt::format("{}@{}, {}", infinity::ToString(type_), node_name_, log_strings_.size()); }
 
-String ChangeRoleTask::ToString() const {
-    return fmt::format("{} to {}", infinity::ToString(type_), role_name_);
-}
-
+String ChangeRoleTask::ToString() const { return fmt::format("{} to {}", infinity::ToString(type_), role_name_); }
 
 } // namespace infinity

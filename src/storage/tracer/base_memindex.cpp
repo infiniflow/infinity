@@ -32,4 +32,4 @@ void BaseMemIndex::DecreaseMemoryUsageBase(SizeT mem) {
     memindex_tracer->DecreaseMemUsed(mem);
 }
 
-}
+} // namespace infinity

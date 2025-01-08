@@ -60,9 +60,9 @@ SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &
         result = fmt::format("{}_{}", rand, name);
         temp = VirtualStore::ConcatenatePath(parent_dir, result);
         ++cnt;
-        if(!use_persistence_manager) {
+        if (!use_persistence_manager) {
             Status status = VirtualStore::MakeDirectory(temp);
-            if(status.ok()) {
+            if (status.ok()) {
                 created = true;
             } else {
                 created = false;

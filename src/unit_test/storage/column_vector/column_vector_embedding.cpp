@@ -60,7 +60,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-//    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
+    //    EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
     EXPECT_EQ(column_vector.Size(), 0u);
@@ -119,7 +119,7 @@ TEST_F(ColumnVectorEmbeddingTest, flat_embedding) {
 
     // ====
     column_vector.Initialize();
-    
+
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -173,7 +173,6 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -214,7 +213,7 @@ TEST_F(ColumnVectorEmbeddingTest, contant_embedding) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    
+
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);

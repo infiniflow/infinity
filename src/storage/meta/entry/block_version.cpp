@@ -31,12 +31,12 @@ import status;
 namespace infinity {
 
 void CreateField::SaveToFile(LocalFileHandle *file_handle) const {
-    Status status = file_handle->Append((char*)(&create_ts_), sizeof(create_ts_));
-    if(!status.ok()) {
+    Status status = file_handle->Append((char *)(&create_ts_), sizeof(create_ts_));
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    status = file_handle->Append((char*)(&row_count_), sizeof(row_count_));
-    if(!status.ok()) {
+    status = file_handle->Append((char *)(&row_count_), sizeof(row_count_));
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 }
@@ -44,11 +44,11 @@ void CreateField::SaveToFile(LocalFileHandle *file_handle) const {
 CreateField CreateField::LoadFromFile(LocalFileHandle *file_handle) {
     CreateField create_field;
     auto [size1, status1] = file_handle->Read(&create_field.create_ts_, sizeof(create_field.create_ts_));
-    if(!status1.ok()) {
+    if (!status1.ok()) {
         UnrecoverableError(status1.message());
     }
     auto [size2, status2] = file_handle->Read(&create_field.row_count_, sizeof(create_field.row_count_));
-    if(!status2.ok()) {
+    if (!status2.ok()) {
         UnrecoverableError(status2.message());
     }
     return create_field;
@@ -98,7 +98,7 @@ void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
         if (ts <= checkpoint_ts) {
             file_handle.Append(&ts, sizeof(ts));
         } else {
-            ++ deleted_row_count;
+            ++deleted_row_count;
             file_handle.Append(&dump_ts, sizeof(dump_ts));
         }
     }
@@ -108,7 +108,7 @@ void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_
 void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
     BlockOffset create_size = created_.size();
     Status status = file_handle->Append(&create_size, sizeof(create_size));
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     for (const auto &create : created_) {
@@ -117,11 +117,11 @@ void BlockVersion::SpillToFile(LocalFileHandle *file_handle) const {
 
     BlockOffset capacity = deleted_.size();
     status = file_handle->Append(&capacity, sizeof(capacity));
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     status = file_handle->Append(deleted_.data(), capacity * sizeof(TxnTimeStamp));
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 }

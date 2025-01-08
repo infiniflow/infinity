@@ -279,7 +279,7 @@ String DataBlock::ToBriefString() const {
     std::stringstream ss;
     ss << "row count: " << row_count_ << std::endl;
     ss << "column: ";
-    for (SizeT idx = 0; idx < column_count_; ++ idx) {
+    for (SizeT idx = 0; idx < column_count_; ++idx) {
         ss << column_vectors[idx]->data_type()->ToString() << " ";
     }
     ss << std::endl;

@@ -23,4 +23,4 @@ namespace infinity {
 export using infinity::JoinReference;
 export using infinity::JoinType;
 
-}
+} // namespace infinity

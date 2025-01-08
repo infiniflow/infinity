@@ -26,7 +26,7 @@ struct DateTimeType {
 
     // time_value: seconds since 00:00:00
     // date_value: days since 1970-01-01
-    explicit constexpr DateTimeType(int32_t date_value, int32_t time_value) : date(date_value), time(time_value){};
+    explicit constexpr DateTimeType(int32_t date_value, int32_t time_value) : date(date_value), time(time_value) {};
 
     // epoch_time: seconds since 1970-01-01 00:00:00
     explicit constexpr DateTimeType(int64_t epoch_time) {

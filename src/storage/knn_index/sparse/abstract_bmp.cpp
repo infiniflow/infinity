@@ -43,7 +43,13 @@ MemIndexTracerInfo BMPIndexInMem::GetInfo() const {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return {};
             } else {
-                return {index->MemoryUsage(), index->DocNum()};
+                using IndexT = typename std::remove_pointer_t<T>;
+                if constexpr (IndexT::kOwnMem) {
+                    return {index->MemoryUsage(), index->DocNum()};
+                } else {
+                    UnrecoverableError("BMPIndexInMem::GetInfo: index does not own memory");
+                    return {};
+                }
             }
         },
         bmp_);
@@ -63,28 +69,15 @@ BMPIndexInMem::BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, co
             using T = std::decay_t<decltype(index)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 using IndexT = std::decay_t<decltype(*index)>;
-                bmp_ = new IndexT(term_num, block_size);
+                if constexpr (IndexT::kOwnMem) {
+                    bmp_ = new IndexT(term_num, block_size);
+                } else {
+                    UnrecoverableError("BMPIndexInMem::BMPIndexInMem: index does not own memory");
+                }
             }
         },
         bmp_);
     own_memory_ = true;
-}
-
-AbstractBMP BMPIndexInMem::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
-    const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
-    const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
-
-    switch (sparse_info->DataType()) {
-        case EmbeddingDataType::kElemFloat: {
-            return InitAbstractIndex<f32>(index_bmp, sparse_info);
-        }
-        case EmbeddingDataType::kElemDouble: {
-            return InitAbstractIndex<f64>(index_bmp, sparse_info);
-        }
-        default: {
-            return nullptr;
-        }
-    }
 }
 
 BMPIndexInMem::~BMPIndexInMem() {
@@ -97,11 +90,16 @@ BMPIndexInMem::~BMPIndexInMem() {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return;
             } else {
-                SizeT mem_used = index->MemoryUsage();
-                if (index != nullptr) {
-                    delete index;
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    SizeT mem_used = index->MemoryUsage();
+                    if (index != nullptr) {
+                        delete index;
+                    }
+                    DecreaseMemoryUsageBase(mem_used);
+                } else {
+                    UnrecoverableError("BMPIndexInMem::~BMPIndexInMem: index does not own memory");
                 }
-                DecreaseMemoryUsageBase(mem_used);
             }
         },
         bmp_);
@@ -114,7 +112,13 @@ SizeT BMPIndexInMem::GetRowCount() const {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 return SizeT(0);
             } else {
-                return index->DocNum();
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    return index->DocNum();
+                } else {
+                    UnrecoverableError("BMPIndexInMem::GetRowCount: index does not own memory");
+                    return SizeT(0);
+                }
             }
         },
         bmp_);
@@ -129,13 +133,17 @@ void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_e
                 return;
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
-                SizeT mem_before = index->MemoryUsage();
-                MemIndexInserterIter<SparseRefT> iter(block_offset, block_column_entry, buffer_mgr, row_offset, row_count);
-                index->AddDocs(std::move(iter));
-                SizeT mem_after = index->MemoryUsage();
-                IncreaseMemoryUsageBase(mem_after - mem_before);
-                LOG_INFO(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
+                if constexpr (IndexT::kOwnMem) {
+                    using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+                    SizeT mem_before = index->MemoryUsage();
+                    MemIndexInserterIter<SparseRefT> iter(block_offset, block_column_entry, buffer_mgr, row_offset, row_count);
+                    index->AddDocs(std::move(iter));
+                    SizeT mem_after = index->MemoryUsage();
+                    IncreaseMemoryUsageBase(mem_after - mem_before);
+                    LOG_INFO(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
+                } else {
+                    UnrecoverableError("BMPIndexInMem::AddDocs: index does not own memory");
+                }
             }
         },
         bmp_);
@@ -149,14 +157,18 @@ void BMPIndexInMem::AddDocs(const SegmentEntry *segment_entry, BufferManager *bu
                 return;
             } else {
                 using IndexT = std::decay_t<decltype(*index)>;
-                using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
-
-                if (check_ts) {
-                    OneColumnIterator<SparseRefT> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-                    index->AddDocs(std::move(iter));
+                if constexpr (!IndexT::kOwnMem) {
+                    UnrecoverableError("BMPIndexInMem::AddDocs: index does not own memory");
                 } else {
-                    OneColumnIterator<SparseRefT, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
-                    index->AddDocs(std::move(iter));
+                    using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+
+                    if (check_ts) {
+                        OneColumnIterator<SparseRefT> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                        index->AddDocs(std::move(iter));
+                    } else {
+                        OneColumnIterator<SparseRefT, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                        index->AddDocs(std::move(iter));
+                    }
                 }
             }
         },
@@ -175,10 +187,15 @@ SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_
             if constexpr (std::is_same_v<IndexType, std::nullptr_t>) {
                 return;
             } else {
-                row_count = index->DocNum();
-                index_size = index->GetSizeInBytes();
-                if (dump_size != nullptr) {
-                    *dump_size = index->MemoryUsage();
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    row_count = index->DocNum();
+                    index_size = index->GetSizeInBytes();
+                    if (dump_size != nullptr) {
+                        *dump_size = index->MemoryUsage();
+                    }
+                } else {
+                    UnrecoverableError("BMPIndexInMem::Dump: index does not own memory");
                 }
             }
         },

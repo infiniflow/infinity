@@ -24,7 +24,7 @@ struct DateType {
 
     DateType() = default;
 
-    explicit constexpr DateType(int32_t date_value) : value(date_value){};
+    explicit constexpr DateType(int32_t date_value) : value(date_value) {};
 
     inline int32_t GetValue() const { return value; }
 

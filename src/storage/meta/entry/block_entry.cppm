@@ -36,6 +36,7 @@ import wal_entry;
 import column_def;
 import txn_store;
 import cleanup_scanner;
+import snapshot_info;
 
 namespace infinity {
 
@@ -58,7 +59,7 @@ public:
 
 public:
     // for iterator unit test
-    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, ""){};
+    explicit BlockEntry() : BaseEntry(EntryType::kBlock, false, "") {};
 
     ~BlockEntry() override;
 
@@ -194,13 +195,14 @@ public:
 
     void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 
+    SharedPtr<BlockSnapshotInfo> GetSnapshotInfo() const;
 public:
     // Setter, Used in import, segment append block, and block append block in compact
     inline void IncreaseRowCount(SizeT increased_row_count) { block_row_count_ += increased_row_count; }
 
     SizeT GetStorageSize() const;
 
-    void CheckFlush(TxnTimeStamp ts, bool &flush_column, bool &flush_version, bool check_commit = true) const;
+    void CheckFlush(TxnTimeStamp ts, bool &flush_column, bool &flush_version, bool check_commit, bool need_lock) const;
 
     bool TryToMmap();
 
@@ -224,9 +226,9 @@ protected:
     // check if a value must not exist in the block
     SharedPtr<FastRoughFilter> fast_rough_filter_ = MakeShared<FastRoughFilter>();
 
-    TxnTimeStamp min_row_ts_{}; // Indicate the commit_ts last append
-    TxnTimeStamp max_row_ts_{}; // Indicate the commit_ts last append/update/delete
-    TxnTimeStamp checkpoint_ts_{0};        // replay not set
+    TxnTimeStamp min_row_ts_{};     // Indicate the commit_ts last append
+    TxnTimeStamp max_row_ts_{};     // Indicate the commit_ts last append/update/delete
+    TxnTimeStamp checkpoint_ts_{0}; // replay not set
 
     TransactionID using_txn_id_{0}; // Temporarily used to lock the modification to block entry.
 

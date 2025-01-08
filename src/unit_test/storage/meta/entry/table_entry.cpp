@@ -336,7 +336,9 @@ TEST_P(TableEntryTest, get_fulltext_analyzers_test) {
     }
 
     // insert data
-    { InsertData("default_db", "tbl1"); }
+    {
+        InsertData("default_db", "tbl1");
+    }
 
     // CreateIndex
     {
@@ -402,7 +404,9 @@ TEST_P(TableEntryTest, optimize_fulltext_index_test) {
     }
 
     // insert data
-    { InsertData("default_db", "tbl1"); }
+    {
+        InsertData("default_db", "tbl1");
+    }
 
     // CreateIndex
     {
@@ -425,7 +429,9 @@ TEST_P(TableEntryTest, optimize_fulltext_index_test) {
     }
 
     // insert data
-    { InsertData("default_db", "tbl1"); }
+    {
+        InsertData("default_db", "tbl1");
+    }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"));
@@ -633,7 +639,9 @@ TEST_P(TableEntryTest, compact_test) {
     }
 
     // insert data
-    { InsertData("default_db", "tbl1"); }
+    {
+        InsertData("default_db", "tbl1");
+    }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("compact"));
@@ -678,7 +686,9 @@ TEST_P(TableEntryTest, check_any_delete_test) {
     }
 
     // insert data
-    { InsertData("default_db", "tbl1"); }
+    {
+        InsertData("default_db", "tbl1");
+    }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("check"));
@@ -757,7 +767,9 @@ TEST_P(TableEntryTest, serialize_test) {
     }
 
     // insert data
-    { InsertData("default_db", "tbl1"); }
+    {
+        InsertData("default_db", "tbl1");
+    }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"));
@@ -827,7 +839,9 @@ TEST_P(TableEntryTest, deserialize_test) {
     }
 
     // insert data
-    { InsertData("default_db", "tbl1"); }
+    {
+        InsertData("default_db", "tbl1");
+    }
 
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"));

@@ -42,4 +42,11 @@ export enum class FulltextSimilarity {
     kBoolean,
 };
 
+export struct BM25Params {
+    float k1 = 1.2F;
+    float b = 0.75F;
+    float delta_term = 0.0F;
+    float delta_phrase = 0.0F;
+};
+
 } // namespace infinity

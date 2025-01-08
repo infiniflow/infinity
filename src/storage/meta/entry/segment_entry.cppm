@@ -34,6 +34,7 @@ import roaring_bitmap;
 import wal_entry;
 import column_def;
 import constant_expr;
+import snapshot_info;
 
 namespace infinity {
 
@@ -290,6 +291,8 @@ public:
     void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
 
     void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
+
+    SharedPtr<SegmentSnapshotInfo> GetSnapshotInfo() const;
 };
 
 } // namespace infinity

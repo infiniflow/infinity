@@ -274,8 +274,8 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
     json_res["db_name"] = *this->db_name_;
 
-    String& db_comment = *this->db_comment_;
-    if(!db_comment.empty()) {
+    String &db_comment = *this->db_comment_;
+    if (!db_comment.empty()) {
         json_res["db_comment"] = db_comment;
     }
 
@@ -305,7 +305,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     SharedPtr<String> db_name = MakeShared<String>(db_entry_json["db_name"]);
 
     SharedPtr<String> db_comment = nullptr;
-    if(db_entry_json.contains("db_comment")) {
+    if (db_entry_json.contains("db_comment")) {
         db_comment = MakeShared<String>(db_entry_json["db_comment"]);
     } else {
         db_comment = MakeShared<String>();

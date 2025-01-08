@@ -337,6 +337,11 @@ void PeerClient::HeartBeat(HeartBeatPeerTask *peer_task) {
                 peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectLeader);
                 return;
             }
+            case TTransportExceptionType::NOT_OPEN: {
+                peer_task->error_message_ = thrift_exception.what();
+                peer_task->error_code_ = static_cast<i64>(ErrorCode::kCantConnectLeader);
+                return;
+            }
             default: {
                 String error_message = "Heartbeat: error happens when data transfer to leader";
                 UnrecoverableError(error_message);

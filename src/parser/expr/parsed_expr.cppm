@@ -23,4 +23,4 @@ namespace infinity {
 export using infinity::ParsedExpr;
 export using infinity::ParsedExprType;
 
-}
+} // namespace infinity

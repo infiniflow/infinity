@@ -47,8 +47,7 @@ public:
 
     u64 GetTermFreq() const { return term_freq_; }
 
-    void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader);
-
+    void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader, float delta, float k1, float b) override;
     RowID BlockMinPossibleDocID() const override { return iter_->BlockLowestPossibleDocID(); }
     RowID BlockLastDocID() const override { return iter_->BlockLastDocID(); }
     float BlockMaxBM25Score() override;
@@ -97,7 +96,6 @@ public:
     const String *column_name_ptr_ = nullptr;
 
 private:
-
     u32 doc_freq_ = 0;
     u64 total_df_ = 0;
 
@@ -113,6 +111,7 @@ private:
     float f1 = 0.0f;
     float f2 = 0.0f;
     float f3 = 0.0f;
+    float f4 = 0.0f;
     float avg_column_len_ = 0;
     UniquePtr<FullTextColumnLengthReader> column_length_reader_ = nullptr;
     float bm25_common_score_ = 0; // include: weight * smooth_idf * (k1 + 1.0F)

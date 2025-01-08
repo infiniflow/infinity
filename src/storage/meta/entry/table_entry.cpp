@@ -68,6 +68,7 @@ import cast_expression;
 import expression_evaluator;
 import column_vector;
 import expression_state;
+import snapshot_info;
 
 namespace infinity {
 
@@ -430,7 +431,8 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
             }
         }
         PopulateEntireConfig populate_entire_config{.prepare_ = false, .check_ts_ = false};
-        [[maybe_unused]] SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
+        [[maybe_unused]] SharedPtr<SegmentIndexEntry> segment_index_entry =
+            table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
     }
 }
 
@@ -714,7 +716,8 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
             case IndexType::kSecondary:
             case IndexType::kBMP: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
-                    LOG_TRACE(fmt::format("Table {}.{} index {} segment {} MemIndexInsert.", *GetDBName(), *table_name_, *index_base->index_name_, seg_id));
+                    LOG_TRACE(
+                        fmt::format("Table {}.{} index {} segment {} MemIndexInsert.", *GetDBName(), *table_name_, *index_base->index_name_, seg_id));
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
                 }
                 break;
@@ -914,7 +917,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
                 Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = table_index_entry->GetIndexBySegmentSnapshot(this, txn);
                 for (auto &[segment_id, segment_index_entry] : index_by_segment) {
-                    if (!segment_index_entry->TrySetOptimizing(txn)) {
+                    const auto [result_b, add_segment_optimizing] = segment_index_entry->TrySetOptimizing(txn);
+                    if (!result_b) {
                         LOG_INFO(fmt::format("Index {} segment {} is optimizing, skip optimize.", index_name, segment_id));
                         continue;
                     }
@@ -933,7 +937,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                         opt_success = true;
                         continue;
                     }
-
+                    add_segment_optimizing();
                     String msg = fmt::format("merging {}", index_name);
                     Vector<String> base_names;
                     Vector<RowID> base_rowids;
@@ -1444,7 +1448,7 @@ Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
 
 IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
 
-void TableEntry::InvalidateFullTextIndexCache() { 
+void TableEntry::InvalidateFullTextIndexCache() {
     LOG_DEBUG(fmt::format("Invalidate fulltext index cache: table_name: {}", *table_name_));
     fulltext_column_index_cache_.Invalidate();
 }
@@ -1595,7 +1599,6 @@ void TableEntry::SetCreateIndexDone() {
     table_status_ = TableStatus::kNone;
 }
 
-
 void TableEntry::AddColumns(const Vector<SharedPtr<ColumnDef>> &column_defs, TxnTableStore *txn_table_store) {
     ExpressionBinder tmp_binder(nullptr);
     Vector<Value> default_values;
@@ -1647,6 +1650,25 @@ void TableEntry::DropColumns(const Vector<String> &column_names, TxnTableStore *
     for (auto &[segment_id, segment_entry] : segment_map_) {
         segment_entry->DropColumns(column_ids, txn_table_store);
     }
+}
+
+SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo(Txn* txn_ptr) const {
+    SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
+    table_snapshot_info->db_name_ = *GetDBName();
+    table_snapshot_info->table_name_ = *table_name_;
+    table_snapshot_info->table_comment_ = *table_comment_;
+    table_snapshot_info->txn_id_ = txn_id_;
+    table_snapshot_info->begin_ts_ = begin_ts_;
+    table_snapshot_info->commit_ts_ = commit_ts_;
+    table_snapshot_info->max_commit_ts_ = max_commit_ts_;
+    table_snapshot_info->next_column_id_ = next_column_id_;
+    table_snapshot_info->next_segment_id_ = next_segment_id_;
+    table_snapshot_info->columns_ = columns_;
+    for (const auto &segment_pair : segment_map_) {
+        SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = segment_pair.second->GetSnapshotInfo();
+        table_snapshot_info->segment_snapshots_.emplace(segment_pair.first, segment_snapshot_info);
+    }
+    return table_snapshot_info;
 }
 
 } // namespace infinity

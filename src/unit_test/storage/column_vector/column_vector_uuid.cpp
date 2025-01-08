@@ -58,7 +58,6 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
     ColumnVector column_vector(data_type);
     column_vector.Initialize();
 
-    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), u64(DEFAULT_VECTOR_SIZE));
@@ -117,7 +116,7 @@ TEST_F(ColumnVectorUuidTest, flat_uuid) {
 
     // ====
     column_vector.Initialize();
-    
+
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kFlat), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -168,7 +167,6 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
 
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
 
-    
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);
@@ -217,7 +215,7 @@ TEST_F(ColumnVectorUuidTest, contant_uuid) {
 
     // ====
     column_vector.Initialize(ColumnVectorType::kConstant, DEFAULT_VECTOR_SIZE);
-    
+
     EXPECT_THROW(column_vector.SetVectorType(ColumnVectorType::kConstant), UnrecoverableException);
 
     EXPECT_EQ(column_vector.capacity(), (u64)DEFAULT_VECTOR_SIZE);

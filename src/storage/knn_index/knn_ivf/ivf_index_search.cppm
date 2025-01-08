@@ -93,8 +93,7 @@ struct IVF_Filter<false> {
 };
 
 template <LogicalType t,
-          template <typename, typename>
-          typename C,
+          template <typename, typename> typename C,
           typename DistanceDataType,
           bool use_bitmask,
           typename MultiVectorInnerTopnIndexType = void>

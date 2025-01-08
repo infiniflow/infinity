@@ -793,6 +793,9 @@ void PhysicalImport::CSVRowHandler(void *context) {
         RecoverableError(status);
     }
 
+    Vector<String> parsed_cell;
+    parsed_cell.reserve(column_count);
+
     // append data to segment entry
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
         ZsvCell cell = parser_context->parser_.GetCell(column_idx);
@@ -802,11 +805,13 @@ void PhysicalImport::CSVRowHandler(void *context) {
             str_view = std::string_view((char *)cell.str, cell.len);
             auto &column_vector = parser_context->column_vectors_[column_idx];
             column_vector.AppendByStringView(str_view);
+            parsed_cell.emplace_back(str_view);
         } else {
             if (column_def->has_default_value()) {
                 auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
                 auto &column_vector = parser_context->column_vectors_[column_idx];
                 column_vector.AppendByConstantExpr(const_expr);
+                parsed_cell.emplace_back(const_expr->ToString());
             } else {
                 Status status = Status::ImportFileFormatError(
                     fmt::format("No value in column {} in CSV of row number: {}", column_def->name_, parser_context->row_count_));
@@ -821,12 +826,20 @@ void PhysicalImport::CSVRowHandler(void *context) {
             auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
             column_vector.AppendByConstantExpr(const_expr);
         } else {
-            Status status =
-                Status::ImportFileFormatError(fmt::format("No value in column {} index {} in CSV of row number: {}, current row has column count: {}",
-                                                          column_def->name_,
-                                                          column_idx,
-                                                          parser_context->row_count_,
-                                                          column_count));
+            String parsed_row;
+            for (auto &cell : parsed_cell) {
+                parsed_row += cell;
+                parsed_row += " ";
+            }
+
+            Status status = Status::ImportFileFormatError(fmt::format("No value in column {} index {} in CSV of row number: {}, table has column "
+                                                                      "count: {}, current row has column count: {}, parsed row: {}",
+                                                                      column_def->name_,
+                                                                      column_idx,
+                                                                      parser_context->row_count_,
+                                                                      table_entry->ColumnCount(),
+                                                                      column_count,
+                                                                      parsed_row));
             RecoverableError(status);
         }
     }

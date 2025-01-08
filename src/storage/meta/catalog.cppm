@@ -42,6 +42,7 @@ import base_entry;
 import column_def;
 import cleanup_scanner;
 import log_file;
+import snapshot_info;
 
 namespace infinity {
 
@@ -151,6 +152,8 @@ public:
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name, Txn* txn_ptr);
+
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, Txn *txn);
 
     static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id);
@@ -245,6 +248,7 @@ public:
     void AttachDeltaCheckpoint(const String &file_name);
 
     static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const String &catalog_path);
+
 private:
     static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
 
@@ -292,7 +296,6 @@ public:
     atomic_bool enable_profile_{false};
 
 private:
-
     Atomic<bool> running_{};
     UniquePtr<Thread> mem_index_commit_thread_{};
 

@@ -69,13 +69,15 @@ export struct StringOption : public BaseOption {
 };
 
 export struct BooleanOption : public BaseOption {
-    explicit BooleanOption(std::string_view name, bool default_value) : BaseOption(std::move(name), BaseOptionDataType::kBoolean), value_(default_value) {}
+    explicit BooleanOption(std::string_view name, bool default_value)
+        : BaseOption(std::move(name), BaseOptionDataType::kBoolean), value_(default_value) {}
 
     bool value_{};
 };
 
 export struct LogLevelOption : public BaseOption {
-    explicit LogLevelOption(std::string_view name, LogLevel log_level) : BaseOption(std::move(name), BaseOptionDataType::kLogLevel), value_(log_level) {}
+    explicit LogLevelOption(std::string_view name, LogLevel log_level)
+        : BaseOption(std::move(name), BaseOptionDataType::kLogLevel), value_(log_level) {}
 
     LogLevel value_{};
 };
@@ -106,7 +108,8 @@ export String FlushOptionTypeToString(FlushOptionType flush_option_type) {
 }
 
 export struct FlushOption : public BaseOption {
-    explicit FlushOption(std::string_view name, FlushOptionType flush_type) : BaseOption(std::move(name), BaseOptionDataType::kFlush), value_(flush_type) {}
+    explicit FlushOption(std::string_view name, FlushOptionType flush_type)
+        : BaseOption(std::move(name), BaseOptionDataType::kFlush), value_(flush_type) {}
 
     FlushOptionType value_{};
 };
@@ -168,6 +171,7 @@ export enum class GlobalOptionIndex : i8 {
     kDenseIndexBuildingWorker = 53,
     kSparseIndexBuildingWorker = 54,
     kFulltextIndexBuildingWorker = 55,
+    kSnapshotDir = 56,
     kInvalid = 57,
 };
 
