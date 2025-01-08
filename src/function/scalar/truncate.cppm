@@ -1,12 +1,12 @@
 module;
 
-export module truncate;
+export module trunc;
 
 import stl;
 
 namespace infinity {
 
 class Catalog;
-export void RegisterTruncateFunction(const UniquePtr<Catalog> &catalog_ptr);
+export void RegisterTruncFunction(const UniquePtr<Catalog> &catalog_ptr);
 
 }
