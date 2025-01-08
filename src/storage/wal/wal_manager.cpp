@@ -158,7 +158,10 @@ void WalManager::PutEntries(Vector<WalEntry *> wal_entries) {
     wait_flush_.EnqueueBulk(wal_entries);
 }
 
-TxnTimeStamp WalManager::LastCheckpointTS() { return last_ckp_ts_ == UNCOMMIT_TS ? 0 : last_ckp_ts_; }
+TxnTimeStamp WalManager::LastCheckpointTS() const {
+    const TxnTimeStamp last_ckp_ts = last_ckp_ts_;
+    return last_ckp_ts == UNCOMMIT_TS ? 0 : last_ckp_ts;
+}
 
 Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_timestamp) const {
 
