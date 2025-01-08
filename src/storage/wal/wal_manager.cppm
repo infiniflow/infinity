@@ -31,6 +31,7 @@ class BGTaskProcessor;
 struct TableEntry;
 class Txn;
 struct SegmentEntry;
+class Catalog;
 
 export enum class StorageMode {
     kUnInitialized,
@@ -117,6 +118,12 @@ private:
     // Checkpoint Helper
     void FullCheckpointInner(Txn *txn);
     void DeltaCheckpointInner(Txn *txn);
+
+public:
+    void CommitFullCheckpoint(TxnTimeStamp max_commit_ts);
+    void CommitDeltaCheckpoint(TxnTimeStamp max_commit_ts);
+
+private:
     Tuple<TxnTimeStamp, i64> GetCommitState();
     i64 GetLastCkpWalSize();
     void SetLastCkpWalSize(i64 wal_size);

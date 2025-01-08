@@ -528,10 +528,7 @@ void WalManager::FullCheckpointInner(Txn *txn) {
         throw e;
     }
     last_ckp_ts_ = max_commit_ts;
-    WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
     last_full_ckp_ts_ = max_commit_ts;
-    const auto &catalog_dir = *storage_->catalog()->CatalogDir();
-    CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
 }
 
 void WalManager::DeltaCheckpointInner(Txn *txn) {
@@ -571,8 +568,16 @@ void WalManager::DeltaCheckpointInner(Txn *txn) {
         throw e;
     }
     last_ckp_ts_ = max_commit_ts;
-    WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
 }
+
+void WalManager::CommitFullCheckpoint(TxnTimeStamp max_commit_ts) {
+    WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
+    const auto &catalog_dir = *storage_->catalog()->CatalogDir();
+
+    CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
+}
+
+void WalManager::CommitDeltaCheckpoint(TxnTimeStamp max_commit_ts) { WalFile::RecycleWalFile(max_commit_ts, wal_dir_); }
 
 void WalManager::UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size) {
     std::scoped_lock lock(mutex2_);
