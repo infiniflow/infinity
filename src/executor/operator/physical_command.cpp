@@ -459,6 +459,15 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             SnapshotOp snapshot_operation = snapshot_cmd->operation();
             SnapshotScope snapshot_scope = snapshot_cmd->scope();
             const String &snapshot_name = snapshot_cmd->name();
+
+            {
+                // Full checkpoint
+                Txn *txn = query_context->GetTxn();
+                auto checkpoint_task = MakeShared<ForceCheckpointTask>(txn, true);
+                query_context->storage()->bg_processor()->Submit(checkpoint_task);
+                checkpoint_task->Wait();
+            }
+
             switch (snapshot_operation) {
                 case SnapshotOp::kCreate: {
                     LOG_INFO(fmt::format("Execute snapshot create"));

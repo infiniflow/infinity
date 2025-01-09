@@ -180,6 +180,7 @@ SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() const {
         String outline_file_path = *OutlineFilename(file_idx);
         SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
         outline_snapshot_info->filename_ = outline_file_path;
+        block_column_snapshot_info->outline_snapshots_.emplace_back(outline_snapshot_info);
     }
     return block_column_snapshot_info;
 }
