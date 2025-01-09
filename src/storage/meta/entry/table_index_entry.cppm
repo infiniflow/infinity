@@ -114,6 +114,8 @@ public:
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> GetIndexBySegmentSnapshot(const TableEntry *table_entry, Txn *txn);
     const SharedPtr<String> &index_dir() const { return index_dir_; }
     String GetPathNameTail() const;
+
+    SharedPtr<SegmentIndexEntry> GetSegment(SegmentID segment_id, Txn *txn);
     bool GetOrCreateSegment(SegmentID segment_id, Txn *txn, SharedPtr<SegmentIndexEntry> &segment_index_entry);
 
     // MemIndexCommit is non-blocking.

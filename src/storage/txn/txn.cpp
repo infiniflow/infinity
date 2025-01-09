@@ -627,11 +627,6 @@ TxnTimeStamp Txn::Commit() {
 
     txn_store_.MaintainCompactionAlg();
 
-    if (!txn_delta_ops_entry_->operations().empty()) {
-        LOG_TRACE(txn_delta_ops_entry_->ToStringSimple());
-        InfinityContext::instance().storage()->bg_processor()->Submit(MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_)));
-    }
-
     return commit_ts;
 }
 
@@ -690,6 +685,14 @@ void Txn::Rollback() {
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
 
     LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_context_ptr_->txn_id_));
+}
+
+SharedPtr<AddDeltaEntryTask> Txn::MakeAddDeltaEntryTask() {
+    if (!txn_delta_ops_entry_->operations().empty()) {
+        LOG_TRACE(txn_delta_ops_entry_->ToStringSimple());
+        return MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_));
+    }
+    return nullptr;
 }
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) {

@@ -72,6 +72,7 @@ BufferHandle BufferObj::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kMmap) {
         switch (status_) {
+            case BufferStatus::kUnloaded:
             case BufferStatus::kLoaded: {
                 break;
             }
@@ -315,12 +316,20 @@ void BufferObj::LoadInner() {
     ++rc_;
 }
 
-void BufferObj::GetMutPointer() {
+void *BufferObj::GetMutPointer() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kTemp) {
         buffer_mgr_->RemoveTemp(this);
+    } else if (type_ == BufferType::kMmap) {
+        bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
+        if (!free_success) {
+            String error_message = "Out of memory.";
+            UnrecoverableError(error_message);
+        }
+        file_worker_->ReadFromFile(false);
     }
     type_ = BufferType::kEphemeral;
+    return file_worker_->GetData();
 }
 
 void BufferObj::UnloadInner() {
@@ -338,7 +347,7 @@ void BufferObj::UnloadInner() {
             type_ = BufferType::kMmap;
         } else if (type_ == BufferType::kMmap) {
             file_worker_->MmapNotNeed();
-            status_ = BufferStatus::kFreed;
+            status_ = BufferStatus::kUnloaded;
         } else {
             buffer_mgr_->PushGCQueue(this);
             status_ = BufferStatus::kUnloaded;

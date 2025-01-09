@@ -436,9 +436,9 @@ i32 VirtualStore::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &data_l
         return -1;
     i32 f = open(file_path.c_str(), O_RDONLY);
     void *tmpd = mmap(NULL, len_f, PROT_READ, MAP_SHARED, f, 0);
+    close(f);
     if (tmpd == MAP_FAILED)
         return -1;
-    close(f);
     i32 rc = madvise(tmpd,
                      len_f,
                      MADV_NORMAL

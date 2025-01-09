@@ -108,7 +108,7 @@ public:
 
     void ReplayWalEntry(const WalEntry &entry, ReplayWalOptions options);
 
-    TxnTimeStamp LastCheckpointTS();
+    TxnTimeStamp LastCheckpointTS() const;
 
     Vector<SharedPtr<String>> GetDiffWalEntryString(TxnTimeStamp timestamp) const;
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
@@ -180,7 +180,7 @@ private:
     Atomic<bool> checkpoint_in_progress_{false};
 
     // Only Checkpoint/Cleanup thread access following members
-    TxnTimeStamp last_ckp_ts_{};
+    Atomic<TxnTimeStamp> last_ckp_ts_{};
     TxnTimeStamp last_full_ckp_ts_{};
 };
 
