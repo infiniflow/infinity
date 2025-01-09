@@ -97,8 +97,8 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
 
     // Create compressed file
-    String compressed_filename = fmt::format("{}/{}.lz4", save_dir, snapshot_name_);
-    std::ofstream output_stream = VirtualStore::BeginCompress(compressed_filename);
+//    String compressed_filename = fmt::format("{}/{}.lz4", save_dir, snapshot_name_);
+//    std::ofstream output_stream = VirtualStore::BeginCompress(compressed_filename);
 
     // Get files
     Vector<String> original_files = GetFiles();
@@ -152,10 +152,10 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
             }
             write_file_handle->Sync();
 
-            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
-            if (!compress_status.ok()) {
-                RecoverableError(compress_status);
-            }
+//            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
+//            if (!compress_status.ok()) {
+//                RecoverableError(compress_status);
+//            }
         }
     } else {
         String data_dir = config->DataDir();
@@ -168,14 +168,14 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
                 RecoverableError(copy_status);
             }
 
-            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
-            if (!compress_status.ok()) {
-                RecoverableError(compress_status);
-            }
+//            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
+//            if (!compress_status.ok()) {
+//                RecoverableError(compress_status);
+//            }
         }
     }
 
-    VirtualStore::EndCompress(output_stream);
+//    VirtualStore::EndCompress(output_stream);
 
 //    String md5 = CalcMD5(compressed_filename);
 
@@ -190,7 +190,7 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     json_res["database_name"] = db_name_;
     json_res["table_name"] = table_name_;
     json_res["table_comment"] = table_comment_;
-    json_res["md5"] = "empty";
+//    json_res["md5"] = md5;
 
     json_res["txn_id"] = txn_id_;
     json_res["begin_ts"] = begin_ts_;

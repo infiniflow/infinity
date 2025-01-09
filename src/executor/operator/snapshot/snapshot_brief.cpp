@@ -72,9 +72,9 @@ Vector<SnapshotBrief> SnapshotBrief::GetSnapshots(const String &dir) {
 
             snapshot_brief.commit_ts_ = snapshot_json["commit_ts"];
 
-            std::filesystem::path compressed_file(snapshot_path);
-            compressed_file.replace_extension("lz4");
-            snapshot_brief.size_ = VirtualStore::GetFileSize(compressed_file.string());
+//            std::filesystem::path compressed_file(snapshot_path);
+//            compressed_file.replace_extension("lz4");
+            snapshot_brief.size_ = VirtualStore::GetDirectorySize(dir);
 
 
             struct stat statbuf;
