@@ -436,6 +436,7 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
             UnrecoverableError(error_message);
         }
     }
+    std::unique_lock lock(rw_locker_);
     this->DecreaseRemainRow(delete_row_n);
     return delete_row_n;
 }
