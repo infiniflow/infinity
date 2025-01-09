@@ -1,16 +1,18 @@
-
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 module;
-#include <type_traits>
-#include "type/internal_types.h"
-#include <ostream>
-#include "type/logical_type.h"
-#include <cstddef>
-#include <cmath>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <iomanip>
 module trunc;
 import stl;
 import catalog;
@@ -41,7 +43,7 @@ inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, Co
     ss << left;
     std::string str = ss.str();
     std::string truncated_str;
-    size_t i = str.find_first_of('.');
+    int i = str.find_first_of('.');
     if (right < static_cast<BigIntT>(0) || std::isnan(right) || std::isinf(right)) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
@@ -51,6 +53,30 @@ inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, Co
     } else if (std::isinf(left)) {
         truncated_str = "Inf";
     } else if (right > static_cast<BigIntT>(17) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
+        truncated_str = str.substr(0, i);
+    } else {
+        truncated_str = str.substr(0, i + right + 1);
+    }
+    result_ptr->AppendVarcharInner(truncated_str, result);
+}
+
+template <>
+inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, ColumnVector *result_ptr) {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(6);
+    ss << left;
+    std::string str = ss.str();
+    std::string truncated_str;
+    int i = str.find_first_of('.');
+    if (right < static_cast<BigIntT>(0) || std::isnan(right) || std::isinf(right)) {
+        Status status = Status::InvalidDataType();
+        RecoverableError(status);
+        return;
+    } else if (std::isnan(left)) {
+        truncated_str = "NaN";
+    } else if (std::isinf(left)) {
+        truncated_str = "Inf";
+    } else if (right > static_cast<BigIntT>(7) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
         truncated_str = str.substr(0, i);
     } else {
         truncated_str = str.substr(0, i + right + 1);
@@ -68,6 +94,13 @@ void RegisterTruncFunction(const UniquePtr<Catalog> &catalog_ptr) {
                               DataType(LogicalType::kVarchar),
                               &ScalarFunction::BinaryFunctionToVarlen<DoubleT, BigIntT, VarcharT, TruncFunction>);
     function_set_ptr->AddFunction(truncate_double_bigint);
+
+    ScalarFunction truncate_float_bigint(func_name,
+                              {DataType(LogicalType::kFloat), DataType(LogicalType::kBigInt)},
+                              DataType(LogicalType::kVarchar),
+                              &ScalarFunction::BinaryFunctionToVarlen<FloatT, BigIntT, VarcharT, TruncFunction>);
+    function_set_ptr->AddFunction(truncate_float_bigint);
+
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }

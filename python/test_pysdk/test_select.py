@@ -1028,15 +1028,18 @@ class TestInfinity:
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_truncate" + suffix, ConflictType.Ignore)
         db_obj.create_table("test_select_truncate" + suffix,
-                            {"c": {"type": "double"}}, ConflictType.Error)
+                            {"c1": {"type": "double"},
+                             "c2": {"type": "float"}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_select_truncate" + suffix)
         table_obj.insert(
-            [{'c': 2.123}, {'c': -2.123}, {'c': 2}, {'c': 2.1}, {'c': float("nan")}, {'c': float("inf")}, {'c':float("-inf")}])
+            [{"c1": 2.123, "c2":float(2.123)}, {"c1": -2.123, "c2":float(-2.123)}, {"c1": 2, "c2": float(2)}, {"c1": 2.1, "c2": float(2.1)}, 
+             {"c1": float("nan"), "c2": float("nan")}, {"c1":float("-inf"), "c2": float("-inf")}, {"c1":float("-inf"), "c2": float("-inf")}])
 
-        res, extra_res = table_obj.output(["trunc(c, 2)"]).to_df()
+        res, extra_res = table_obj.output(["trunc(c1, 2)", "trunc(c2, 2)"]).to_df()
         print(res)
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'(c trunc 2)': ("2.12", "-2.12", "2.00", "2.10", "NaN", "Inf", "Inf")})
-                                      .astype({'(c trunc 2)': dtype('str_')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 trunc 2)': ("2.12", "-2.12", "2.00", "2.10", "NaN", "Inf", "Inf"),
+                                                         '(c2 trunc 2)': ("2.12", "-2.12", "2.00", "2.10", "NaN", "Inf", "Inf")})
+                                      .astype({'(c1 trunc 2)': dtype('str_'), '(c2 trunc 2)': dtype('str_')}))
 
 
         res = db_obj.drop_table("test_select_truncate" + suffix)

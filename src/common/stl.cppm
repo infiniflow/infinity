@@ -25,6 +25,7 @@ module;
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
@@ -32,6 +33,7 @@ module;
 #include <forward_list>
 #include <functional>
 #include <iomanip>
+#include <ios>
 #include <iostream>
 #include <iterator>
 #include <list>
@@ -40,6 +42,7 @@ module;
 #include <optional>
 #include <random>
 #include <ranges>
+#include <sched.h>
 #include <semaphore>
 #include <set>
 #include <shared_mutex>
@@ -160,6 +163,11 @@ using std::stable_sort;
 using std::tie;
 using std::transform;
 using std::unique;
+using std::setprecision;
+using std::fixed;
+
+using std::string;
+using std::stringstream;
 
 namespace ranges {
 
@@ -203,7 +211,6 @@ using std::chrono::days;
 using std::chrono::day;
 using std::chrono::month;
 using std::chrono::year;
-
 using std::chrono::sys_days;
 using std::chrono::system_clock;
 using std::chrono::year_month_day;
