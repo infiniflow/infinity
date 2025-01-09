@@ -625,7 +625,7 @@ TxnTimeStamp Txn::Commit() {
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-    txn_store_.MaintainCompactionAlg();
+    PostCommit();
 
     return commit_ts;
 }
@@ -659,6 +659,22 @@ void Txn::CommitBottom() {
     commit_bottom_done_ = true;
     commit_cv_.notify_one();
     LOG_TRACE(fmt::format("Txn bottom: {} is finished.", txn_context_ptr_->txn_id_));
+}
+
+void Txn::PostCommit() {
+    txn_store_.MaintainCompactionAlg();
+
+    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
+        if (wal_cmd->GetType() == WalCommandType::CHECKPOINT) {
+            auto *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(wal_cmd.get());
+            if (checkpoint_cmd->is_full_checkpoint_) {
+                wal_manager->CommitFullCheckpoint(checkpoint_cmd->max_commit_ts_);
+            } else {
+                wal_manager->CommitDeltaCheckpoint(checkpoint_cmd->max_commit_ts_);
+            }
+        }
+    }
 }
 
 void Txn::CancelCommitBottom() {

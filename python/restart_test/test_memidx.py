@@ -576,7 +576,7 @@ class TestMemIdx:
         @decorator2
         def part2(infinity_obj):
             # wait for optimize
-            time.sleep(5)
+            time.sleep(3)
 
             idx1_files = list(idx1_dir.glob("*"))
             idx2_files = list(idx2_dir.glob("*"))
@@ -589,8 +589,9 @@ class TestMemIdx:
                 return
 
             assert len(idx1_files) == 3
-
             assert len(idx2_files) == 3
+
+            time.sleep(2)
 
             infinity_obj.cleanup()
             idx1_files = list(idx1_dir.glob("*"))
