@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28.1)
 
-project(infinity VERSION 0.5.2)
+project(infinity VERSION 0.6.0)
 
 if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
