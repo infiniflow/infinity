@@ -24,7 +24,7 @@ module;
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
