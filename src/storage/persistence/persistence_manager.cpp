@@ -285,7 +285,7 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
 }
 
 Tuple<SizeT, Status> PersistenceManager::GetDirectorySize(const String &path_str) {
-    uintmax_t total_size = 0;
+    SizeT total_size = 0;
 
     if (!VirtualStore::Exists(path_str)) {
         return {0, Status::IOError(fmt::format("{} doesn't exist.", path_str))};
