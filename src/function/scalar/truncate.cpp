@@ -53,9 +53,7 @@ inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, Co
     } else if (right > static_cast<BigIntT>(17) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
         truncated_str = str.substr(0, i);
     } else {
-        
         truncated_str = str.substr(0, i + right + 1);
-        std::cout << truncated_str << std::endl;
     }
     result_ptr->AppendVarcharInner(truncated_str, result);
 }
