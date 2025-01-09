@@ -47,6 +47,7 @@ import internal_types;
 import infinity_context;
 import persistence_manager;
 import persist_result_handler;
+import snapshot_info;
 
 namespace infinity {
 
@@ -482,6 +483,28 @@ bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
     }
     TxnTimeStamp begin_ts = txn->BeginTS();
     return begin_ts < deprecate_ts_.load() && BaseEntry::CheckVisible(txn);
+}
+
+SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexEntry::GetSnapshotInfo(Txn *txn_ptr) const {
+    SharedPtr<ChunkIndexSnapshotInfo> chunk_index_snapshot_info = MakeShared<ChunkIndexSnapshotInfo>();
+    chunk_index_snapshot_info->chunk_id_ = chunk_id_;
+    chunk_index_snapshot_info->base_name_ = base_name_;
+
+    TableIndexEntry *table_index_entry = segment_index_entry_->table_index_entry();
+    const auto &index_dir = segment_index_entry_->index_dir();
+    const IndexBase *index_base = table_index_entry->index_base();
+    if (index_base->index_type_ == IndexType::kFullText) {
+        Path path = Path(*index_dir) / base_name_;
+        String index_prefix = path.string();
+        String posting_file = index_prefix + POSTING_SUFFIX;
+        String dict_file = index_prefix + DICT_SUFFIX;
+        String len_file = index_prefix + LENGTH_SUFFIX;
+        chunk_index_snapshot_info->files_.push_back(posting_file);
+        chunk_index_snapshot_info->files_.push_back(dict_file);
+        chunk_index_snapshot_info->files_.push_back(len_file);
+    }
+    chunk_index_snapshot_info->base_name_ = base_name_;
+    return chunk_index_snapshot_info;
 }
 
 } // namespace infinity

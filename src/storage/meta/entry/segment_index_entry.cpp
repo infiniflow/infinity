@@ -927,7 +927,11 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                         using IndexT = std::decay_t<decltype(*index)>;
                         if constexpr (IndexT::kOwnMem) {
                             using DataType = typename IndexT::DataType;
-                            CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
+                            CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry,
+                                                                                      buffer_mgr,
+                                                                                      column_def->id(),
+                                                                                      begin_ts,
+                                                                                      row_count);
                             HnswInsertConfig insert_config;
                             insert_config.optimize_ = true;
                             index->InsertVecs(std::move(iter), insert_config);
@@ -964,7 +968,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                             UnrecoverableError("Invalid index type.");
                         }
                     }
-                    },
+                },
                 abstract_bmp);
             merged_chunk_index_entry = memory_bmp_index->Dump(this, buffer_mgr);
             break;
@@ -1135,7 +1139,6 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
     }
     LOG_INFO(fmt::format("AddChunkIndexEntryReplay chunk_id: {} deprecate_ts: {}, base_rowid: {}, row_count: {} to to segment: {}",
                          chunk_id,
-
                          deprecate_ts,
                          base_rowid.ToUint64(),
                          row_count,
@@ -1256,11 +1259,11 @@ Pair<bool, std::function<void()>> SegmentIndexEntry::TrySetOptimizing(Txn *txn) 
         return {false, nullptr};
     }
     return {true, [this, txn] {
-        TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
-        TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
-        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_, true);
-        txn_index_store->AddSegmentOptimizing(this);
-    }};
+                TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
+                TxnTableStore *txn_table_store = txn->txn_store()->GetTxnTableStore(table_entry);
+                TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_, true);
+                txn_index_store->AddSegmentOptimizing(this);
+            }};
 }
 
 void SegmentIndexEntry::ResetOptimizing() { optimizing_.store(false); }
@@ -1282,6 +1285,19 @@ void SegmentIndexEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
     }
     this->deleted_ = true;
     this->deprecate_ts_ = deprecate_ts;
+}
+
+SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexEntry::GetSnapshotInfo(Txn *txn_ptr) const {
+    SharedPtr<SegmentIndexSnapshotInfo> segment_index_snapshot = MakeShared<SegmentIndexSnapshotInfo>();
+
+    std::shared_lock lock(rw_locker_);
+    segment_index_snapshot->chunk_index_snapshots_.reserve(chunk_index_entries_.size());
+    for (const auto &chunk_index_entry : chunk_index_entries_) {
+        auto chunk_index_snapshot_info = chunk_index_entry->GetSnapshotInfo(txn_ptr);
+        segment_index_snapshot->chunk_index_snapshots_.emplace_back(chunk_index_snapshot_info);
+    }
+    segment_index_snapshot->segment_id_ = segment_id_;
+    return segment_index_snapshot;
 }
 
 } // namespace infinity

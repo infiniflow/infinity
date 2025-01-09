@@ -1068,7 +1068,7 @@ UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, Buff
 void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_path, String &full_catalog_name) {
     full_catalog_path = *catalog_dir_;
     full_catalog_name = CatalogFile::FullCheckpointFilename(max_commit_ts);
-    String full_path = Path(InfinityContext::instance().config()->DataDir()) / *catalog_dir_ / CatalogFile::FullCheckpointFilename(max_commit_ts);
+    String full_path = Path(InfinityContext::instance().config()->DataDir()) / *catalog_dir_ / full_catalog_name;
     String catalog_tmp_path =
         Path(InfinityContext::instance().config()->DataDir()) / *catalog_dir_ / CatalogFile::TempFullCheckpointFilename(max_commit_ts);
 
@@ -1111,8 +1111,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
 
     delta_catalog_path = *catalog_dir_;
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
-    String full_path =
-        fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
+    String delta_path = fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), *catalog_dir_, delta_catalog_name);
 
     if (flush_delta_entry->commit_ts() != max_commit_ts) {
         String error_message = "Expect flush_delta_entry->commit_ts() == max_commit_ts";
@@ -1172,16 +1171,16 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
         UnrecoverableError(error_message);
     }
 
-    auto [out_file_handle, write_status] = VirtualStore::Open(full_path, FileAccessMode::kWrite);
+    auto [out_file_handle, write_status] = VirtualStore::Open(delta_path, FileAccessMode::kWrite);
     if (!write_status.ok()) {
-        String error_message = fmt::format("Failed to open delta catalog file: {}", full_path);
+        String error_message = fmt::format("Failed to open delta catalog file: {}", delta_path);
         UnrecoverableError(error_message);
     }
 
     out_file_handle->Append((reinterpret_cast<const char *>(buf.data())), act_size);
     out_file_handle->Sync();
     if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone) {
-        VirtualStore::UploadObject(full_path, delta_catalog_name);
+        VirtualStore::UploadObject(delta_path, delta_catalog_name);
     }
     // {
     // log for delta op debug
@@ -1192,7 +1191,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
     //     }
     //     LOG_INFO(ss.str());
     // }
-    LOG_DEBUG(fmt::format("Save delta catalog to: {}, size: {}.", full_path, act_size));
+    LOG_DEBUG(fmt::format("Save delta catalog to: {}, size: {}.", delta_path, act_size));
 
     return true;
 }
