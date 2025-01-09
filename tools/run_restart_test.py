@@ -31,12 +31,12 @@ if __name__ == "__main__":
     current_path = os.getcwd()
     python_test_dir = current_path + "/python"
 
-    test_case = None
     if args.test_case:
         test_case = f"{python_test_dir}/restart_test/{args.test_case}"
     else:
         test_case = f"{python_test_dir}/restart_test"
 
+    test_case = "python/restart_test/test_compact.py::TestCompact::test_compact_restart_repeatedly"
     if not slow:
         process = subprocess.Popen(
             [

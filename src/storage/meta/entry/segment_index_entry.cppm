@@ -33,6 +33,7 @@ import chunk_index_entry;
 import default_values;
 import statement_common;
 import txn;
+import snapshot_info;
 
 namespace infinity {
 
@@ -239,6 +240,7 @@ public:
         return ts >= deprecate_ts;
     }
 
+    SharedPtr<SegmentIndexSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id);
 

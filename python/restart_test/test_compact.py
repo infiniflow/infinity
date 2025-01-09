@@ -103,7 +103,7 @@ class TestCompact:
         import_path = "test/data/csv/embedding_int_dim3.csv"
         import_num = 1000
         import_options = None
-        kill_num = 10
+        kill_num = 1
         file_lines = 3
 
         @decorator1

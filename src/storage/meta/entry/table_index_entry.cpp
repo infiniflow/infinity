@@ -579,4 +579,15 @@ void TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<Uniq
 
 bool TableIndexEntry::CheckIfIndexColumn(ColumnID column_id) const { return static_cast<ColumnID>(column_def_->id()) == column_id; }
 
+SharedPtr<TableIndexSnapshotInfo> TableIndexEntry::GetSnapshotInfo(Txn *txn_ptr) const {
+    std::shared_lock lock(rw_locker_);
+    auto snapshot_info = MakeShared<TableIndexSnapshotInfo>();
+    snapshot_info->index_base_ = index_base_;
+    snapshot_info->index_dir_ = index_dir_;
+    for(const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+        snapshot_info->index_by_segment_.emplace(segment_id, segment_index_entry->GetSnapshotInfo(txn_ptr));
+    }
+    return snapshot_info;
+}
+
 } // namespace infinity
