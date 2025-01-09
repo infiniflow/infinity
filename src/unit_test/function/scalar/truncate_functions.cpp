@@ -14,10 +14,12 @@
 
 
 #include "gtest/gtest.h"
+
+import stl;
 import base_test;
 import infinity_exception;
-import stl;
 import infinity_context;
+
 import catalog;
 import logger;
 
@@ -43,7 +45,9 @@ import scalar_function_set;
 
 import trunc;
 import third_party;
+
 using namespace infinity;
+
 class TruncateFunctionsTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TruncateFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
