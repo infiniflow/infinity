@@ -81,6 +81,8 @@ public:
 
     Tuple<SizeT, Status> GetFileSize(const String &file_path);
 
+    Tuple<SizeT, Status> GetDirectorySize(const String &path_str);
+
     ObjAddr GetObjCacheWithoutCnt(const String &local_path);
 
     [[nodiscard]] PersistWriteResult PutObjCache(const String &file_path);
