@@ -115,7 +115,8 @@ public:
             normalized = MakeUniqueForOverwrite<DataType[]>(this->dim_);
             DataType norm = 0;
             for (SizeT j = 0; j < this->dim_; ++j) {
-                norm += src[j] * src[j];
+                DataType x = src[j];
+                norm += x * x;
             }
             norm = std::sqrt(norm);
             if (norm == 0) {

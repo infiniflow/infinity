@@ -375,6 +375,10 @@ TEST_P(CatalogDeltaEntryTest, MergeEntries) {
         local_catalog_delta_entry->operations().push_back(std::move(op));
     }
 
+    for (auto &op : local_catalog_delta_entry->operations()) {
+        op->commit_ts_ = 1;
+    }
+
     // merge
     global_catalog_delta_entry->ReplayDeltaEntry(std::move(local_catalog_delta_entry));
     // check ops
