@@ -44,8 +44,10 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
         return "/"
     elif binary_expr_key == "mod":
         return "%"
-    else:
+    elif binary_expr_key == "trunc":
         return binary_expr_key
+    else:
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown binary expression: {binary_expr_key}")
 
 
 def deprecated_api(message):

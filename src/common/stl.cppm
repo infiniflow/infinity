@@ -23,7 +23,6 @@ module;
 #include <charconv>
 #include <chrono>
 #include <cmath>
-#include <cstdint>
 #include <cstdio>
 #include <cstddef>
 #include <cstdlib>
