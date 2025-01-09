@@ -145,7 +145,7 @@ String WalBlockInfo::ToString() const {
         }
     }
     ss << "]";
-    return ss.str();
+    return std::move(ss).str();
 }
 
 WalSegmentInfo::WalSegmentInfo(SegmentEntry *segment_entry)
@@ -201,7 +201,7 @@ String WalSegmentInfo::ToString() const {
     ss << "segment_id: " << segment_id_ << ", column_count: " << column_count_ << ", row_count: " << row_count_
        << ", actual_row_count: " << actual_row_count_ << ", row_capacity: " << row_capacity_;
     ss << ", block_info count: " << block_infos_.size() << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
@@ -297,7 +297,7 @@ String WalChunkIndexInfo::ToString() const {
     std::stringstream ss;
     ss << "chunk_id: " << chunk_id_ << ", base_name: " << base_name_ << ", base_rowid: " << base_rowid_.ToString() << ", row_count: " << row_count_
        << ", deprecate_ts: " << deprecate_ts_;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
@@ -934,14 +934,14 @@ String WalCmdCreateDatabase::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "db dir: " << db_dir_tail_ << std::endl;
     ss << "db comment: " << db_comment_ << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdDropDatabase::ToString() const {
     std::stringstream ss;
     ss << "Drop Database: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdCreateTable::ToString() const {
@@ -950,7 +950,7 @@ String WalCmdCreateTable::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_def_->ToString() << std::endl;
     ss << "table dir: " << table_dir_tail_ << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdDropTable::ToString() const {
@@ -958,7 +958,7 @@ String WalCmdDropTable::ToString() const {
     ss << "Drop Table: " << std::endl;
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdCreateIndex::ToString() const {
@@ -967,7 +967,7 @@ String WalCmdCreateIndex::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "index def: " << index_base_->ToString() << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdDropIndex::ToString() const {
@@ -976,7 +976,7 @@ String WalCmdDropIndex::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "index name: " << index_name_ << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdImport::ToString() const {
@@ -986,7 +986,7 @@ String WalCmdImport::ToString() const {
     ss << "table name: " << table_name_ << std::endl;
     auto &segment_info = segment_info_;
     ss << segment_info.ToString() << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdAppend::ToString() const {
@@ -995,7 +995,7 @@ String WalCmdAppend::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << block_->ToBriefString();
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdDelete::ToString() const {
@@ -1004,7 +1004,7 @@ String WalCmdDelete::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "delete row cout: " << row_ids_.size() << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdSetSegmentStatusSealed::ToString() const {
@@ -1013,7 +1013,7 @@ String WalCmdSetSegmentStatusSealed::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "segment id: " << segment_id_ << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdUpdateSegmentBloomFilterData::ToString() const {
@@ -1022,7 +1022,7 @@ String WalCmdUpdateSegmentBloomFilterData::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "segment id: " << segment_id_ << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdCheckpoint::ToString() const {
@@ -1031,7 +1031,7 @@ String WalCmdCheckpoint::ToString() const {
     ss << "catalog path: " << fmt::format("{}/{}", catalog_path_, catalog_name_) << std::endl;
     ss << "max commit ts: " << max_commit_ts_ << std::endl;
     ss << "is full checkpoint: " << is_full_checkpoint_ << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdCompact::ToString() const {
@@ -1049,7 +1049,7 @@ String WalCmdCompact::ToString() const {
         ss << new_seg_info.ToString() << " | ";
     }
     ss << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdOptimize::ToString() const {
@@ -1063,7 +1063,7 @@ String WalCmdOptimize::ToString() const {
         ss << param_ptr->ToString() << " | ";
     }
     ss << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdDumpIndex::ToString() const {
@@ -1082,7 +1082,7 @@ String WalCmdDumpIndex::ToString() const {
         ss << chunk_id << " | ";
     }
     ss << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdRenameTable::ToString() const {
@@ -1091,7 +1091,7 @@ String WalCmdRenameTable::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "new table name: " << new_table_name_ << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdAddColumns::ToString() const {
@@ -1103,7 +1103,7 @@ String WalCmdAddColumns::ToString() const {
     for (auto &column_def : column_defs_) {
         ss << column_def->ToString() << " | ";
     }
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdDropColumns::ToString() const {
@@ -1115,7 +1115,7 @@ String WalCmdDropColumns::ToString() const {
     for (auto &column_name : column_names_) {
         ss << column_name << " | ";
     }
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdCreateDatabase::CompactInfo() const {
@@ -1230,7 +1230,7 @@ String WalCmdDumpIndex::CompactInfo() const {
                        segment_id_,
                        ss.str());
 
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmdRenameTable::CompactInfo() const {
@@ -1388,7 +1388,7 @@ String WalEntry::ToString() const {
         ss << cmd->ToString();
     }
     ss << "========================" << std::endl;
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalEntry::CompactInfo() const {
@@ -1401,7 +1401,7 @@ String WalEntry::CompactInfo() const {
     if (cmds_.size() > 0) {
         ss << cmds_.back()->CompactInfo();
     }
-    return ss.str();
+    return std::move(ss).str();
 }
 
 String WalCmd::WalCommandTypeToString(WalCommandType type) {
