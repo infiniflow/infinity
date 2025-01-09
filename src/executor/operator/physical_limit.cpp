@@ -154,7 +154,7 @@ PhysicalLimit::PhysicalLimit(u64 id,
         offset = (static_pointer_cast<ValueExpression>(offset_expr_))->GetValue().value_.big_int;
     }
 
-    counter_ = MakeUnique<UnSyncCounter>(offset, limit);
+    counter_ = MakeUnique<AtomicCounter>(offset, limit);
 }
 
 void PhysicalLimit::Init() {}
