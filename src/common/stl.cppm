@@ -42,7 +42,6 @@ module;
 #include <optional>
 #include <random>
 #include <ranges>
-#include <sched.h>
 #include <semaphore>
 #include <set>
 #include <shared_mutex>
@@ -292,7 +291,6 @@ using std::holds_alternative;
 using std::variant;
 using std::variant_size_v;
 using std::visit;
-
 using std::common_type_t;
 using std::conditional_t;
 using std::derived_from;

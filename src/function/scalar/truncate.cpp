@@ -34,6 +34,7 @@ struct TruncFunction {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
+
 };
 
 template <>
@@ -83,6 +84,7 @@ inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, Col
     }
     result_ptr->AppendVarcharInner(truncated_str, result);
 }
+
 
 void RegisterTruncFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "trunc";

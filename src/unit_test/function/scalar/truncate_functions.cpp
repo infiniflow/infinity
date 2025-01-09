@@ -15,41 +15,45 @@
 
 #include "gtest/gtest.h"
 import base_test;
-
 import infinity_exception;
-
-import global_resource_usage;
-import third_party;
-
-import logger;
 import stl;
 import infinity_context;
 import catalog;
-import truncate;
-import scalar_function;
-import scalar_function_set;
+import logger;
+
+import default_values;
+import value;
+
+import base_expression;
+import column_expression;
+import column_vector;
+import data_block;
+
 import function_set;
 import function;
-import column_expression;
-import value;
-import default_values;
-import data_block;
-import base_expression;
-import column_vector;
-import logical_type;
-import internal_types;
+
+import global_resource_usage;
+
 import data_type;
+import internal_types;
+import logical_type;
+
+import scalar_function;
+import scalar_function_set;
+
+import trunc;
+import third_party;
 using namespace infinity;
 class TruncateFunctionsTest : public BaseTestParamStr {};
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, AbsFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TruncateFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
 TEST_P(TruncateFunctionsTest, truncate_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
-    RegisterAbsFunction(catalog_ptr);
+    RegisterTruncFunction(catalog_ptr);
 
     String op = "trunc";
 
@@ -62,7 +66,7 @@ TEST_P(TruncateFunctionsTest, truncate_func) {
 
         DataType data_type1(LogicalType::kFloat);
         DataType data_type2(LogicalType::kBigInt);
-        DataType result_type(LogicalType::kVarchar);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kVarchar);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
         SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type2, "t1", 1, "c2", 1, 0);
 
@@ -70,7 +74,89 @@ TEST_P(TruncateFunctionsTest, truncate_func) {
         inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("POW(Heterogeneous, Double)->Double", func.ToString().c_str());
+        EXPECT_STREQ("trunc(Float, BigInt)->Varchar", func.ToString().c_str());
+
+        Vector<SharedPtr<DataType>> column_types;
+        column_types.emplace_back(MakeShared<DataType>(data_type1));
+        column_types.emplace_back(MakeShared<DataType>(data_type2));
+
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeFloat(static_cast<f32>(i)));
+            data_block.AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
+        }
+        data_block.Finalize();
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            Value v1 = data_block.GetValue(0, i);
+            Value v2 = data_block.GetValue(1, i);
+            EXPECT_EQ(v1.type_.type(), LogicalType::kFloat);
+            EXPECT_EQ(v2.type_.type(), LogicalType::kBigInt);
+            EXPECT_FLOAT_EQ(v1.value_.float32, static_cast<f32>(i));
+            EXPECT_EQ(v2.value_.big_int, static_cast<i64>(i));
+        }
+
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
+        func.function_(data_block, result);
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            Value v = result->GetValue(i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kVarchar);
+        }
+    }
+
+    {
+        Vector<SharedPtr<BaseExpression>> inputs;
+
+        DataType data_type1(LogicalType::kDouble);
+        DataType data_type2(LogicalType::kBigInt);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kVarchar);
+        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
+        SharedPtr<ColumnExpression> col2_expr_ptr = MakeShared<ColumnExpression>(data_type2, "t1", 1, "c2", 1, 0);
+
+        inputs.emplace_back(col1_expr_ptr);
+        inputs.emplace_back(col2_expr_ptr);
+
+        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+        EXPECT_STREQ("trunc(Double, BigInt)->Varchar", func.ToString().c_str());
+
+        Vector<SharedPtr<DataType>> column_types;
+        column_types.emplace_back(MakeShared<DataType>(data_type1));
+        column_types.emplace_back(MakeShared<DataType>(data_type2));
+
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeDouble(static_cast<f64>(i)));
+            data_block.AppendValue(1, Value::MakeBigInt(static_cast<i64>(i)));
+        }
+        data_block.Finalize();
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            Value v1 = data_block.GetValue(0, i);
+            Value v2 = data_block.GetValue(1, i);
+            EXPECT_EQ(v1.type_.type(), LogicalType::kDouble);
+            EXPECT_EQ(v2.type_.type(), LogicalType::kBigInt);
+            EXPECT_FLOAT_EQ(v1.value_.float64, static_cast<f64>(i));
+            EXPECT_EQ(v2.value_.big_int, static_cast<i64>(i));
+        }
+
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
+        func.function_(data_block, result);
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            Value v = result->GetValue(i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kVarchar);
+        }
     }
 }
 
