@@ -26,12 +26,13 @@ import logger;
 import default_values;
 import infinity_context;
 import status;
+import admin_statement;
 
 namespace infinity {
 
 Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> CatalogFile::ParseValidCheckpointFilenames(const String &catalog_dir,
                                                                                                              TxnTimeStamp max_checkpoint_ts) {
-    auto [full_infos, delta_infos] = ParseCheckpointFilenames(catalog_dir);
+    auto [full_infos, delta_infos, temp_full_infos, temp_delta_infos] = ParseCheckpointFilenames(catalog_dir);
     std::sort(full_infos.begin(), full_infos.end(), [](const auto &lhs, const auto &rhs) { return lhs.max_commit_ts_ < rhs.max_commit_ts_; });
     std::sort(delta_infos.begin(), delta_infos.end(), [](const auto &lhs, const auto &rhs) { return lhs.max_commit_ts_ < rhs.max_commit_ts_; });
 
@@ -66,13 +67,22 @@ String CatalogFile::TempFullCheckpointFilename(TxnTimeStamp max_commit_ts) { ret
 
 String CatalogFile::DeltaCheckpointFilename(TxnTimeStamp max_commit_ts) { return fmt::format("DELTA.{}", max_commit_ts); }
 
+String CatalogFile::TempDeltaCheckpointFilename(TxnTimeStamp max_commit_ts) { return fmt::format("_DELTA.{}", max_commit_ts); }
+
 void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &catalog_dir) {
-    auto [full_infos, delta_infos] = ParseCheckpointFilenames(catalog_dir);
+    bool upload_catalog =
+        InfinityContext::instance().GetServerRole() == NodeRole::kLeader or InfinityContext::instance().GetServerRole() == NodeRole::kStandalone;
+
+    auto [full_infos, delta_infos, temp_full_infos, temp_delta_infos] = ParseCheckpointFilenames(catalog_dir);
     bool found = false;
     for (const auto &full_info : full_infos) {
         if (full_info.max_commit_ts_ < max_commit_ts) {
             VirtualStore::DeleteFile(full_info.path_);
             LOG_DEBUG(fmt::format("WalManager::Checkpoint delete catalog file: {}", full_info.path_));
+            if (upload_catalog) {
+                const String filename = Path(full_info.path_).filename();
+                VirtualStore::RemoveObject(filename);
+            }
         } else if (full_info.max_commit_ts_ == max_commit_ts) {
             found = true;
         }
@@ -85,11 +95,15 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
         if (delta_info.max_commit_ts_ <= max_commit_ts) {
             VirtualStore::DeleteFile(delta_info.path_);
             LOG_DEBUG(fmt::format("WalManager::Checkpoint delete catalog file: {}", delta_info.path_));
+            if (upload_catalog) {
+                const String filename = Path(delta_info.path_).filename();
+                VirtualStore::RemoveObject(filename);
+            }
         }
     }
 }
 
-Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::ParseCheckpointFilenames(const String &catalog_dir) {
+CatalogFilesInfo CatalogFile::ParseCheckpointFilenames(const String &catalog_dir) {
     auto [entries, status] = VirtualStore::ListDirectory(Path(InfinityContext::instance().config()->DataDir()) / catalog_dir);
     if (!status.ok()) {
         String error_message = fmt::format("Can't list directory: {}/{}", InfinityContext::instance().config()->DataDir(), catalog_dir);
@@ -97,11 +111,13 @@ Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::Par
     }
 
     if (entries.empty()) {
-        return {Vector<FullCatalogFileInfo>{}, Vector<DeltaCatalogFileInfo>{}};
+        return {Vector<FullCatalogFileInfo>{}, Vector<DeltaCatalogFileInfo>{}, Vector<TempFullCatalogFileInfo>{}, Vector<TempDeltaCatalogFileInfo>{}};
     }
 
     Vector<FullCatalogFileInfo> full_infos;
     Vector<DeltaCatalogFileInfo> delta_infos;
+    Vector<TempFullCatalogFileInfo> temp_full_infos;
+    Vector<TempDeltaCatalogFileInfo> temp_delta_infos;
     for (const auto &entry : entries) {
         if (!entry->is_regular_file()) {
             LOG_WARN(fmt::format("Catalog file {} is not a regular file", entry->path().string()));
@@ -128,6 +144,10 @@ Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::Par
                 continue;
             }
             auto file_prefix = filename.substr(0, dot2_pos);
+            if (IsEqual(file_prefix, String("_FULL"))) {
+                temp_full_infos.emplace_back(TempFullCatalogFileInfo{entry->path().string(), checkpoint_ts});
+                continue;
+            }
             if (!IsEqual(file_prefix, String("FULL"))) {
                 LOG_WARN(fmt::format("Catalog file {} has wrong file name", entry->path().string()));
                 continue;
@@ -142,6 +162,10 @@ Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::Par
                 continue;
             }
             auto file_prefix = filename.substr(0, dot_pos);
+            if (IsEqual(file_prefix, String("_DELTA"))) {
+                temp_delta_infos.emplace_back(TempDeltaCatalogFileInfo{entry->path().string(), checkpoint_ts});
+                continue;
+            }
             if (!IsEqual(file_prefix, String("DELTA"))) {
                 LOG_WARN(fmt::format("Catalog file {} has wrong file name", entry->path().string()));
                 continue;
@@ -149,7 +173,7 @@ Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> CatalogFile::Par
             delta_infos.push_back({entry->path().string(), checkpoint_ts});
         }
     }
-    return {full_infos, delta_infos};
+    return {std::move(full_infos), std::move(delta_infos), std::move(temp_full_infos), std::move(temp_delta_infos)};
 }
 
 Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(const String &wal_dir) {
