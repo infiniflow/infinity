@@ -352,6 +352,20 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
         parsed_expr = ttypes.ParsedExpr(type=expr_type)
         return parsed_expr
     # in
+    elif isinstance(cons, exp.Command):
+        func_name = cons.args['this']
+        arguments = []
+        for arg in cons.args['expression']:
+            if arg:
+                arguments.append(parse_expr(arg))
+
+        func_expr = ttypes.FunctionExpr(
+            function_name=func_name,
+            arguments=arguments
+        )
+        expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+        parsed_expr = ttypes.ParsedExpr(type=expr_type)
+        return parsed_expr
     elif isinstance(cons, exp.In):
         left_operand = parse_expr(cons.args['this'])
         arguments = []

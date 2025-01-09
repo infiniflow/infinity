@@ -8,7 +8,8 @@ import time
 python_executable = sys.executable
 
 
-def python_sdk_test(python_test_dir: str, pytest_mark: str):
+def python_sdk_test(python_test_dir: str, pytest_mark: str, single_file_name=""):
+    # The single file name must be start with '/'
     print("python test path is {}".format(python_test_dir))
     # run test
     print(f"start pysdk test with {pytest_mark}")
@@ -22,7 +23,7 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
         "-x",
         "-m",
         pytest_mark,
-        f"{python_test_dir}/test_pysdk",
+        f"{python_test_dir}/test_pysdk" + single_file_name,
     ]
     quoted_args = ['"' + arg + '"' if " " in arg else arg for arg in args]
     print(" ".join(quoted_args))
