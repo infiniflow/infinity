@@ -1049,7 +1049,7 @@ String WalCmdCompact::ToString() const {
         ss << new_seg_info.ToString() << " | ";
     }
     ss << std::endl;
-    return String();
+    return ss.str();
 }
 
 String WalCmdOptimize::ToString() const {
