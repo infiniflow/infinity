@@ -13,6 +13,8 @@
 // limitations under the License.
 
 module;
+#include <cstdio>
+#include <string>
 module trunc;
 import stl;
 import catalog;
@@ -39,48 +41,64 @@ struct TruncFunction {
 
 template <>
 inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, ColumnVector *result_ptr) {
-    std::stringstream ss;
-    ss << std::fixed << std::setprecision(16);
-    ss << left;
-    std::string str = ss.str();
-    std::string truncated_str;
-    int i = str.find_first_of('.');
     if (right < static_cast<BigIntT>(0) || std::isnan(right) || std::isinf(right)) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
         return;
-    } else if (std::isnan(left)) {
-        truncated_str = "NaN";
-    } else if (std::isinf(left)) {
-        truncated_str = "Inf";
-    } else if (right > static_cast<BigIntT>(17) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
-        truncated_str = str.substr(0, i);
-    } else {
-        truncated_str = str.substr(0, i + right + 1);
+    } 
+    char buffer[100];  
+    buffer[0] =' ';  
+    int len = std::snprintf(buffer + 1, sizeof(buffer) - 1, "%.*f", (int)right, left);
+    if (len < 0) {
+        Status status = Status::InvalidDataType();
+        RecoverableError(status);
+        return;
     }
+
+    std::string str(buffer, len + 1);
+    std::string truncated_str;
+    int i = str.find_first_of('.');
+    if (std::isnan(left)) {
+        truncated_str = " NaN";
+    } else if (std::isinf(left)) {
+        truncated_str = " Inf";
+    } else if (right > static_cast<BigIntT>(7) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
+        truncated_str = str.substr(0, i + 1);
+    } else {
+        truncated_str = str.substr(0, i + right + 2);
+    }
+
     result_ptr->AppendVarcharInner(truncated_str, result);
+
 }
 
 template <>
 inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, ColumnVector *result_ptr) {
-    std::stringstream ss;
-    ss << std::fixed << std::setprecision(6);
-    ss << left;
-    std::string str = ss.str();
-    std::string truncated_str;
-    int i = str.find_first_of('.');
     if (right < static_cast<BigIntT>(0) || std::isnan(right) || std::isinf(right)) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
         return;
-    } else if (std::isnan(left)) {
-        truncated_str = "NaN";
+    } 
+    char buffer[100]; 
+    buffer[0] =' ';  
+    int len = std::snprintf(buffer + 1, sizeof(buffer) - 1, "%.*f", (int)right, left);
+    if (len < 0) {
+        Status status = Status::InvalidDataType();
+        RecoverableError(status);
+        return;
+    }
+
+    std::string str(buffer, len + 1);
+    std::string truncated_str;
+    int i = str.find_first_of('.');
+    if (std::isnan(left)) {
+        truncated_str = " NaN";
     } else if (std::isinf(left)) {
-        truncated_str = "Inf";
-    } else if (right > static_cast<BigIntT>(7) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
-        truncated_str = str.substr(0, i);
+        truncated_str = " Inf";
+    } else if (right > static_cast<BigIntT>(17) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
+        truncated_str = str.substr(0, i + 1);
     } else {
-        truncated_str = str.substr(0, i + right + 1);
+        truncated_str = str.substr(0, i + right + 2);
     }
     result_ptr->AppendVarcharInner(truncated_str, result);
 }
