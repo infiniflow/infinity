@@ -14,7 +14,6 @@
 
 module;
 #include <cstdio>
-#include <string>
 module trunc;
 import stl;
 import catalog;
