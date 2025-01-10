@@ -967,7 +967,6 @@ class table_http_result:
             function_name = ""
             for col in cols:
                 # print(function_name)
-                
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
                     df_type[k] = function_return_type(function_name, df_type[k])
