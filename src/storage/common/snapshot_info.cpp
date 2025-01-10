@@ -34,6 +34,7 @@ import persistence_manager;
 import persist_result_handler;
 import defer_op;
 import utility;
+import block_version;
 
 namespace infinity {
 
@@ -67,14 +68,38 @@ nlohmann::json SegmentSnapshotInfo::Serialize() {
     return json_res;
 }
 
+nlohmann::json ChunkIndexSnapshotInfo::Serialize() {
+    nlohmann::json json_res;
+    return json_res;
+}
+
+nlohmann::json SegmentIndexSnapshotInfo::Serialize() {
+    nlohmann::json json_res;
+    json_res["segment_id"] = segment_id_;
+    for (const auto &chunk_index_snapshot : chunk_index_snapshots_) {
+        json_res["chunk_indexes"].emplace_back(chunk_index_snapshot->Serialize());
+    }
+    return json_res;
+}
+
+nlohmann::json TableIndexSnapshotInfo::Serialize() {
+    nlohmann::json json_res;
+    json_res["index_dir"] = *index_dir_;
+    json_res["index_base"] = index_base_->Serialize();
+    for (const auto &segment_index_entry : index_by_segment_) {
+        json_res["segment_indexes"].emplace_back(segment_index_entry.second->Serialize());
+    }
+    return json_res;
+}
+
 void TableSnapshotInfo::Serialize(const String &save_dir) {
 
     Config *config = InfinityContext::instance().config();
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
 
     // Create compressed file
-    String compressed_filename = fmt::format("{}/{}.lz4", save_dir, snapshot_name_);
-    std::ofstream output_stream = VirtualStore::BeginCompress(compressed_filename);
+    //    String compressed_filename = fmt::format("{}/{}.lz4", save_dir, snapshot_name_);
+    //    std::ofstream output_stream = VirtualStore::BeginCompress(compressed_filename);
 
     // Get files
     Vector<String> original_files = GetFiles();
@@ -128,10 +153,10 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
             }
             write_file_handle->Sync();
 
-            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
-            if (!compress_status.ok()) {
-                RecoverableError(compress_status);
-            }
+            //            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
+            //            if (!compress_status.ok()) {
+            //                RecoverableError(compress_status);
+            //            }
         }
     } else {
         String data_dir = config->DataDir();
@@ -144,20 +169,20 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
                 RecoverableError(copy_status);
             }
 
-            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
-            if (!compress_status.ok()) {
-                RecoverableError(compress_status);
-            }
+            //            Status compress_status = VirtualStore::AddFileCompress(output_stream, dst_file_path);
+            //            if (!compress_status.ok()) {
+            //                RecoverableError(compress_status);
+            //            }
         }
     }
 
-    VirtualStore::EndCompress(output_stream);
+    //    VirtualStore::EndCompress(output_stream);
 
-    String md5 = CalcMD5(compressed_filename);
+    //    String md5 = CalcMD5(compressed_filename);
 
     // Remove the directory
-    String directory = fmt::format("{}/{}", save_dir, snapshot_name_);
-    VirtualStore::RemoveDirectory(directory);
+    //    String directory = fmt::format("{}/{}", save_dir, snapshot_name_);
+    //    VirtualStore::RemoveDirectory(directory);
 
     nlohmann::json json_res;
     json_res["version"] = version_;
@@ -166,7 +191,7 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     json_res["database_name"] = db_name_;
     json_res["table_name"] = table_name_;
     json_res["table_comment"] = table_comment_;
-    json_res["md5"] = md5;
+    //    json_res["md5"] = md5;
 
     json_res["txn_id"] = txn_id_;
     json_res["begin_ts"] = begin_ts_;
@@ -202,6 +227,10 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
         json_res["segments"].emplace_back(segment_snapshot_pair.second->Serialize());
     }
 
+    for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
+        json_res["table_indexes"].emplace_back(table_index_snapshot_pair.second->Serialize());
+    }
+
     String json_string = json_res.dump();
 
     Path save_path = Path(save_dir) / fmt::format("{}.json", snapshot_name_);
@@ -231,6 +260,21 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
                 files.emplace_back(VirtualStore::ConcatenatePath(block_snapshot->block_dir_, column_block_snapshot->filename_));
                 for (const auto &outline_snapshot : column_block_snapshot->outline_snapshots_) {
                     files.emplace_back(VirtualStore::ConcatenatePath(block_snapshot->block_dir_, outline_snapshot->filename_));
+                }
+            }
+
+            files.emplace_back(VirtualStore::ConcatenatePath(block_snapshot->block_dir_, *BlockVersion::FileName()));
+        }
+    }
+
+    for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
+        for (const auto &segment_index_snapshot_pair : table_index_snapshot_pair.second->index_by_segment_) {
+            for (const auto &chunk_index_snapshot : segment_index_snapshot_pair.second->chunk_index_snapshots_) {
+                if (chunk_index_snapshot->files_.empty()) {
+                    files.emplace_back(
+                        VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, chunk_index_snapshot->base_name_));
+                } else {
+                    files.insert(files.end(), chunk_index_snapshot->files_.cbegin(), chunk_index_snapshot->files_.cend());
                 }
             }
         }

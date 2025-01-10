@@ -32,6 +32,23 @@ export struct DeltaCatalogFileInfo {
     TxnTimeStamp max_commit_ts_;
 };
 
+export struct TempFullCatalogFileInfo {
+    String path_;
+    TxnTimeStamp max_commit_ts_;
+};
+
+export struct TempDeltaCatalogFileInfo {
+    String path_;
+    TxnTimeStamp max_commit_ts_;
+};
+
+export struct CatalogFilesInfo {
+    Vector<FullCatalogFileInfo> full_infos_;
+    Vector<DeltaCatalogFileInfo> delta_infos_;
+    Vector<TempFullCatalogFileInfo> temp_full_infos_;
+    Vector<TempDeltaCatalogFileInfo> temp_delta_infos_;
+};
+
 export struct TempWalFileInfo {
     String path_;
 };
@@ -52,10 +69,12 @@ public:
 
     static String DeltaCheckpointFilename(TxnTimeStamp max_commit_ts);
 
+    static String TempDeltaCheckpointFilename(TxnTimeStamp max_commit_ts);
+
     // max_commit_ts is the largest commit ts before the latest full checkpoint
     static void RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &catalog_dir);
 
-    static Pair<Vector<FullCatalogFileInfo>, Vector<DeltaCatalogFileInfo>> ParseCheckpointFilenames(const String &catalog_dir);
+    static CatalogFilesInfo ParseCheckpointFilenames(const String &catalog_dir);
 };
 
 export class WalFile {

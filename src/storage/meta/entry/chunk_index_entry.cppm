@@ -28,6 +28,7 @@ import default_values;
 import column_def;
 import txn;
 import buffer_obj;
+import snapshot_info;
 
 namespace infinity {
 
@@ -143,6 +144,8 @@ public:
         TxnTimeStamp deprecate_ts = deprecate_ts_.load();
         return ts >= deprecate_ts;
     }
+
+    SharedPtr<ChunkIndexSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
 
 public:
     ChunkID chunk_id_;

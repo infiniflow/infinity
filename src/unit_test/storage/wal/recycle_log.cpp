@@ -199,9 +199,11 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
             }
         }
         {
-            auto [full_catalog_infos, delta_catalog_infos] = CatalogFile::ParseCheckpointFilenames(catalog_dir);
+            auto [full_catalog_infos, delta_catalog_infos, temp_full_infos, temp_delta_infos] = CatalogFile::ParseCheckpointFilenames(catalog_dir);
             ASSERT_EQ(full_catalog_infos.size(), 1ul); // initialize will write a full checkpoint
             ASSERT_EQ(delta_catalog_infos.size(), 2ul);
+            ASSERT_TRUE(temp_full_infos.empty());
+            ASSERT_TRUE(temp_delta_infos.empty());
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
@@ -212,9 +214,11 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
         }
         {
             // assert there is one full catalog file
-            auto [full_catalog_infos, delta_catalog_infos] = CatalogFile::ParseCheckpointFilenames(catalog_dir);
+            auto [full_catalog_infos, delta_catalog_infos, temp_full_infos, temp_delta_infos] = CatalogFile::ParseCheckpointFilenames(catalog_dir);
             ASSERT_EQ(full_catalog_infos.size(), 1ul);
             ASSERT_TRUE(delta_catalog_infos.empty());
+            ASSERT_TRUE(temp_full_infos.empty());
+            ASSERT_TRUE(temp_delta_infos.empty());
         }
         infinity::InfinityContext::instance().UnInit();
 

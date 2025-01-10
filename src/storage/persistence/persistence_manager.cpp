@@ -284,6 +284,23 @@ PersistReadResult PersistenceManager::GetObjCache(const String &file_path) {
     return result;
 }
 
+Tuple<SizeT, Status> PersistenceManager::GetDirectorySize(const String &path_str) {
+    SizeT total_size = 0;
+
+    if (!VirtualStore::Exists(path_str)) {
+        return {0, Status::IOError(fmt::format("{} doesn't exist.", path_str))};
+    }
+
+    const Path path(path_str);
+    for (const auto &entry : fs::recursive_directory_iterator(path)) {
+        if (fs::is_regular_file(entry.status())) {
+            total_size += fs::file_size(entry.path());
+        }
+    }
+
+    return {total_size, Status::OK()};
+}
+
 Tuple<SizeT, Status> PersistenceManager::GetFileSize(const String &file_path) {
     PersistReadResult result;
 

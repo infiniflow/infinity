@@ -459,9 +459,31 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             SnapshotOp snapshot_operation = snapshot_cmd->operation();
             SnapshotScope snapshot_scope = snapshot_cmd->scope();
             const String &snapshot_name = snapshot_cmd->name();
+
+            {
+                // Full checkpoint
+                Txn *txn = query_context->GetTxn();
+                auto checkpoint_task = MakeShared<ForceCheckpointTask>(txn, true);
+                query_context->storage()->bg_processor()->Submit(checkpoint_task);
+                checkpoint_task->Wait();
+            }
+
             switch (snapshot_operation) {
                 case SnapshotOp::kCreate: {
                     LOG_INFO(fmt::format("Execute snapshot create"));
+
+                    {
+                        LOG_TRACE("Create checkpoint");
+                        auto force_ckp_task = MakeShared<ForceCheckpointTask>(query_context->GetTxn(), true);
+                        auto *wal_mgr = query_context->storage()->wal_manager();
+                        if (!wal_mgr->TrySubmitCheckpointTask(force_ckp_task)) {
+                            Status status = Status::InvalidCommand(
+                                fmt::format("Skip {} checkpoint(manual) because there is already a full checkpoint task running.", "FULL"));
+                            RecoverableError(status);
+                        }
+                        force_ckp_task->Wait();
+                    }
+
                     switch (snapshot_scope) {
                         case SnapshotScope::kSystem: {
                             LOG_INFO(fmt::format("Execute snapshot system"));

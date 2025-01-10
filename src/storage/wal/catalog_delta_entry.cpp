@@ -1275,7 +1275,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
         bool found = iter != delta_ops_.end();
         if (found) {
             CatalogDeltaOperation *op = iter->second.get();
-            if (op->commit_ts_ < last_full_ckp_ts_) {
+            if (op->commit_ts_ <= last_full_ckp_ts_) {
                 delta_ops_.erase(iter);
                 found = false;
             }

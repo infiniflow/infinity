@@ -98,6 +98,8 @@ public:
 
     void CommitBottom();
 
+    void PostCommit();
+
     void CancelCommitBottom();
 
     void Rollback();

@@ -23,19 +23,20 @@ import table_entry;
 import status;
 import third_party;
 import config;
+import infinity_exception;
 
 namespace infinity {
 
 Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &snapshot_name, const String &table_name) {
     Txn *txn_ptr = query_context->GetTxn();
     const String &db_name = query_context->schema_name();
-    Tuple<TableEntry *, Status> result = txn_ptr->GetTableByName(db_name, table_name);
-    TableEntry *table_entry_ptr = std::get<0>(result);
-    Status table_status = std::get<1>(result);
-    if (!table_status.ok()) {
-        return table_status;
+
+    SharedPtr<TableSnapshotInfo> table_snapshot;
+    Status status;
+    std::tie(table_snapshot, status) = txn_ptr->GetTableSnapshot(db_name, table_name);
+    if (!status.ok()) {
+        RecoverableError(status);
     }
-    SharedPtr<TableSnapshotInfo> table_snapshot = table_entry_ptr->GetSnapshotInfo(txn_ptr);
     table_snapshot->snapshot_name_ = snapshot_name;
     String snapshot_dir = query_context->global_config()->SnapshotDir();
     table_snapshot->Serialize(snapshot_dir);
