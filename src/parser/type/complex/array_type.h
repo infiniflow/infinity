@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "array_info.h"
-#include "parser_assert.h"
+#pragma once
+
+#include <cstdint>
 
 namespace infinity {
 
-bool ArrayInfo::operator==(const TypeInfo &other) const {
-    if (other.type() != TypeInfoType::kArray)
-        return false;
-    auto *array_info_ptr = dynamic_cast<const ArrayInfo *>(&other);
-    return this->elem_type_ == array_info_ptr->elem_type_;
-}
+#pragma pack(1)
 
-std::string ArrayInfo::ToString() const { return elem_type_.ToString(); }
+struct ArrayType {
+    uint64_t element_num_ : 16 = 0;
+    uint64_t file_offset_ : 48 = 0;
+};
 
-nlohmann::json ArrayInfo::Serialize() const { return elem_type_.Serialize(); }
+static_assert(sizeof(ArrayType) == sizeof(uint64_t));
+static_assert(sizeof(ArrayType) == 8u);
+
+#pragma pack()
 
 } // namespace infinity
