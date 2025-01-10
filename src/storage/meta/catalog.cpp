@@ -321,6 +321,20 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> Catalog::GetTableSnapshot(const Stri
     return {table_entry->GetSnapshotInfo(txn_ptr), Status::OK()};
 }
 
+Status Catalog::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [db_entry, status] = this->GetDatabase(table_snapshot_info->db_name_, txn_id, begin_ts);
+    if (!status.ok()) {
+        // Error
+        LOG_ERROR(fmt::format("Database: {} is invalid.", table_snapshot_info->db_name_));
+        return status;
+    }
+
+    return db_entry->ApplyTableSnapshot(table_snapshot_info, txn_ptr);
+    return Status::OK();
+}
+
 Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name, const String &table_name, Txn *txn) {
     TransactionID txn_id = txn->TxnID();
     TxnTimeStamp begin_ts = txn->BeginTS();
@@ -617,7 +631,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const String &catalog_pa
     }
     i32 n_bytes = catalog_delta_entry->GetSizeInBytes();
     if (file_size != n_bytes && file_size != ptr - buf.data()) {
-        Status status = Status::CatalogCorrupted(catalog_path);
+        Status status = Status::FileCorrupted(catalog_path);
         RecoverableError(status);
     }
     return catalog_delta_entry;
@@ -1035,7 +1049,7 @@ UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
         RecoverableError(status_read);
     }
     if ((SizeT)file_size != n_bytes) {
-        Status status = Status::CatalogCorrupted(catalog_path);
+        Status status = Status::FileCorrupted(catalog_path);
         RecoverableError(status);
     }
 

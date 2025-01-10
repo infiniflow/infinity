@@ -154,6 +154,8 @@ public:
 
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name, Txn* txn_ptr);
 
+    Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn* txn_ptr);
+
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, Txn *txn);
 
     static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id);

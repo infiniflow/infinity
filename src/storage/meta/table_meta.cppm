@@ -25,7 +25,7 @@ import status;
 import extra_ddl_info;
 import column_def;
 import base_entry;
-
+import snapshot_info;
 import table_entry;
 import entry_list;
 import meta_info;
@@ -117,6 +117,9 @@ private:
     void DropEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     TableEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    // restore snapshot
+    Status RestoreSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot, Txn *txn_ptr);
 
     void PushBackEntry(const SharedPtr<TableEntry> &new_table_entry);
 

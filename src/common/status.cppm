@@ -162,7 +162,7 @@ export enum class ErrorCode : long {
     kDuplicatedFile = 7002,
     kConfigFileError = 7003,
     kLockFileError = 7004,
-    kCatalogCorrupted = 7005,
+    kFileCorrupted = 7005,
     kDataCorrupted = 7006,
     kIndexCorrupted = 7007,
     kFileNotFound = 7008,
@@ -338,7 +338,7 @@ public:
     static Status DuplicatedFile(const String &filename);
     static Status ConfigFileError(const String &path, const String &detailed_info);
     static Status LockFileError(const String &path, const String &error_msg);
-    static Status CatalogCorrupted(const String &path);
+    static Status FileCorrupted(const String &path);
     static Status DataCorrupted(const String &path);
     static Status IndexCorrupted(const String &path);
     static Status FileNotFound(const String &path);

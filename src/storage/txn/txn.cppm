@@ -140,6 +140,8 @@ public:
 
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 
+    Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
+
     // Index OPs
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next

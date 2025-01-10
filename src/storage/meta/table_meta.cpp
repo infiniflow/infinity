@@ -169,6 +169,15 @@ TableEntry *TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_t
     return entry;
 }
 
+Status TableMeta::RestoreSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot, Txn *txn_ptr) {
+
+    //    auto [entry, status] = table_entry_list_.RestoreSnapshot(std::move(restore_entry), txn_ptr);
+    //    if (!status.ok()) {
+    //        UnrecoverableError(status.message());
+    //    }
+    return Status::OK();
+}
+
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }
 
 SharedPtr<String> TableMeta::ToString() {

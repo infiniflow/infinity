@@ -42,6 +42,7 @@ export struct BlockColumnSnapshotInfo {
     Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots_;
 
     nlohmann::json Serialize();
+    static SharedPtr<BlockColumnSnapshotInfo> Deserialize(const nlohmann::json &column_block_json);
 };
 
 export struct BlockSnapshotInfo {
@@ -50,6 +51,7 @@ export struct BlockSnapshotInfo {
     Vector<SharedPtr<BlockColumnSnapshotInfo>> column_block_snapshots_;
 
     nlohmann::json Serialize();
+    static SharedPtr<BlockSnapshotInfo> Deserialize(const nlohmann::json &block_json);
 };
 
 export struct SegmentSnapshotInfo {
@@ -58,6 +60,7 @@ export struct SegmentSnapshotInfo {
     Vector<SharedPtr<BlockSnapshotInfo>> block_snapshots_;
 
     nlohmann::json Serialize();
+    static SharedPtr<SegmentSnapshotInfo> Deserialize(const nlohmann::json &segment_json);
 };
 
 export struct ChunkIndexSnapshotInfo {
@@ -65,12 +68,14 @@ export struct ChunkIndexSnapshotInfo {
     String base_name_;
     Vector<String> files_;
     nlohmann::json Serialize();
+    static SharedPtr<ChunkIndexSnapshotInfo> Deserialize(const nlohmann::json &chunk_index_json);
 };
 
 export struct SegmentIndexSnapshotInfo {
     SegmentID segment_id_;
     Vector<SharedPtr<ChunkIndexSnapshotInfo>> chunk_index_snapshots_{};
     nlohmann::json Serialize();
+    static SharedPtr<SegmentIndexSnapshotInfo> Deserialize(const nlohmann::json &segment_index_json);
 };
 
 export struct TableIndexSnapshotInfo {
@@ -78,6 +83,7 @@ export struct TableIndexSnapshotInfo {
     SharedPtr<String> index_dir_{};
     Map<SegmentID, SharedPtr<SegmentIndexSnapshotInfo>> index_by_segment_{};
     nlohmann::json Serialize();
+    static SharedPtr<TableIndexSnapshotInfo> Deserialize(const nlohmann::json &table_index_json);
 };
 
 export struct TableSnapshotInfo : public SnapshotInfo {
@@ -97,6 +103,8 @@ export struct TableSnapshotInfo : public SnapshotInfo {
 
     Vector<String> GetFiles() const;
     void Serialize(const String &save_path);
+    String ToString() const;
+    static Tuple<SharedPtr<TableSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
 };
 
 } // namespace infinity

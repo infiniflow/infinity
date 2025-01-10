@@ -214,6 +214,21 @@ TableEntry *DBEntry::GetTableReplay(const String &table_name, TransactionID txn_
     return table_meta->GetEntryReplay(txn_id, begin_ts);
 }
 
+Status DBEntry::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn *txn_ptr) {
+    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, MakeShared<String>(table_snapshot_info->table_name_), this); };
+    LOG_TRACE(fmt::format("Adding new table entry: {}", table_snapshot_info->table_name_));
+
+//    auto restore_table_snapshot = [&](TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn *txn_ptr) {
+//        return TableEntry::RestoreSnapshot(table_meta, table_snapshot_info, txn_ptr);
+//    };
+
+    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_snapshot_info->table_name_, std::move(init_table_meta));
+
+    table_meta->RestoreSnapshot(table_snapshot_info, txn_ptr);
+
+    return Status::OK();
+}
+
 Vector<TableEntry *> DBEntry::TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts) {
     Vector<TableEntry *> results;
 
