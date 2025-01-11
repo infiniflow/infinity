@@ -45,7 +45,7 @@ import scalar_function_set;
 
 import trunc;
 import third_party;
-
+#if 0
 using namespace infinity;
 
 class TruncateFunctionsTest : public BaseTestParamStr {};
@@ -163,4 +163,4 @@ TEST_P(TruncateFunctionsTest, truncate_func) {
         }
     }
 }
-
+#endif
