@@ -45,9 +45,12 @@ inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, Co
         RecoverableError(status);
         return;
     } 
-    char buffer[100];  
-    buffer[0] =' ';  
-    int len = std::snprintf(buffer + 1, sizeof(buffer) - 1, "%.*f", (int)right, left);
+    char buffer[1000];  
+    buffer[0] =' ';
+    if (right >= 17) {
+        right = 17;
+    }   
+    int len = std::snprintf(buffer + 1, sizeof(buffer) - 2, "%.*f", (int)right, left);
     if (len < 0) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
@@ -61,7 +64,7 @@ inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, Co
         truncated_str = " NaN";
     } else if (std::isinf(left)) {
         truncated_str = " Inf";
-    } else if (right > static_cast<BigIntT>(7) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
+    } else if (right > static_cast<BigIntT>(17) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
         truncated_str = str.substr(0, i + 1);
     } else {
         truncated_str = str.substr(0, i + right + 2);
@@ -78,9 +81,12 @@ inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, Col
         RecoverableError(status);
         return;
     } 
-    char buffer[100]; 
-    buffer[0] =' ';  
-    int len = std::snprintf(buffer + 1, sizeof(buffer) - 1, "%.*f", (int)right, left);
+    char buffer[1000]; 
+    buffer[0] =' ';
+    if (right >= 7) {
+        right = 7;
+    }  
+    int len = std::snprintf(buffer + 1, sizeof(buffer) - 2, "%.*f", (int)right, left);
     if (len < 0) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
@@ -94,7 +100,7 @@ inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, Col
         truncated_str = " NaN";
     } else if (std::isinf(left)) {
         truncated_str = " Inf";
-    } else if (right > static_cast<BigIntT>(17) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
+    } else if (right > static_cast<BigIntT>(7) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
         truncated_str = str.substr(0, i + 1);
     } else {
         truncated_str = str.substr(0, i + right + 2);

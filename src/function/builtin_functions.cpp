@@ -146,6 +146,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterRtrimFunction(catalog_ptr_);
     RegisterTrimFunction(catalog_ptr_);
     RegisterPositionFunction(catalog_ptr_);
+    
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}

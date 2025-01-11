@@ -45,7 +45,7 @@ import scalar_function_set;
 
 import trunc;
 import third_party;
-#if 0
+
 using namespace infinity;
 
 class TruncateFunctionsTest : public BaseTestParamStr {};
@@ -162,5 +162,6 @@ TEST_P(TruncateFunctionsTest, truncate_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kVarchar);
         }
     }
+
 }
-#endif
+
