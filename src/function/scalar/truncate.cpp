@@ -40,71 +40,51 @@ struct TruncFunction {
 
 template <>
 inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, ColumnVector *result_ptr) {
+    constexpr int MaxRight = 17;
+    constexpr int MinBufferSize = 50;
+    
     if (right < static_cast<BigIntT>(0) || std::isnan(right) || std::isinf(right)) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
         return;
-    } 
-    char buffer[1000];  
+    }
+    
+    char buffer[MinBufferSize];  
     buffer[0] =' ';
-    if (right >= 17) {
-        right = 17;
-    }   
+    
+    right = (right > MaxRight) ? MaxRight : right;  
+    
     int len = std::snprintf(buffer + 1, sizeof(buffer) - 2, "%.*f", (int)right, left);
     if (len < 0) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
         return;
     }
-
-    std::string str(buffer, len + 1);
-    std::string truncated_str;
-    int i = str.find_first_of('.');
-    if (std::isnan(left)) {
-        truncated_str = " NaN";
-    } else if (std::isinf(left)) {
-        truncated_str = " Inf";
-    } else if (right > static_cast<BigIntT>(17) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
-        truncated_str = str.substr(0, i + 1);
-    } else {
-        truncated_str = str.substr(0, i + right + 2);
-    }
-
+    std::string truncated_str(buffer, len + 1);
     result_ptr->AppendVarcharInner(truncated_str, result);
 
 }
 
 template <>
 inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, ColumnVector *result_ptr) {
+    constexpr int MaxRight = 7;
+    constexpr int MinBufferSize = 20;
+    
     if (right < static_cast<BigIntT>(0) || std::isnan(right) || std::isinf(right)) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
         return;
     } 
-    char buffer[1000]; 
-    buffer[0] =' ';
-    if (right >= 7) {
-        right = 7;
-    }  
+    char buffer[MinBufferSize]; 
+    buffer[0] =' '; 
+    right = (right >  MaxRight) ?  MaxRight : right;
     int len = std::snprintf(buffer + 1, sizeof(buffer) - 2, "%.*f", (int)right, left);
     if (len < 0) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
         return;
     }
-
-    std::string str(buffer, len + 1);
-    std::string truncated_str;
-    int i = str.find_first_of('.');
-    if (std::isnan(left)) {
-        truncated_str = " NaN";
-    } else if (std::isinf(left)) {
-        truncated_str = " Inf";
-    } else if (right > static_cast<BigIntT>(7) || static_cast<BigIntT>(str.size() - i) < right || right == static_cast<BigIntT>(0)) {
-        truncated_str = str.substr(0, i + 1);
-    } else {
-        truncated_str = str.substr(0, i + right + 2);
-    }
+    std::string truncated_str(buffer, len + 1);
     result_ptr->AppendVarcharInner(truncated_str, result);
 }
 
