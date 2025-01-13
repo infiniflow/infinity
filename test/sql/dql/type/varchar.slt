@@ -154,6 +154,7 @@ INSERT INTO test_varchar_filter VALUES ('ABCDEFGHIJKLMN', 'ABCDEFGHIJKLMN', 10);
 query XXII
 SELECT *, reverse(c1) FROM test_varchar_filter where char_length(c1) > 13;
 ----
+regex@regex.com gmail@gmail.com 6 moc.xeger@xeger
 ABCDEFGHIJKLMN ABCDEFGHIJKLMN 10 NMLKJIHGFEDCBA
 
 statement ok
