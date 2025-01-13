@@ -1057,9 +1057,9 @@ class TestInfinity:
 
         res, extra_res = table_obj.output(["reverse(c1)", "reverse(c2)"]).to_df()
         print(res)
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('cba', '321a', 'c', 'd'),
-                                                         'c2': ('CBA', '321a', 'C', 'D')})
-                                      .astype({'c1': dtype('str_'), 'c2': dtype('str_')}))
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'reverse(c1)': ('cba', '321a', 'c', 'd'),
+                                                         'reverse(c2)': ('CBA', '321a', 'C', 'D')})
+                                      .astype({'reverse(c1)': dtype('str_'), 'reverse(c2)': dtype('str_')}))
 
         res = db_obj.drop_table("test_select_reverse" + suffix)
         assert res.error_code == ErrorCode.OK
