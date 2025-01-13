@@ -24,5 +24,13 @@ SELECT c3, trunc(c3, 2) FROM test_truncate;
 2.500000 2.50
 -2.500000 -2.50
 
+query III
+SELECT trunc(c2, 2) FROM test_truncate;
+----
+2.40
+-2.40
+2.50
+-2.50
+
 statement ok
 DROP TABLE test_truncate;
