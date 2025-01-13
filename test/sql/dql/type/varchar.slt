@@ -149,4 +149,12 @@ SELECT *, reverse(c1) FROM test_varchar_filter where c1 < c2;
 abcddddc abcddddd 2 cddddcba
 
 statement ok
+INSERT INTO test_varchar_filter VALUES ('ABCDEFGHIJKLMN', 'ABCDEFGHIJKLMN', 10);
+
+query XXII
+SELECT *, reverse(c1) FROM test_varchar_filter where char_length(c1) > 13;
+----
+ABCDEFGHIJKLMN ABCDEFGHIJKLMN 10 NMLKJIHGFEDCBA
+
+statement ok
 DROP TABLE test_varchar_filter;
