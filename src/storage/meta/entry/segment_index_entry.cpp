@@ -192,7 +192,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                                        u32 row_offset,
                                        u32 row_count,
                                        TxnTimeStamp commit_ts,
-                                       BufferManager *buffer_manager) {
+                                       BufferManager *buffer_manager,
+                                       TxnStore *txn_store) {
     SegmentOffset block_offset = block_entry->segment_offset();
     RowID begin_row_id = block_entry->base_row_id() + row_offset;
 
@@ -228,7 +229,12 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 }
             }
             SharedPtr<ColumnVector> column_vector = MakeShared<ColumnVector>(block_entry->GetConstColumnVector(buffer_manager, column_idx));
-            memory_indexer_->Insert(column_vector, row_offset, row_count, false);
+            if (index_fulltext->IsRealtime() && txn_store != nullptr) {
+                UniquePtr<std::binary_semaphore> sema = memory_indexer_->AsyncInsert(column_vector, row_offset, row_count);
+                txn_store->AddSemaphore(std::move(sema));
+            } else {
+                memory_indexer_->Insert(column_vector, row_offset, row_count, false);
+            }
             break;
         }
         case IndexType::kHnsw: {

@@ -261,6 +261,10 @@ public:
 
     void SetCreatingIndex(TableEntry *table_entry);
 
+    void AddSemaphore(UniquePtr<std::binary_semaphore> sema) { semas_.push_back(std::move(sema)); }
+
+    const Vector<UniquePtr<std::binary_semaphore>> &semas() const { return semas_; }
+
 private:
     // Txn store
     Txn *txn_{}; // TODO: remove this
@@ -269,6 +273,8 @@ private:
     HashMap<TableEntry *, int> txn_tables_{};
     // Key: table name Value: TxnTableStore
     HashMap<String, UniquePtr<TxnTableStore>> txn_tables_store_{};
+
+    Vector<UniquePtr<std::binary_semaphore>> semas_{};
 };
 
 } // namespace infinity

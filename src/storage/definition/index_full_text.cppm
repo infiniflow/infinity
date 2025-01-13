@@ -65,6 +65,8 @@ public:
 
     static SharedPtr<IndexFullText> Deserialize(const nlohmann::json &index_def_json);
 
+    bool IsRealtime() const { return FlagIsRealtime(flag_); }
+
 public:
     static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 
