@@ -812,6 +812,7 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
 }
 
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {
+    std::unique_lock lock(rw_locker_);
     auto index_type = table_index_entry_->index_base()->index_type_;
     if (index_type == IndexType::kFullText || index_type == IndexType::kHnsw) {
         // Fulltext index, Hnsw doesn't need to be checkpointed.

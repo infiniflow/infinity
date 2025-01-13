@@ -55,6 +55,8 @@ def function_return_type(function_name, param_type) :
             return dtype('float64')
     elif function_name == "filter_text" or function_name == "filter_fulltext" or function_name == "or" or function_name == "and" or function_name == "not":
         return dtype('bool')
+    elif function_name == "trunc":
+        return dtype('str_')
     else:
         return param_type
 
