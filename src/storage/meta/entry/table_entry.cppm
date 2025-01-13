@@ -229,6 +229,8 @@ public:
 
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, Txn *txn) const;
 
+    Vector<SharedPtr<SegmentEntry>> GetVisibleSegments(Txn *txn) const;
+
     const ColumnDef *GetColumnDefByIdx(SizeT idx) const {
         if (idx >= columns_.size()) {
             return nullptr;

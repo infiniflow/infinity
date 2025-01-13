@@ -57,6 +57,10 @@ export struct BlockSnapshotInfo {
 export struct SegmentSnapshotInfo {
     SegmentID segment_id_;
     String segment_dir_;
+    TxnTimeStamp first_delete_ts_;
+    TxnTimeStamp deprecate_ts_;
+    TxnTimeStamp row_count_;
+    TxnTimeStamp actual_row_count_;
     Vector<SharedPtr<BlockSnapshotInfo>> block_snapshots_;
 
     nlohmann::json Serialize();
@@ -95,7 +99,9 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
     TxnTimeStamp max_commit_ts_{};
+    String table_entry_dir_{};
     ColumnID next_column_id_{};
+    SegmentID unsealed_id_{};
     SegmentID next_segment_id_{};
     Vector<SharedPtr<ColumnDef>> columns_{};
     Map<SegmentID, SharedPtr<SegmentSnapshotInfo>> segment_snapshots_{};

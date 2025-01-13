@@ -87,8 +87,14 @@ SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(const nlohmann::json
 
 nlohmann::json SegmentSnapshotInfo::Serialize() {
     nlohmann::json json_res;
+
     json_res["segment_id"] = segment_id_;
     json_res["segment_dir"] = segment_dir_;
+    json_res["first_delete_ts"] = first_delete_ts_;
+    json_res["deprecate_ts"] = deprecate_ts_;
+    json_res["row_count"] = row_count_;
+    json_res["actual_row_count"] = actual_row_count_;
+
     for (const auto &block_snapshot : block_snapshots_) {
         json_res["blocks"].emplace_back(block_snapshot->Serialize());
     }
@@ -99,6 +105,12 @@ SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(const nlohmann::
     auto segment_snapshot = MakeShared<SegmentSnapshotInfo>();
     segment_snapshot->segment_id_ = segment_json["segment_id"];
     segment_snapshot->segment_dir_ = segment_json["segment_dir"];
+
+    segment_snapshot->first_delete_ts_ = segment_json["first_delete_ts"];
+    segment_snapshot->deprecate_ts_ = segment_json["deprecate_ts"];
+    segment_snapshot->row_count_ = segment_json["row_count"];
+    segment_snapshot->actual_row_count_ = segment_json["actual_row_count"];
+
     for (const auto &block_json : segment_json["blocks"]) {
         auto block_snapshot = BlockSnapshotInfo::Deserialize(block_json);
         segment_snapshot->block_snapshots_.emplace_back(block_snapshot);
@@ -261,8 +273,10 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     json_res["begin_ts"] = begin_ts_;
     json_res["commit_ts"] = commit_ts_;
     json_res["max_commit_ts"] = max_commit_ts_;
+    json_res["table_entry_dir"] = table_entry_dir_;
 
     json_res["next_column_id"] = next_column_id_;
+    json_res["unsealed_id"] = unsealed_id_;
     json_res["next_segment_id"] = next_segment_id_;
 
     for (const auto &column_def : this->columns_) {
@@ -347,7 +361,7 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
 }
 
 Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
-//    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
+    //    LOG_INFO(fmt::format("Deserialize snapshot: {}/{}", snapshot_dir, snapshot_name));
 
     String meta_path = fmt::format("{}/{}.json", snapshot_dir, snapshot_name);
 
@@ -372,7 +386,7 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
 
     nlohmann::json snapshot_meta_json = nlohmann::json::parse(json_str);
 
-//    LOG_INFO(snapshot_meta_json.dump());
+    //    LOG_INFO(snapshot_meta_json.dump());
 
     SharedPtr<TableSnapshotInfo> table_snapshot = MakeShared<TableSnapshotInfo>();
 
@@ -392,7 +406,9 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
     table_snapshot->begin_ts_ = snapshot_meta_json["begin_ts"];
     table_snapshot->commit_ts_ = snapshot_meta_json["commit_ts"];
     table_snapshot->max_commit_ts_ = snapshot_meta_json["max_commit_ts"];
+    table_snapshot->table_entry_dir_ = snapshot_meta_json["table_entry_dir"];
     table_snapshot->next_column_id_ = snapshot_meta_json["next_column_id"];
+    table_snapshot->unsealed_id_ = snapshot_meta_json["unsealed_id"];
     table_snapshot->next_segment_id_ = snapshot_meta_json["next_segment_id"];
 
     for (const auto &column_def_json : snapshot_meta_json["column_definition"]) {
@@ -432,7 +448,7 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
         table_snapshot->table_index_snapshots_.emplace(*table_index_snapshot->index_base_->index_name_, table_index_snapshot);
     }
 
-//    LOG_INFO(table_snapshot->ToString());
+    //    LOG_INFO(table_snapshot->ToString());
 
     return {table_snapshot, Status::OK()};
 }

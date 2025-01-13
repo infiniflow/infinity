@@ -143,6 +143,26 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     return segment_entry;
 }
 
+SharedPtr<SegmentEntry> SegmentEntry::ApplySegmentSnapshot(TableEntry *table_entry,
+                                                           SegmentID segment_id,
+                                                           SegmentSnapshotInfo *segment_snapshot_info,
+                                                           TransactionID txn_id,
+                                                           TxnTimeStamp begin_ts) {
+//    SharedPtr<String> segment_dir = MakeShared<String>(segment_snapshot_info->segment_dir_);
+//    auto segment_entry = MakeShared<SegmentEntry>(table_entry, std::move(segment_dir), segment_id, row_capacity, column_count, status);
+////    segment_entry->min_row_ts_ = min_row_ts;
+////    segment_entry->max_row_ts_ = max_row_ts;
+////    segment_entry->commit_ts_ = commit_ts;
+//    segment_entry->first_delete_ts_ = first_delete_ts;
+//    segment_entry->deprecate_ts_ = deprecate_ts;
+//    segment_entry->begin_ts_ = begin_ts;
+//    segment_entry->row_count_ = row_count;
+//    segment_entry->actual_row_count_ = actual_row_count;
+//    segment_entry->txn_id_ = txn_id;
+//    return segment_entry;
+    return nullptr;
+}
+
 void SegmentEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data) {
     status_ = segment_entry->status_;
     row_count_ = segment_entry->row_count_;
@@ -732,7 +752,7 @@ SharedPtr<SegmentSnapshotInfo> SegmentEntry::GetSnapshotInfo() const {
     std::shared_lock lock(rw_locker_);
     SizeT block_count = block_entries_.size();
     segment_snapshot_info->block_snapshots_.reserve(block_count);
-    for(SizeT block_id = 0; block_id < block_count; ++ block_id) {
+    for (SizeT block_id = 0; block_id < block_count; ++block_id) {
         SharedPtr<BlockSnapshotInfo> block_snapshot_info = block_entries_[block_id]->GetSnapshotInfo();
         segment_snapshot_info->block_snapshots_.push_back(block_snapshot_info);
     }
