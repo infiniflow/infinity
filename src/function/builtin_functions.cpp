@@ -67,7 +67,7 @@ import default_values;
 import special_function;
 import internal_types;
 import data_type;
-
+import trunc;
 import logical_type;
 
 namespace infinity {
@@ -118,7 +118,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterIsnanFunction(catalog_ptr_);
     RegisterIsinfFunction(catalog_ptr_);
     RegisterIsfiniteFunction(catalog_ptr_);
-
+    RegisterTruncFunction(catalog_ptr_);
     // register comparison operator
     RegisterEqualsFunction(catalog_ptr_);
     RegisterInEqualFunction(catalog_ptr_);

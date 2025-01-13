@@ -1023,3 +1023,24 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_select_round" + suffix)
         assert res.error_code == ErrorCode.OK
+    
+    def test_select_truncate(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_truncate" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_truncate" + suffix,
+                            {"c1": {"type": "double"},
+                             "c2": {"type": "float"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_truncate" + suffix)
+        table_obj.insert(
+            [{"c1": "2.123", "c2": "2.123"}, {"c1": "-2.123", "c2": "-2.123"}, {"c1": "2", "c2": "2"}, {"c1": "2.1", "c2":" 2.1"}])
+
+        res, extra_res = table_obj.output(["trunc(c1, 2)", "trunc(c2, 2)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 trunc 2)': (" 2.12", " -2.12", " 2.00", " 2.10"),
+                                                         '(c2 trunc 2)': (" 2.12", " -2.12", " 2.00", " 2.10")})
+                                      .astype({'(c1 trunc 2)': dtype('str_'), '(c2 trunc 2)': dtype('str_')}))
+
+
+        res = db_obj.drop_table("test_select_truncate" + suffix)
+        assert res.error_code == ErrorCode.OK
+
