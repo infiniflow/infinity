@@ -77,6 +77,10 @@ public:
 
     void SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter> &buf_writer);
 
+    void AddSema(std::binary_semaphore *sema) { semas_.push_back(sema); }
+
+    const Vector<std::binary_semaphore *> &semas() const { return semas_; }
+
 private:
     using TermBuffer = Vector<char>;
     using PosInfoVec = Vector<PosInfo>;
@@ -124,5 +128,6 @@ private:
     Vector<Pair<u32, UniquePtr<TermList>>> terms_per_doc_;
     PostingWriterProvider posting_writer_provider_{};
     VectorWithLock<u32> &column_lengths_;
+    Vector<std::binary_semaphore *> semas_{};
 };
 } // namespace infinity

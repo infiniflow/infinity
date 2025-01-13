@@ -165,6 +165,44 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     }
 }
 
+UniquePtr<std::binary_semaphore> MemoryIndexer::AsyncInsert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count) {
+    if (is_spilled_) {
+        Load();
+    }
+
+    u64 seq_inserted(0);
+    u32 doc_count(0);
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        seq_inserted = seq_inserted_++;
+        doc_count = doc_count_;
+        doc_count_ += row_count;
+    }
+
+    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
+    auto sema = MakeUnique<std::binary_semaphore>(0);
+
+    IncreaseMemoryUsage(sizeof(u32) * row_count);
+    PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
+    auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
+    inverter->InitAnalyzer(this->analyzer_);
+    inverter->AddSema(sema.get());
+    auto func = [this, task, inverter](int id) {
+        // LOG_INFO(fmt::format("online inverter {} begin", id));
+        SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+        column_length_sum_ += column_length_sum;
+        this->ring_inverted_.Put(task->task_seq_, inverter);
+        // LOG_INFO(fmt::format("online inverter {} end", id));
+        CommitSync(100);
+    };
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        inflight_tasks_++;
+    }
+    inverting_thread_pool_.push(std::move(func));
+    return sema;
+}
+
 void MemoryIndexer::InsertGap(u32 row_count) {
     if (is_spilled_) {
         Load();
@@ -246,6 +284,12 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         for (auto &inverter : inverters) {
             mem_usage_change.Add(inverter->GeneratePosting());
             num_generated += inverter->GetMerged();
+
+            if (const auto &semas = inverter->semas(); !semas.empty()) {
+                for (auto sema : semas) {
+                    sema->release();
+                }
+            }
         }
     }
     if (num_generated > 0) {

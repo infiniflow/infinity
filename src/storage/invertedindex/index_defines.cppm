@@ -20,6 +20,7 @@ export {
         of_position_list = 4,  // 1 << 2
         of_term_frequency = 8, // 1 << 3
         of_block_max = 16,     // 1 << 4
+        of_realtime = 32,      // 1 << 5
     };
 
     typedef u16 docpayload_t;
@@ -35,6 +36,10 @@ export {
     constexpr optionflag_t NO_BLOCK_MAX = of_term_payload | of_doc_payload | of_position_list | of_term_frequency;
     constexpr optionflag_t NO_TERM_FREQUENCY = of_term_payload | of_doc_payload;
     constexpr optionflag_t OPTION_FLAG_NONE = of_none;
+
+    void FlagAddRealtime(optionflag_t &flag) { flag |= of_realtime; }
+    bool FlagIsRealtime(const optionflag_t &flag) { return flag & of_realtime; }
+
     constexpr docid_t INVALID_DOCID = u32(-1);
     constexpr RowID INVALID_ROWID = u64(-1);
     constexpr pos_t INVALID_POSITION = u32(-1);

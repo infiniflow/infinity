@@ -132,6 +132,14 @@ void ColumnInverter::Merge(ColumnInverter &rhs) {
     }
     doc_count_ += rhs.doc_count_;
     merged_++;
+    if (semas_.empty()) {
+        semas_ = std::move(rhs.semas_);
+    } else {
+        semas_.reserve(semas_.size() + rhs.semas_.size());
+        std::move(rhs.semas_.begin(), rhs.semas_.end(), std::back_inserter(semas_));
+        rhs.semas_.clear();
+    }
+
     rhs.terms_per_doc_.clear();
     rhs.doc_count_ = 0;
     rhs.merged_ = 0;

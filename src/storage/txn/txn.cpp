@@ -664,6 +664,10 @@ void Txn::CommitBottom() {
 void Txn::PostCommit() {
     txn_store_.MaintainCompactionAlg();
 
+    for (auto &sema : txn_store_.semas()) {
+        sema->acquire();
+    }
+
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         if (wal_cmd->GetType() == WalCommandType::CHECKPOINT) {
