@@ -60,9 +60,7 @@ bool InMemDocListDecoder::DecodeSkipListWithoutSkipList(docid_t last_doc_id_in_p
         doc_buffer_to_copy_ = new docid_t[MAX_DOC_PER_RECORD];
 
     finish_decoded_ = false;
-    if (!doc_list_reader_.Seek(offset)) {
-        return false;
-    }
+    doc_list_reader_.Seek(offset);
     if (!doc_list_reader_.Decode(doc_buffer_to_copy_, MAX_DOC_PER_RECORD, decode_count_)) {
         return false;
     }
