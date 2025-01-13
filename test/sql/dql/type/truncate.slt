@@ -2,12 +2,13 @@ statement ok
 DROP TABLE IF EXISTS test_truncate;
 
 statement ok
-CREATE TABLE test_math (c1 integer, c2 double, c3 float);
+CREATE TABLE test_truncate (c1 integer, c2 double, c3 float);
 
 # insert
 
 statement ok
-INSERT INTO test_math VALUES (1, 2.4, 2.4), (2, -2.4, -2.4), (3, 2.5, 2.5), (4, -2.5, -2.5);
+INSERT INTO test_truncate VALUES (1, 2.4, 2.4), (2, -2.4, -2.4), (3, 2.5, 2.5), (4, -2.5, -2.5);
+
 query I
 SELECT c2, trunc(c2, 12) FROM test_truncate;
 ----
