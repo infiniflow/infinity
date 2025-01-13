@@ -107,5 +107,13 @@ select c2 from test_math where isfinite(1.0);
 2.500000
 -2.500000
 
+query XII
+SELECT c2, trunc(c2, 2) FROM test_math WHERE c1 > 9;
+----
+2.400000 2.00
+-2.400000 -2.00
+2.500000 3.00
+-2.500000 -3.00
+
 statement ok
 DROP TABLE test_math;
