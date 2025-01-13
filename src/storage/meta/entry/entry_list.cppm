@@ -458,10 +458,7 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntryReplay(std::function<SharedPtr<
             return {entry_ptr, Status::OK()};
         }
         case FindResult::kFound: {
-            SharedPtr<Entry> entry = init_func(txn_id, begin_ts);
-            auto *entry_ptr = entry.get();
-            entry_list_.push_front(std::move(entry));
-            return {entry_ptr, Status::OK()};
+            return {nullptr, Status::DuplicateEntry()};
         }
         default: {
             return {nullptr, Status::InvalidEntry()};
