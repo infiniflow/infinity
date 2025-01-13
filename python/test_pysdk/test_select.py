@@ -1044,3 +1044,22 @@ class TestInfinity:
         res = db_obj.drop_table("test_select_truncate" + suffix)
         assert res.error_code == ErrorCode.OK
 
+
+    def test_select_reverse(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_reverse" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_reverse" + suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_reverse" + suffix)
+        table_obj.insert(
+            [{"c1": 'abc', "c2": 'ABC'}, {"c1": 'a123', "c2": 'a123'}, {"c1": 'c', "c2": 'C'}, {"c1": 'd', "c2": 'D'}])
+
+        res, extra_res = table_obj.output(["reverse(c1)", "reverse(c2)"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('cba', '321a', 'c', 'd'),
+                                                         'c2': ('CBA', '321a', 'C', 'D')})
+                                      .astype({'c1': dtype('str_'), 'c2': dtype('str_')}))
+
+        res = db_obj.drop_table("test_select_reverse" + suffix)
+        assert res.error_code == ErrorCode.OK
