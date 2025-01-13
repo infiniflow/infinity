@@ -29,6 +29,7 @@ import third_party;
 import logger;
 import txn_manager;
 import txn_state;
+import txn;
 
 namespace infinity {
 
@@ -95,6 +96,9 @@ public:
     // Replay op
     Tuple<Entry *, Status>
     AddEntryReplay(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&init_func, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Tuple<Entry *, Status>
+    ApplySnapshot(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&restore_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Status
     UpdateEntryReplay(std::function<void(SharedPtr<Entry>, TransactionID, TxnTimeStamp)> &&update_func, TransactionID txn_id, TxnTimeStamp begin_ts);
@@ -462,6 +466,28 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntryReplay(std::function<SharedPtr<
             auto *entry_ptr = entry.get();
             entry_list_.push_front(std::move(entry));
             return {entry_ptr, Status::OK()};
+        }
+        default: {
+            return {nullptr, Status::InvalidEntry()};
+        }
+    }
+}
+
+template <EntryConcept Entry>
+Tuple<Entry *, Status> EntryList<Entry>::ApplySnapshot(std::function<SharedPtr<Entry>(TransactionID, TxnTimeStamp)> &&restore_entry_func,
+                                                       TransactionID txn_id,
+                                                       TxnTimeStamp begin_ts) {
+    std::unique_lock lock(rw_locker_);
+    FindResult find_res = FindEntryReplay(txn_id, begin_ts);
+    switch (find_res) {
+        case FindResult::kNotFound: {
+            SharedPtr<Entry> entry = restore_entry_func(txn_id, begin_ts);
+            auto *entry_ptr = entry.get();
+            entry_list_.push_front(std::move(entry));
+            return {entry_ptr, Status::OK()};
+        }
+        case FindResult::kFound: {
+            return {nullptr, Status::DuplicateEntry()};
         }
         default: {
             return {nullptr, Status::InvalidEntry()};

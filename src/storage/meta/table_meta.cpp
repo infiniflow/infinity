@@ -143,6 +143,17 @@ void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(Transactio
     }
 }
 
+Status TableMeta::ApplyTableSnapshot(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&restore_entry,
+                                     TransactionID txn_id,
+                                     TxnTimeStamp begin_ts) {
+
+    auto [entry, status] = table_entry_list_.ApplySnapshot(std::move(restore_entry), txn_id, begin_ts);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return Status::OK();
+}
+
 void TableMeta::UpdateEntryReplay(std::function<void(SharedPtr<TableEntry>, TransactionID, TxnTimeStamp)> &&update_entry,
                                   TransactionID txn_id,
                                   TxnTimeStamp begin_ts) {
@@ -167,15 +178,6 @@ TableEntry *TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_t
         UnrecoverableError(status.message());
     }
     return entry;
-}
-
-Status TableMeta::RestoreSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot, Txn *txn_ptr) {
-
-    //    auto [entry, status] = table_entry_list_.RestoreSnapshot(std::move(restore_entry), txn_ptr);
-    //    if (!status.ok()) {
-    //        UnrecoverableError(status.message());
-    //    }
-    return Status::OK();
 }
 
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }

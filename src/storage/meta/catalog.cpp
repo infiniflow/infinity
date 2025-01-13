@@ -331,8 +331,7 @@ Status Catalog::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_sna
         return status;
     }
 
-    return db_entry->ApplyTableSnapshot(table_snapshot_info, txn_ptr);
-    return Status::OK();
+    return db_entry->ApplyTableSnapshot(table_snapshot_info, txn_ptr->TxnID(), txn_ptr->BeginTS());
 }
 
 Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name, const String &table_name, Txn *txn) {
