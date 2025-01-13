@@ -921,7 +921,9 @@ class table_http_result:
                 if k not in df_dict:
                     df_dict[k] = ()
                 tup = df_dict[k]
-                if res[k].isdigit() or is_float(res[k]):
+                if isinstance(res[k], str) and len(res[k]) > 0 and res[k][0] == " ":
+                    new_tup = tup + (res[k],)
+                elif res[k].isdigit() or is_float(res[k]):
                     new_tup = tup + (eval(res[k]),)
                 elif is_list(res[k]):
                     new_tup = tup + (ast.literal_eval(res[k]),)

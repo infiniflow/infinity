@@ -32,6 +32,7 @@ module;
 #include <forward_list>
 #include <functional>
 #include <iomanip>
+#include <ios>
 #include <iostream>
 #include <iterator>
 #include <list>
@@ -160,6 +161,11 @@ using std::stable_sort;
 using std::tie;
 using std::transform;
 using std::unique;
+using std::setprecision;
+using std::fixed;
+
+using std::string;
+using std::stringstream;
 
 namespace ranges {
 
