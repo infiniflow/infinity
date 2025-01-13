@@ -267,7 +267,7 @@ TEST_F(InMemDocListDecoderTest, test2) {
     posting_buffer->Flush();
 
     // without skiplist, we only decode one time
-    ASSERT_TRUE(!doc_list_decoder.DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder.DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
 }
 
 TEST_F(InMemDocListDecoderTest, test3) {
@@ -372,7 +372,7 @@ TEST_F(InMemDocListDecoderTest, test5) {
     ASSERT_EQ((u32)1, doc_buffer[2]);
     ASSERT_EQ((u32)2, doc_buffer[3]);
 
-    ASSERT_TRUE(!doc_list_decoder_->DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
 
     delete doc_list_decoder_;
 }
