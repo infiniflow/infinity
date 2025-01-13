@@ -34,6 +34,7 @@ ALL             { return ALL; }
 ALLOCATION      { return ALLOCATION; }
 ALTER           { return ALTER; }
 AND             { return AND; }
+ARRAY           { return ARRAY; }
 AS              { return AS; }
 ASC             { return ASC; }
 BETWEEN         { return BETWEEN; }
@@ -202,6 +203,7 @@ TO              { return TO; }
 TRANSACTION     { return TRANSACTION; }
 TRANSACTIONS    { return TRANSACTIONS; }
 TRUE            { return TRUE; }
+TUPLE           { return TUPLE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
 UNLOCK          { return UNLOCK; }
