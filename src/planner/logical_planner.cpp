@@ -88,6 +88,7 @@ import create_collection_info;
 import create_view_info;
 import drop_collection_info;
 import embedding_info;
+import array_info;
 import type_info;
 import drop_index_info;
 import drop_schema_info;
@@ -460,6 +461,69 @@ Status LogicalPlanner::BuildCreate(CreateStatement *statement, SharedPtr<BindCon
     return Status::OK();
 }
 
+Pair<bool, String> VerifyColumnDataType(const DataType &data_type) {
+    switch (data_type.type()) {
+        case LogicalType::kBoolean:
+        case LogicalType::kTinyInt:
+        case LogicalType::kSmallInt:
+        case LogicalType::kInteger:
+        case LogicalType::kBigInt:
+        case LogicalType::kFloat:
+        case LogicalType::kDouble:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
+        case LogicalType::kVarchar:
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kTimestamp:
+        case LogicalType::kDateTime: {
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            if (auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());
+                embedding_info->Dimension() > EMBEDDING_LIMIT) {
+                return std::make_pair(
+                    false,
+                    fmt::format("Embedding dimension: {} is larger than EMBEDDING_LIMIT: {}", embedding_info->Dimension(), EMBEDDING_LIMIT));
+            }
+            break;
+        }
+        case LogicalType::kMultiVector:
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray:
+        case LogicalType::kSparse: {
+            break;
+        }
+        case LogicalType::kArray: {
+            auto *array_info = static_cast<const ArrayInfo *>(data_type.type_info().get());
+            if (const auto [element_success, err_msg] = VerifyColumnDataType(array_info->ElemType()); !element_success) {
+                return std::make_pair(false, fmt::format("Not supported data type: {}, error in element type: {}", data_type.ToString(), err_msg));
+            }
+            break;
+        }
+        case LogicalType::kHugeInt:
+        case LogicalType::kDecimal:
+        case LogicalType::kInterval:
+        case LogicalType::kTuple:
+        case LogicalType::kPoint:
+        case LogicalType::kLine:
+        case LogicalType::kLineSeg:
+        case LogicalType::kBox:
+        case LogicalType::kCircle:
+        case LogicalType::kUuid:
+        case LogicalType::kRowID:
+        case LogicalType::kMixed:
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kEmptyArray:
+        case LogicalType::kInvalid: {
+            return std::make_pair(false, fmt::format("Not supported data type: {}", data_type.ToString()));
+            break;
+        }
+    }
+    return {true, String{}};
+}
+
 Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_table_info = (CreateTableInfo *)statement->create_info_.get();
 
@@ -493,57 +557,8 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
         }
 
         const DataType *data_type = create_table_info->column_defs_[idx]->type().get();
-        switch (data_type->type()) {
-            case LogicalType::kBoolean:
-            case LogicalType::kTinyInt:
-            case LogicalType::kSmallInt:
-            case LogicalType::kInteger:
-            case LogicalType::kBigInt:
-            case LogicalType::kFloat:
-            case LogicalType::kDouble:
-            case LogicalType::kFloat16:
-            case LogicalType::kBFloat16:
-            case LogicalType::kVarchar:
-            case LogicalType::kDate:
-            case LogicalType::kTime:
-            case LogicalType::kTimestamp:
-            case LogicalType::kDateTime: {
-                break;
-            }
-            case LogicalType::kEmbedding: {
-                TypeInfo *type_info_ptr = data_type->type_info().get();
-                EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr);
-                if (embedding_info->Dimension() > EMBEDDING_LIMIT) {
-                    return Status::NotSupport(
-                        fmt::format("Embedding data limit is {}, which larger than limit {}", embedding_info->Dimension(), EMBEDDING_LIMIT));
-                }
-                break;
-            }
-            case LogicalType::kMultiVector:
-            case LogicalType::kTensor:
-            case LogicalType::kTensorArray:
-            case LogicalType::kSparse: {
-                break;
-            }
-            case LogicalType::kHugeInt:
-            case LogicalType::kDecimal:
-            case LogicalType::kInterval:
-            case LogicalType::kArray:
-            case LogicalType::kTuple:
-            case LogicalType::kPoint:
-            case LogicalType::kLine:
-            case LogicalType::kLineSeg:
-            case LogicalType::kBox:
-            case LogicalType::kCircle:
-            case LogicalType::kUuid:
-            case LogicalType::kRowID:
-            case LogicalType::kMixed:
-            case LogicalType::kNull:
-            case LogicalType::kMissing:
-            case LogicalType::kEmptyArray:
-            case LogicalType::kInvalid: {
-                return Status::NotSupport(fmt::format("Not supported data type: {}", data_type->ToString()));
-            }
+        if (const auto [success, err_msg] = VerifyColumnDataType(*data_type); !success) {
+            return Status::NotSupport(err_msg);
         }
 
         SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(idx,
