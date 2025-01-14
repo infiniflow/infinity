@@ -36,6 +36,34 @@ import simd_functions;
 
 namespace infinity {
 
+namespace {
+
+template <typename QueryDataType, typename DistDataType>
+UniquePtr<KnnDistanceBase1> InitDistanceBase(KnnDistanceType distance_type) {
+    return MakeUnique<KnnDistance1<QueryDataType, DistDataType>>(distance_type);
+}
+
+} // namespace
+
+UniquePtr<KnnDistanceBase1> KnnDistanceBase1::Make(EmbeddingDataType embedding_type, KnnDistanceType distance_type) {
+    switch (embedding_type) {
+        case EmbeddingDataType::kElemFloat:
+            return InitDistanceBase<f32, f32>(distance_type);
+        case EmbeddingDataType::kElemUInt8:
+            return InitDistanceBase<u8, f32>(distance_type);
+        case EmbeddingDataType::kElemInt8:
+            return InitDistanceBase<i8, f32>(distance_type);
+        case EmbeddingDataType::kElemBit:
+            return InitDistanceBase<u8, f32>(distance_type);
+        default: {
+            Status status = Status::NotSupport(
+                fmt::format("Query EmbeddingDataType: {} is not support.", EmbeddingType::EmbeddingDataType2String(embedding_type)));
+            RecoverableError(status);
+            return nullptr;
+        }
+    }
+}
+
 template <>
 void KnnDistance1<f32, f32>::InitKnnDistance1(KnnDistanceType dist_type) {
     switch (dist_type) {
@@ -152,62 +180,8 @@ void KnnDistance1<i8, f32>::InitKnnDistance1(KnnDistanceType dist_type) {
 
 KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx, bool execute_block_scan_job)
     : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx), execute_block_scan_job_(execute_block_scan_job) {
-    switch (knn_scan_shared_data_->query_elem_type_) {
-        case EmbeddingDataType::kElemFloat: {
-            Init<f32, f32>();
-            break;
-        }
-        case EmbeddingDataType::kElemUInt8: {
-            Init<u8, f32>();
-            break;
-        }
-        case EmbeddingDataType::kElemInt8: {
-            Init<i8, f32>();
-            break;
-        }
-        case EmbeddingDataType::kElemBit: {
-            Init<u8, f32>();
-            break;
-        }
-        default: {
-            Status status = Status::NotSupport(fmt::format("Query EmbeddingDataType: {} is not support.",
-                                                           EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->query_elem_type_)));
-            RecoverableError(status);
-        }
-    }
-}
-
-template <typename QueryDataType, typename DistDataType>
-void KnnScanFunctionData::Init() {
-    static_assert(std::is_same_v<DistDataType, f32>);
-    switch (knn_scan_shared_data_->knn_distance_type_) {
-        case KnnDistanceType::kInvalid: {
-            String error_message = "Invalid Knn distance type";
-            UnrecoverableError(error_message);
-        }
-        case KnnDistanceType::kL2:
-        case KnnDistanceType::kHamming: {
-            const auto knn_threshold = GetKnnThreshold(knn_scan_shared_data_->opt_params_);
-            auto merge_knn_max = MakeUnique<MergeKnn<QueryDataType, CompareMax, DistDataType>>(knn_scan_shared_data_->query_count_,
-                                                                                               knn_scan_shared_data_->topk_,
-                                                                                               knn_threshold);
-            merge_knn_max->Begin();
-            merge_knn_base_ = std::move(merge_knn_max);
-            break;
-        }
-        case KnnDistanceType::kCosine:
-        case KnnDistanceType::kInnerProduct: {
-            const auto knn_threshold = GetKnnThreshold(knn_scan_shared_data_->opt_params_);
-            auto merge_knn_min = MakeUnique<MergeKnn<QueryDataType, CompareMin, DistDataType>>(knn_scan_shared_data_->query_count_,
-                                                                                               knn_scan_shared_data_->topk_,
-                                                                                               knn_threshold);
-            merge_knn_min->Begin();
-            merge_knn_base_ = std::move(merge_knn_min);
-            break;
-        }
-    }
-
-    knn_distance_ = MakeUnique<KnnDistance1<QueryDataType, DistDataType>>(knn_scan_shared_data_->knn_distance_type_);
+    merge_knn_base_ = MergeKnnBase::Make(knn_scan_shared_data_);
+    knn_distance_ = KnnDistanceBase1::Make(knn_scan_shared_data_->query_elem_type_, knn_scan_shared_data_->knn_distance_type_);
 }
 
 } // namespace infinity
