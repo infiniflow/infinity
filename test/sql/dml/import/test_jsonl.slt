@@ -2,7 +2,7 @@ statement ok
 DROP TABLE IF EXISTS test_jsonl;
 
 statement ok
-CREATE TABLE test_jsonl (name VARCHAR, age INT, array EMBEDDING(INT, 5));
+CREATE TABLE test_jsonl (name VARCHAR, age INT, embedding_column EMBEDDING(INT, 5));
 
 query I
 COPY test_jsonl FROM '/var/infinity/test_data/test_jsonl.jsonl' WITH (FORMAT JSONL);

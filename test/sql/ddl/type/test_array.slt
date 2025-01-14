@@ -1,0 +1,47 @@
+statement ok
+DROP TABLE IF EXISTS test_array_table;
+
+statement ok
+CREATE TABLE test_array_table (col1 INT, col2 ARRAY(INT));
+
+query I
+SHOW TABLE test_array_table COLUMNS;
+----
+col1 Integer Null (empty)
+col2 Array(Integer) Null (empty)
+
+################
+
+statement ok
+DROP TABLE test_array_table;
+
+statement ok
+CREATE TABLE test_array_table (col1 INT, col2 ARRAY(ARRAY(INT)));
+
+query I
+SHOW TABLE test_array_table COLUMNS;
+----
+col1 Integer Null (empty)
+col2 Array(Array(Integer)) Null (empty)
+
+################
+
+statement ok
+DROP TABLE test_array_table;
+
+statement ok
+CREATE TABLE test_array_table (col1 INT, col2 ARRAY(EMBEDDING(FLOAT, 1024)));
+
+query I
+SHOW TABLE test_array_table COLUMNS;
+----
+col1 Integer Null (empty)
+col2 Array(Embedding(float,1024)) Null (empty)
+
+################
+
+statement ok
+DROP TABLE test_array_table;
+
+statement error
+CREATE TABLE test_array_table (col1 INT, col2 ARRAY(EMBEDDING(FLOAT, 16385)));

@@ -16,8 +16,8 @@
 
 #include <utility>
 
+#include "type/complex/array_type.h"
 #include "type/data_type.h"
-#include "type/logical_type.h"
 #include "type/type_info.h"
 
 namespace infinity {
@@ -33,11 +33,13 @@ public:
     bool operator==(const TypeInfo &other) const override;
 
     // Array always costs 8 bytes. Real data is stored in heap memory.
-    [[nodiscard]] size_t Size() const override { return 8u; }
+    [[nodiscard]] size_t Size() const override { return sizeof(ArrayType); }
 
     [[nodiscard]] nlohmann::json Serialize() const override;
 
-    [[nodiscard]] inline std::string ToString() const override { return "array(" + elem_type_.ToString() + ")"; }
+    [[nodiscard]] std::string ToString() const override;
+
+    [[nodiscard]] const DataType &ElemType() const { return elem_type_; }
 
 private:
     DataType elem_type_;
