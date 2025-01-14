@@ -50,11 +50,10 @@ inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, Co
     }
     
     char buffer[MinBufferSize];  
-    buffer[0] =' ';
-    
+
     right = (right > MaxRight) ? MaxRight : right;  
     
-    int len = std::snprintf(buffer + 1, sizeof(buffer) - 2, "%.*f", (int)right, left);
+    int len = std::snprintf(buffer, sizeof(buffer) - 1, "%.*f", (int)right, left);
     if (len < 0) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);
@@ -76,9 +75,9 @@ inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, Col
         return;
     } 
     char buffer[MinBufferSize]; 
-    buffer[0] =' '; 
+
     right = (right >  MaxRight) ?  MaxRight : right;
-    int len = std::snprintf(buffer + 1, sizeof(buffer) - 2, "%.*f", (int)right, left);
+    int len = std::snprintf(buffer, sizeof(buffer) - 1, "%.*f", (int)right, left);
     if (len < 0) {
         Status status = Status::InvalidDataType();
         RecoverableError(status);

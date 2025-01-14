@@ -1038,11 +1038,12 @@ class TestInfinity:
 
         res, extra_res = table_obj.output(["trunc(c1, 14)",  "trunc(c2, 2)", "trunc(c3, 2)"]).to_df()
         print(res)
-        pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 trunc 14)': (" 2.12300000000000", " -2.12300000000000", " 2.00000000000000", " 2.10000000000000"),
-                                                         '(c2 trunc 2)': (" 2.12", " -2.12", " 2.00", " 2.10"),
-                                                         '(c3 trunc 2)': (" 2.12", " -2.12", " 2.00", " 2.10")
+        print(res.dtypes)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 trunc 14)': ("2.12300000000000\x00", "-2.12300000000000\x00", "2.00000000000000\x00", "2.10000000000000\x00"),
+                                                         '(c2 trunc 2)': ("2.12\x00", "-2.12\x00", "2.00\x00", "2.10\x00"),
+                                                         '(c3 trunc 2)': ("2.12\x00", "-2.12\x00", "2.00\x00", "2.10\x00")
                                                          })
-                                      .astype({'(c1 trunc 14)': dtype('str_'), '(c2 trunc 2)': dtype('str_'), '(c3 trunc 2)': dtype('str_')}))
+                                      .astype({'(c1 trunc 14)': dtype('object'), '(c2 trunc 2)': dtype('object'), '(c3 trunc 2)': dtype('object')}))
 
 
         res = db_obj.drop_table("test_select_truncate" + suffix)
@@ -1061,6 +1062,7 @@ class TestInfinity:
 
         res, extra_res = table_obj.output(["reverse(c1)", "reverse(c2)"]).to_df()
         print(res)
+        print(res.dtypes)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'reverse(c1)': ('cba', '321a', 'c', 'nmlkjihgfedcba'),
                                                          'reverse(c2)': ('CBA', '321a', 'C', 'NMLKJIHGFEDCBA')})
                                       .astype({'reverse(c1)': dtype('str_'), 'reverse(c2)': dtype('str_')}))
