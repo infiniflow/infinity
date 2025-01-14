@@ -59,7 +59,7 @@ inline void TruncFunction::Run(DoubleT left, BigIntT right, VarcharT &result, Co
         RecoverableError(status);
         return;
     }
-    std::string truncated_str(buffer, len + 1);
+    std::string truncated_str(buffer, len);
     result_ptr->AppendVarcharInner(truncated_str, result);
 
 }
@@ -83,7 +83,7 @@ inline void TruncFunction::Run(FloatT left, BigIntT right, VarcharT &result, Col
         RecoverableError(status);
         return;
     }
-    std::string truncated_str(buffer, len + 1);
+    std::string truncated_str(buffer, len);
     result_ptr->AppendVarcharInner(truncated_str, result);
 }
 
