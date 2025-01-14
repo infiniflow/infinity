@@ -43,6 +43,7 @@ import physical_import;
 import explain_statement;
 import internal_types;
 import select_statement;
+import logical_type;
 
 namespace infinity {
 
@@ -257,8 +258,27 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     for (SizeT col = 0; col < column_cnt; ++col) {
                         Value value = data_block->GetValue(col, row);
                         const String &column_name = result.result_table_->GetColumnNameById(col);
-                        const String &column_value = value.ToString();
-                        json_result_row[column_name] = column_value;
+                        switch (value.type().type()) {
+                            case LogicalType::kTinyInt:
+                            case LogicalType::kSmallInt:
+                            case LogicalType::kInteger:
+                            case LogicalType::kBigInt: {
+                                json_result_row[column_name] = value.ToInteger();
+                                break;
+                            }
+                            case LogicalType::kFloat: {
+                                json_result_row[column_name] = value.ToFloat();
+                                break;
+                            }
+                            case LogicalType::kDouble: {
+                                json_result_row[column_name] = value.ToDouble();
+                                break;
+                            }
+                            default: {
+                                json_result_row[column_name] = value.ToString();
+                                break;
+                            }
+                        }
                     }
                     response["output"].push_back(json_result_row);
                 }
