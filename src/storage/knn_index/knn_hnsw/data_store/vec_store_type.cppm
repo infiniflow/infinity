@@ -59,7 +59,7 @@ public:
     }
 };
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class PlainL2VecStoreType {
 public:
     using DataType = DataT;
@@ -71,7 +71,7 @@ public:
     using QueryVecType = const DataType *;
     using StoreType = typename Meta<true>::StoreType;
     using QueryType = typename Meta<true>::QueryType;
-    using Distance = PlainL2Dist<DataType>;
+    using Distance = std::conditional_t<LSG, PlainLSL2Dist<DataType>, PlainL2Dist<DataType>>;
 
     static constexpr bool HasOptimize = false;
 
