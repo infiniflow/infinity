@@ -2,7 +2,7 @@ statement ok
 DROP TABLE IF EXISTS sqllogic_test_export_deleted_jsonl;
 
 statement ok
-CREATE TABLE sqllogic_test_export_deleted_jsonl (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+CREATE TABLE sqllogic_test_export_deleted_jsonl (name VARCHAR, age INT, embedding_column EMBEDDING(FLOAT, 4));
 
 statement ok
 INSERT INTO sqllogic_test_export_deleted_jsonl VALUES(3, '4433252', [1.1, 2.03, 3.04, 4.0]);
@@ -46,7 +46,7 @@ statement ok
 DROP TABLE IF EXISTS test_import_deleted_jsonl;
 
 statement ok
-CREATE TABLE test_import_deleted_jsonl (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+CREATE TABLE test_import_deleted_jsonl (name VARCHAR, age INT, embedding_column EMBEDDING(FLOAT, 4));
 
 statement ok
 COPY test_import_deleted_jsonl FROM '/var/infinity/test_data/tmp/test_export_deleted.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
@@ -64,7 +64,7 @@ statement ok
 DROP TABLE IF EXISTS sqllogic_test_export_deleted_csv;
 
 statement ok
-CREATE TABLE sqllogic_test_export_deleted_csv (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+CREATE TABLE sqllogic_test_export_deleted_csv (name VARCHAR, age INT, embedding_column EMBEDDING(FLOAT, 4));
 
 statement ok
 INSERT INTO sqllogic_test_export_deleted_csv  VALUES(3, '4433252', [1.1, 2.03, 3.04, 4.0]);
@@ -108,7 +108,7 @@ statement ok
 DROP TABLE IF EXISTS test_import_deleted_csv;
 
 statement ok
-CREATE TABLE test_import_deleted_csv (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+CREATE TABLE test_import_deleted_csv (name VARCHAR, age INT, embedding_column EMBEDDING(FLOAT, 4));
 
 statement ok
 COPY test_import_deleted_csv FROM '/var/infinity/test_data/tmp/test_export_deleted.csv' WITH (FORMAT CSV, DELIMITER ',');

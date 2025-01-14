@@ -59,6 +59,7 @@ import md5;
 import lower;
 import upper;
 import regex;
+import reverse;
 import ltrim;
 import rtrim;
 import trim;
@@ -142,6 +143,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterLowerFunction(catalog_ptr_);
     RegisterUpperFunction(catalog_ptr_);
     RegisterRegexFunction(catalog_ptr_);
+    RegisterReverseFunction(catalog_ptr_);
     RegisterLtrimFunction(catalog_ptr_);
     RegisterRtrimFunction(catalog_ptr_);
     RegisterTrimFunction(catalog_ptr_);

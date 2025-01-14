@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,25 +14,20 @@
 
 #pragma once
 
-#include "parsed_expr.h"
-#include "type/data_type.h"
-#include "type/logical_type.h"
-#include "type/type_info.h"
-#include <memory>
+#include <cstdint>
 
 namespace infinity {
 
-class CastExpr final : public ParsedExpr {
-public:
-    explicit CastExpr(DataType data_type) : ParsedExpr(ParsedExprType::kCast), data_type_(std::move(data_type)) {}
+#pragma pack(1)
 
-    ~CastExpr() final;
-
-    [[nodiscard]] std::string ToString() const override;
-
-public:
-    DataType data_type_;
-    ParsedExpr *expr_{nullptr};
+struct ArrayType {
+    uint64_t element_num_ : 16 = 0;
+    uint64_t file_offset_ : 48 = 0;
 };
+
+static_assert(sizeof(ArrayType) == sizeof(uint64_t));
+static_assert(sizeof(ArrayType) == 8u);
+
+#pragma pack()
 
 } // namespace infinity

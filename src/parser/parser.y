@@ -132,7 +132,8 @@ struct SQL_LTYPE {
     std::vector<infinity::ColumnDef*>*     column_def_array_t;
     infinity::TableElement*           table_element_t;
     infinity::ColumnDef*              table_column_t;
-    infinity::ColumnType              column_type_t;
+    infinity::ColumnType*              column_type_t;
+    std::vector<std::unique_ptr<infinity::ColumnType>>*     column_type_array_t;
     infinity::ConstraintType          column_constraint_t;
     std::set<infinity::ConstraintType>* column_constraints_t;
     std::vector<std::string>*         identifier_array_t;
@@ -179,6 +180,16 @@ struct SQL_LTYPE {
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 }
+
+%destructor {
+    fprintf(stderr, "destroy column_type\n");
+    delete ($$);
+} <column_type_t>
+
+%destructor {
+    fprintf(stderr, "destroy column_type_array\n");
+    delete ($$);
+} <column_type_array_t>
 
 %destructor {
     fprintf(stderr, "destroy index info\n");
@@ -388,8 +399,9 @@ struct SQL_LTYPE {
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN UNNEST
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
-%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TEXT MULTIVECTOR TENSOR SPARSE TENSORARRAY IGNORE
-%token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT COMMENT
+%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP
+%token ARRAY TUPLE EMBEDDING VECTOR MULTIVECTOR TENSOR SPARSE TENSORARRAY BIT TEXT
+%token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT COMMENT IGNORE
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
@@ -425,6 +437,7 @@ struct SQL_LTYPE {
 %type <table_element_t>         table_element
 %type <table_column_t>          table_column
 %type <column_type_t>           column_type
+%type <column_type_array_t>     column_type_array
 %type <identifier_array_t>      identifier_array optional_identifier_array
 %type <table_constraint_t>      table_constraint
 %type <column_constraint_t>     column_constraint
@@ -802,47 +815,16 @@ table_element : table_column {
 table_column :
 //   1          2              3                  4
 IDENTIFIER column_type with_index_param_list default_expr {
-    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
-    std::vector<std::unique_ptr<infinity::InitParameter>> index_param_list = infinity::InitParameter::MakeInitParameterList($3);
-    switch($2.logical_type_) {
-        case infinity::LogicalType::kDecimal: {
-            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
-            if(type_info_ptr == nullptr) {
-                yyerror(&yyloc, scanner, result, "Fail to create decimal info.");
-                free($1);
-                YYERROR;
-            }
-            break;
-        }
-//        case infinity::LogicalType::kBitmap: {
-//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
-//            break;
-//        }
-        case infinity::LogicalType::kEmbedding:
-        case infinity::LogicalType::kMultiVector:
-        case infinity::LogicalType::kTensor:
-        case infinity::LogicalType::kTensorArray: {
-            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
-            break;
-        }
-        case infinity::LogicalType::kSparse: {
-            auto store_type = infinity::SparseInfo::ParseStoreType(index_param_list);
-            type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width, store_type);
-            if (type_info_ptr == nullptr) {
-                yyerror(&yyloc, scanner, result, "Fail to create sparse info.");
-                free($1);
-                YYERROR;
-            }
-            break;
-        }
-        default: {
-            break;
-        }
-    }
-
     std::shared_ptr<infinity::ParsedExpr> default_expr($4);
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, "", std::move(default_expr));
-
+    std::vector<std::unique_ptr<infinity::InitParameter>> index_param_list = infinity::InitParameter::MakeInitParameterList($3);
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*($2), index_param_list);
+    delete $2;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        free($1);
+        YYERROR;
+    }
+    $$ = new infinity::ColumnDef(std::move(data_type_result), "", std::move(default_expr));
     ParserHelper::ToLower($1);
     $$->name_ = $1;
     free($1);
@@ -853,36 +835,21 @@ IDENTIFIER column_type with_index_param_list default_expr {
     */
 }
 | IDENTIFIER column_type column_constraints default_expr {
-    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
-    switch($2.logical_type_) {
-        case infinity::LogicalType::kDecimal: {
-            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
-            break;
-        }
-//        case infinity::LogicalType::kBitmap: {
-//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
-//            break;
-//        }
-        case infinity::LogicalType::kEmbedding:
-        case infinity::LogicalType::kMultiVector:
-        case infinity::LogicalType::kTensor:
-        case infinity::LogicalType::kTensorArray: {
-            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
-            break;
-        }
-        default: {
-            break;
-        }
-    }
-
     std::shared_ptr<infinity::ParsedExpr> default_expr($4);
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, "", default_expr);
-
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*($2), std::vector<std::unique_ptr<infinity::InitParameter>>{});
+    delete $2;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        free($1);
+        delete $3;
+        YYERROR;
+    }
+    $$ = new infinity::ColumnDef(std::move(data_type_result), "", std::move(default_expr));
     ParserHelper::ToLower($1);
     $$->name_ = $1;
-    $$->constraints_ = *$3;
-    delete $3;
     free($1);
+    $$->constraints_ = std::move(*$3);
+    delete $3;
     /*
     if (!$$->trySetNullableExplicit()) {
         yyerror(&yyloc, result, scanner, ("Conflicting nullability constraints for " + std::string{$1}).c_str());
@@ -890,46 +857,18 @@ IDENTIFIER column_type with_index_param_list default_expr {
     */
 }
 | IDENTIFIER column_type with_index_param_list default_expr COMMENT STRING {
-    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
+    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
     std::vector<std::unique_ptr<infinity::InitParameter>> index_param_list = infinity::InitParameter::MakeInitParameterList($3);
-    switch($2.logical_type_) {
-        case infinity::LogicalType::kDecimal: {
-            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
-            if(type_info_ptr == nullptr) {
-                yyerror(&yyloc, scanner, result, "Fail to create decimal info.");
-                free($1);
-                YYERROR;
-            }
-            break;
-        }
-//        case infinity::LogicalType::kBitmap: {
-//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
-//            break;
-//        }
-        case infinity::LogicalType::kEmbedding:
-        case infinity::LogicalType::kMultiVector:
-        case infinity::LogicalType::kTensor:
-        case infinity::LogicalType::kTensorArray: {
-            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
-            break;
-        }
-        case infinity::LogicalType::kSparse: {
-            auto store_type = infinity::SparseInfo::ParseStoreType(index_param_list);
-            type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width, store_type);
-            if (type_info_ptr == nullptr) {
-                yyerror(&yyloc, scanner, result, "Fail to create sparse info.");
-                free($1);
-                YYERROR;
-            }
-            break;
-        }
-        default: {
-            break;
-        }
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*($2), index_param_list);
+    delete $2;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        free($1);
+        free($6);
+        YYERROR;
     }
 
-    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, $6, std::move(default_expr));
+    $$ = new infinity::ColumnDef(std::move(data_type_result), $6, std::move(default_expr));
     free($6);
 
     ParserHelper::ToLower($1);
@@ -942,35 +881,22 @@ IDENTIFIER column_type with_index_param_list default_expr {
     */
 }
 | IDENTIFIER column_type column_constraints default_expr COMMENT STRING {
-    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
-    switch($2.logical_type_) {
-        case infinity::LogicalType::kDecimal: {
-            type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
-            break;
-        }
-//        case infinity::LogicalType::kBitmap: {
-//            type_info_ptr = infinity::BitmapInfo::Make($2.width);
-//            break;
-//        }
-        case infinity::LogicalType::kEmbedding:
-        case infinity::LogicalType::kMultiVector:
-        case infinity::LogicalType::kTensor:
-        case infinity::LogicalType::kTensorArray: {
-            type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
-            break;
-        }
-        default: {
-            break;
-        }
-    }
-
     std::shared_ptr<infinity::ParsedExpr> default_expr($4);
-    $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, $6, default_expr);
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*($2), std::vector<std::unique_ptr<infinity::InitParameter>>{});
+    delete $2;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        free($1);
+        free($6);
+        delete $3;
+        YYERROR;
+    }
+    $$ = new infinity::ColumnDef(std::move(data_type_result), $6, std::move(default_expr));
     free($6);
 
     ParserHelper::ToLower($1);
     $$->name_ = $1;
-    $$->constraints_ = *$3;
+    $$->constraints_ = std::move(*$3);
     delete $3;
     free($1);
     /*
@@ -980,104 +906,122 @@ IDENTIFIER column_type with_index_param_list default_expr {
     */
 };
 
+column_type_array : column_type {
+    $$ = new std::vector<std::unique_ptr<infinity::ColumnType>>();
+    $$->emplace_back($1);
+}
+| column_type_array ',' column_type {
+    $$ = $1;
+    $$->emplace_back($3);
+};
+
 column_type :
-BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| TINYINT { $$ = infinity::ColumnType{infinity::LogicalType::kTinyInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| SMALLINT { $$ = infinity::ColumnType{infinity::LogicalType::kSmallInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| INTEGER { $$ = infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| INT { $$ = infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| BIGINT { $$ = infinity::ColumnType{infinity::LogicalType::kBigInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| HUGEINT { $$ = infinity::ColumnType{infinity::LogicalType::kHugeInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| FLOAT { $$ = infinity::ColumnType{infinity::LogicalType::kFloat, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| REAL  { $$ = infinity::ColumnType{infinity::LogicalType::kFloat, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| DOUBLE { $$ = infinity::ColumnType{infinity::LogicalType::kDouble, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| FLOAT16 { $$ = infinity::ColumnType{infinity::LogicalType::kFloat16, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| BFLOAT16 { $$ = infinity::ColumnType{infinity::LogicalType::kBFloat16, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| DATE { $$ = infinity::ColumnType{infinity::LogicalType::kDate, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| TIME { $$ = infinity::ColumnType{infinity::LogicalType::kTime, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| DATETIME { $$ = infinity::ColumnType{infinity::LogicalType::kDateTime, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| TIMESTAMP { $$ = infinity::ColumnType{infinity::LogicalType::kTimestamp, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| UUID { $$ = infinity::ColumnType{infinity::LogicalType::kUuid, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| POINT { $$ = infinity::ColumnType{infinity::LogicalType::kPoint, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| LINE { $$ = infinity::ColumnType{infinity::LogicalType::kLine, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| LSEG { $$ = infinity::ColumnType{infinity::LogicalType::kLineSeg, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| BOX { $$ = infinity::ColumnType{infinity::LogicalType::kBox, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-// | PATH { $$ = infinity::ColumnType{infinity::LogicalType::kPath, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-// | POLYGON { $$ = infinity::ColumnType{infinity::LogicalType::kPolygon, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| CIRCLE { $$ = infinity::ColumnType{infinity::LogicalType::kCircle, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+BOOLEAN { $$ = new infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| TINYINT { $$ = new infinity::ColumnType{infinity::LogicalType::kTinyInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| SMALLINT { $$ = new infinity::ColumnType{infinity::LogicalType::kSmallInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| INTEGER { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| INT { $$ = new infinity::ColumnType{infinity::LogicalType::kInteger, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| BIGINT { $$ = new infinity::ColumnType{infinity::LogicalType::kBigInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| HUGEINT { $$ = new infinity::ColumnType{infinity::LogicalType::kHugeInt, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| FLOAT { $$ = new infinity::ColumnType{infinity::LogicalType::kFloat, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| REAL  { $$ = new infinity::ColumnType{infinity::LogicalType::kFloat, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| DOUBLE { $$ = new infinity::ColumnType{infinity::LogicalType::kDouble, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| FLOAT16 { $$ = new infinity::ColumnType{infinity::LogicalType::kFloat16, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| BFLOAT16 { $$ = new infinity::ColumnType{infinity::LogicalType::kBFloat16, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| DATE { $$ = new infinity::ColumnType{infinity::LogicalType::kDate, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| TIME { $$ = new infinity::ColumnType{infinity::LogicalType::kTime, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| DATETIME { $$ = new infinity::ColumnType{infinity::LogicalType::kDateTime, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| TIMESTAMP { $$ = new infinity::ColumnType{infinity::LogicalType::kTimestamp, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| UUID { $$ = new infinity::ColumnType{infinity::LogicalType::kUuid, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| POINT { $$ = new infinity::ColumnType{infinity::LogicalType::kPoint, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| LINE { $$ = new infinity::ColumnType{infinity::LogicalType::kLine, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| LSEG { $$ = new infinity::ColumnType{infinity::LogicalType::kLineSeg, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| BOX { $$ = new infinity::ColumnType{infinity::LogicalType::kBox, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+// | PATH { $$ = new infinity::ColumnType{infinity::LogicalType::kPath, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+// | POLYGON { $$ = new infinity::ColumnType{infinity::LogicalType::kPolygon, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| CIRCLE { $$ = new infinity::ColumnType{infinity::LogicalType::kCircle, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
 // Variable types
-| VARCHAR { $$ = infinity::ColumnType{infinity::LogicalType::kVarchar, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, $5, infinity::EmbeddingDataType::kElemInvalid}; }
-| DECIMAL '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-| DECIMAL { $$ = infinity::ColumnType{infinity::LogicalType::kDecimal, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
-// | BLOB '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kBlob, $3}; }
-// | BITMAP '(' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kBitmap, $3}; }
-| EMBEDDING '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
-| EMBEDDING '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
-| EMBEDDING '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
-| EMBEDDING '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| EMBEDDING '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| EMBEDDING '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
-| EMBEDDING '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
-| EMBEDDING '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
-| EMBEDDING '(' FLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
-| EMBEDDING '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
-| EMBEDDING '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
-| MULTIVECTOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
-| MULTIVECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
-| MULTIVECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
-| MULTIVECTOR '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| MULTIVECTOR '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| MULTIVECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
-| MULTIVECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
-| MULTIVECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
-| MULTIVECTOR '(' FLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
-| MULTIVECTOR '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
-| MULTIVECTOR '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kMultiVector, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
-| TENSOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
-| TENSOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
-| TENSOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
-| TENSOR '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| TENSOR '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| TENSOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
-| TENSOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
-| TENSOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
-| TENSOR '(' FLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
-| TENSOR '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
-| TENSOR '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
-| TENSORARRAY '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
-| TENSORARRAY '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
-| TENSORARRAY '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
-| TENSORARRAY '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| TENSORARRAY '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| TENSORARRAY '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
-| TENSORARRAY '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
-| TENSORARRAY '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
-| TENSORARRAY '(' FLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
-| TENSORARRAY '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
-| TENSORARRAY '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
-| VECTOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
-| VECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
-| VECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
-| VECTOR '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| VECTOR '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| VECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
-| VECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
-| VECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
-| VECTOR '(' FLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
-| VECTOR '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
-| VECTOR '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
-| SPARSE '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
-| SPARSE '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
-| SPARSE '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
-| SPARSE '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| SPARSE '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
-| SPARSE '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
-| SPARSE '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
-| SPARSE '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
-| SPARSE '(' FLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
-| SPARSE '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
-| SPARSE '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
+| VARCHAR { $$ = new infinity::ColumnType{infinity::LogicalType::kVarchar, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| DECIMAL '(' LONG_VALUE ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, $5, infinity::EmbeddingDataType::kElemInvalid}; }
+| DECIMAL '(' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kDecimal, 0, $3, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+| DECIMAL { $$ = new infinity::ColumnType{infinity::LogicalType::kDecimal, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid}; }
+// | BLOB '(' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kBlob, $3}; }
+// | BITMAP '(' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kBitmap, $3}; }
+| EMBEDDING '(' BIT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
+| EMBEDDING '(' TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
+| EMBEDDING '(' SMALLINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
+| EMBEDDING '(' INTEGER ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| EMBEDDING '(' INT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| EMBEDDING '(' BIGINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
+| EMBEDDING '(' FLOAT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
+| EMBEDDING '(' DOUBLE ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
+| EMBEDDING '(' FLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
+| EMBEDDING '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
+| EMBEDDING '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
+| MULTIVECTOR '(' BIT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
+| MULTIVECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
+| MULTIVECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
+| MULTIVECTOR '(' INTEGER ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| MULTIVECTOR '(' INT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| MULTIVECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
+| MULTIVECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
+| MULTIVECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
+| MULTIVECTOR '(' FLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
+| MULTIVECTOR '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
+| MULTIVECTOR '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kMultiVector, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
+| TENSOR '(' BIT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
+| TENSOR '(' TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
+| TENSOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
+| TENSOR '(' INTEGER ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| TENSOR '(' INT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| TENSOR '(' BIGINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
+| TENSOR '(' FLOAT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
+| TENSOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
+| TENSOR '(' FLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
+| TENSOR '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
+| TENSOR '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensor, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
+| TENSORARRAY '(' BIT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
+| TENSORARRAY '(' TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
+| TENSORARRAY '(' SMALLINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
+| TENSORARRAY '(' INTEGER ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| TENSORARRAY '(' INT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| TENSORARRAY '(' BIGINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
+| TENSORARRAY '(' FLOAT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
+| TENSORARRAY '(' DOUBLE ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
+| TENSORARRAY '(' FLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
+| TENSORARRAY '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
+| TENSORARRAY '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kTensorArray, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
+| VECTOR '(' BIT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
+| VECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
+| VECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
+| VECTOR '(' INTEGER ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| VECTOR '(' INT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| VECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
+| VECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
+| VECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
+| VECTOR '(' FLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
+| VECTOR '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
+| VECTOR '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kEmbedding, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
+| SPARSE '(' BIT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemBit}; }
+| SPARSE '(' TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt8}; }
+| SPARSE '(' SMALLINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt16}; }
+| SPARSE '(' INTEGER ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| SPARSE '(' INT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt32}; }
+| SPARSE '(' BIGINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemInt64}; }
+| SPARSE '(' FLOAT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat}; }
+| SPARSE '(' DOUBLE ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemDouble}; }
+| SPARSE '(' FLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemFloat16}; }
+| SPARSE '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::EmbeddingDataType::kElemBFloat16}; }
+| SPARSE '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = new infinity::ColumnType{infinity::LogicalType::kSparse, $6, 0, 0, infinity::EmbeddingDataType::kElemUInt8}; }
+| ARRAY '(' column_type ')' {
+  $$ = new infinity::ColumnType{infinity::LogicalType::kArray, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid};
+  $$->element_types_.emplace_back($3);
+}
+| TUPLE '(' column_type_array ')' {
+  $$ = new infinity::ColumnType{infinity::LogicalType::kTuple, 0, 0, 0, infinity::EmbeddingDataType::kElemInvalid};
+  $$->element_types_ = std::move(*($3));
+  delete $3;
+}
 /*
 | DECIMAL opt_decimal_specification {
   $$ = infinity::ColumnType{DataType::DECIMAL, 0, $2->first, $2->second};
@@ -3514,28 +3458,14 @@ case_check_array: WHEN expr THEN expr {
 };
 
 cast_expr: CAST '(' expr AS column_type ')' {
-    std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
-    switch($5.logical_type_) {
-        case infinity::LogicalType::kDecimal: {
-            type_info_ptr = infinity::DecimalInfo::Make($5.precision, $5.scale);
-            break;
-        }
-//        case infinity::LogicalType::kBitmap: {
-//            type_info_ptr = infinity::BitmapInfo::Make($5.width);
-//            break;
-//        }
-        case infinity::LogicalType::kEmbedding:
-        case infinity::LogicalType::kMultiVector:
-        case infinity::LogicalType::kTensor:
-        case infinity::LogicalType::kTensorArray: {
-            type_info_ptr = infinity::EmbeddingInfo::Make($5.embedding_type_, $5.width);
-            break;
-        }
-        default: {
-            break;
-        }
+    auto [data_type_result, fail_reason] = infinity::ColumnType::GetDataTypeFromColumnType(*($5), std::vector<std::unique_ptr<infinity::InitParameter>>{});
+    delete $5;
+    if (!data_type_result) {
+        yyerror(&yyloc, scanner, result, fail_reason.c_str());
+        delete $3;
+        YYERROR;
     }
-    infinity::CastExpr* cast_expr = new infinity::CastExpr($5.logical_type_, type_info_ptr);
+    infinity::CastExpr* cast_expr = new infinity::CastExpr(std::move(*data_type_result));
     cast_expr->expr_ = $3;
     $$ = cast_expr;
 };
