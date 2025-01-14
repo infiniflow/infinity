@@ -25,6 +25,7 @@ import column_def;
 
 namespace infinity {
 
+enum class SegmentStatus;
 export struct SnapshotInfo {
     // structure to represent the snapshot
     String snapshot_name_;
@@ -39,6 +40,7 @@ export struct OutlineSnapshotInfo {
 export struct BlockColumnSnapshotInfo {
     ColumnID column_id_;
     String filename_;
+    u64 last_chunk_offset_;
     Vector<SharedPtr<OutlineSnapshotInfo>> outline_snapshots_;
 
     nlohmann::json Serialize();
@@ -47,8 +49,11 @@ export struct BlockColumnSnapshotInfo {
 
 export struct BlockSnapshotInfo {
     BlockID block_id_;
+    SizeT row_count_;
+    SizeT row_capacity_;
     String block_dir_;
     Vector<SharedPtr<BlockColumnSnapshotInfo>> column_block_snapshots_;
+    String fast_rough_filter_;
 
     nlohmann::json Serialize();
     static SharedPtr<BlockSnapshotInfo> Deserialize(const nlohmann::json &block_json);
@@ -57,6 +62,7 @@ export struct BlockSnapshotInfo {
 export struct SegmentSnapshotInfo {
     SegmentID segment_id_;
     String segment_dir_;
+    SegmentStatus status_;
     TxnTimeStamp first_delete_ts_;
     TxnTimeStamp deprecate_ts_;
     TxnTimeStamp row_count_;
@@ -103,6 +109,7 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     ColumnID next_column_id_{};
     SegmentID unsealed_id_{};
     SegmentID next_segment_id_{};
+    SizeT row_count_{};
     Vector<SharedPtr<ColumnDef>> columns_{};
     Map<SegmentID, SharedPtr<SegmentSnapshotInfo>> segment_snapshots_{};
     Map<String, SharedPtr<TableIndexSnapshotInfo>> table_index_snapshots_{};

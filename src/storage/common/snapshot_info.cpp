@@ -37,6 +37,7 @@ import utility;
 import block_version;
 import data_type;
 import parsed_expr;
+import segment_entry;
 
 namespace infinity {
 
@@ -94,6 +95,7 @@ nlohmann::json SegmentSnapshotInfo::Serialize() {
     json_res["deprecate_ts"] = deprecate_ts_;
     json_res["row_count"] = row_count_;
     json_res["actual_row_count"] = actual_row_count_;
+    json_res["segment_status"] = status_;
 
     for (const auto &block_snapshot : block_snapshots_) {
         json_res["blocks"].emplace_back(block_snapshot->Serialize());
@@ -110,6 +112,7 @@ SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(const nlohmann::
     segment_snapshot->deprecate_ts_ = segment_json["deprecate_ts"];
     segment_snapshot->row_count_ = segment_json["row_count"];
     segment_snapshot->actual_row_count_ = segment_json["actual_row_count"];
+    segment_snapshot->status_ = static_cast<SegmentStatus>(segment_json["segment_status"]);
 
     for (const auto &block_json : segment_json["blocks"]) {
         auto block_snapshot = BlockSnapshotInfo::Deserialize(block_json);
@@ -278,6 +281,7 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     json_res["next_column_id"] = next_column_id_;
     json_res["unsealed_id"] = unsealed_id_;
     json_res["next_segment_id"] = next_segment_id_;
+    json_res["row_count"] = row_count_;
 
     for (const auto &column_def : this->columns_) {
         nlohmann::json column_def_json;
@@ -410,6 +414,7 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
     table_snapshot->next_column_id_ = snapshot_meta_json["next_column_id"];
     table_snapshot->unsealed_id_ = snapshot_meta_json["unsealed_id"];
     table_snapshot->next_segment_id_ = snapshot_meta_json["next_segment_id"];
+    table_snapshot->row_count_ = snapshot_meta_json["row_count"];
 
     for (const auto &column_def_json : snapshot_meta_json["column_definition"]) {
         SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);

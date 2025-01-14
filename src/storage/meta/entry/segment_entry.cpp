@@ -143,24 +143,32 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     return segment_entry;
 }
 
-SharedPtr<SegmentEntry> SegmentEntry::ApplySegmentSnapshot(TableEntry *table_entry,
-                                                           SegmentID segment_id,
-                                                           SegmentSnapshotInfo *segment_snapshot_info,
-                                                           TransactionID txn_id,
-                                                           TxnTimeStamp begin_ts) {
-//    SharedPtr<String> segment_dir = MakeShared<String>(segment_snapshot_info->segment_dir_);
-//    auto segment_entry = MakeShared<SegmentEntry>(table_entry, std::move(segment_dir), segment_id, row_capacity, column_count, status);
-////    segment_entry->min_row_ts_ = min_row_ts;
-////    segment_entry->max_row_ts_ = max_row_ts;
-////    segment_entry->commit_ts_ = commit_ts;
-//    segment_entry->first_delete_ts_ = first_delete_ts;
-//    segment_entry->deprecate_ts_ = deprecate_ts;
-//    segment_entry->begin_ts_ = begin_ts;
-//    segment_entry->row_count_ = row_count;
-//    segment_entry->actual_row_count_ = actual_row_count;
-//    segment_entry->txn_id_ = txn_id;
-//    return segment_entry;
-    return nullptr;
+SharedPtr<SegmentEntry>
+SegmentEntry::ApplySegmentSnapshot(TableEntry *table_entry, SegmentSnapshotInfo *segment_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    SharedPtr<String> segment_dir = MakeShared<String>(segment_snapshot_info->segment_dir_);
+    auto segment_entry = MakeShared<SegmentEntry>(table_entry,
+                                                  std::move(segment_dir),
+                                                  segment_snapshot_info->segment_id_,
+                                                  DEFAULT_SEGMENT_CAPACITY,
+                                                  table_entry->ColumnCount(),
+                                                  segment_snapshot_info->status_);
+    //    segment_entry->min_row_ts_ = commit_ts;
+    //    segment_entry->max_row_ts_ = commit_ts;
+    //    segment_entry->commit_ts_ = commit_ts;
+    segment_entry->deleted_ = false;
+    segment_entry->first_delete_ts_ = segment_snapshot_info->first_delete_ts_;
+    segment_entry->deprecate_ts_ = segment_snapshot_info->deprecate_ts_;
+    segment_entry->begin_ts_ = begin_ts;
+    segment_entry->row_count_ = segment_snapshot_info->row_count_;
+    segment_entry->actual_row_count_ = segment_snapshot_info->actual_row_count_;
+    segment_entry->txn_id_ = txn_id;
+
+    for (const auto &block_snapshot : segment_snapshot_info->block_snapshots_) {
+        auto block_entry = BlockEntry::ApplyBlockSnapshot(segment_entry.get(), block_snapshot.get(), txn_id, begin_ts);
+        segment_entry->block_entries_.emplace_back(block_entry);
+    }
+
+    return segment_entry;
 }
 
 void SegmentEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data) {

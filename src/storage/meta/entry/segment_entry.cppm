@@ -114,7 +114,6 @@ public:
                                                          TransactionID txn_id);
 
     static SharedPtr<SegmentEntry> ApplySegmentSnapshot(TableEntry *table_entry,
-                                                        SegmentID segment_id,
                                                         SegmentSnapshotInfo *segment_snapshot_info,
                                                         TransactionID txn_id,
                                                         TxnTimeStamp begin_ts);

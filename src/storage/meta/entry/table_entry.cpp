@@ -240,13 +240,14 @@ SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
                                               table_snapshot_info->unsealed_id_,
                                               table_snapshot_info->next_segment_id_,
                                               table_snapshot_info->next_column_id_);
-//    table_entry->row_count_.store(row_count);
-//
-//    for (const auto &segment_pair : segment_snapshots_) {
-//        SegmentID segment_id = segment_pair.first;
-//        SegmentSnapshotInfo *segment_snapshot = segment_pair.second.get();
-//        SegmentEntry::ApplySegmentSnapshot(table_entry, segment_id, segment_snapshot, txn_id, begin_ts);
-//    }
+    table_entry->row_count_.store(table_snapshot_info->row_count_);
+
+    for (const auto &segment_pair : table_snapshot_info->segment_snapshots_) {
+        SegmentID segment_id = segment_pair.first;
+        SegmentSnapshotInfo *segment_snapshot = segment_pair.second.get();
+        SharedPtr<SegmentEntry> segment_entry = SegmentEntry::ApplySegmentSnapshot(table_entry.get(), segment_snapshot, txn_id, begin_ts);
+        table_entry->segment_map_.emplace(segment_id, segment_entry);
+    }
 
     return table_entry;
 }
@@ -1712,12 +1713,12 @@ SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo(Txn *txn_ptr) const {
     table_snapshot_info->next_segment_id_ = next_segment_id_;
     table_snapshot_info->columns_ = columns_;
 
-//    Vector<SegmentEntry> segments = GetVisibleSegments(txn_ptr);
-//
-//    for (const auto &segment_ptr : segments) {
-//        SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = segment_ptr->GetSnapshotInfo();
-//        table_snapshot_info->segment_snapshots_.emplace(segment_ptr->segment_id(), segment_snapshot_info);
-//    }
+    Vector<SharedPtr<SegmentEntry>> segments = GetVisibleSegments(txn_ptr);
+
+    for (const auto &segment_ptr : segments) {
+        SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = segment_ptr->GetSnapshotInfo();
+        table_snapshot_info->segment_snapshots_.emplace(segment_ptr->segment_id(), segment_snapshot_info);
+    }
 
     {
         auto map_guard = this->IndexMetaMap();
