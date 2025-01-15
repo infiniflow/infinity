@@ -178,7 +178,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::ApplyBlockColumnSnapshot(BlockEntr
 SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() const {
     SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
     block_column_snapshot_info->column_id_ = column_id_;
-    block_column_snapshot_info->filename_ = LastChunkOff();
+    block_column_snapshot_info->filename_ = *filename_;
     block_column_snapshot_info->last_chunk_offset_ = last_chunk_offset_;
     SizeT outline_count = outline_buffers_.size();
     for (SizeT file_idx = 0; file_idx < outline_count; ++file_idx) {
