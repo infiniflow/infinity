@@ -70,6 +70,7 @@ Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID t
     txn_context_ptr_ = TxnContext::Make();
     txn_context_ptr_->txn_id_ = txn_id;
     txn_context_ptr_->begin_ts_ = begin_ts;
+    txn_context_ptr_->text_ = txn_text_;
 }
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts)
