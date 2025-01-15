@@ -3201,6 +3201,48 @@ function_expr : IDENTIFIER '(' ')' {
     func_expr->distinct_ = true;
     $$ = func_expr;
 }
+| YEAR '(' expr ')' {
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "year";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| MONTH '(' expr ')' {
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "month";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| DAY '(' expr ')' {
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "day";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| HOUR '(' expr ')' {
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "hour";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| MINUTE '(' expr ')' {
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "minute";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
+| SECOND '(' expr ')' {
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "second";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    func_expr->arguments_->emplace_back($3);
+    $$ = func_expr;
+}
 | operand IS NOT NULLABLE {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "is_not_null";
