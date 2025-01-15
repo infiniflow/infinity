@@ -33,6 +33,7 @@ import txn_store;
 
 import base_entry;
 import db_entry;
+import txn_state;
 
 using namespace infinity;
 
@@ -54,7 +55,7 @@ TEST_P(DBEntryTest, decode_index_test) {
 TEST_P(DBEntryTest, to_string_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get database"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get database"), TransactionType::kRead);
 
     auto [db_entry, status] = catalog->GetDatabase("default_db", txn1->TxnID(), txn1->BeginTS());
     std::cout << *(db_entry->ToString()) << std::endl;
@@ -94,7 +95,7 @@ TEST_P(DBEntryTest, to_string_test) {
 TEST_P(DBEntryTest, get_all_table_metas_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get database"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get database"), TransactionType::kRead);
 
     // create table, drop table
     {
@@ -127,7 +128,7 @@ TEST_P(DBEntryTest, get_all_table_metas_test) {
 TEST_P(DBEntryTest, remove_table_entry_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get database"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get database"), TransactionType::kRead);
 
     // create table, remove table entry, drop table
     {

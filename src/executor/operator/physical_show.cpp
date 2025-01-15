@@ -5945,7 +5945,11 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
 
         {
             // txn type
-            Value value = Value::MakeVarchar(TxnType2Str(txn_context->type_));
+            String transaction_type_str = "read";
+            if(txn_context->is_write_transaction_) {
+                transaction_type_str = "write";
+            }
+            Value value = Value::MakeVarchar(transaction_type_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
         }

@@ -53,6 +53,7 @@ import extra_ddl_info;
 import virtual_store;
 import result_cache_manager;
 import global_resource_usage;
+import txn_state;
 
 namespace infinity {
 
@@ -333,7 +334,7 @@ Status Storage::AdminToWriter() {
         MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
     bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
-    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"));
+    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kCheckpoint);
     auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
     bg_processor_->Submit(force_ckp_task);
     force_ckp_task->Wait();
@@ -770,7 +771,7 @@ void Storage::LoadFullCheckpoint(const String &checkpoint_path) {
 void Storage::AttachDeltaCheckpoint(const String &checkpoint_path) { new_catalog_->AttachDeltaCheckpoint(checkpoint_path); }
 
 void Storage::CreateDefaultDB() {
-    Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
     new_txn->SetReaderAllowed(true);
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase(MakeShared<String>("default_db"), ConflictType::kError, MakeShared<String>("Initial startup created"));

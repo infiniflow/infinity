@@ -51,7 +51,7 @@ TxnManager::~TxnManager() {
 #endif
 }
 
-Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
+Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "TxnManager is not running, cannot create txn";
@@ -67,6 +67,8 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
 
     // Record the start ts of the txn
     TxnTimeStamp begin_ts = current_ts_ + 1;
+
+    bool ckp_txn = txn_type == TransactionType::kCheckpoint;
     if (ckp_txn) {
         if (ckp_begin_ts_ != UNCOMMIT_TS) {
             // not set ckp_begin_ts_ may not truncate the wal file.
@@ -78,7 +80,7 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     }
 
     // Create txn instance
-    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, new_txn_id, begin_ts, std::move(txn_text)));
+    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, new_txn_id, begin_ts, std::move(txn_text), txn_type));
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
@@ -333,70 +335,60 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 }
 
 void TxnManager::CleanupTxn(Txn *txn, bool commit) {
-    TxnType txn_type = txn->GetTxnType();
+    bool is_write_transaction = txn->IsWriteTransaction();
     TransactionID txn_id = txn->TxnID();
-    switch (txn_type) {
-        case TxnType::kRead: {
-            // For read-only Txn only remove txn from txn_map
+    if(is_write_transaction) {
+        // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
+        TxnState txn_state = txn->GetTxnState();
+        switch (txn_state) {
+            case TxnState::kCommitting: {
+                txn->SetTxnCommitted();
+                break;
+            }
+            case TxnState::kRollbacking: {
+                txn->SetTxnRollbacked();
+                break;
+            }
+            default: {
+                String error_message = fmt::format("Invalid transaction status: {}", TxnState2Str(txn_state));
+                UnrecoverableError(error_message);
+            }
+        }
+        SharedPtr<AddDeltaEntryTask> add_delta_entry_task = txn->MakeAddDeltaEntryTask();
+        {
+            // cleanup the txn from committing_txn and txm_map
+            auto commit_ts = txn->CommitTS();
             std::lock_guard guard(locker_);
-            //            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
-            //            if (txn_contexts_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
-            //                txn_contexts_.pop_front();
-            //            }
-            //            txn_contexts_.push_back(txn_ptr);
-            txn_map_.erase(txn_id);
-            break;
-        }
-        case TxnType::kWrite: {
-            // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
-            TxnState txn_state = txn->GetTxnState();
-            switch (txn_state) {
-                case TxnState::kCommitting: {
-                    txn->SetTxnCommitted();
-                    break;
-                }
-                case TxnState::kRollbacking: {
-                    txn->SetTxnRollbacked();
-                    break;
-                }
-                default: {
-                    String error_message = fmt::format("Invalid transaction status: {}", TxnState2Str(txn_state));
-                    UnrecoverableError(error_message);
-                }
+            SizeT remove_n = committing_txns_.erase(commit_ts);
+            if (remove_n == 0) {
+                UnrecoverableError("Txn not found in committing_txns_");
             }
-            SharedPtr<AddDeltaEntryTask> add_delta_entry_task = txn->MakeAddDeltaEntryTask();
-            {
-                // cleanup the txn from committing_txn and txm_map
-                auto commit_ts = txn->CommitTS();
-                std::lock_guard guard(locker_);
-                SizeT remove_n = committing_txns_.erase(commit_ts);
-                if (remove_n == 0) {
-                    UnrecoverableError("Txn not found in committing_txns_");
-                }
-                SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
-                if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
-                    txn_context_histories_.pop_front();
-                }
-                txn_context_histories_.push_back(txn_ptr->txn_context());
-                remove_n = txn_map_.erase(txn_id);
-                if (remove_n == 0) {
-                    String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
-                    UnrecoverableError(error_message);
-                }
-                if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
-                    max_committed_ts_ = commit_ts;
-                }
+            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+            if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+                txn_context_histories_.pop_front();
             }
-            if (commit && add_delta_entry_task) {
-                InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
+            txn_context_histories_.push_back(txn_ptr->txn_context());
+            remove_n = txn_map_.erase(txn_id);
+            if (remove_n == 0) {
+                String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
+                UnrecoverableError(error_message);
             }
-            break;
+            if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
+                max_committed_ts_ = commit_ts;
+            }
         }
-        case TxnType::kInvalid: {
-            String error_message = "Txn type is invalid";
-            UnrecoverableError(error_message);
-            break;
+        if (commit && add_delta_entry_task) {
+            InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
         }
+    } else {
+        // For read-only Txn only remove txn from txn_map
+        std::lock_guard guard(locker_);
+        //            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+        //            if (txn_contexts_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+        //                txn_contexts_.pop_front();
+        //            }
+        //            txn_contexts_.push_back(txn_ptr);
+        txn_map_.erase(txn_id);
     }
 }
 

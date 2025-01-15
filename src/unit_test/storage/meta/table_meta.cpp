@@ -30,6 +30,7 @@ import index_hnsw;
 import statement_common;
 import data_access_state;
 import txn_store;
+import txn_state;
 
 using namespace infinity;
 
@@ -46,7 +47,7 @@ TEST_P(TableMetaTest, to_string_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     {
         Vector<SharedPtr<ColumnDef>> columns;
@@ -81,7 +82,7 @@ TEST_P(TableMetaTest, name_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     {
         Vector<SharedPtr<ColumnDef>> columns;
@@ -118,7 +119,7 @@ TEST_P(TableMetaTest, get_all_entries_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     {
         Vector<SharedPtr<ColumnDef>> columns;

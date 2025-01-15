@@ -30,6 +30,7 @@ import background_process;
 import default_values;
 import status;
 import logger;
+import txn_state;
 
 using namespace infinity;
 
@@ -75,13 +76,13 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                 }
                 // create and drop db to fill wal log
                 {
-                    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
+                    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
                     auto status = txn->DropDatabase("db1", ConflictType::kIgnore);
                     ASSERT_TRUE(status.ok() || status.code() == ErrorCode::kIgnore);
                     txn_mgr->CommitTxn(txn);
                 }
                 { // put create after drop to prevent the merge delta result is empty
-                    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+                    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
                     auto status = txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kIgnore, MakeShared<String>());
                     ASSERT_TRUE(status.ok());
                     txn_mgr->CommitTxn(txn);
@@ -96,7 +97,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         }
         TxnTimeStamp ckp_commit_ts = 0;
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kCheckpoint);
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false /*full_check_point*/);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
@@ -131,7 +132,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
             auto [db, status] = txn->GetDatabase("db1");
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -172,13 +173,13 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
                 }
                 // create and drop db to fill wal log
                 {
-                    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
+                    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
                     auto status = txn->DropDatabase("db1", ConflictType::kIgnore);
                     ASSERT_TRUE(status.ok() || status.code() == ErrorCode::kIgnore);
                     txn_mgr->CommitTxn(txn);
                 }
                 { // put create after drop to prevent the merge delta result is empty
-                    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+                    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
                     auto status = txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kIgnore, MakeShared<String>());
                     ASSERT_TRUE(status.ok());
                     txn_mgr->CommitTxn(txn);
@@ -191,7 +192,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
                 }
             }
             {
-                auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("delta ckp"));
+                auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("delta ckp"), TransactionType::kCheckpoint);
                 SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, false /*delta_check_point*/);
                 bg_processor->Submit(force_ckp_task);
                 force_ckp_task->Wait();
@@ -206,7 +207,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
             ASSERT_TRUE(temp_delta_infos.empty());
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kCheckpoint);
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true /*full_check_point*/);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
@@ -239,7 +240,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
             auto [db, status] = txn->GetDatabase("db1");
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
