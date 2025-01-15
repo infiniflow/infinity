@@ -1038,7 +1038,6 @@ class TestInfinity:
 
         res, extra_res = table_obj.output(["trunc(c1, 14)",  "trunc(c2, 2)", "trunc(c3, 2)"]).to_df()
         print(res)
-        print(res.dtypes)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'(c1 trunc 14)': ("2.12300000000000", "-2.12300000000000", "2.00000000000000", "2.10000000000000"),
                                                          '(c2 trunc 2)': ("2.12", "-2.12", "2.00", "2.10"),
                                                          '(c3 trunc 2)': ("2.12", "-2.12", "2.00", "2.10")
@@ -1062,10 +1061,72 @@ class TestInfinity:
 
         res, extra_res = table_obj.output(["reverse(c1)", "reverse(c2)"]).to_df()
         print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'reverse(c1)': ('cba', '321a', 'c', 'nmlkjihgfedcba'),
+                                                         'reverse(c2)': ('CBA', '321a', 'C', 'NMLKJIHGFEDCBA')})
+                                      .astype({'reverse(c1)': dtype('str_'), 'reverse(c2)': dtype('str_')}))
+
+        res = db_obj.drop_table("test_select_reverse" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+
+    def test_select_year(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_reverse" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_reverse" + suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_reverse" + suffix)
+        table_obj.insert(
+            [{"c1": 'abc', "c2": 'ABC'}, {"c1": 'a123', "c2": 'a123'}, {"c1": 'c', "c2": 'C'}, {"c1": 'abcdefghijklmn', "c2": 'ABCDEFGHIJKLMN'}])
+
+        res, extra_res = table_obj.output(["reverse(c1)", "reverse(c2)"]).to_df()
+        print(res)
+
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'reverse(c1)': ('cba', '321a', 'c', 'nmlkjihgfedcba'),
+                                                         'reverse(c2)': ('CBA', '321a', 'C', 'NMLKJIHGFEDCBA')})
+                                      .astype({'reverse(c1)': dtype('str_'), 'reverse(c2)': dtype('str_')}))
+
+        res = db_obj.drop_table("test_select_reverse" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+
+    def test_select_month(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_reverse" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_reverse" + suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_reverse" + suffix)
+        table_obj.insert(
+            [{"c1": 'abc', "c2": 'ABC'}, {"c1": 'a123', "c2": 'a123'}, {"c1": 'c', "c2": 'C'}, {"c1": 'abcdefghijklmn', "c2": 'ABCDEFGHIJKLMN'}])
+
+        res, extra_res = table_obj.output(["reverse(c1)", "reverse(c2)"]).to_df()
+        print(res)
         print(res.dtypes)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'reverse(c1)': ('cba', '321a', 'c', 'nmlkjihgfedcba'),
                                                          'reverse(c2)': ('CBA', '321a', 'C', 'NMLKJIHGFEDCBA')})
                                       .astype({'reverse(c1)': dtype('str_'), 'reverse(c2)': dtype('str_')}))
 
         res = db_obj.drop_table("test_select_reverse" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+
+    def test_select_day(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_day" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_day" + suffix,
+                            {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_reverse" + suffix)
+        table_obj.insert(
+            [{"c1": 'abc', "c2": 'ABC'}, {"c1": 'a123', "c2": 'a123'}, {"c1": 'c', "c2": 'C'}, {"c1": 'abcdefghijklmn', "c2": 'ABCDEFGHIJKLMN'}])
+
+        res, extra_res = table_obj.output(["reverse(c1)", "reverse(c2)"]).to_df()
+        print(res)
+        print(res.dtypes)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'reverse(c1)': ('cba', '321a', 'c', 'nmlkjihgfedcba'),
+                                                         'reverse(c2)': ('CBA', '321a', 'C', 'NMLKJIHGFEDCBA')})
+                                      .astype({'reverse(c1)': dtype('str_'), 'reverse(c2)': dtype('str_')}))
+
+        res = db_obj.drop_table("test_select_day" + suffix)
         assert res.error_code == ErrorCode.OK
