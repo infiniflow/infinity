@@ -169,7 +169,7 @@ TEST_P(SecondFunctionsTest, second_func) {
 
         for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
-            EXPECT_EQ(v1.type_.type(), LogicalType::kDateTime);
+            EXPECT_EQ(v1.type_.type(), LogicalType::kTimestamp);
         }
 
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
