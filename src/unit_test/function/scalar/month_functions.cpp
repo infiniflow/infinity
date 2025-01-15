@@ -87,7 +87,7 @@ TEST_P(MonthFunctionsTest, month_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeDare(static_cast<DateT>(2 * i)));
+            data_block.AppendValue(0, Value::MakeDate(static_cast<DateT>(2 * i)));
         }
         data_block.Finalize();
 
