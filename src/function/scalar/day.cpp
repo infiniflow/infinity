@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 module;
 module day;
 import stl;
@@ -30,16 +29,18 @@ namespace infinity {
 
 struct DayFunction {
     template <typename TA, typename TB>
-    static inline void Run(TA left, TB &result) {
+    static inline bool Run(TA left, TB &result) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
+        return false;
     }
 
 };
 
 template <>
-inline void DayFunction::Run(DateT left, BigIntT &result) {
+inline bool DayFunction::Run(DateT left, BigIntT &result) {
     result = DateT::GetDatePart(left, TimeUnit::kDay);
+    return true;
 }
 
 void RegisterDayFunction(const UniquePtr<Catalog> &catalog_ptr) {
@@ -50,7 +51,7 @@ void RegisterDayFunction(const UniquePtr<Catalog> &catalog_ptr) {
     ScalarFunction day_function(func_name,
                                   {DataType(LogicalType::kDate)},
                                   {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionVarlenToVarlen<DateT, BigIntT, DayFunction>);
+                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayFunction>);
     function_set_ptr->AddFunction(day_function);
 
 

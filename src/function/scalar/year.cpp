@@ -11,9 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-#include "type/internal_types.h"
-#include "type/logical_type.h"
 module;
 module year;
 import stl;
@@ -32,15 +29,16 @@ namespace infinity {
 
 struct YearFunction {
     template <typename TA, typename TB>
-    static inline void Run(TA left, TB &result) {
+    static inline bool Run(TA left, TB &result) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
+        return false;
     }
 
 };
 
 template <>
-inline void YearFunction::Run(DateT left, BigIntT &result) {
+inline bool YearFunction::Run(DateT left, BigIntT &result) {
     result = DateT::GetDatePart(left, TimeUnit::kYear);
 }
 
@@ -52,7 +50,7 @@ void RegisterYearFunction(const UniquePtr<Catalog> &catalog_ptr) {
     ScalarFunction year_function(func_name,
                                   {DataType(LogicalType::kDate)},
                                   {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionVarlenToVarlen<DateT, BigIntT, YearFunction>);
+                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, YearFunction>);
     function_set_ptr->AddFunction(year_function);
 
 
