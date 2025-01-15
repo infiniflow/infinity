@@ -112,7 +112,7 @@ void ColumnInverter::MergePrepare() {
         for (auto it = terms_once->begin(); it != terms_once->end(); ++it) {
             StringRef term(it->text_);
             u32 term_ref = AddTerm(term);
-            positions_.emplace_back(term_ref, doc_id, it->word_offset_);
+            positions_.emplace_back(term_ref, doc_id, it->word_offset_, it->payload_);
         }
     }
     terms_per_doc_.clear();
@@ -127,7 +127,7 @@ void ColumnInverter::Merge(ColumnInverter &rhs) {
         for (auto it = terms_once->begin(); it != terms_once->end(); ++it) {
             StringRef term(it->text_);
             u32 term_ref = AddTerm(term);
-            positions_.emplace_back(term_ref, doc_id, it->word_offset_);
+            positions_.emplace_back(term_ref, doc_id, it->word_offset_, it->payload_);
         }
     }
     doc_count_ += rhs.doc_count_;
@@ -214,6 +214,7 @@ void ColumnInverter::Sort() {
 MemUsageChange ColumnInverter::GeneratePosting() {
     u32 last_term_num = std::numeric_limits<u32>::max();
     u32 last_doc_id = INVALID_DOCID;
+    u16 last_doc_payload = 0;
     StringRef last_term, term;
     SharedPtr<PostingWriter> posting = nullptr;
     MemUsageChange ret{true, 0};
@@ -223,7 +224,7 @@ MemUsageChange ColumnInverter::GeneratePosting() {
         if (last_term_num != i.term_num_) {
             if (last_doc_id != INVALID_DOCID) {
                 assert(posting.get() != nullptr);
-                posting->EndDocument(last_doc_id, 0);
+                posting->EndDocument(last_doc_id, last_doc_payload);
                 // printf(" EndDocument1-%u\n", last_doc_id);
             }
             term = GetTermFromNum(i.term_num_);
@@ -243,15 +244,16 @@ MemUsageChange ColumnInverter::GeneratePosting() {
             assert(last_doc_id != INVALID_DOCID);
             assert(last_doc_id < i.doc_id_);
             assert(posting.get() != nullptr);
-            posting->EndDocument(last_doc_id, 0);
+            posting->EndDocument(last_doc_id, last_doc_payload);
             // printf(" EndDocument2-%u\n", last_doc_id);
         }
         last_doc_id = i.doc_id_;
+        last_doc_payload = i.doc_payload_;
         posting->AddPosition(i.term_pos_);
         // printf(" pos-%u", i.term_pos_);
     }
     if (last_doc_id != INVALID_DOCID) {
-        posting->EndDocument(last_doc_id, 0);
+        posting->EndDocument(last_doc_id, last_doc_payload);
         // printf(" EndDocument3-%u\n", last_doc_id);
     }
     // printf("GeneratePosting() end begin_doc_id_ %u, doc_count_ %u, merged_ %u", begin_doc_id_, doc_count_, merged_);
@@ -312,13 +314,14 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
             last_term_num = i.term_num_;
             term = GetTermFromNum(last_term_num);
         }
-        record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
+        record_length = term.size() + sizeof(docid_t) + sizeof(u32) + sizeof(u16) + 1;
 
         buf_writer->Write((const char *)&record_length, sizeof(u32));
         buf_writer->Write(term.data(), term.size());
         buf_writer->Write((const char *)&str_null, sizeof(char));
         buf_writer->Write((const char *)&(i.doc_id_), sizeof(docid_t));
         buf_writer->Write((const char *)&(i.term_pos_), sizeof(u32));
+        buf_writer->Write((const char *)&(i.doc_payload_), sizeof(u16));
     }
     buf_writer->Flush();
     // update data size

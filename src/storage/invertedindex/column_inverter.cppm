@@ -63,6 +63,7 @@ public:
         u32 term_num_{0};
         u32 doc_id_{0};
         u32 term_pos_{0};
+        u16 doc_payload_{0};
 
         bool operator<(const PosInfo &rhs) const {
             if (term_num_ != rhs.term_num_) {
