@@ -130,12 +130,12 @@ protected:
                 String str = std::to_string(i * SIZE / run_num + j);
                 u32 doc_id = 34567; // i * SIZE / run_num + j;
                 u32 term_pos = i;
-                u16 doc_payload = i;
+                u16 doc_payload = 10086;
                 memcpy(buffer, str.data(), str.size());
                 buffer[str.size()] = '\0';
                 memcpy(buffer + str.size() + 1, &doc_id, sizeof(u32));
                 memcpy(buffer + str.size() + 1 + sizeof(u32), &term_pos, sizeof(u32));
-                memcpy(buffer + str.size() + 1 + sizeof(u32) + sizeof(u16), &doc_payload, sizeof(u16));
+                memcpy(buffer + str.size() + 1 + sizeof(u32) + sizeof(u32), &doc_payload, sizeof(u16));
                 u32 len = str.size() + 1 + sizeof(u32) + sizeof(u32) + sizeof(u16);
                 fwrite(&len, sizeof(u32), 1, f);
                 fwrite(buffer, len, 1, f);
@@ -157,6 +157,7 @@ protected:
         f = fopen("./tt", "r");
         u64 count = 0;
         u32 doc_id = 34567;
+        u32 doc_payload = 10086;
         fread(&count, sizeof(u64), 1, f);
         EXPECT_EQ(count, SIZE);
         for (u32 i = 0; i < count; ++i) {
@@ -166,6 +167,7 @@ protected:
             fread(buf, len, 1, f);
             TermTuple tuple(buf, len);
             EXPECT_EQ(tuple.doc_id_, doc_id);
+            EXPECT_EQ(tuple.doc_payload_, doc_payload);
             delete[] buf;
         }
         std::filesystem::remove("./tt");

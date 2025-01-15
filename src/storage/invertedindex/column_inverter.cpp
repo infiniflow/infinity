@@ -314,7 +314,7 @@ void ColumnInverter::SpillSortResults(FILE *spill_file, u64 &tuple_count, Unique
             last_term_num = i.term_num_;
             term = GetTermFromNum(last_term_num);
         }
-        record_length = term.size() + sizeof(docid_t) + sizeof(u32) + 1;
+        record_length = term.size() + sizeof(docid_t) + sizeof(u32) + sizeof(u16) + 1;
 
         buf_writer->Write((const char *)&record_length, sizeof(u32));
         buf_writer->Write(term.data(), term.size());
