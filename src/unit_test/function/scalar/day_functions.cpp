@@ -123,7 +123,7 @@ TEST_P(DayFunctionsTest, day_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeDateTime(DateTime(i, i)));
+            data_block.AppendValue(0, Value::MakeDateTime(DateTimeT(i, i)));
         }
         data_block.Finalize();
 
