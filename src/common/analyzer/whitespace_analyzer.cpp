@@ -37,7 +37,7 @@ int WhitespaceAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func
         std::string t;
         u32 offset = 0;
         while (is >> t) {
-            func(data, t.data(), t.size(), offset++, 0, Term::AND, 0, false);
+            func(data, t.data(), t.size(), offset++, 0, false);
         }
         return 0;
     } else {
@@ -49,11 +49,11 @@ int WhitespaceAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func
         while (search_start < input_text.size()) {
             const auto found = input_text.find_first_of(delimiters, search_start);
             if (found == std::string_view::npos) {
-                func(data, input_text.data() + search_start, input_text.size() - search_start, offset++, 0, Term::AND, 0, false);
+                func(data, input_text.data() + search_start, input_text.size() - search_start, offset++, 0, false);
                 break;
             }
             if (found > search_start) {
-                func(data, input_text.data() + search_start, found - search_start, offset++, 0, Term::AND, 0, false);
+                func(data, input_text.data() + search_start, found - search_start, offset++, 0, false);
             }
             search_start = found + 1;
         }
