@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "type/logical_type.h"
 module;
 module month;
 import stl;
@@ -43,16 +44,29 @@ inline bool MonthFunction::Run(DateT left, BigIntT &result) {
     return true;
 }
 
+
+template <>
+inline bool MonthFunction::Run(DateTimeT left, BigIntT &result) {
+    result = DateT::GetDateTimePart(left, TimeUnit::kMonth);
+    return true;
+}
+
 void RegisterMonthFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "month";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    ScalarFunction month_function(func_name,
+    ScalarFunction month_date_function(func_name,
                                   {DataType(LogicalType::kDate)},
                                   {DataType(LogicalType::kBigInt)},
                                   &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, MonthFunction>);
-    function_set_ptr->AddFunction(month_function);
+    function_set_ptr->AddFunction(month_date_function);
+
+    ScalarFunction month_datetime_function(func_name,
+                                  {DataType(LogicalType::kDateTime)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, MonthFunction>);
+    function_set_ptr->AddFunction(month_datetime_function);
 
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

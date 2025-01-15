@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "type/logical_type.h"
 module;
 module year;
 import stl;
@@ -40,18 +41,32 @@ struct YearFunction {
 template <>
 inline bool YearFunction::Run(DateT left, BigIntT &result) {
     result = DateT::GetDatePart(left, TimeUnit::kYear);
+    return true;
 }
+
+template <>
+inline bool YearFunction::Run(DateTimeT left, BigIntT &result) {
+    result = DatetimeT::GetDateTimePart(left, TimeUnit::kYear);
+    return true;
+}
+
 
 void RegisterYearFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "year";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    ScalarFunction year_function(func_name,
+    ScalarFunction year_date_function(func_name,
                                   {DataType(LogicalType::kDate)},
                                   {DataType(LogicalType::kBigInt)},
                                   &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, YearFunction>);
-    function_set_ptr->AddFunction(year_function);
+    function_set_ptr->AddFunction(year_date_function);
+
+        ScalarFunction year_datetime_function(func_name,
+                                  {DataType(LogicalType::kDateTime)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, YearFunction>);
+    function_set_ptr->AddFunction(year_datetime_function);
 
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

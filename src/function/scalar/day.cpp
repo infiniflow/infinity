@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "type/logical_type.h"
 module;
 module day;
 import stl;
@@ -43,16 +44,28 @@ inline bool DayFunction::Run(DateT left, BigIntT &result) {
     return true;
 }
 
+template <>
+inline bool DayFunction::Run(DateTimeT left, BigIntT &result) {
+    result = DateT::GetDateTimePart(left, TimeUnit::kDay);
+    return true;
+}
+
 void RegisterDayFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "day";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    ScalarFunction day_function(func_name,
+    ScalarFunction day_date_function(func_name,
                                   {DataType(LogicalType::kDate)},
                                   {DataType(LogicalType::kBigInt)},
                                   &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayFunction>);
-    function_set_ptr->AddFunction(day_function);
+    function_set_ptr->AddFunction(day_date_function);
+
+    ScalarFunction day_datetime_function(func_name,
+                                  {DataType(LogicalType::kDateTime)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayFunction>);
+    function_set_ptr->AddFunction(day_datetime_function);
 
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
