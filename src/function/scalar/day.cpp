@@ -49,6 +49,12 @@ inline bool DayFunction::Run(DateTimeT left, BigIntT &result) {
     return true;
 }
 
+template <>
+inline bool DayFunction::Run(TimestampT left, BigIntT &result) {
+    result = TimestampT::GetDateTimePart(left, TimeUnit::kDay);
+    return true;
+}
+
 void RegisterDayFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "day";
 
@@ -66,6 +72,11 @@ void RegisterDayFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayFunction>);
     function_set_ptr->AddFunction(day_datetime_function);
 
+    ScalarFunction day_timestamp_function(func_name,
+                                  {DataType(LogicalType::kTimestamp)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayFunction>);
+    function_set_ptr->AddFunction(day_timestamp_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }

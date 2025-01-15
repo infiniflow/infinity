@@ -49,6 +49,11 @@ inline bool YearFunction::Run(DateTimeT left, BigIntT &result) {
     return true;
 }
 
+template <>
+inline bool YearFunction::Run(TimestampT left, BigIntT &result) {
+    result = TimestampT::GetDateTimePart(left, TimeUnit::kYear);
+    return true;
+}
 
 void RegisterYearFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "year";
@@ -61,12 +66,17 @@ void RegisterYearFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, YearFunction>);
     function_set_ptr->AddFunction(year_date_function);
 
-        ScalarFunction year_datetime_function(func_name,
+    ScalarFunction year_datetime_function(func_name,
                                   {DataType(LogicalType::kDateTime)},
                                   {DataType(LogicalType::kBigInt)},
                                   &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, YearFunction>);
     function_set_ptr->AddFunction(year_datetime_function);
 
+    ScalarFunction year_timestamp_function(func_name,
+                                  {DataType(LogicalType::kTimestamp)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, YearFunction>);
+    function_set_ptr->AddFunction(year_timestamp_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }

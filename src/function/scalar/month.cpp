@@ -50,6 +50,12 @@ inline bool MonthFunction::Run(DateTimeT left, BigIntT &result) {
     return true;
 }
 
+template <>
+inline bool MonthFunction::Run(TimestampT left, BigIntT &result) {
+    result = TimestampT::GetDateTimePart(left, TimeUnit::kMonth);
+    return true;
+}
+
 void RegisterMonthFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "month";
 
@@ -66,6 +72,12 @@ void RegisterMonthFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   {DataType(LogicalType::kBigInt)},
                                   &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, MonthFunction>);
     function_set_ptr->AddFunction(month_datetime_function);
+
+    ScalarFunction month_timestamp_function(func_name,
+                                  {DataType(LogicalType::kTimestamp)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, MonthFunction>);
+    function_set_ptr->AddFunction(month_timestamp_function);
 
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

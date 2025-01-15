@@ -24,17 +24,17 @@ SELECT day(d1) FROM test_datetime;
 ----
 1
 
-query I
+query IV
 SELECT hour(t1) FROM test_datetime;
 ----
 0
 
-query II
+query V
 SELECT minute(t1) FROM test_datetime;
 ----
 0
 
-query III
+query VI
 SELECT second(t1) FROM test_datetime;
 ----
 0
