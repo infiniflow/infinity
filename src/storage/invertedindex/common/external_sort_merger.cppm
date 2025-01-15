@@ -99,7 +99,7 @@ export struct TermTuple {
 export struct TermTupleList {
     TermTupleList(std::string_view term, u32 list_size = 2 * 1024 * 1024) : term_(term) {
         doc_pos_list_.reserve(list_size);
-        max_tuple_num_ = list_size / (sizeof(u32) * 2);
+        max_tuple_num_ = list_size / (sizeof(u32) * 2 + sizeof(u16));
     }
 
     bool IsFull() { return doc_pos_list_.size() >= max_tuple_num_; }
