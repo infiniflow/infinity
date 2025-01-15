@@ -43,6 +43,12 @@ inline bool MinuteFunction::Run(DateTimeT left, BigIntT &result) {
     return true;
 }
 
+template <>
+inline bool MinuteFunction::Run(TimeT left, BigIntT &result) {
+    result = TimeT::GetTimePart(left, TimeUnit::kMinute);
+    return true;
+}
+
 void RegisterMinuteFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "minute";
 
@@ -53,6 +59,12 @@ void RegisterMinuteFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   {DataType(LogicalType::kBigInt)},
                                   &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, MinuteFunction>);
     function_set_ptr->AddFunction(minute_datetime_function);
+
+    ScalarFunction minute_time_function(func_name,
+                                  {DataType(LogicalType::kTime)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, MinuteFunction>);
+    function_set_ptr->AddFunction(minute_time_function);
 
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

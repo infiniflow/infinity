@@ -1128,3 +1128,58 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_select_day" + suffix)
         assert res.error_code == ErrorCode.OK
+
+    
+    def test_select_hour(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_hour" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_hour" + suffix,
+                            {"c1": {"type": "time"},
+                             "c2": {"type": "datetime"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_hour" + suffix)
+        table_obj.insert(
+            [{"c1":"0:0:0", "c2":  "2022-05-26 21:44:33"}])
+
+        res, extra_res = table_obj.output(["hour(c1)" ,"hour(c2)"]).to_pl()
+        print(res)
+        assert res['hour(c1)'][0] == 0, "The value of hour(c1) should be 0"
+        assert res['hour(c2)'][0] == 21, "The value of hour(c2) should be 26"
+
+        res = db_obj.drop_table("test_select_hour" + suffix)
+        assert res.error_code == ErrorCode.OK
+    
+    def test_select_minute(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_minute" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_minute" + suffix,
+                            {"c1": {"type": "time"},
+                             "c2": {"type": "datetime"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_minute" + suffix)
+        table_obj.insert(
+            [{"c1":"0:0:0", "c2":  "2022-05-26 21:44:33"}])
+
+        res, extra_res = table_obj.output(["minute(c1)", "minute(c2)"]).to_pl()
+        print(res)
+        assert res['minute(c1)'][0] == 0, "The value of minute(c1) should be 0"
+        assert res['minute(c2)'][0] == 44, "The value of minute(c2) should be 44"
+
+        res = db_obj.drop_table("test_select_minute" + suffix)
+        assert res.error_code == ErrorCode.OK
+    
+    def test_select_second(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_second" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_second" + suffix,
+                            {"c1": {"type": "time"},
+                             "c2": {"type": "datetime"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_second" + suffix)
+        table_obj.insert(
+            [{"c1":"0:0:0", "c2":  "2022-05-26 21:44:33"}])
+
+        res, extra_res = table_obj.output(["second(c1)", "second(c2)"]).to_pl()
+        print(res)
+        assert res['second(c1)'][0] == 0, "The value of second(c1) should be 0"
+        assert res['second(c2)'][0] == 33, "The value of second(c2) should be 33"
+
+        res = db_obj.drop_table("test_select_second" + suffix)
+        assert res.error_code == ErrorCode.OK

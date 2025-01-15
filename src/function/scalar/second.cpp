@@ -43,6 +43,12 @@ inline bool SecondFunction::Run(DateTimeT left, BigIntT &result) {
     return true;
 }
 
+template <>
+inline bool SecondFunction::Run(TimeT left, BigIntT &result) {
+    result = TimeT::GetTimePart(left, TimeUnit::kSecond);
+    return true;
+}
+
 void RegisterSecondFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "second";
 
@@ -54,6 +60,11 @@ void RegisterSecondFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, SecondFunction>);
     function_set_ptr->AddFunction(second_datetime_function);
 
+    ScalarFunction second_time_function(func_name,
+                                  {DataType(LogicalType::kTime)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, SecondFunction>);
+    function_set_ptr->AddFunction(second_time_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }

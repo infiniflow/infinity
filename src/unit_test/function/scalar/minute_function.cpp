@@ -101,4 +101,44 @@ TEST_P(MinuteFunctionsTest, minute_func) {
             EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
         }
     }
+
+        {
+        Vector<SharedPtr<BaseExpression>> inputs;
+
+        DataType data_type(LogicalType::kTime);
+        SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
+        SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
+
+        inputs.emplace_back(col_expr_ptr);
+
+        ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
+        EXPECT_STREQ("minute(Time)->BigInt", func.ToString().c_str());
+
+        Vector<SharedPtr<DataType>> column_types;
+        column_types.emplace_back(MakeShared<DataType>(data_type));
+
+        SizeT row_count = DEFAULT_VECTOR_SIZE;
+
+        DataBlock data_block;
+        data_block.Init(column_types);
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            data_block.AppendValue(0, Value::MakeTime(static_cast<TimeT>(2 * i)));
+        }
+        data_block.Finalize();
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            Value v1 = data_block.GetValue(0, i);
+            EXPECT_EQ(v1.type_.type(), LogicalType::kTime);
+        }
+
+        SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
+        result->Initialize();
+        func.function_(data_block, result);
+
+        for (SizeT i = 0; i < row_count; ++i) {
+            Value v = result->GetValue(i);
+            EXPECT_EQ(v.type_.type(), LogicalType::kBigInt);
+        }
+    }
 }

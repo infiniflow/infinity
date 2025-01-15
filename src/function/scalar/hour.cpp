@@ -43,6 +43,12 @@ inline bool HourFunction::Run(DateTimeT left, BigIntT &result) {
     return true;
 }
 
+template <>
+inline bool HourFunction::Run(TimeT left, BigIntT &result) {
+    result = TimeT::GetTimePart(left, TimeUnit::kHour);
+    return true;
+}
+
 void RegisterHourFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "hour";
 
@@ -53,6 +59,12 @@ void RegisterHourFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                   {DataType(LogicalType::kBigInt)},
                                   &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, HourFunction>);
     function_set_ptr->AddFunction(hour_datetime_function);
+
+    ScalarFunction hour_time_function(func_name,
+                                  {DataType(LogicalType::kTime)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<TimeT, BigIntT, HourFunction>);
+    function_set_ptr->AddFunction(hour_time_function);
 
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

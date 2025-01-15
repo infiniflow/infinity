@@ -1,0 +1,44 @@
+statement ok
+DROP TABLE IF EXISTS test_datetime;
+
+statement ok
+CREATE TABLE test_datetime (i INTEGER, d1 DATE, d2 DATETIME, t1 );
+
+# insert
+
+statement ok
+INSERT INTO test_datetime VALUES (1, DATE '1970-1-1', DATETIME '5570-8-31 0:0:0', TIME '0:0:0');
+
+query I
+SELECT year(d1) FROM test_datetime;
+----
+1970
+
+query II
+SELECT month(d1) FROM test_datetime;
+----
+1
+
+query III
+SELECT day(d1) FROM test_datetime;
+----
+1
+
+query I
+SELECT hour(t1) FROM test_datetime;
+----
+0
+
+query II
+SELECT minute(t1) FROM test_datetime;
+----
+0
+
+query III
+SELECT second(t1) FROM test_datetime;
+----
+0
+
+
+statement ok
+DROP TABLE test_datetime;
