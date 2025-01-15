@@ -24,7 +24,11 @@ namespace infinity {
 
 String TxnContext::ToString() {
     std::stringstream ss;
-    ss << "Txn ID: " << txn_id_ << ", Begin TS: " << begin_ts_ << ", Commit TS: " << commit_ts_ << ", State: " << TxnState2Str(state_) << "\n";
+    ss << "Txn ID: " << txn_id_;
+    if(text_ != nullptr) {
+        ss << ", Text: " << *text_;
+    }
+    ss << ", Begin TS: " << begin_ts_ << ", Commit TS: " << commit_ts_ << ", State: " << TxnState2Str(state_) << "\n";
     for (const auto &operation : operations_) {
         ss << *operation << "\n";
     }

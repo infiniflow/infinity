@@ -449,14 +449,16 @@ void PhysicalShow::Init() {
             break;
         }
         case ShowStmtType::kTransactionHistory: {
-            output_names_->reserve(6);
-            output_types_->reserve(6);
+            output_names_->reserve(7);
+            output_types_->reserve(7);
             output_names_->emplace_back("txn_id");
+            output_names_->emplace_back("text");
             output_names_->emplace_back("begin_ts");
             output_names_->emplace_back("commit_ts");
             output_names_->emplace_back("state");
             output_names_->emplace_back("type");
             output_names_->emplace_back("operations");
+            output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(varchar_type);
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(bigint_type);
@@ -5880,6 +5882,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{
         varchar_type,
+        varchar_type,
         bigint_type,
         bigint_type,
         varchar_type,
@@ -5909,31 +5912,42 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
         }
 
         {
+            // txn id
+            String txn_text;
+            if(txn_context->text_.get() != nullptr) {
+                txn_text = *txn_context->text_;
+            }
+            Value value = Value::MakeVarchar(txn_text);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
             // txn begin_ts
             Value value = Value::MakeBigInt(txn_context->begin_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
 
         {
             // txn commit_ts
             Value value = Value::MakeBigInt(txn_context->commit_ts_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }
 
         {
             // txn state
             Value value = Value::MakeVarchar(TxnState2Str(txn_context->state_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
 
         {
             // txn type
             Value value = Value::MakeVarchar(TxnType2Str(txn_context->type_));
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
         }
 
         {
@@ -5945,7 +5959,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
             }
             Value value = Value::MakeVarchar(ss.str());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
         }
 
         ++row_count;

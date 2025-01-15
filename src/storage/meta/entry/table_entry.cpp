@@ -952,6 +952,9 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                                                            msg,
                                                            chunk_index_entry->base_name_,
                                                            (chunk_index_entries[0]->base_rowid_ + total_row_count).ToUint64());
+
+//                            merging text_index ft_0000000000000000_8000 ft_000000000000e000... chunk_index_entry ft_000000000000e000 base_rowid expects to be 0000000000008000@src/storage/meta/entry/table_entry.cpp:955
+
                             UnrecoverableError(error_msg);
                         }
                         base_names.push_back(chunk_index_entry->base_name_);
