@@ -179,6 +179,9 @@ UniquePtr<DataType[]> HnswLSGBuilder::GetLSAvg(Iter iter, SizeT row_count, const
 }
 
 UniquePtr<IVFIndexInChunk> HnswLSGBuilder::MakeIVFIndex() {
+    const DataType *column_type = column_def_->type().get();
+    auto *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+
     auto index_name = MakeShared<String>("tmp_index_name");
     String filename = "tmp_index_file";
     Vector<String> column_names = {column_def_->name()};
@@ -208,6 +211,10 @@ UniquePtr<IVFIndexInChunk> HnswLSGBuilder::MakeIVFIndex() {
         parameters.push_back(new InitParameter("centroids_num_ratio", std::move(sample_raito_)));
     }
     parameters.push_back(new InitParameter("storage_type", "plain"));
+    {
+        String data_type = EmbeddingT::EmbeddingDataType2String(embedding_info->Type());
+        parameters.push_back(new InitParameter("plain_storage_data_type", std::move(data_type)));
+    }
 
     SharedPtr<IndexIVF> index_ivf = IndexIVF::Make(index_name, nullptr, filename, std::move(column_names), parameters);
     UniquePtr<IVFIndexInChunk> ivf_index(IVFIndexInChunk::GetNewIVFIndexInChunk(index_ivf.get(), column_def_.get()));

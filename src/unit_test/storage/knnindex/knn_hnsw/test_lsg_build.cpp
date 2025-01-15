@@ -36,7 +36,7 @@ public:
 
 TEST_F(LSGBuildTest, test1) {
     SizeT dim = 128;
-    int element_size = 100;
+    int element_size = 1000;
     auto data = MakeUnique<float[]>(dim * element_size);
 
     std::mt19937 rng;
@@ -61,6 +61,7 @@ TEST_F(LSGBuildTest, test1) {
     auto column_def = MakeShared<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
 
     LSGConfig lsg_config;
+    lsg_config.sample_raito_ = 0.1;
 
     [[maybe_unused]] HnswLSGBuilder lsg_builder(index_hnsw.get(), column_def, std::move(lsg_config));
 
