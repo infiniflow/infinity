@@ -11,7 +11,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "infinity_embedded_sdk"
-version = "0.6.0.dev1"
+version = "0.6.0.dev2"
 requires-python = ">=3.10"
 dependencies = [
     "sqlglot~=11.7.0",
@@ -22,7 +22,7 @@ dependencies = [
     "pandas~=2.2.0",
     "numpy~=1.26.0",
     "pyarrow~=17.0.0",
-    "polars~=1.9.0",
+    "polars-lts-cpu~=1.9.0",
     "openpyxl~=3.1.0",
     "requests~=2.32.0"
 ]
