@@ -130,11 +130,13 @@ protected:
                 String str = std::to_string(i * SIZE / run_num + j);
                 u32 doc_id = 34567; // i * SIZE / run_num + j;
                 u32 term_pos = i;
+                u16 doc_payload = i;
                 memcpy(buffer, str.data(), str.size());
                 buffer[str.size()] = '\0';
                 memcpy(buffer + str.size() + 1, &doc_id, sizeof(u32));
                 memcpy(buffer + str.size() + 1 + sizeof(u32), &term_pos, sizeof(u32));
-                u32 len = str.size() + 1 + sizeof(u32) + sizeof(u32);
+                memcpy(buffer + str.size() + 1 + sizeof(u32) + sizeof(u16), &doc_payload, sizeof(u16));
+                u32 len = str.size() + 1 + sizeof(u32) + sizeof(u32) + sizeof(u16);
                 fwrite(&len, sizeof(u32), 1, f);
                 fwrite(buffer, len, 1, f);
                 s += len + sizeof(u32);

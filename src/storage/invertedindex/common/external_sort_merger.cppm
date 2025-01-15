@@ -59,6 +59,7 @@ export struct TermTuple {
     std::string_view term_;
     u32 doc_id_;
     u32 term_pos_;
+    u16 doc_payload_;
     int Compare(const TermTuple &rhs) const {
         int ret = term_.compare(rhs.term_);
 
@@ -88,9 +89,10 @@ export struct TermTuple {
 
     bool operator<(const TermTuple &other) const { return Compare(other) < 0; }
 
-    TermTuple(char *p, u32 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - 1) {
+    TermTuple(char *p, u32 len) : term_(p, len - sizeof(doc_id_) - sizeof(term_pos_) - sizeof(doc_payload_) - 1) {
         doc_id_ = *((u32 *)(p + term_.size() + 1));
         term_pos_ = *((u32 *)(p + term_.size() + 1 + sizeof(doc_id_)));
+        doc_payload_ = *((u16 *)(p + term_.size() + 1 + sizeof(doc_id_) + sizeof(term_pos_)));
     }
 };
 
@@ -102,13 +104,13 @@ export struct TermTupleList {
 
     bool IsFull() { return doc_pos_list_.size() >= max_tuple_num_; }
 
-    void Add(u32 doc_id, u32 term_pos) { doc_pos_list_.emplace_back(doc_id, term_pos); }
+    void Add(u32 doc_id, u32 term_pos, u16 doc_payload) { doc_pos_list_.emplace_back(doc_id, term_pos, doc_payload); }
 
     SizeT Size() const { return doc_pos_list_.size(); }
 
     String term_;
-    // <doc_id, term_pos>
-    Vector<Pair<u32, u32>> doc_pos_list_;
+    // <doc_id, term_pos, doc_payload>
+    Vector<Tuple<u32, u32, u16>> doc_pos_list_;
     u32 max_tuple_num_{0};
 };
 
