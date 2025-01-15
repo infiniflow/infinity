@@ -37,7 +37,6 @@ import isinf;
 import isfinite;
 import and_func;
 import divide;
-import day;
 import equals;
 import extract;
 import greater;
@@ -49,7 +48,12 @@ import like;
 import minus;
 import modulo;
 import multiply;
+import year;
 import month;
+import day;
+import hour;
+import minute;
+import second;
 import not_func;
 import or_func;
 import plus;
@@ -66,7 +70,6 @@ import ltrim;
 import rtrim;
 import trim;
 import position;
-import year;
 import default_values;
 import special_function;
 import internal_types;
@@ -156,6 +159,9 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterYearFunction(catalog_ptr_);
     RegisterMonthFunction(catalog_ptr_);
     RegisterDayFunction(catalog_ptr_);
+    RegisterHourFunction(catalog_ptr_);
+    RegisterMinuteFunction(catalog_ptr_);
+    RegisterSecondFunction(catalog_ptr_);
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}
