@@ -35,6 +35,7 @@ import internal_types;
 import data_type;
 import embedding_info;
 import sparse_info;
+import array_info;
 import constant_expr;
 import logger;
 import column_def;
@@ -226,7 +227,7 @@ public:
     Value GetValue(SizeT index) const;
 
     // Set the <index> element of the vector to the specified value.
-    void SetValue(SizeT index, const Value &Value);
+    void SetValue(SizeT index, const Value &value);
 
     void Finalize(SizeT index);
 
@@ -282,6 +283,8 @@ public:
     static Vector<Pair<Span<const char>, SizeT>>
     GetTensorArray(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info);
 
+    static Pair<Span<const char>, SizeT> GetArray(const ArrayT &src_array, const VectorBuffer *src_buffer, const ArrayInfo *array_info);
+
     Pair<Span<const char>, SizeT> GetMultiVectorRaw(SizeT idx) const;
 
     Pair<Span<const char>, SizeT> GetTensorRaw(SizeT idx) const;
@@ -289,6 +292,10 @@ public:
     Vector<Pair<Span<const char>, SizeT>> GetTensorArrayRaw(SizeT idx) const;
 
 private:
+    Value GetArrayValueRecursively(const DataType &data_type, const char *data_ptr) const;
+
+    void SetArrayValueRecursively(const Value &value, char *dst_ptr);
+
     template <typename T>
     static void CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count);
 
@@ -604,6 +611,12 @@ void CopySparse(SparseT &dst_sparse,
                 const VectorBuffer *src_vec_buffer,
                 const SparseInfo *sparse_info);
 
+void CopyArray(ArrayT &dst_array,
+               VectorBuffer *dst_vec_buffer,
+               const ArrayT &src_array,
+               const VectorBuffer *src_vec_buffer,
+               const ArrayInfo *array_info);
+
 template <>
 void ColumnVector::CopyValue<BooleanT>(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
     auto dst_tail = dst.tail_index_;
@@ -722,6 +735,22 @@ inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_b
         const auto *src_sparse = reinterpret_cast<const SparseT *>(src) + idx;
 
         CopySparse(*dst_sparse, dst_buf, *src_sparse, src_buf, sparse_info);
+    }
+}
+
+template <>
+inline void ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT count,
+                                            const Selection &input_select) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());
+    for (SizeT idx = 0; idx < count; ++idx) {
+        SizeT dest_idx = input_select[idx];
+        auto *dst_array = reinterpret_cast<ArrayT *>(dst) + dest_idx;
+        const auto *src_array = reinterpret_cast<const ArrayT *>(src) + idx;
+        CopyArray(*dst_array, dst_buf, *src_array, src_buf, array_info);
     }
 }
 
@@ -950,6 +979,23 @@ inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_b
     }
 }
 
+template <>
+inline void ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_buf,
+                                            VectorBuffer *__restrict dst_buf,
+                                            SizeT source_start_idx,
+                                            SizeT dest_start_idx,
+                                            SizeT count) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());
+    SizeT source_end_idx = source_start_idx + count;
+    for (SizeT idx = source_start_idx, dst_idx = dest_start_idx; idx < source_end_idx; ++idx, ++dst_idx) {
+        const auto *src_array = reinterpret_cast<const ArrayT *>(src) + idx;
+        auto *dst_array = reinterpret_cast<ArrayT *>(dst) + dst_idx;
+        CopyArray(*dst_array, dst_buf, *src_array, src_buf, array_info);
+    }
+}
+
 #if 0
 template <>
 inline void ColumnVector::CopyFrom<PathT>(const VectorBuffer *__restrict src_buf,
@@ -1139,6 +1185,17 @@ ColumnVector::CopyRowFrom<SparseT>(const VectorBuffer *__restrict src_buf, SizeT
     auto *dst_sparse = reinterpret_cast<SparseT *>(dst) + dst_idx;
 
     CopySparse(*dst_sparse, dst_buf, *src_sparse, src_buf, sparse_info);
+}
+
+template <>
+inline void
+ColumnVector::CopyRowFrom<ArrayT>(const VectorBuffer *__restrict src_buf, SizeT src_idx, VectorBuffer *__restrict dst_buf, SizeT dst_idx) {
+    const_ptr_t src = src_buf->GetData();
+    ptr_t dst = dst_buf->GetDataMut();
+    const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());
+    const auto *src_array = reinterpret_cast<const ArrayT *>(src) + src_idx;
+    auto *dst_array = reinterpret_cast<ArrayT *>(dst) + dst_idx;
+    CopyArray(*dst_array, dst_buf, *src_array, src_buf, array_info);
 }
 
 #if 0
