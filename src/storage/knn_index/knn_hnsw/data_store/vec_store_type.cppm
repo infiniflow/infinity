@@ -50,7 +50,7 @@ public:
     using QueryVecType = const DataType *;
     using StoreType = typename Meta<true>::StoreType;
     using QueryType = typename Meta<true>::QueryType;
-    using Distance = std::conditional_t<LSG, PlainL2LSGDist<DataType>, PlainCosDist<DataType>>;
+    using Distance = std::conditional_t<LSG, PlainCosLSGDist<DataType>, PlainCosDist<DataType>>;
 
     static constexpr bool HasOptimize = false;
 

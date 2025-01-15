@@ -105,6 +105,8 @@ private:
 export template <typename DataType, bool CheckTS = true>
 class OneColumnIterator {
 public:
+    using ValueType = const DataType *;
+
     OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts)
         : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts) {}
 
@@ -126,6 +128,8 @@ private:
 export template <typename DataType, bool CheckTS>
 class CappedOneColumnIterator : public OneColumnIterator<DataType, CheckTS> {
 public:
+    using ValueType = const DataType *;
+
     CappedOneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT cap)
         : OneColumnIterator<DataType, CheckTS>(entry, buffer_mgr, column_id, iterate_ts), cap_(cap) {}
 
@@ -143,6 +147,8 @@ private:
 export template <typename ElementT, bool CheckTS>
 class OneColumnIterator<MultiVectorRef<ElementT>, CheckTS> {
 public:
+    using ValueType = const ElementT *;
+
     OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT ele_size)
         : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts), ele_size_(ele_size) {}
 
@@ -178,6 +184,8 @@ private:
 export template <typename DataType, typename IdxType, bool CheckTS>
 class OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> {
 public:
+    using ValueType = SparseVecRef<DataType, IdxType>;
+
     OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts)
         : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts) {}
 
@@ -209,6 +217,8 @@ private:
 export template <typename DataType, typename IdxType, bool CheckTS>
 class CappedOneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> : public OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> {
 public:
+    using ValueType = SparseVecRef<DataType, IdxType>;
+
     CappedOneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT cap)
         : OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS>(entry, buffer_mgr, column_id, iterate_ts), cap_(cap) {}
 

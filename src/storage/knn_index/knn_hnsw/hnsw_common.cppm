@@ -38,6 +38,7 @@ export using LayerSize = i32;
 
 export template <typename Iterator, typename RtnType, typename LabelType>
 concept DataIteratorConcept = requires(Iterator iter) {
+    typename Iterator::ValueType;
     { iter.Next() } -> std::same_as<Optional<Pair<RtnType, LabelType>>>;
 };
 
@@ -49,6 +50,8 @@ class DenseVectorIter {
     LabelType label_;
 
 public:
+    using ValueType = const DataType *;
+
     DenseVectorIter(const DataType *ptr, SizeT dim, SizeT vec_num, LabelType offset = 0)
         : ptr_(ptr), dim_(dim), ptr_end_(ptr_ + dim * vec_num), label_(offset) {}
 
@@ -71,6 +74,8 @@ class SparseVectorIter {
     LabelType label_;
 
 public:
+    using ValueType = SparseVecRef<DataType, IdxType>;
+
     SparseVectorIter(const i64 *indptr, const IdxType *indice, const DataType *data, i32 vec_num, LabelType offset = 0)
         : indptr_(indptr), indice_(indice), data_(data), indptr_end_(indptr_ + vec_num + 1), label_(offset) {}
 

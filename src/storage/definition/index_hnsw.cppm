@@ -37,6 +37,16 @@ export String HnswEncodeTypeToString(HnswEncodeType encode_type);
 
 export HnswEncodeType StringToHnswEncodeType(const String &str);
 
+export enum class HnswBuildType {
+    kPlain,
+    kLSG,
+    kInvalid,
+};
+
+export String HnswBuildTypeToString(HnswBuildType build_type);
+
+export HnswBuildType StringToHnswBuildType(const String &str);
+
 export class IndexHnsw final : public IndexBase {
 public:
     static SharedPtr<IndexBase> Make(SharedPtr<String> index_name,
@@ -51,11 +61,12 @@ public:
               Vector<String> column_names,
               MetricType metric_type,
               HnswEncodeType encode_type,
+              HnswBuildType build_type,
               SizeT M,
               SizeT ef_construction,
               SizeT block_size)
         : IndexBase(IndexType::kHnsw, index_name, index_comment, file_name, std::move(column_names)), metric_type_(metric_type),
-          encode_type_(encode_type), M_(M), ef_construction_(ef_construction), block_size_(block_size) {}
+          encode_type_(encode_type), build_type_(build_type), M_(M), ef_construction_(ef_construction), block_size_(block_size) {}
 
     ~IndexHnsw() final = default;
 
@@ -81,6 +92,7 @@ public:
 public:
     const MetricType metric_type_{MetricType::kInvalid};
     HnswEncodeType encode_type_{HnswEncodeType::kInvalid};
+    HnswBuildType build_type_{HnswBuildType::kInvalid};
     const SizeT M_{};
     const SizeT ef_construction_{};
     const SizeT block_size_{};

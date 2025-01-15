@@ -51,10 +51,12 @@ TEST_F(LSGBuildTest, test1) {
     Vector<String> column_names = {"col_name"};
     MetricType metric_type = MetricType::kMetricL2;
     HnswEncodeType encode_type = HnswEncodeType::kPlain;
+    HnswBuildType build_type = HnswBuildType::kLSG;
     SizeT M = 8;
     SizeT ef_construction = 200;
-    SizeT block_size = 8192;
-    auto index_hnsw = MakeUnique<IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, M, ef_construction, block_size);
+    SizeT block_size = 128;
+    auto index_hnsw =
+        MakeUnique<IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size);
 
     auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, dim);
     auto data_type = MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo);
@@ -63,8 +65,9 @@ TEST_F(LSGBuildTest, test1) {
     LSGConfig lsg_config;
     lsg_config.sample_raito_ = 0.1;
 
-    [[maybe_unused]] HnswLSGBuilder lsg_builder(index_hnsw.get(), column_def, std::move(lsg_config));
+    HnswLSGBuilder lsg_builder(index_hnsw.get(), column_def, std::move(lsg_config));
 
-    auto iter = DenseVectorIter<f32, i32>(data.get(), dim, element_size);
-    UniquePtr<HnswIndexInMem> hnsw_index = lsg_builder.Make(std::move(iter), element_size, RowID(0, 0));
+    auto iter = DenseVectorIter<f32, u32>(data.get(), dim, element_size);
+
+    [[maybe_unused]] auto hnsw_index = lsg_builder.MakeImplIter<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0), false);
 }

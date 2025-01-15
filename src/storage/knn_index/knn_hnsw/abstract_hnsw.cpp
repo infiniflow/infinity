@@ -56,6 +56,30 @@ UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id,
     return memidx;
 }
 
+void HnswIndexInMem::SetSegmentEntry(SegmentIndexEntry *segment_index_entry) {
+    segment_index_entry_ = segment_index_entry;
+    begin_row_id_ = RowID(segment_index_entry->segment_id(), 0);
+}
+
+UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(const IndexBase *index_base, const ColumnDef *column_def, bool trace) {
+    RowID begin_row_id{0, 0};
+    auto memidx = MakeUnique<HnswIndexInMem>(begin_row_id, index_base, column_def, nullptr, trace);
+    if (trace) {
+        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+        std::visit(
+            [&](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                    if (index != nullptr) {
+                        memindex_tracer->IncreaseMemoryUsage(index->mem_usage());
+                    }
+                }
+            },
+            memidx->hnsw_);
+    }
+    return memidx;
+}
+
 HnswIndexInMem::HnswIndexInMem(RowID begin_row_id,
                                const IndexBase *index_base,
                                const ColumnDef *column_def,
@@ -85,6 +109,110 @@ HnswIndexInMem::HnswIndexInMem(RowID begin_row_id,
             }
         },
         hnsw_);
+}
+
+template <typename DataType, bool OwnMem>
+AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
+    switch (index_hnsw->encode_type_) {
+        case HnswEncodeType::kPlain: {
+            if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                if constexpr (!OwnMem) {
+                    return nullptr;
+                }
+                switch (index_hnsw->metric_type_) {
+                    case MetricType::kMetricL2: {
+                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType, true>, SegmentOffset, true>;
+                        return static_cast<HnswIndex *>(nullptr);
+                    }
+                    case MetricType::kMetricInnerProduct: {
+                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType, true>, SegmentOffset, true>;
+                        return static_cast<HnswIndex *>(nullptr);
+                    }
+                    case MetricType::kMetricCosine: {
+                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType, true>, SegmentOffset, true>;
+                        return static_cast<HnswIndex *>(nullptr);
+                    }
+                    default: {
+                        return nullptr;
+                    }
+                }
+            } else if (index_hnsw->build_type_ != HnswBuildType::kPlain) {
+                return nullptr;
+            }
+            switch (index_hnsw->metric_type_) {
+                case MetricType::kMetricL2: {
+                    using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset, OwnMem>;
+                    return static_cast<HnswIndex *>(nullptr);
+                }
+                case MetricType::kMetricInnerProduct: {
+                    using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                    return static_cast<HnswIndex *>(nullptr);
+                }
+                case MetricType::kMetricCosine: {
+                    using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset, OwnMem>;
+                    return static_cast<HnswIndex *>(nullptr);
+                }
+                default: {
+                    return nullptr;
+                }
+            }
+        }
+        case HnswEncodeType::kLVQ: {
+            if constexpr (std::is_same_v<DataType, u8> || std::is_same_v<DataType, i8>) {
+                return nullptr;
+            } else if (index_hnsw->build_type_ == HnswBuildType::kPlain) {
+                switch (index_hnsw->metric_type_) {
+                    case MetricType::kMetricL2: {
+                        using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
+                        return static_cast<HnswIndex *>(nullptr);
+                    }
+                    case MetricType::kMetricInnerProduct: {
+                        using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
+                        return static_cast<HnswIndex *>(nullptr);
+                    }
+                    case MetricType::kMetricCosine: {
+                        using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset, OwnMem>;
+                        return static_cast<HnswIndex *>(nullptr);
+                    }
+                    default: {
+                        return nullptr;
+                    }
+                }
+            }
+        }
+        default: {
+            return nullptr;
+        }
+    }
+}
+
+template <bool OwnMem>
+AbstractHnsw InitAbstractIndexT(const IndexBase *index_base, const ColumnDef *column_def) {
+    const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+
+    switch (embedding_info->Type()) {
+        case EmbeddingDataType::kElemFloat: {
+            return InitAbstractIndexT<float, OwnMem>(index_hnsw);
+        }
+        case EmbeddingDataType::kElemUInt8: {
+            return InitAbstractIndexT<u8, OwnMem>(index_hnsw);
+        }
+        case EmbeddingDataType::kElemInt8: {
+            return InitAbstractIndexT<i8, OwnMem>(index_hnsw);
+        }
+        default: {
+            return nullptr;
+        }
+    }
+}
+
+AbstractHnsw HnswIndexInMem::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def, bool own_mem) {
+    if (own_mem) {
+        return InitAbstractIndexT<true>(index_base, column_def);
+    } else {
+        return InitAbstractIndexT<false>(index_base, column_def);
+    }
 }
 
 HnswIndexInMem::~HnswIndexInMem() {
@@ -144,7 +272,11 @@ void HnswIndexInMem::InsertVecs(SizeT block_offset,
                             break;
                         }
                         case LogicalType::kMultiVector: {
-                            MemIndexInserterIter<MultiVectorRef<DataType>> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+                            MemIndexInserterIter<MultiVectorRef<DataType>> iter(block_offset,
+                                                                                block_column_entry,
+                                                                                buffer_manager,
+                                                                                row_offset,
+                                                                                row_count);
                             InsertVecs(index, std::move(iter), config, mem_usage);
                             break;
                         }
@@ -208,6 +340,22 @@ void HnswIndexInMem::InsertVecs(const SegmentEntry *segment_entry,
                         }
                     }
                     this->IncreaseMemoryUsageBase(mem_usage);
+                }
+            }
+        },
+        hnsw_);
+}
+
+void HnswIndexInMem::SetLSGParam(float alpha, UniquePtr<float[]> avg) {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::LSG) {
+                    index->distance().SetLSGParam(alpha, std::move(avg));
+                } else {
+                    UnrecoverableError("Invalid index type.");
                 }
             }
         },

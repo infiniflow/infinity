@@ -14,6 +14,12 @@
 
 module;
 
+namespace infinity {
+struct SegmentEntry;
+class ColumnDef;
+struct RowID;
+} // namespace infinity
+
 export module hnsw_lsg_builder;
 
 import stl;
@@ -21,14 +27,11 @@ import stl;
 namespace infinity {
 
 struct HnswIndexInMem;
-struct SegmentEntry;
-class ColumnDef;
 class IndexHnsw;
 class BufferManager;
 struct IVF_Search_Params;
 class KnnDistanceBase1;
 class IVFIndexInChunk;
-struct RowID;
 
 export struct LSGConfig {
     float sample_raito_ = 0.01;
@@ -42,24 +45,24 @@ public:
 
     ~HnswLSGBuilder();
 
-    UniquePtr<HnswIndexInMem> Make(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr);
+    UniquePtr<HnswIndexInMem> Make(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace = true);
 
-    template <typename Iter>
-    UniquePtr<HnswIndexInMem> Make(Iter iter, SizeT row_count, const RowID &base_row_id);
+    template <typename Iter, typename DataType, typename DistanceDataType>
+    UniquePtr<HnswIndexInMem> MakeImplIter(Iter iter, SizeT row_count, const RowID &base_row_id, bool trace);
 
 private:
-    template <typename Iter, typename DataType, typename DistanceDataType>
-    UniquePtr<HnswIndexInMem> MakeImpl(Iter iter, SizeT row_count, const RowID &base_row_id);
+    template <typename DataType, typename DistanceDataType>
+    UniquePtr<HnswIndexInMem> MakeImpl(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace);
 
     template <typename Iter, typename DataType, typename DistanceDataType>
-    UniquePtr<DataType[]> GetLSAvg(Iter iter, SizeT row_count, const RowID &base_row_id);
+    UniquePtr<float[]> GetLSAvg(Iter iter, SizeT row_count, const RowID &base_row_id);
 
     UniquePtr<IVFIndexInChunk> MakeIVFIndex();
 
     IVF_Search_Params MakeIVFSearchParams() const;
 
     template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
-    UniquePtr<DataType[]> GetAvgByIVF(Iter iter, SizeT row_count, const IVFIndexInChunk *ivf_index);
+    UniquePtr<float[]> GetAvgByIVF(Iter iter, SizeT row_count, const IVFIndexInChunk *ivf_index);
 
 private:
     const IndexHnsw *index_hnsw_ = nullptr;

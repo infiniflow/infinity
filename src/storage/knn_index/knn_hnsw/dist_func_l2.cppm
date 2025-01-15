@@ -41,6 +41,7 @@ public:
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
     using DistanceType = typename VecStoreMeta::DistanceType;
+    using LVQDist = LVQL2Dist<DataType, i8>;
 
 private:
     using SIMDFuncType = std::conditional_t<std::is_same_v<DataType, float>, f32, i32> (*)(const DataType *, const DataType *, SizeT);
@@ -98,7 +99,7 @@ public:
         return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
-    LVQL2Dist<DataType, i8> ToLVQDistance(SizeT dim) &&;
+    LVQDist ToLVQDistance(SizeT dim) &&;
 
 private:
     DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim) const { return SIMDFunc(v1, v2, dim); }

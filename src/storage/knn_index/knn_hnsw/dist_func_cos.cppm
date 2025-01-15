@@ -28,6 +28,9 @@ export module dist_func_cos;
 
 namespace infinity {
 
+template <typename Dist, typename VecStoreMeta>
+class LSGDistWrapper;
+
 export template <typename DataType, typename CompressType>
 class LVQCosDist;
 
@@ -37,6 +40,7 @@ public:
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
     using DistanceType = typename VecStoreMeta::DistanceType;
+    using LVQDist = LVQCosDist<DataType, i8>;
 
 private:
     using SIMDFuncType = f32 (*)(const DataType *, const DataType *, SizeT);
@@ -78,10 +82,12 @@ public:
         return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
-    LVQCosDist<DataType, i8> ToLVQDistance(SizeT dim) &&;
+    LVQDist ToLVQDistance(SizeT dim) &&;
 
 private:
     DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim) const { return -SIMDFunc(v1, v2, dim); }
+
+    friend class LSGDistWrapper<PlainCosDist<DataType>, VecStoreMeta>;
 };
 
 export template <typename DataType, typename CompressType>

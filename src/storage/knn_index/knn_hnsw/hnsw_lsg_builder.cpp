@@ -41,6 +41,7 @@ import knn_result_handler;
 import logical_type;
 import embedding_info;
 import hnsw_common;
+import status;
 
 namespace infinity {
 
@@ -87,6 +88,9 @@ private:
 
 HnswLSGBuilder::HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef> column_def, LSGConfig lsg_config)
     : index_hnsw_(index_hnsw), column_def_(column_def), lsg_config_(std::move(lsg_config)) {
+    if (index_hnsw_->build_type_ != HnswBuildType::kLSG) {
+        RecoverableError(Status::NotSupport("Only support LSG build type"));
+    }
     const DataType *column_type = column_def_->type().get();
     if (column_type->type() != LogicalType::kEmbedding) {
         UnrecoverableError("Invalid column type");
@@ -110,52 +114,42 @@ HnswLSGBuilder::HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef>
 HnswLSGBuilder::~HnswLSGBuilder() = default;
 
 UniquePtr<HnswIndexInMem>
-HnswLSGBuilder::Make(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr) {
+HnswLSGBuilder::Make(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace) {
+    const DataType *column_type = column_def_->type().get();
+    auto *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+    switch (embedding_info->Type()) {
+        case EmbeddingDataType::kElemFloat:
+            return MakeImpl<float, float>(segment_entry, column_id, begin_ts, check_ts, buffer_mgr, trace);
+        case EmbeddingDataType::kElemDouble:
+            return MakeImpl<double, float>(segment_entry, column_id, begin_ts, check_ts, buffer_mgr, trace);
+        default:
+            UnrecoverableError("Invalid embedding data type");
+            return nullptr;
+    }
+}
+
+template <typename DataType, typename DistanceDataType>
+UniquePtr<HnswIndexInMem>
+HnswLSGBuilder::MakeImpl(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace) {
     OneColumnIterator<DataType> iter(segment_entry, buffer_mgr, column_id, begin_ts);
     SizeT row_count = segment_entry->row_count();
     RowID base_row_id(segment_entry->segment_id(), 0);
-    return Make(std::move(iter), row_count, base_row_id);
-}
-
-template <typename Iter>
-UniquePtr<HnswIndexInMem> HnswLSGBuilder::Make(Iter iter, SizeT row_count, const RowID &base_row_id) {
-    const DataType *column_type = column_def_->type().get();
-    auto *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    switch (embedding_info->Type()) {
-        case EmbeddingDataType::kElemFloat:
-            return MakeImpl<Iter, float, float>(std::move(iter), row_count, base_row_id);
-        case EmbeddingDataType::kElemDouble:
-            return MakeImpl<Iter, double, float>(std::move(iter), row_count, base_row_id);
-        default:
-            UnrecoverableError("Invalid embedding data type");
-            return nullptr;
-    }
-}
-
-template <>
-UniquePtr<HnswIndexInMem> HnswLSGBuilder::Make<DenseVectorIter<f32, i32>>(DenseVectorIter<f32, i32> iter, SizeT row_count, const RowID &base_row_id) {
-    const DataType *column_type = column_def_->type().get();
-    auto *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    switch (embedding_info->Type()) {
-        case EmbeddingDataType::kElemFloat:
-            return MakeImpl<DenseVectorIter<f32, i32>, float, float>(std::move(iter), row_count, base_row_id);
-        case EmbeddingDataType::kElemDouble:
-            return MakeImpl<DenseVectorIter<f32, i32>, double, float>(std::move(iter), row_count, base_row_id);
-        default:
-            UnrecoverableError("Invalid embedding data type");
-            return nullptr;
-    }
+    return MakeImplIter<decltype(iter), DataType, DistanceDataType>(std::move(iter), row_count, base_row_id, trace);
 }
 
 template <typename Iter, typename DataType, typename DistanceDataType>
-UniquePtr<HnswIndexInMem> HnswLSGBuilder::MakeImpl(Iter iter, SizeT row_count, const RowID &base_row_id) {
-    [[maybe_unused]] Iter iter_copy = iter;
-    [[maybe_unused]] auto avg = GetLSAvg<Iter, DataType, DistanceDataType>(iter, row_count, base_row_id);
-    return nullptr;
+UniquePtr<HnswIndexInMem> HnswLSGBuilder::MakeImplIter(Iter iter, SizeT row_count, const RowID &base_row_id, bool trace) {
+    Iter iter_copy = iter;
+    auto avg = GetLSAvg<Iter, DataType, DistanceDataType>(std::move(iter_copy), row_count, base_row_id);
+    auto hnsw_index = HnswIndexInMem::Make(index_hnsw_, column_def_.get(), trace);
+    float alpha = lsg_config_.alpha_;
+    hnsw_index->SetLSGParam(alpha, std::move(avg));
+    hnsw_index->InsertVecs(std::move(iter), kDefaultHnswInsertConfig, false);
+    return hnsw_index;
 }
 
 template <typename Iter, typename DataType, typename DistanceDataType>
-UniquePtr<DataType[]> HnswLSGBuilder::GetLSAvg(Iter iter, SizeT row_count, const RowID &base_row_id) {
+UniquePtr<float[]> HnswLSGBuilder::GetLSAvg(Iter iter, SizeT row_count, const RowID &base_row_id) {
     auto ivf_index = MakeIVFIndex();
     {
         IterIVFDataAccessor iter_accessor;
@@ -164,7 +158,7 @@ UniquePtr<DataType[]> HnswLSGBuilder::GetLSAvg(Iter iter, SizeT row_count, const
         ivf_index->BuildIVFIndex(base_row_id, row_count, &iter_accessor, column_def_);
     }
 
-    UniquePtr<DataType[]> avg;
+    UniquePtr<float[]> avg;
     switch (index_hnsw_->metric_type_) {
         case MetricType::kMetricL2:
             avg = GetAvgByIVF<Iter, DataType, CompareMax, DistanceDataType>(std::move(iter), row_count, ivf_index.get());
@@ -243,8 +237,8 @@ IVF_Search_Params HnswLSGBuilder::MakeIVFSearchParams() const {
 }
 
 template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
-UniquePtr<DataType[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count, const IVFIndexInChunk *ivf_index) {
-    auto avg = MakeUnique<DataType[]>(row_count);
+UniquePtr<float[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count, const IVFIndexInChunk *ivf_index) {
+    auto avg = MakeUnique<float[]>(row_count);
 
     IVF_Search_Params ivf_search_params = MakeIVFSearchParams();
 
@@ -268,5 +262,10 @@ UniquePtr<DataType[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count, co
     }
     return avg;
 }
+
+template UniquePtr<HnswIndexInMem> HnswLSGBuilder::MakeImplIter<DenseVectorIter<f32, u32>, f32, f32>(DenseVectorIter<f32, u32> iter,
+                                                                                                     SizeT row_count,
+                                                                                                     const RowID &base_row_id,
+                                                                                                     bool trace);
 
 } // namespace infinity

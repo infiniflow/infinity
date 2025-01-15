@@ -31,6 +31,7 @@ public:
     using StoreType = typename VecStoreMeta::StoreType;
     using DistanceType = typename VecStoreMeta::DistanceType;
     using LSG = void;
+    using LVQDist = typename Dist::LVQDist;
 
     LSGDistWrapper() = default;
     LSGDistWrapper(LSGDistWrapper &&other) : avg_(std::exchange(other.avg_, nullptr)), alpha_(other.alpha_), dist_(std::move(other.dist_)) {}
@@ -60,6 +61,8 @@ public:
         alpha_ = alpha;
         avg_ = std::move(avg);
     }
+
+    LVQDist ToLVQDistance(SizeT dim) && { return std::move(dist_).ToLVQDistance(dim); }
 
 private:
     DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim, float gt1, float gt2) const {
