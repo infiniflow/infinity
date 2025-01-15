@@ -46,7 +46,7 @@ inline bool MonthFunction::Run(DateT left, BigIntT &result) {
 
 template <>
 inline bool MonthFunction::Run(DateTimeT left, BigIntT &result) {
-    result = DateT::GetDateTimePart(left, TimeUnit::kMonth);
+    result = DateTimeT::GetDateTimePart(left, TimeUnit::kMonth);
     return true;
 }
 

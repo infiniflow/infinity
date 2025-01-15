@@ -45,7 +45,7 @@ inline bool DayFunction::Run(DateT left, BigIntT &result) {
 
 template <>
 inline bool DayFunction::Run(DateTimeT left, BigIntT &result) {
-    result = DateT::GetDateTimePart(left, TimeUnit::kDay);
+    result = DateTimeT::GetDateTimePart(left, TimeUnit::kDay);
     return true;
 }
 

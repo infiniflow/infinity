@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module;
-module minute;
+module second;
 import stl;
 import catalog;
 import status;
@@ -27,7 +27,7 @@ import column_vector;
 
 namespace infinity {
 
-struct MinuteFunction {
+struct SecondFunction {
     template <typename TA, typename TB>
     static inline bool Run(TA left, TB &result) {
         Status status = Status::NotSupport("Not implemented");
@@ -38,21 +38,21 @@ struct MinuteFunction {
 };
 
 template <>
-inline bool MinuteFunction::Run(DateTimeT left, BigIntT &result) {
-    result = DateT::GetDateTimePart(left, TimeUnit::kMinute);
+inline bool SecondFunction::Run(DateTimeT left, BigIntT &result) {
+    result = DateTimeT::GetDateTimePart(left, TimeUnit::kSecond);
     return true;
 }
 
-void RegisterMinuteFunction(const UniquePtr<Catalog> &catalog_ptr) {
-    String func_name = "minute";
+void RegisterSecondFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    String func_name = "second";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    ScalarFunction minute_datetime_function(func_name,
+    ScalarFunction second_datetime_function(func_name,
                                   {DataType(LogicalType::kDateTime)},
                                   {DataType(LogicalType::kBigInt)},
-                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, MinuteFunction>);
-    function_set_ptr->AddFunction(minute_datetime_function);
+                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, SecondFunction>);
+    function_set_ptr->AddFunction(second_datetime_function);
 
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

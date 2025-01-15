@@ -14,7 +14,6 @@
 
 
 #include "gtest/gtest.h"
-#include <string_view>
 
 import stl;
 import base_test;

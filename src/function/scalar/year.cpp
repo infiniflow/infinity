@@ -45,7 +45,7 @@ inline bool YearFunction::Run(DateT left, BigIntT &result) {
 
 template <>
 inline bool YearFunction::Run(DateTimeT left, BigIntT &result) {
-    result = DatetimeT::GetDateTimePart(left, TimeUnit::kYear);
+    result = DateTimeT::GetDateTimePart(left, TimeUnit::kYear);
     return true;
 }
 

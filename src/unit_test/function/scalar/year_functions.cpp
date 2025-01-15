@@ -14,7 +14,6 @@
 
 
 #include "gtest/gtest.h"
-#include <string_view>
 
 import stl;
 import base_test;
@@ -87,7 +86,7 @@ TEST_P(YearFunctionsTest, year_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeDare(static_cast<DateT>(2 * i)));
+            data_block.AppendValue(0, Value::MakeDate(static_cast<DateT>(2 * i)));
         }
         data_block.Finalize();
 

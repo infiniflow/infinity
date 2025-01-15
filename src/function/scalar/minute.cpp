@@ -39,7 +39,7 @@ struct MinuteFunction {
 
 template <>
 inline bool MinuteFunction::Run(DateTimeT left, BigIntT &result) {
-    result = DateT::GetDateTimePart(left, TimeUnit::kMinute);
+    result = DateTimeT::GetDateTimePart(left, TimeUnit::kMinute);
     return true;
 }
 

@@ -40,23 +40,23 @@ import logical_type;
 import scalar_function;
 import scalar_function_set;
 
-import day;
+import hour;
 import third_party;
 
 using namespace infinity;
 
-class DayFunctionsTest : public BaseTestParamStr {};
+class HourFunctionsTest : public BaseTestParamStr {};
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, DayFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, HourFunctionsTest, ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH));
 
-TEST_P(DayFunctionsTest, day_func) {
+TEST_P(HourFunctionsTest, hour_func) {
     using namespace infinity;
 
     UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>();
 
-    RegisterDayFunction(catalog_ptr);
+    RegisterHourFunction(catalog_ptr);
 
-    String op = "day";
+    String op = "hour";
 
     SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
@@ -65,14 +65,14 @@ TEST_P(DayFunctionsTest, day_func) {
     {
         Vector<SharedPtr<BaseExpression>> inputs;
 
-        DataType data_type(LogicalType::kDate);
+        DataType data_type(LogicalType::kDateTime);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kBigInt);
         SharedPtr<ColumnExpression> col_expr_ptr = MakeShared<ColumnExpression>(data_type, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("day(Date)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("hour(Date)->BigInt", func.ToString().c_str());
 
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(MakeShared<DataType>(data_type));
@@ -83,13 +83,13 @@ TEST_P(DayFunctionsTest, day_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeDate(static_cast<DateT>(2 * i)));
+            data_block.AppendValue(0, Value::MakeDateTime(DateTime(i, i)));
         }
         data_block.Finalize();
 
         for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
-            EXPECT_EQ(v1.type_.type(), LogicalType::kDate);
+            EXPECT_EQ(v1.type_.type(), LogicalType::kDateTime);
         }
 
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);

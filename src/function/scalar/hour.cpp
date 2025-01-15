@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module;
-module day;
+module hour;
 import stl;
 import catalog;
 import status;
@@ -39,7 +39,7 @@ struct HourFunction {
 
 template <>
 inline bool HourFunction::Run(DateTimeT left, BigIntT &result) {
-    result = DateT::GetDateTimePart(left, TimeUnit::kHour);
+    result = DateTimeT::GetDateTimePart(left, TimeUnit::kHour);
     return true;
 }
 
