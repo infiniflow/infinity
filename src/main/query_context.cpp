@@ -426,9 +426,9 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
         Txn *new_txn = nullptr;
         // TODO: more type check and setting
         if (is_checkpoint) {
-            storage_->txn_manager()->BeginTxn(nullptr, TransactionType::kCheckpoint);
+            new_txn = storage_->txn_manager()->BeginTxn(nullptr, TransactionType::kCheckpoint);
         } else {
-            storage_->txn_manager()->BeginTxn(nullptr, TransactionType::kNormal);
+            new_txn = storage_->txn_manager()->BeginTxn(nullptr, TransactionType::kNormal);
         }
         session_ptr_->SetTxn(new_txn);
     }
