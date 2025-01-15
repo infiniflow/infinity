@@ -29,6 +29,7 @@ import hnsw_common;
 import data_store;
 import third_party;
 import serialize;
+import dist_func_lsg_wrapper;
 
 // Fixme: some variable has implicit type conversion.
 // Fixme: some variable has confusing name.
@@ -60,6 +61,8 @@ public:
     using CMP = CompareByFirst<DistanceType, VertexType>;
     using CMPReverse = CompareByFirstReverse<DistanceType, VertexType>;
     using DistHeap = Heap<PDV, CMP>;
+
+    constexpr static bool LSG = IsLSGDistance<Distance>;
 
     constexpr static int prefetch_offset_ = 0;
     constexpr static int prefetch_step_ = 2;
@@ -151,7 +154,7 @@ protected:
         data_store_.PrefetchVec(enter_point);
         // enter_point will not be added to result_handler, the distance is not used
         {
-            auto dist = distance_(query, data_store_.GetVec(enter_point), data_store_.vec_store_meta());
+            auto dist = distance_(query, enter_point, data_store_);
             candidate.emplace(-dist, enter_point);
             add_result(dist, enter_point);
         }
@@ -188,7 +191,7 @@ protected:
                     }
                     prefetch_start -= prefetch_step_;
                 }
-                auto dist = distance_(query, data_store_.GetVec(n_idx), data_store_.vec_store_meta());
+                auto dist = distance_(query, n_idx, data_store_);
                 if (result_handler.GetSize(0) < result_n || dist <= result_handler.GetDistance0(0)) {
                     candidate.emplace(-dist, n_idx);
                     add_result(dist, n_idx);
@@ -202,7 +205,7 @@ protected:
     template <bool WithLock>
     VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, i32 layer_idx) const {
         VertexType cur_p = enter_point;
-        auto cur_dist = distance_(query, data_store_.GetVec(cur_p), data_store_.vec_store_meta());
+        auto cur_dist = distance_(query, cur_p, data_store_);
         bool check = true;
         while (check) {
             check = false;
@@ -215,7 +218,7 @@ protected:
             const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(cur_p, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
-                auto n_dist = distance_(query, data_store_.GetVec(n_idx), data_store_.vec_store_meta());
+                auto n_dist = distance_(query, n_idx, data_store_);
                 if (n_dist < cur_dist) {
                     cur_p = n_idx;
                     cur_dist = n_dist;
@@ -239,11 +242,10 @@ protected:
             while (!candidates.empty() && SizeT(result_size) < M) {
                 std::pop_heap(candidates.begin(), candidates.end(), CMPReverse());
                 const auto &[c_dist, c_idx] = candidates.back();
-                StoreType c_data = data_store_.GetVec(c_idx);
                 bool check = true;
                 for (SizeT i = 0; i < SizeT(result_size); ++i) {
                     VertexType r_idx = result_p[i];
-                    auto cr_dist = distance_(c_data, data_store_.GetVec(r_idx), data_store_.vec_store_meta());
+                    auto cr_dist = distance_(c_idx, r_idx, data_store_);
                     if (cr_dist < c_dist) {
                         check = false;
                         break;
@@ -273,14 +275,13 @@ protected:
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
-            StoreType n_data = data_store_.GetVec(n_idx);
-            auto n_dist = distance_(n_data, data_store_.GetVec(vertex_i), data_store_.vec_store_meta());
+            auto n_dist = distance_(n_idx, vertex_i, data_store_);
 
             Vector<PDV> candidates;
             candidates.reserve(n_neighbor_size + 1);
             candidates.emplace_back(n_dist, vertex_i);
             for (int j = 0; j < n_neighbor_size; ++j) {
-                candidates.emplace_back(distance_(n_data, data_store_.GetVec(n_neighbors_p[j]), data_store_.vec_store_meta()), n_neighbors_p[j]);
+                candidates.emplace_back(distance_(n_idx, n_neighbors_p[j], data_store_), n_neighbors_p[j]);
             }
 
             SelectNeighborsHeuristic(std::move(candidates), Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
@@ -425,6 +426,8 @@ public:
 
     SizeT mem_usage() const { return data_store_.mem_usage(); }
 
+    Distance &distance() { return distance_; }
+
 protected:
     SizeT M_;
     SizeT ef_construction_;
@@ -485,7 +488,7 @@ public:
     }
 
     static UniquePtr<This> LoadFromPtr(LocalFileHandle &file_handle, SizeT size) {
-        auto buffer = MakeUnique<char []>(size);
+        auto buffer = MakeUnique<char[]>(size);
         file_handle.Read(buffer.get(), size);
         const char *ptr = buffer.get();
         SizeT M = ReadBufAdv<SizeT>(ptr);

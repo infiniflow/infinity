@@ -26,6 +26,9 @@ export module dist_func_l2;
 
 namespace infinity {
 
+template <typename Dist, typename VecStoreMeta>
+class LSGDistWrapper;
+
 export template <typename DataType, typename CompressType>
 class LVQL2Dist;
 
@@ -85,50 +88,22 @@ public:
         }
     }
 
-    DistanceType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
-        return SIMDFunc(v1, v2, vec_store_meta.dim());
+    template <typename DataStore>
+    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
+        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.dim());
+    }
+
+    template <typename DataStore>
+    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store) const {
+        return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
     LVQL2Dist<DataType, i8> ToLVQDistance(SizeT dim) &&;
-};
-
-export template <typename DataType>
-class PlainLSL2Dist : public PlainL2Dist<DataType> {
-public:
-    using Base = PlainL2Dist<DataType>;
-    using VecStoreMeta = PlainVecStoreMeta<DataType>;
-    using StoreType = typename VecStoreMeta::StoreType;
-    using DistanceType = typename VecStoreMeta::DistanceType;
-
-    PlainLSL2Dist() = default;
-    PlainLSL2Dist(PlainLSL2Dist &&other) : Base(std::move(other)), gt_(std::exchange(other.gt_, nullptr)), alpha_(other.alpha_) {}
-    PlainLSL2Dist &operator=(PlainLSL2Dist &&other) {
-        if (this != &other) {
-            Base::operator=(std::move(other));
-            gt_ = std::exchange(other.gt_, nullptr);
-            alpha_ = other.alpha_;
-        }
-        return *this;
-    }
-    ~PlainLSL2Dist() = default;
-
-    PlainLSL2Dist(SizeT dim, UniquePtr<DataType[]> gt, float alpha) : Base(dim), gt_(std::move(gt)), alpha_(alpha) {}
-
-    DistanceType operator()(const StoreType &v1, const StoreType &v2, VertexType v1_i, VertexType v2_i, const VecStoreMeta &vec_store_meta) const {
-        DistanceType dist = Base::operator()(v1, v2, vec_store_meta);
-        if (v1_i == v2_i) {
-            return dist;
-        }
-        if (v1_i < 0 || v2_i < 0) {
-            return dist;
-        }
-        auto k = std::pow(std::sqrt(gt_[v1_i]) * std::sqrt(gt_[v2_i]), alpha_);
-        return dist / k;
-    }
 
 private:
-    UniquePtr<DataType[]> gt_;
-    float alpha_ = 1.0;
+    DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim) const { return SIMDFunc(v1, v2, dim); }
+
+    friend class LSGDistWrapper<PlainL2Dist<DataType>, VecStoreMeta>;
 };
 
 export template <typename DataType, typename CompressType>
@@ -195,9 +170,23 @@ public:
         }
     }
 
-    template <typename VecStoreMeta>
-    DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
-        SizeT dim = vec_store_meta.dim();
+    template <typename DataStore>
+    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
+        const StoreType &v1 = data_store.GetVec(v1_i);
+        const StoreType &v2 = data_store.GetVec(v2_i);
+        SizeT dim = data_store.dim();
+        return Inner(v1, v2, dim);
+    }
+
+    template <typename DataStore>
+    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store) const {
+        const StoreType &v2 = data_store.GetVec(v2_i);
+        SizeT dim = data_store.dim();
+        return Inner(v1, v2, dim);
+    }
+
+private:
+    DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim) const {
         i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
         auto scale1 = v1->scale_;
         auto scale2 = v2->scale_;

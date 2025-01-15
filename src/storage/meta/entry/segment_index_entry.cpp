@@ -770,6 +770,8 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                                 if (params->compress_to_lvq) {
                                     if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
                                         UnrecoverableError("Invalid index type.");
+                                    } else if constexpr (IndexT::LSG) {
+                                        UnrecoverableError("Invalid index type.");
                                     } else {
                                         auto *p = std::move(*index).CompressToLVQ().release();
                                         delete index;
