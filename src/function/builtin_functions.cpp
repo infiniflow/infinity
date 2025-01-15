@@ -152,7 +152,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterTrimFunction(catalog_ptr_);
     RegisterPositionFunction(catalog_ptr_);
 
-    // date functions
+    // date and time functions
     RegisterYearFunction(catalog_ptr_);
     RegisterMonthFunction(catalog_ptr_);
     RegisterDayFunction(catalog_ptr_);
