@@ -112,7 +112,7 @@ TEST_P(DayFunctionsTest, day_func) {
         inputs.emplace_back(col_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("second(Date)->BigInt", func.ToString().c_str());
+        EXPECT_STREQ("day(DateTime)->BigInt", func.ToString().c_str());
 
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(MakeShared<DataType>(data_type));
