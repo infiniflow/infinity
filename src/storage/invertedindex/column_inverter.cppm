@@ -63,6 +63,7 @@ public:
         u32 term_num_{0};
         u32 doc_id_{0};
         u32 term_pos_{0};
+        u16 doc_payload_{0};
 
         bool operator<(const PosInfo &rhs) const {
             if (term_num_ != rhs.term_num_) {
@@ -76,6 +77,10 @@ public:
     };
 
     void SpillSortResults(FILE *spill_file, u64 &tuple_count, UniquePtr<BufWriter> &buf_writer);
+
+    void AddSema(std::binary_semaphore *sema) { semas_.push_back(sema); }
+
+    const Vector<std::binary_semaphore *> &semas() const { return semas_; }
 
 private:
     using TermBuffer = Vector<char>;
@@ -124,5 +129,6 @@ private:
     Vector<Pair<u32, UniquePtr<TermList>>> terms_per_doc_;
     PostingWriterProvider posting_writer_provider_{};
     VectorWithLock<u32> &column_lengths_;
+    Vector<std::binary_semaphore *> semas_{};
 };
 } // namespace infinity

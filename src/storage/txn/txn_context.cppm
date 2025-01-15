@@ -35,6 +35,7 @@ export struct TxnContext {
     TxnState state_{TxnState::kStarted};
     TxnType type_{TxnType::kInvalid};
 
+    SharedPtr<String> text_{};
     Vector<SharedPtr<String>> operations_;
 };
 

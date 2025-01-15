@@ -48,6 +48,12 @@ import like;
 import minus;
 import modulo;
 import multiply;
+import year;
+import month;
+import day;
+import hour;
+import minute;
+import second;
 import not_func;
 import or_func;
 import plus;
@@ -59,6 +65,7 @@ import md5;
 import lower;
 import upper;
 import regex;
+import reverse;
 import ltrim;
 import rtrim;
 import trim;
@@ -142,10 +149,19 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterLowerFunction(catalog_ptr_);
     RegisterUpperFunction(catalog_ptr_);
     RegisterRegexFunction(catalog_ptr_);
+    RegisterReverseFunction(catalog_ptr_);
     RegisterLtrimFunction(catalog_ptr_);
     RegisterRtrimFunction(catalog_ptr_);
     RegisterTrimFunction(catalog_ptr_);
     RegisterPositionFunction(catalog_ptr_);
+
+    // date and time functions
+    RegisterYearFunction(catalog_ptr_);
+    RegisterMonthFunction(catalog_ptr_);
+    RegisterDayFunction(catalog_ptr_);
+    RegisterHourFunction(catalog_ptr_);
+    RegisterMinuteFunction(catalog_ptr_);
+    RegisterSecondFunction(catalog_ptr_);
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}

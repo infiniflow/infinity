@@ -1,0 +1,37 @@
+statement ok
+DROP TABLE IF EXISTS test_truncate;
+
+statement ok
+CREATE TABLE test_truncate (c1 integer, c2 double, c3 float);
+
+# insert
+
+statement ok
+INSERT INTO test_truncate VALUES (1, 2.4, 2.4), (2, -2.4, -2.4), (3, 2.5, 2.5), (4, -2.5, -2.5);
+
+query I
+SELECT c2, trunc(c2, 12) FROM test_truncate;
+----
+2.400000 2.400000000000
+-2.400000 -2.400000000000
+2.500000 2.500000000000
+-2.500000 -2.500000000000
+
+query II
+SELECT c3, trunc(c3, 2) FROM test_truncate;
+----
+2.400000 2.40
+-2.400000 -2.40
+2.500000 2.50
+-2.500000 -2.50
+
+query III
+SELECT trunc(c2, 2) FROM test_truncate;
+----
+2.40
+-2.40
+2.50
+-2.50
+
+statement ok
+DROP TABLE test_truncate;

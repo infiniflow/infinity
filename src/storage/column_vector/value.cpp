@@ -1301,6 +1301,48 @@ void Value::Reset() {
     this->type_.Reset();
 }
 
+i64 Value::ToInteger() const {
+    switch (type_.type()) {
+        case LogicalType::kTinyInt: {
+            return value_.tiny_int;
+        }
+        case LogicalType::kSmallInt: {
+            return value_.small_int;
+        }
+        case LogicalType::kInteger: {
+            return value_.integer;
+        }
+        case LogicalType::kBigInt: {
+            return value_.big_int;
+        }
+        default: {
+            String error_message = fmt::format("Attempt to output {} as integer", type_.ToString());
+            UnrecoverableError(error_message);
+        }
+    }
+    String error_message = "Unreachable code.";
+    UnrecoverableError(error_message);
+    return -1;
+}
+
+f32 Value::ToFloat() const {
+    if(type_.type() == LogicalType::kFloat) {
+        return static_cast<f32>(value_.float32);
+    }
+    String error_message = fmt::format("Attempt to output {} as float", type_.ToString());
+    UnrecoverableError(error_message);
+    return std::numeric_limits<f32>::quiet_NaN();
+}
+
+f64 Value::ToDouble() const {
+    if(type_.type() == LogicalType::kDouble) {
+        return static_cast<f64>(value_.float64);
+    }
+    String error_message = fmt::format("Attempt to output {} as double", type_.ToString());
+    UnrecoverableError(error_message);
+    return std::numeric_limits<f64>::quiet_NaN();
+}
+
 String Value::ToString() const {
     switch (type_.type()) {
         case LogicalType::kBoolean: {

@@ -87,7 +87,7 @@ class http_network_util:
                 raise Exception(f"Cannot connect to {url} after {self.retry_time} retries")
             return response
         return self.request_inner(url, method, header, data)
-    
+
     def request_inner(self, url, method, header={}, data={}):
         match method:
             case "get":
@@ -921,10 +921,8 @@ class table_http_result:
                 if k not in df_dict:
                     df_dict[k] = ()
                 tup = df_dict[k]
-                if isinstance(res[k], str) and len(res[k]) > 0 and res[k][0] == " ":
+                if isinstance(res[k], (int, float)):
                     new_tup = tup + (res[k],)
-                elif res[k].isdigit() or is_float(res[k]):
-                    new_tup = tup + (eval(res[k]),)
                 elif is_list(res[k]):
                     new_tup = tup + (ast.literal_eval(res[k]),)
                 elif is_date(res[k]):
@@ -996,6 +994,7 @@ class table_http_result:
     def to_arrow(self):
         dataframe, extra_result = self.to_df()
         return pa.Table.from_pandas(dataframe), extra_result
+
 
 @dataclass
 class database_result():

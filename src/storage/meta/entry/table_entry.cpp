@@ -794,7 +794,7 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
     for (SizeT i = 0; i < num_ranges; i++) {
         AppendRange &range = append_ranges[i];
         SharedPtr<BlockEntry> block_entry = block_entries[i];
-        segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr());
+        segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr(), txn->txn_store());
         if ((i == dump_idx && segment_index_entry->MemIndexRowCount() >= infinity::InfinityContext::instance().config()->MemIndexCapacity()) ||
             (i == num_ranges - 1 && segment_entry->Room() <= 0)) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
@@ -925,7 +925,8 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
                                                         range.start_offset_,
                                                         range.row_count_,
                                                         segment_index_entry->max_ts(),
-                                                        buffer_manager);
+                                                        buffer_manager,
+                                                        nullptr);
                 }
                 segment_index_entry->MemIndexWaitInflightTasks();
                 message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name, segment_id);
@@ -983,6 +984,9 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                                                            msg,
                                                            chunk_index_entry->base_name_,
                                                            (chunk_index_entries[0]->base_rowid_ + total_row_count).ToUint64());
+
+//                            merging text_index ft_0000000000000000_8000 ft_000000000000e000... chunk_index_entry ft_000000000000e000 base_rowid expects to be 0000000000008000@src/storage/meta/entry/table_entry.cpp:955
+
                             UnrecoverableError(error_msg);
                         }
                         base_names.push_back(chunk_index_entry->base_name_);

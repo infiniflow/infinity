@@ -16,6 +16,7 @@
 #include "info/bitmap_info.h"
 #include "serialize.h"
 #include "spdlog/fmt/fmt.h"
+#include "type/info/array_info.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
 #include "type/info/sparse_info.h"
@@ -200,6 +201,15 @@ bool DataType::operator==(const arrow::DataType &other) const {
             }
             return false;
         }
+        case LogicalType::kArray: {
+            if (other.id() != arrow::Type::LIST) {
+                return false;
+            }
+            const auto &other_array_type = static_cast<const arrow::ListType &>(other);
+            const auto &other_array_element_type = *other_array_type.value_type();
+            auto *array_info = static_cast<const ArrayInfo *>(type_info_.get());
+            return array_info->ElemType() == other_array_element_type;
+        }
         default: {
             return false;
         }
@@ -270,22 +280,26 @@ int32_t DataType::GetSizeInBytes() const {
     int32_t size = sizeof(LogicalType);
     if (this->type_info_) {
         switch (this->type_) {
-            case LogicalType::kArray:
-                ParserError("Array isn't implemented here.");
+            case LogicalType::kArray: {
+                const auto *array_info = dynamic_cast<const ArrayInfo *>(this->type_info_.get());
+                size += array_info->ElemType().GetSizeInBytes();
                 break;
+            }
                 //            case LogicalType::kBitmap:
                 //                size += sizeof(int64_t);
                 //                break;
-            case LogicalType::kDecimal:
+            case LogicalType::kDecimal: {
                 size += sizeof(int64_t) * 2;
                 break;
+            }
             case LogicalType::kTensor:
             case LogicalType::kTensorArray:
             case LogicalType::kMultiVector:
-            case LogicalType::kEmbedding:
+            case LogicalType::kEmbedding: {
                 size += sizeof(EmbeddingDataType);
                 size += sizeof(int32_t);
                 break;
+            }
             case LogicalType::kSparse: {
                 size += sizeof(EmbeddingDataType) * 2;
                 size += sizeof(int64_t);
@@ -302,9 +316,11 @@ int32_t DataType::GetSizeInBytes() const {
 void DataType::WriteAdv(char *&ptr) const {
     WriteBufAdv<LogicalType>(ptr, this->type_);
     switch (this->type_) {
-        case LogicalType::kArray:
-            ParserError("Array isn't implemented here.");
+        case LogicalType::kArray: {
+            const auto *array_info = dynamic_cast<const ArrayInfo *>(this->type_info_.get());
+            array_info->ElemType().WriteAdv(ptr);
             break;
+        }
             //        case LogicalType::kBitmap: {
             //            int64_t limit = MAX_BITMAP_SIZE_INTERNAL;
             //            if (this->type_info_ != nullptr) {
@@ -359,9 +375,12 @@ std::shared_ptr<DataType> DataType::ReadAdv(const char *&ptr, int32_t maxbytes) 
     LogicalType type = ReadBufAdv<LogicalType>(ptr);
     std::shared_ptr<TypeInfo> type_info{nullptr};
     switch (type) {
-        case LogicalType::kArray:
-            ParserError("Array isn't implemented here.");
+        case LogicalType::kArray: {
+            ParserAssert(ptr_end > ptr, "ptr goes out of range when reading Array element DataType");
+            const auto array_element_type = DataType::ReadAdv(ptr, ptr_end - ptr);
+            type_info = ArrayInfo::Make(std::move(*array_element_type));
             break;
+        }
             //        case LogicalType::kBitmap: {
             //            int64_t limit = ReadBufAdv<int64_t>(ptr);
             //            type_info = BitmapInfo::Make(limit);
@@ -401,7 +420,7 @@ std::shared_ptr<DataType> DataType::ReadAdv(const char *&ptr, int32_t maxbytes) 
     return data_type;
 }
 
-nlohmann::json DataType::Serialize() {
+nlohmann::json DataType::Serialize() const {
     nlohmann::json json_res;
     json_res["data_type"] = this->type_;
 
@@ -420,8 +439,8 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
         const nlohmann::json &type_info_json = data_type_json["type_info"];
         switch (logical_type) {
             case LogicalType::kArray: {
-                ParserError("Array isn't implemented here.");
-                type_info = nullptr;
+                const auto element_type = DataType::Deserialize(type_info_json);
+                type_info = ArrayInfo::Make(std::move(*element_type));
                 break;
             }
                 //            case LogicalType::kBitmap: {

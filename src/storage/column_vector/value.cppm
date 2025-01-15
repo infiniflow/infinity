@@ -351,6 +351,12 @@ public:
 
     [[nodiscard]] String ToString() const;
 
+    [[nodiscard]] i64 ToInteger() const;
+
+    [[nodiscard]] f32 ToFloat() const;
+
+    [[nodiscard]] f64 ToDouble() const;
+
     void Reset();
 
     void AppendToJson(const String &name, nlohmann::json &json);

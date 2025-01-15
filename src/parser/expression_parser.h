@@ -285,13 +285,11 @@ union EXPRESSIONSTYPE
     double  double_value;
     int64_t long_value;
 
-    infinity::ColumnType              column_type_t;
-
     infinity::ParsedExpr*             expr_t;
     infinity::ConstantExpr*           const_expr_t;
     std::vector<infinity::ParsedExpr*>*    expr_array_t;
 
-#line 295 "expression_parser.h"
+#line 293 "expression_parser.h"
 
 };
 typedef union EXPRESSIONSTYPE EXPRESSIONSTYPE;
