@@ -194,27 +194,27 @@ void TxnManager::SendToWAL(Txn *txn) {
 
     std::lock_guard guard(locker_);
     if (wait_conflict_ck_.empty()) {
-        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
+        String error_message = fmt::format("TxnManager::SendToWAL wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
         UnrecoverableError(error_message);
     }
     if (wait_conflict_ck_.begin()->first > commit_ts) {
-        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
+        String error_message = fmt::format("TxnManager::SendToWAL wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
                                            wait_conflict_ck_.begin()->first,
                                            txn->CommitTS());
         UnrecoverableError(error_message);
     }
     if (wal_entry) {
-        wait_conflict_ck_.at(commit_ts) = wal_entry;
+        wait_conflict_ck_.at(commit_ts) = txn;
     } else {
         wait_conflict_ck_.erase(commit_ts); // rollback
     }
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
-        Vector<WalEntry *> wal_entries;
+        Vector<Txn *> txn_array;
         do {
-            wal_entries.push_back(wait_conflict_ck_.begin()->second);
+            txn_array.push_back(wait_conflict_ck_.begin()->second);
             wait_conflict_ck_.erase(wait_conflict_ck_.begin());
         } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
-        wal_mgr_->PutEntries(wal_entries);
+        wal_mgr_->SubmitTxn(txn_array);
     }
 }
 

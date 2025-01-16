@@ -150,13 +150,11 @@ void WalManager::Stop() {
     LOG_INFO("WAL manager is stopped.");
 }
 
-// Session request to persist an entry. Assuming txn_id of the entry has
-// been initialized.
-void WalManager::PutEntries(Vector<WalEntry *> wal_entries) {
+void WalManager::SubmitTxn(Vector<Txn *> &txn_array) {
     if (!running_.load()) {
         return;
     }
-    wait_flush_.EnqueueBulk(wal_entries);
+    wait_flush_.EnqueueBulk(txn_array);
 }
 
 TxnTimeStamp WalManager::LastCheckpointTS() const {
@@ -292,23 +290,26 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
 void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush log mainloop begin");
 
-    Deque<WalEntry *> log_batch{};
+    Deque<Txn *> txn_batch{};
     TxnManager *txn_mgr = storage_->txn_manager();
     ClusterManager *cluster_manager = nullptr;
     while (running_.load()) {
-        wait_flush_.DequeueBulk(log_batch);
-        if (log_batch.empty()) {
+        wait_flush_.DequeueBulk(txn_batch);
+        if (txn_batch.empty()) {
             LOG_WARN("WalManager::Dequeue empty batch logs");
             continue;
         }
 
-        for (const auto &entry : log_batch) {
-            // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
-            if (entry == nullptr) {
+        for (const auto &txn : txn_batch) {
+            if (txn == nullptr) {
                 // terminate entry
+                LOG_INFO("Terminate WAL Manager flush thread");
                 running_ = false;
                 break;
             }
+
+            WalEntry *entry = txn->GetWALEntry();
+            // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
 
             if (entry->cmds_.empty()) {
                 continue;
@@ -371,13 +372,12 @@ void WalManager::Flush() {
             cluster_manager->SyncLogs();
         }
 
-        for (const auto &entry : log_batch) {
-            Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
-            if (txn != nullptr) {
-                txn->CommitBottom();
-            }
+        // Commit bottom
+        for (const auto &txn : txn_batch) {
+            txn->CommitBottom();
+            // TODO: if txn is checkpoint, swap WAL file
         }
-        log_batch.clear();
+        txn_batch.clear();
 
         // Check if the wal file is too large, swap to a new one.
         try {
