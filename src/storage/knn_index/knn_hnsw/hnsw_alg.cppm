@@ -118,7 +118,7 @@ protected:
               LogicalType ColumnLogicalType = LogicalType::kEmbedding,
               typename MultiVectorInnerTopnIndexType = void>
     Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>
-    SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Filter &filter) const {
+    SearchLayer(VertexType enter_point, const StoreType &query, VertexType query_i, i32 layer_idx, SizeT result_n, const Filter &filter) const {
         static_assert(ColumnLogicalType == LogicalType::kEmbedding || ColumnLogicalType == LogicalType::kMultiVector);
         auto d_ptr = MakeUniqueForOverwrite<DistanceType[]>(result_n);
         auto i_ptr = MakeUniqueForOverwrite<SearchLayerReturnParam3T<ColumnLogicalType>[]>(result_n);
@@ -154,7 +154,7 @@ protected:
         data_store_.PrefetchVec(enter_point);
         // enter_point will not be added to result_handler, the distance is not used
         {
-            auto dist = distance_(query, enter_point, data_store_);
+            auto dist = distance_(query, enter_point, data_store_, query_i);
             candidate.emplace(-dist, enter_point);
             add_result(dist, enter_point);
         }
@@ -191,7 +191,7 @@ protected:
                     }
                     prefetch_start -= prefetch_step_;
                 }
-                auto dist = distance_(query, n_idx, data_store_);
+                auto dist = distance_(query, n_idx, data_store_, query_i);
                 if (result_handler.GetSize(0) < result_n || dist <= result_handler.GetDistance0(0)) {
                     candidate.emplace(-dist, n_idx);
                     add_result(dist, n_idx);
@@ -203,9 +203,9 @@ protected:
     }
 
     template <bool WithLock>
-    VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, i32 layer_idx) const {
+    VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, VertexType query_i, i32 layer_idx) const {
         VertexType cur_p = enter_point;
-        auto cur_dist = distance_(query, cur_p, data_store_);
+        auto cur_dist = distance_(query, cur_p, data_store_, query_i);
         bool check = true;
         while (check) {
             check = false;
@@ -218,7 +218,7 @@ protected:
             const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(cur_p, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
-                auto n_dist = distance_(query, n_idx, data_store_);
+                auto n_dist = distance_(query, n_idx, data_store_, query_i);
                 if (n_dist < cur_dist) {
                     cur_p = n_idx;
                     cur_dist = n_dist;
@@ -242,10 +242,11 @@ protected:
             while (!candidates.empty() && SizeT(result_size) < M) {
                 std::pop_heap(candidates.begin(), candidates.end(), CMPReverse());
                 const auto &[c_dist, c_idx] = candidates.back();
+                StoreType c_data = data_store_.GetVec(c_idx);
                 bool check = true;
                 for (SizeT i = 0; i < SizeT(result_size); ++i) {
                     VertexType r_idx = result_p[i];
-                    auto cr_dist = distance_(c_idx, r_idx, data_store_);
+                    auto cr_dist = distance_(c_data, r_idx, data_store_, c_idx);
                     if (cr_dist < c_dist) {
                         check = false;
                         break;
@@ -275,13 +276,14 @@ protected:
                 *n_neighbor_size_p = n_neighbor_size + 1;
                 continue;
             }
-            auto n_dist = distance_(n_idx, vertex_i, data_store_);
+            StoreType n_data = data_store_.GetVec(n_idx);
+            auto n_dist = distance_(n_data, vertex_i, data_store_, n_idx);
 
             Vector<PDV> candidates;
             candidates.reserve(n_neighbor_size + 1);
             candidates.emplace_back(n_dist, vertex_i);
             for (int j = 0; j < n_neighbor_size; ++j) {
-                candidates.emplace_back(distance_(n_idx, n_neighbors_p[j], data_store_), n_neighbors_p[j]);
+                candidates.emplace_back(distance_(n_data, n_neighbors_p[j], data_store_, n_idx), n_neighbors_p[j]);
             }
 
             SelectNeighborsHeuristic(std::move(candidates), Mmax, n_neighbors_p, n_neighbor_size_p); // write in memory
@@ -293,16 +295,16 @@ protected:
     template <bool WithLock, FilterConcept<LabelType> Filter, LogicalType ColumnLogicalType>
     auto SearchLayerHelper(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Filter &filter) const {
         if constexpr (ColumnLogicalType == LogicalType::kEmbedding) {
-            return SearchLayer<WithLock, Filter, ColumnLogicalType>(enter_point, query, layer_idx, result_n, filter);
+            return SearchLayer<WithLock, Filter, ColumnLogicalType>(enter_point, query, kInvalidVertex, layer_idx, result_n, filter);
         } else if constexpr (ColumnLogicalType == LogicalType::kMultiVector) {
             if (result_n <= std::numeric_limits<u8>::max()) {
-                return SearchLayer<WithLock, Filter, ColumnLogicalType, u8>(enter_point, query, layer_idx, result_n, filter);
+                return SearchLayer<WithLock, Filter, ColumnLogicalType, u8>(enter_point, query, kInvalidVertex, layer_idx, result_n, filter);
             }
             if (result_n <= std::numeric_limits<u16>::max()) {
-                return SearchLayer<WithLock, Filter, ColumnLogicalType, u16>(enter_point, query, layer_idx, result_n, filter);
+                return SearchLayer<WithLock, Filter, ColumnLogicalType, u16>(enter_point, query, kInvalidVertex, layer_idx, result_n, filter);
             }
             if (result_n <= std::numeric_limits<u32>::max()) {
-                return SearchLayer<WithLock, Filter, ColumnLogicalType, u32>(enter_point, query, layer_idx, result_n, filter);
+                return SearchLayer<WithLock, Filter, ColumnLogicalType, u32>(enter_point, query, kInvalidVertex, layer_idx, result_n, filter);
             }
             UnrecoverableError(fmt::format("Unsupported result_n : {}, which is larger than u32::max()", result_n));
             return Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<SearchLayerReturnParam3T<ColumnLogicalType>[]>>{};
@@ -324,7 +326,7 @@ protected:
             return {0, nullptr, nullptr};
         }
         for (i32 cur_layer = max_layer; cur_layer > 0; --cur_layer) {
-            ep = SearchLayerNearest<WithLock>(ep, query, cur_layer);
+            ep = SearchLayerNearest<WithLock>(ep, query, kInvalidVertex, cur_layer);
         }
         return SearchLayerHelper<WithLock, Filter, ColumnLogicalType>(ep, query, 0, ef, filter);
     }
@@ -360,10 +362,10 @@ public:
         data_store_.AddVertex(vertex_i, q_layer);
 
         for (i32 cur_layer = max_layer; cur_layer > q_layer; --cur_layer) {
-            ep = SearchLayerNearest<true>(ep, query, cur_layer);
+            ep = SearchLayerNearest<true>(ep, query, vertex_i, cur_layer);
         }
         for (i32 cur_layer = std::min(q_layer, max_layer); cur_layer >= 0; --cur_layer) {
-            auto [result_n, d_ptr, v_ptr] = SearchLayer<true>(ep, query, cur_layer, ef_construction_, None);
+            auto [result_n, d_ptr, v_ptr] = SearchLayer<true>(ep, query, vertex_i, cur_layer, ef_construction_, None);
             auto search_result = Vector<PDV>(result_n);
             for (SizeT i = 0; i < result_n; ++i) {
                 search_result[i] = {d_ptr[i], v_ptr[i]};

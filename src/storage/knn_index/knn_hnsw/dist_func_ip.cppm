@@ -26,9 +26,6 @@ export module dist_func_ip;
 
 namespace infinity {
 
-template <typename Dist, typename VecStoreMeta>
-class LSGDistWrapper;
-
 export template <typename DataType, typename CompressType>
 class LVQIPDist;
 
@@ -91,7 +88,7 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store) const {
+    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
     }
 
@@ -99,8 +96,6 @@ public:
 
 private:
     DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim) const { return -SIMDFunc(v1, v2, dim); }
-
-    friend class LSGDistWrapper<PlainIPDist<DataType>, VecStoreMeta>;
 };
 
 export template <typename DataType, typename CompressType>
@@ -183,7 +178,7 @@ public:
     }
 
     template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store) const {
+    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
         return Inner(v1, data_store.GetVec(v2_i), data_store.vec_store_meta());
     }
 
@@ -203,8 +198,6 @@ private:
                     (bias1 + bias2) * norm1_mean + mean_c_scale_1 + mean_c_scale_2;
         return -dist;
     }
-
-    friend class LSGDistWrapper<PlainIPDist<DataType>, VecStoreMetaType>;
 };
 
 template <typename DataType>

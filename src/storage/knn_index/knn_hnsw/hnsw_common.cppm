@@ -36,9 +36,11 @@ export using VertexType = i32;
 export using VertexListSize = i32;
 export using LayerSize = i32;
 
+export constexpr VertexType kInvalidVertex = -1;
+
 export template <typename Iterator, typename RtnType, typename LabelType>
 concept DataIteratorConcept = requires(Iterator iter) {
-    typename Iterator::ValueType;
+    typename std::decay_t<Iterator>::ValueType;
     { iter.Next() } -> std::same_as<Optional<Pair<RtnType, LabelType>>>;
 };
 

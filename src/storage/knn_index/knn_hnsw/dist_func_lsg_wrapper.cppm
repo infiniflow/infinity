@@ -49,12 +49,17 @@ public:
 
     template <typename DataStore>
     DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
-        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.dim(), avg_[v1_i], avg_[v2_i]);
+        DistanceType d = dist_(v1_i, v2_i, data_store);
+        return Inner(d, avg_[v1_i], avg_[v2_i]);
     }
 
     template <typename DataStore>
-    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store) const {
-        return dist_(v1, v2_i, data_store);
+    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+        DistanceType d = dist_(v1, v2_i, data_store, v1_i);
+        if (v1_i == kInvalidVertex) {
+            return d;
+        }
+        return Inner(d, avg_[v1_i], avg_[v2_i]);
     }
 
     void SetLSGParam(float alpha, UniquePtr<float[]> avg) {
@@ -65,10 +70,12 @@ public:
     LVQDist ToLVQDistance(SizeT dim) && { return std::move(dist_).ToLVQDistance(dim); }
 
 private:
-    DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim, float gt1, float gt2) const {
-        DistanceType dist = dist_.Inner(v1, v2, dim);
-        auto k = std::pow(std::sqrt(gt1) * std::sqrt(gt2), alpha_);
-        return dist / k;
+    DistanceType Inner(DistanceType d, float gt1, float gt2) const {
+        float k = std::pow(std::sqrt(gt1 * gt2), alpha_);
+        if (k == 0.0) {
+            return std::numeric_limits<DistanceType>::max();
+        }
+        return d / k;
     }
 
 private:
