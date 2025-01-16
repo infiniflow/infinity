@@ -151,6 +151,10 @@ public:
 
     SizeT AppendTensorArrayMeta(Span<const TensorT> tensor_metas) const;
 
+    const char *GetArrayRaw(SizeT offset, SizeT size) const;
+
+    SizeT AppendArrayRaw(const char *raw_data, SizeT size) const;
+
 private:
     UniquePtr<VarBufferManager> var_buffer_mgr_{nullptr};
 };

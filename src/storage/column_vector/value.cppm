@@ -37,6 +37,7 @@ enum class ExtraValueInfoType : u8 {
     EMBEDDING_VALUE_INFO = 2,
     TENSORARRAY_VALUE_INFO = 3,
     SPARSE_VALUE_INFO = 4,
+    ARRAY_VALUE_INFO = 5,
 };
 
 //===--------------------------------------------------------------------===//
@@ -282,7 +283,7 @@ public:
         return value;
     }
 
-    static Value MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
+    static Value MakeEmbedding(const_ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr);
 
     static Value MakeMultiVector(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
 
@@ -293,6 +294,8 @@ public:
     static Value MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr);
 
     static Value MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr);
+
+    static Value MakeArray(Vector<Value> array_elements, SharedPtr<TypeInfo> type_info_ptr);
 
     template <typename Idx, typename T>
     static Value MakeSparse(const Pair<Vector<Idx>, Vector<T>> &vec) {
@@ -345,6 +348,8 @@ public:
 
     const Vector<SharedPtr<EmbeddingValueInfo>> &GetTensorArray() const { return this->value_info_->Get<TensorArrayValueInfo>().member_tensor_data_; }
 
+    const Vector<Value> &GetArray() const;
+
     Tuple<SizeT, Span<char>, Span<char>> GetSparse() const { return this->value_info_->Get<SparseValueInfo>().GetData(); }
 
     [[nodiscard]] const DataType &type() const { return type_; }
@@ -359,9 +364,9 @@ public:
 
     void Reset();
 
-    void AppendToJson(const String &name, nlohmann::json &json);
+    void AppendToJson(const String &name, nlohmann::json &json) const;
 
-    void AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<arrow::ArrayBuilder> &array_builder);
+    void AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *array_builder) const;
 
     // Member method
 public:
@@ -491,5 +496,17 @@ UuidT Value::GetValue() const;
 
 template <>
 RowID Value::GetValue() const;
+
+//===--------------------------------------------------------------------===//
+// Array Value Info
+//===--------------------------------------------------------------------===//
+export struct ArrayValueInfo : public ExtraValueInfo {
+    static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::ARRAY_VALUE_INFO;
+    friend struct Value;
+    explicit ArrayValueInfo(Vector<Value> array_elements)
+        : ExtraValueInfo(ExtraValueInfoType::ARRAY_VALUE_INFO), array_elements_(std::move(array_elements)) {}
+    void AppendValue(Value v) { array_elements_.emplace_back(std::move(v)); }
+    Vector<Value> array_elements_;
+};
 
 } // namespace infinity
