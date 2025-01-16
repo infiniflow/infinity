@@ -44,6 +44,7 @@ import wal_manager;
 import buffer_manager;
 import internal_types;
 import background_process;
+import txn_state;
 
 using namespace infinity;
 
@@ -88,7 +89,7 @@ TEST_P(OptimizeKnnTest, test1) {
     auto index_name = std::make_shared<std::string>("idx1");
 
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
         txn_mgr->CommitTxn(txn);
@@ -106,7 +107,7 @@ TEST_P(OptimizeKnnTest, test1) {
         }
         // index_param_list
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
@@ -119,7 +120,7 @@ TEST_P(OptimizeKnnTest, test1) {
     }
 
     auto DoAppend = [&]() {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnVector>> column_vectors;
         for (SizeT i = 0; i < table_def->columns().size(); ++i) {
             SharedPtr<DataType> data_type = table_def->columns()[i]->type();
@@ -149,7 +150,7 @@ TEST_P(OptimizeKnnTest, test1) {
             DoAppend();
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
 
             auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
             ASSERT_TRUE(status1.ok());
@@ -164,7 +165,7 @@ TEST_P(OptimizeKnnTest, test1) {
         }
     }
     {
-        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"));
+        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
@@ -176,7 +177,7 @@ TEST_P(OptimizeKnnTest, test1) {
     WaitFlushFullCkp(storage);
     WaitCleanup(storage);
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
 
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status1.ok());
@@ -210,7 +211,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
     auto index_name = std::make_shared<std::string>("idx1");
 
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         txn->CreateTable(*db_name, table_def, ConflictType::kError);
         txn_mgr->CommitTxn(txn);
     }
@@ -218,7 +219,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
     {
         Vector<String> column_names{"col1"};
         const String &file_name = "idx_file.idx";
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
         auto index_secondary = IndexSecondary::Make(index_name, MakeShared<String>("test comment"), file_name, column_names);
@@ -228,7 +229,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
     }
 
     auto DoAppend = [&]() {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnVector>> column_vectors;
         for (SizeT i = 0; i < table_def->columns().size(); ++i) {
             SharedPtr<DataType> data_type = table_def->columns()[i]->type();
@@ -254,7 +255,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
             DoAppend();
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
             auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
             ASSERT_TRUE(status1.ok());
             auto [table_index_entry, status] = txn->GetIndexByName(*db_name, *table_name, *index_name);
@@ -265,7 +266,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         }
     }
     {
-        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"));
+        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
         table_entry->OptimizeIndex(txn);
@@ -274,7 +275,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
     WaitFlushFullCkp(storage);
     WaitCleanup(storage);
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status1.ok());
         auto [table_index_entry, status] = txn->GetIndexByName(*db_name, *table_name, *index_name);

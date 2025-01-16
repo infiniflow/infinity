@@ -515,8 +515,8 @@ Status Status::LockFileError(const String &path, const String &error_msg) {
     return Status(ErrorCode::kLockFileError, MakeUnique<String>(fmt::format("Lock file error: {}, {}", path, error_msg)));
 }
 
-Status Status::CatalogCorrupted(const String &path) {
-    return Status(ErrorCode::kCatalogCorrupted, MakeUnique<String>(fmt::format("Catalog: {} is corrupted", path)));
+Status Status::FileCorrupted(const String &path) {
+    return Status(ErrorCode::kFileCorrupted, MakeUnique<String>(fmt::format("Catalog: {} is corrupted", path)));
 }
 
 Status Status::DataCorrupted(const String &path) {

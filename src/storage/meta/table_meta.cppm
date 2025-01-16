@@ -25,7 +25,7 @@ import status;
 import extra_ddl_info;
 import column_def;
 import base_entry;
-
+import snapshot_info;
 import table_entry;
 import entry_list;
 import meta_info;
@@ -109,6 +109,11 @@ private:
     // replay
     void
     CreateEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    // restore snapshot
+    Status ApplyTableSnapshot(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&restore_entry,
+                              TransactionID txn_id,
+                              TxnTimeStamp begin_ts);
 
     void UpdateEntryReplay(std::function<void(SharedPtr<TableEntry>, TransactionID, TxnTimeStamp)> &&update_entry,
                            TransactionID txn_id,

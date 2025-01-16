@@ -32,6 +32,7 @@ import column_vector;
 import default_values;
 import status;
 import type_info;
+import array_info;
 
 namespace infinity {
 
@@ -547,7 +548,7 @@ Value Value::MakeVarchar(const VarcharT &input) {
     return value;
 }
 
-Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
+Value Value::MakeEmbedding(const_ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         String error_message = fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
         UnrecoverableError(error_message);
@@ -638,6 +639,15 @@ Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
     }
     Value value(LogicalType::kTensorArray, std::move(type_info_ptr));
     value.value_info_ = MakeShared<TensorArrayValueInfo>();
+    return value;
+}
+
+Value Value::MakeArray(Vector<Value> array_elements, SharedPtr<TypeInfo> type_info_ptr) {
+    if (type_info_ptr->type() != TypeInfoType::kArray) {
+        UnrecoverableError(fmt::format("Value::MakeArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+    }
+    Value value(LogicalType::kArray, std::move(type_info_ptr));
+    value.value_info_ = MakeShared<ArrayValueInfo>(std::move(array_elements));
     return value;
 }
 
@@ -1040,8 +1050,12 @@ bool Value::operator==(const Value &other) const {
             const auto &[nnz2, raw_idx2, raw_data2] = sparse2;
             return nnz1 == nnz2 && std::ranges::equal(raw_idx1, raw_idx2) && std::ranges::equal(raw_data1, raw_data2);
         }
+        case LogicalType::kArray: {
+            const auto &array1 = this->GetArray();
+            const auto &array2 = other.GetArray();
+            return std::ranges::equal(array1, array2);
+        }
         case LogicalType::kInterval:
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kMixed:
         case LogicalType::kMissing:
@@ -1154,6 +1168,7 @@ void Value::CopyUnionValue(const Value &other) {
             // No value for null value.
             break;
         }
+        case LogicalType::kArray:
         case LogicalType::kVarchar:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
@@ -1163,7 +1178,6 @@ void Value::CopyUnionValue(const Value &other) {
             this->value_info_ = other.value_info_;
             break;
         }
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kMixed:
         case LogicalType::kMissing:
@@ -1275,6 +1289,7 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             // No value for null type
             break;
         }
+        case LogicalType::kArray:
         case LogicalType::kVarchar:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
@@ -1284,7 +1299,6 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             this->value_info_ = std::move(other.value_info_);
             break;
         }
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kMixed:
         case LogicalType::kMissing:
@@ -1476,8 +1490,20 @@ String Value::ToString() const {
         case LogicalType::kEmptyArray: {
             return "[]";
         }
+        case LogicalType::kArray: {
+            const auto &array_elements = this->GetArray();
+            std::ostringstream oss;
+            oss << '[';
+            for (SizeT i = 0; i < array_elements.size(); ++i) {
+                oss << array_elements[i].ToString();
+                if (i != array_elements.size() - 1) {
+                    oss << ',';
+                }
+            }
+            oss << ']';
+            return std::move(oss).str();
+        }
         case LogicalType::kDecimal:
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kPoint:
         case LogicalType::kLine:
@@ -1497,7 +1523,7 @@ String Value::ToString() const {
     return {};
 }
 
-void Value::AppendToJson(const String &name, nlohmann::json &json) {
+void Value::AppendToJson(const String &name, nlohmann::json &json) const {
     switch (type_.type()) {
         case LogicalType::kBoolean: {
             json[name] = value_.boolean;
@@ -1603,9 +1629,18 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
             json[name] = sparse_json;
             return;
         }
+        case LogicalType::kArray: {
+            auto &array_json = json[name];
+            array_json = nlohmann::json::array();
+            for (const auto &array_elements = this->GetArray(); const auto &v : array_elements) {
+                nlohmann::json v_json;
+                v.AppendToJson("v", v_json);
+                array_json.push_back(std::move(v_json["v"]));
+            }
+            return;
+        }
         case LogicalType::kHugeInt:
         case LogicalType::kDecimal:
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kPoint:
         case LogicalType::kLine:
@@ -1623,80 +1658,80 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
     }
 }
 
-void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<arrow::ArrayBuilder> &array_builder) {
-    switch (data_type->type()) {
+void Value::AppendToArrowArray(const DataType &data_type, arrow::ArrayBuilder *array_builder) const {
+    switch (data_type.type()) {
         case LogicalType::kBoolean: {
-            auto builder = std::dynamic_pointer_cast<::arrow::BooleanBuilder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::BooleanBuilder *>(array_builder);
             auto status = builder->Append(value_.boolean);
             break;
         }
         case LogicalType::kTinyInt: {
-            auto builder = std::dynamic_pointer_cast<::arrow::Int8Builder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::Int8Builder *>(array_builder);
             auto status = builder->Append(value_.tiny_int);
             break;
         }
         case LogicalType::kSmallInt: {
-            auto builder = std::dynamic_pointer_cast<::arrow::Int16Builder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::Int16Builder *>(array_builder);
             auto status = builder->Append(value_.small_int);
             break;
         }
         case LogicalType::kInteger: {
-            auto builder = std::dynamic_pointer_cast<::arrow::Int32Builder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::Int32Builder *>(array_builder);
             auto status = builder->Append(value_.integer);
             break;
         }
         case LogicalType::kBigInt: {
-            auto builder = std::dynamic_pointer_cast<::arrow::Int64Builder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::Int64Builder *>(array_builder);
             auto status = builder->Append(value_.big_int);
             break;
         }
         case LogicalType::kFloat16: {
-            auto builder = std::dynamic_pointer_cast<::arrow::HalfFloatBuilder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::HalfFloatBuilder *>(array_builder);
             auto status = builder->Append(value_.float16.raw);
             break;
         }
         case LogicalType::kBFloat16: {
-            auto builder = std::dynamic_pointer_cast<::arrow::FloatBuilder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::FloatBuilder *>(array_builder);
             auto status = builder->Append(static_cast<f32>(value_.bfloat16));
             break;
         }
         case LogicalType::kFloat: {
-            auto builder = std::dynamic_pointer_cast<::arrow::FloatBuilder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::FloatBuilder *>(array_builder);
             auto status = builder->Append(value_.float32);
             break;
         }
         case LogicalType::kDouble: {
-            auto builder = std::dynamic_pointer_cast<::arrow::DoubleBuilder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::DoubleBuilder *>(array_builder);
             auto status = builder->Append(value_.float64);
             break;
         }
         case LogicalType::kDate: {
-            auto builder = std::dynamic_pointer_cast<::arrow::Date32Builder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::Date32Builder *>(array_builder);
             auto status = builder->Append(value_.date.value);
             break;
         }
         case LogicalType::kTime: {
-            auto builder = std::dynamic_pointer_cast<::arrow::Time32Builder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::Time32Builder *>(array_builder);
             auto status = builder->Append(value_.time.value);
             break;
         }
         case LogicalType::kDateTime: {
-            auto builder = std::dynamic_pointer_cast<::arrow::TimestampBuilder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::TimestampBuilder *>(array_builder);
             auto status = builder->Append(value_.datetime.GetEpochTime());
             break;
         }
         case LogicalType::kTimestamp: {
-            auto builder = std::dynamic_pointer_cast<::arrow::TimestampBuilder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::TimestampBuilder *>(array_builder);
             auto status = builder->Append(value_.timestamp.GetEpochTime());
             break;
         }
         case LogicalType::kVarchar: {
-            auto builder = std::dynamic_pointer_cast<::arrow::StringBuilder>(array_builder);
+            auto *builder = dynamic_cast<::arrow::StringBuilder *>(array_builder);
             auto status = builder->Append(value_info_->Get<StringValueInfo>().GetString());
             break;
         }
         case LogicalType::kEmbedding: {
-            auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type.type_info().get());
             Span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
                 String error_message = "Embedding data size mismatch.";
@@ -1704,15 +1739,15 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
 
-            auto *fixedlist_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(array_builder.get());
+            auto *fixedlist_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(array_builder);
             auto status = fixedlist_builder->Append();
 
             Embedding2Arrow(embedding, embedding_info->Type(), embedding_info->Dimension(), fixedlist_builder->value_builder());
             break;
         }
         case LogicalType::kSparse: {
-            const auto *sparse_info = static_cast<const SparseInfo *>(data_type->type_info().get());
-            auto struct_builder = std::static_pointer_cast<arrow::StructBuilder>(array_builder);
+            const auto *sparse_info = static_cast<const SparseInfo *>(data_type.type_info().get());
+            auto *struct_builder = dynamic_cast<arrow::StructBuilder *>(array_builder);
             auto status = struct_builder->Append();
 
             auto *index_builder = struct_builder->child(0);
@@ -1733,17 +1768,17 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
         }
         case LogicalType::kMultiVector:
         case LogicalType::kTensor: {
-            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type->type_info().get());
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());
 
             Span<char> tensor = this->GetEmbedding();
 
-            auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder.get());
+            auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
             auto status = list_builder->Append();
             Tensor2Arrow(tensor, embedding_info, list_builder->value_builder());
             break;
         }
         case LogicalType::kTensorArray: {
-            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type->type_info().get());
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());
 
             const Vector<SharedPtr<EmbeddingValueInfo>> &embedding_value_infos = this->GetTensorArray();
             Vector<Span<char>> tensor_array;
@@ -1751,16 +1786,26 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
                 tensor_array.push_back(embedding_value_info->GetData());
             }
 
-            auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder.get());
+            auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
             auto status = list_builder->Append();
             TensorArray2Arrow(tensor_array, embedding_info, list_builder->value_builder());
+            break;
+        }
+        case LogicalType::kArray: {
+            auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
+            auto status = list_builder->Append();
+            auto *val_builder = list_builder->value_builder();
+            const auto *array_info = static_cast<const ArrayInfo *>(data_type.type_info().get());
+            const auto &array_element_type = array_info->ElemType();
+            for (const auto &v : GetArray()) {
+                v.AppendToArrowArray(array_element_type, val_builder);
+            }
             break;
         }
         case LogicalType::kRowID:
         case LogicalType::kInterval:
         case LogicalType::kHugeInt:
         case LogicalType::kDecimal:
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kPoint:
         case LogicalType::kLine:
@@ -1778,6 +1823,8 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
         }
     }
 }
+
+const Vector<Value> &Value::GetArray() const { return this->value_info_->Get<ArrayValueInfo>().array_elements_; }
 
 SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes) {
     if (bytes == 0) {

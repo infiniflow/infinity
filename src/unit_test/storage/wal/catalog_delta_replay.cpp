@@ -52,6 +52,7 @@ import default_values;
 import block_index;
 import wal_manager;
 import compaction_process;
+import txn_state;
 
 using namespace infinity;
 
@@ -76,7 +77,7 @@ protected:
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
         for (SizeT segment_size : segment_sizes) {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
 
             auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
             // table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
@@ -127,7 +128,7 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
             txn->CreateDatabase(db_name1, ConflictType::kError, MakeShared<String>());
             txn->CreateDatabase(db_name2, ConflictType::kError, MakeShared<String>());
@@ -140,7 +141,7 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
             txn->CreateDatabase(db_name3, ConflictType::kError, MakeShared<String>());
             txn_mgr->RollBackTxn(txn);
         }
@@ -156,7 +157,7 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
             {
                 auto [db_entry, status] = txn->GetDatabase(*db_name1);
                 ASSERT_TRUE(status.ok() && db_entry != nullptr);
@@ -199,7 +200,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def1, ConflictType::kError);
             txn->CreateTable(*db_name, table_def2, ConflictType::kError);
@@ -212,7 +213,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def3, ConflictType::kError);
             txn_mgr->RollBackTxn(txn);
@@ -229,7 +230,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
             {
                 auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name1);
                 EXPECT_TRUE(status.ok());
@@ -266,7 +267,7 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
 
         TxnManager *txn_mgr = storage->txn_manager();
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -276,7 +277,7 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -323,7 +324,7 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
             {
                 auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status.ok());
@@ -367,7 +368,7 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
 
         TxnManager *txn_mgr = storage->txn_manager();
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -406,7 +407,7 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
 
         TxnManager *txn_mgr = storage->txn_manager();
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
         {
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -450,7 +451,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
 
         TxnManager *txn_mgr = storage->txn_manager();
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -460,7 +461,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
         }
         {
 
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -484,7 +485,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
             txn_mgr->CommitTxn(txn);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("delete"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -522,7 +523,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         TxnManager *txn_mgr = storage->txn_manager();
         // create table and insert two records
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -552,7 +553,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             EXPECT_EQ(table_entry->row_count(), 1ul);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert"), TransactionType::kNormal);
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -583,12 +584,12 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         // 1. remain some uncommitted txn before force full checkpoint
         // 2. wait delta checkpoint
         {
-            auto *txn_uncommitted = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn_uncommitted = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn_uncommitted->CreateTable(*db_name, table_def_uncommitted, ConflictType::kError);
 
             LOG_INFO("BEFORE FULL CKP");
-            auto *txn_force_ckp = txn_mgr->BeginTxn(MakeUnique<String>("full checkpoint task"));
+            auto *txn_force_ckp = txn_mgr->BeginTxn(MakeUnique<String>("full checkpoint task"), TransactionType::kCheckpoint);
 
             auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn_force_ckp, true);
             storage->bg_processor()->Submit(force_ckp_task);
@@ -599,12 +600,12 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             txn_mgr->CommitTxn(txn_uncommitted);
 
             // some txn in delta checkpoint
-            auto *txn_committed = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn_committed = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn_committed->CreateTable(*db_name, table_def_committed, ConflictType::kError);
             txn_mgr->CommitTxn(txn_committed);
 
-            auto *txn_record3 = txn_mgr->BeginTxn(MakeUnique<String>("insert data"));
+            auto *txn_record3 = txn_mgr->BeginTxn(MakeUnique<String>("insert data"), TransactionType::kNormal);
 
             Vector<SharedPtr<ColumnVector>> column_vectors;
             for (SizeT i = 0; i < table_def_committed->columns().size(); ++i) {
@@ -636,7 +637,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             WaitFlushDeltaOp(storage);
         }
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
             auto [table_entry, table_status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(table_status.ok());
 
@@ -655,7 +656,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
         TxnManager *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
             {
                 auto [table_uncommitted, uncommitted_status] = txn->GetTableByName(*db_name, *table_name_uncommitted);
                 EXPECT_TRUE(uncommitted_status.ok());
@@ -714,7 +715,7 @@ TEST_P(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     {
         // create table
         auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
         Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -730,7 +731,7 @@ TEST_P(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     }
 
     {
-        auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+        auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
 
         TxnTimeStamp begin_ts = txn5->BeginTS();
 
@@ -770,7 +771,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
         TxnManager *txn_mgr = storage->txn_manager();
         {
             // create table
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -781,7 +782,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
         }
         {
             // insert datas
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -825,7 +826,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
         {
             {
                 // create index def
-                auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+                auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
@@ -893,7 +894,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
             }
             {
                 // Drop index (by Name)
-                auto *txn_idx_drop = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
+                auto *txn_idx_drop = txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
                 {
 
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
@@ -925,7 +926,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         TxnManager *txn_mgr = storage->txn_manager();
         {
             // create database
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
             txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
 
@@ -937,7 +938,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         }
         {
             // create table
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -948,7 +949,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         }
         {
             // insert datas
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -992,7 +993,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
         {
             {
                 // create index def
-                auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+                auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
@@ -1059,7 +1060,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
             }
             {
                 // Drop index (by Name)
-                auto *txn_idx_drop = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
+                auto *txn_idx_drop = txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
                 {
 
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);
@@ -1094,7 +1095,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         TxnManager *txn_mgr = storage->txn_manager();
         {
             // create table
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -1105,7 +1106,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         }
         {
             // insert data
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
@@ -1145,7 +1146,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
         {
             {
                 // create index def
-                auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+                auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
@@ -1219,7 +1220,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
 
             {
                 // Drop index (by Name)
-                auto *txn_idx_drop = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
+                auto *txn_idx_drop = txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
                 {
 
                     auto status9 = txn_idx_drop->DropIndexByName(*db_name, *table_name, idx_name, ConflictType::kInvalid);

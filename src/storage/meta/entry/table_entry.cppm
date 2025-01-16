@@ -115,6 +115,9 @@ public:
                                                   SegmentID next_segment_id,
                                                   ColumnID next_column_id) noexcept;
 
+    static SharedPtr<TableEntry>
+    ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
+
 public:
     Tuple<TableIndexEntry *, Status>
     CreateIndex(const SharedPtr<IndexBase> &index_base, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
@@ -225,6 +228,8 @@ public:
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, TxnTimeStamp ts) const;
 
     SharedPtr<SegmentEntry> GetSegmentByID(SegmentID seg_id, Txn *txn) const;
+
+    Vector<SharedPtr<SegmentEntry>> GetVisibleSegments(Txn *txn) const;
 
     const ColumnDef *GetColumnDefByIdx(SizeT idx) const {
         if (idx >= columns_.size()) {
@@ -399,7 +404,7 @@ public:
 
     void DropColumns(const Vector<String> &column_names, TxnTableStore *txn_store);
 
-    SharedPtr<TableSnapshotInfo> GetSnapshotInfo(Txn* txn_ptr) const;
+    SharedPtr<TableSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
 };
 
 } // namespace infinity

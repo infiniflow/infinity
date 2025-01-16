@@ -45,6 +45,7 @@ import status;
 import default_values;
 import wal_manager;
 import global_resource_usage;
+import txn_state;
 
 namespace infinity {
 
@@ -80,7 +81,7 @@ void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) {
 }
 
 void CompactionProcessor::DoCompact() {
-    Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"));
+    Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"), TransactionType::kNormal);
     bool success = false;
     DeferFn defer_fn([&] {
         if (!success) {
@@ -114,7 +115,7 @@ void CompactionProcessor::DoCompact() {
 TxnTimeStamp
 CompactionProcessor::ManualDoCompact(const String &schema_name, const String &table_name, bool rollback, Optional<std::function<void()>> mid_func) {
     auto statement = MakeUnique<ManualCompactStatement>(schema_name, table_name);
-    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("ManualCompact"));
+    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("ManualCompact"), TransactionType::kNormal);
     LOG_INFO(fmt::format("Compact txn id {}.", txn->TxnID()));
     BGQueryContextWrapper wrapper(txn);
     BGQueryState state;
@@ -139,7 +140,7 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
         Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
         for (auto *table_entry : table_entries) {
             while (true) {
-                Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Compact"));
+                Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Compact"), TransactionType::kNormal);
                 TransactionID txn_id = txn->TxnID();
                 auto compact_segments = table_entry->CheckCompaction(txn_id);
                 if (compact_segments.empty()) {
@@ -161,7 +162,7 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
 }
 
 void CompactionProcessor::ScanAndOptimize() {
-    Txn *opt_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanAndOptimize"));
+    Txn *opt_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanAndOptimize"), TransactionType::kNormal);
     LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", opt_txn->BeginTS()));
     TransactionID txn_id = opt_txn->TxnID();
     TxnTimeStamp begin_ts = opt_txn->BeginTS();
@@ -204,7 +205,7 @@ void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
 
 void CompactionProcessor::DoDumpByline(DumpIndexBylineTask *dump_task) {
     String msg = fmt::format("Dump index by line, table name: {}, index name: {}", *dump_task->table_name_, *dump_task->index_name_);
-    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>(msg));
+    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>(msg), TransactionType::kNormal);
     try {
         auto [table_index_entry, status] = txn->GetIndexByName(*dump_task->db_name_, *dump_task->table_name_, *dump_task->index_name_);
         if (!status.ok()) {

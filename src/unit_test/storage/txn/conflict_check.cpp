@@ -32,6 +32,7 @@ import data_block;
 import value;
 import infinity_exception;
 import status;
+import txn_state;
 
 using namespace infinity;
 
@@ -52,7 +53,7 @@ protected:
     void TearDown() override { infinity::InfinityContext::instance().UnInit(); }
 
     Txn *DeleteRow(const String &db_name, const String &table_name, Vector<SegmentOffset> segment_offsets) {
-        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Delete row"));
+        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Delete row"), TransactionType::kNormal);
 
         Vector<RowID> row_ids;
         for (auto segment_offset : segment_offsets) {
@@ -79,7 +80,7 @@ protected:
     };
 
     void InitTable(const String &db_name, const String &table_name, SharedPtr<TableDef> table_def, SizeT row_cnt) {
-        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Init table"));
+        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Init table"), TransactionType::kNormal);
 
         txn->CreateTable(db_name, table_def, ConflictType::kError);
         auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
@@ -104,7 +105,7 @@ protected:
     }
 
     void CheckRowCnt(const String &db_name, const String &table_name, SizeT expected_row_cnt) {
-        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Check row count"));
+        auto *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Check row count"), TransactionType::kNormal);
         auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
         EXPECT_TRUE(status.ok());
 

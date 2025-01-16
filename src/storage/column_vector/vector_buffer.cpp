@@ -392,4 +392,8 @@ SizeT VectorBuffer::AppendTensorArrayMeta(Span<const TensorT> tensor_metas) cons
     return var_buffer_mgr_->Append(reinterpret_cast<const char *>(tensor_metas.data()), tensor_meta_size);
 }
 
+const char *VectorBuffer::GetArrayRaw(SizeT offset, SizeT size) const { return var_buffer_mgr_->Get(offset, size); }
+
+SizeT VectorBuffer::AppendArrayRaw(const char *raw_data, SizeT size) const { return var_buffer_mgr_->Append(raw_data, size); }
+
 } // namespace infinity

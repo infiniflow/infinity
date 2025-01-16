@@ -33,7 +33,9 @@ export struct TxnContext {
     TxnTimeStamp begin_ts_{};
     TxnTimeStamp commit_ts_{};
     TxnState state_{TxnState::kStarted};
-    TxnType type_{TxnType::kInvalid};
+    TransactionType txn_type_{TransactionType::kRead};
+
+    bool is_write_transaction_{false};
 
     SharedPtr<String> text_{};
     Vector<SharedPtr<String>> operations_;

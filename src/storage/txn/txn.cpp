@@ -60,7 +60,12 @@ import snapshot_info;
 
 namespace infinity {
 
-Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID txn_id, TxnTimeStamp begin_ts, SharedPtr<String> txn_text)
+Txn::Txn(TxnManager *txn_manager,
+         BufferManager *buffer_manager,
+         TransactionID txn_id,
+         TxnTimeStamp begin_ts,
+         SharedPtr<String> txn_text,
+         TransactionType txn_type)
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
       txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), txn_text_(std::move(txn_text)) {
     catalog_ = InfinityContext::instance().storage()->catalog();
@@ -71,9 +76,10 @@ Txn::Txn(TxnManager *txn_manager, BufferManager *buffer_manager, TransactionID t
     txn_context_ptr_->txn_id_ = txn_id;
     txn_context_ptr_->begin_ts_ = begin_ts;
     txn_context_ptr_->text_ = txn_text_;
+    txn_context_ptr_->txn_type_ = txn_type;
 }
 
-Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts)
+Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TransactionType txn_type)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
       txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
     catalog_ = InfinityContext::instance().storage()->catalog();
@@ -83,10 +89,12 @@ Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, T
     txn_context_ptr_ = TxnContext::Make();
     txn_context_ptr_->txn_id_ = txn_id;
     txn_context_ptr_->begin_ts_ = begin_ts;
+    txn_context_ptr_->txn_type_ = txn_type;
 }
 
-UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, txn_id, begin_ts);
+UniquePtr<Txn>
+Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TransactionType txn_type) {
+    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, txn_id, begin_ts, txn_type);
     txn->txn_context_ptr_->commit_ts_ = begin_ts;
     txn->txn_context_ptr_->state_ = TxnState::kCommitted;
     return txn;
@@ -492,6 +500,10 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> Txn::GetTableSnapshot(const String &
     return catalog_->GetTableSnapshot(db_name, table_name, this);
 }
 
+Status Txn::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info) {
+    return catalog_->ApplyTableSnapshot(table_snapshot_info, this);
+}
+
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: CreateCollection"};
 }
@@ -528,7 +540,7 @@ TxnState Txn::GetTxnState() const {
     return txn_context_ptr_->state_;
 }
 
-TxnType Txn::GetTxnType() const { return txn_context_ptr_->type_; }
+bool Txn::IsWriteTransaction() const { return txn_context_ptr_->is_write_transaction_; }
 
 void Txn::SetTxnRollbacking(TxnTimeStamp rollback_ts) {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
@@ -546,9 +558,9 @@ void Txn::SetTxnRollbacked() {
     txn_context_ptr_->state_ = TxnState::kRollbacked;
 }
 
-void Txn::SetTxnRead() { txn_context_ptr_->type_ = TxnType::kRead; }
+void Txn::SetTxnRead() { txn_context_ptr_->is_write_transaction_ = false; }
 
-void Txn::SetTxnWrite() { txn_context_ptr_->type_ = TxnType::kWrite; }
+void Txn::SetTxnWrite() { txn_context_ptr_->is_write_transaction_ = true; }
 
 void Txn::SetTxnCommitted() {
     std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
