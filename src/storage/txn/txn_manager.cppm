@@ -41,7 +41,7 @@ public:
 
     ~TxnManager();
 
-    Txn *BeginTxn(UniquePtr<String> txn_text, bool ckp_txn = false);
+    Txn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
 
     Txn *GetTxn(TransactionID txn_id) const;
 

@@ -30,6 +30,7 @@ import db_entry;
 import table_entry;
 import table_index_entry;
 import txn_manager;
+import txn_state;
 
 namespace infinity {
 
@@ -130,7 +131,7 @@ void BGMemIndexTracer::TriggerDump(UniquePtr<DumpIndexTask> dump_task) {
 }
 
 Txn *BGMemIndexTracer::GetTxn() {
-    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Dump index"));
+    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("Dump index"), TransactionType::kNormal);
     return txn;
 }
 

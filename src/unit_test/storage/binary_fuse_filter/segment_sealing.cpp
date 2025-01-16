@@ -43,13 +43,14 @@ import data_block;
 import segment_entry;
 import block_entry;
 import logger;
+import txn_state;
 
 using namespace infinity;
 
 class SealingTaskTest : public BaseTestParamStr {
 protected:
     void AppendBlocks(TxnManager *txn_mgr, const String &table_name, u32 row_cnt_input, BufferManager *buffer_mgr) {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import blocks"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import blocks"), TransactionType::kNormal);
         auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
         auto column_count = table_entry->ColumnCount();
         EXPECT_EQ(column_count, u32(1));
@@ -98,7 +99,7 @@ TEST_P(SealingTaskTest, append_unsealed_segment_sealed) {
         {
             // create table
             auto tbl1_def = MakeUnique<TableDef>(MakeShared<String>("default_db"), MakeShared<String>(table_name), MakeShared<String>(), columns);
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             Status status = txn->CreateTable("default_db", std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
@@ -108,7 +109,7 @@ TEST_P(SealingTaskTest, append_unsealed_segment_sealed) {
         u32 input_row_cnt = 8'192 * 1'024 * 3 + 1; // one full segment
         this->AppendBlocks(txn_mgr, table_name, input_row_cnt, buffer_manager);
         {
-            auto txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+            auto txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
             auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
             EXPECT_NE(table_entry, nullptr);
             // 8'192 * 1'024 * 3 + 1

@@ -17,6 +17,7 @@ import db_meta;
 
 import txn_manager;
 import txn;
+import txn_state;
 import catalog;
 
 using namespace infinity;
@@ -32,7 +33,7 @@ TEST_P(DBMetaTest, to_string_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // create db in empty catalog should be success
     {
@@ -58,7 +59,7 @@ TEST_P(DBMetaTest, empty_db_entry_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // create db in empty catalog should be success
     {
@@ -84,7 +85,7 @@ TEST_P(DBMetaTest, get_all_db_entry_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // create db in empty catalog should be success
     {

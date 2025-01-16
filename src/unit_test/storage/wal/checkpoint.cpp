@@ -54,6 +54,7 @@ import infinity;
 import background_process;
 import compaction_process;
 import wal_manager;
+import txn_state;
 
 using namespace infinity;
 
@@ -85,7 +86,7 @@ protected:
 
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
         for (SizeT segment_size : segment_sizes) {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"), TransactionType::kNormal);
 
             auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
             // table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
@@ -160,7 +161,7 @@ TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
     }
     { // create table
         auto tbl1_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), columns);
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
         Status status = txn->CreateTable(*db_name, std::move(tbl1_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -176,7 +177,7 @@ TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
     }
 
     {
-        auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+        auto txn5 = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
         TxnTimeStamp begin_ts = txn5->BeginTS();
         auto [table_entry, status] = txn5->GetTableByName(*db_name, *table_name);
         EXPECT_NE(table_entry, nullptr);
@@ -234,7 +235,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         }
         {
             auto tbl1_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), columns);
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name, std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
@@ -248,7 +249,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         SharedPtr<IndexBase> index_base =
             IndexSecondary::Make(index_name, MakeShared<String>("test comment"), fmt::format("{}_{}", *table_name, *index_name), {*column_name});
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
@@ -272,7 +273,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
@@ -292,7 +293,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         SharedPtr<IndexBase> index_base =
             IndexSecondary::Make(index_name, MakeShared<String>("test comment"), fmt::format("{}_{}", *table_name, *index_name), {*column_name});
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
@@ -353,13 +354,13 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         }
         {
             auto tbl1_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), columns);
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
             Status status = txn->CreateTable(*db_name, std::move(tbl1_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         SharedPtr<IndexBase> index_base = IndexFullText::Make(index_name,
                                                               MakeShared<String>("test comment"),
                                                               fmt::format("{}_{}", *table_name, *index_name),
@@ -377,7 +378,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         txn_mgr->CommitTxn(txn);
 
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kCheckpoint);
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true /*full_check_point*/);
             bg_processor->Submit(force_ckp_task);
             force_ckp_task->Wait();
@@ -385,7 +386,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         }
 
         for (SizeT i = 0; i < kInsertN; ++i) {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
@@ -418,7 +419,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         Storage *storage = infinity::InfinityContext::instance().storage();
         TxnManager *txn_mgr = storage->txn_manager();
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         SharedPtr<IndexBase> index_base =
             IndexSecondary::Make(index_name, MakeShared<String>("test comment"), fmt::format("{}_{}", *table_name, *index_name), {*column_name});
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
@@ -463,14 +464,14 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
 
             auto tbl_def = MakeUnique<TableDef>(db_name, table_name, MakeShared<String>(), columns);
 
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
             auto status = txn->CreateTable(*db_name, std::move(tbl_def), ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
 
         auto append = [&] {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
             auto [table_entry, get_status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(get_status.ok());
 
@@ -487,7 +488,7 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
         };
         append();
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"), true);
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"), TransactionType::kCheckpoint);
             SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true /*full_check_point*/);
             storage->bg_processor()->Submit(force_ckp_task);
             append();
@@ -507,7 +508,7 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
         auto *txn_mgr = storage->txn_manager();
 
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
             EXPECT_TRUE(status.ok());
 
