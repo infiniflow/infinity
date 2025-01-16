@@ -459,6 +459,7 @@ struct SQL_LTYPE {
 %type <expr_t>                  match_text_expr query_expr fusion_expr search_clause optional_search_filter_expr
 %type <const_expr_t>            constant_expr interval_expr default_expr
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
+%type <const_expr_t>            curly_brackets_expr unclosed_curly_brackets_expr
 %type <const_expr_t>            common_array_expr subarray_array_expr unclosed_subarray_array_expr
 %type <const_expr_t>            sparse_array_expr long_sparse_array_expr unclosed_long_sparse_array_expr double_sparse_array_expr unclosed_double_sparse_array_expr
 %type <const_expr_t>            empty_array_expr common_sparse_array_expr
@@ -3622,6 +3623,9 @@ constant_expr: STRING {
 | common_array_expr {
     $$ = $1;
 }
+| curly_brackets_expr {
+    $$ = $1;
+}
 
 common_array_expr: array_expr {
     $$ = $1;
@@ -3705,6 +3709,22 @@ unclosed_double_sparse_array_expr: '[' float_sparse_ele {
 
 empty_array_expr: '[' ']' {
     $$ = new infinity::ConstantExpr(infinity::LiteralType::kEmptyArray);
+}
+
+curly_brackets_expr: unclosed_curly_brackets_expr '}' {
+    $$ = $1;
+}
+| '{' '}' {
+    $$ = new infinity::ConstantExpr(infinity::LiteralType::kCurlyBracketsArray);
+}
+
+unclosed_curly_brackets_expr: '{' constant_expr {
+    $$ = new infinity::ConstantExpr(infinity::LiteralType::kCurlyBracketsArray);
+    $$->curly_brackets_array_.emplace_back($2);
+}
+| unclosed_curly_brackets_expr ',' constant_expr {
+    $1->curly_brackets_array_.emplace_back($3);
+    $$ = $1;
 }
 
 int_sparse_ele: LONG_VALUE ':' LONG_VALUE {

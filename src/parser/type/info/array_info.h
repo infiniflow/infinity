@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 #include <utility>
 
-#include "type/complex/array_type.h"
 #include "type/data_type.h"
 #include "type/type_info.h"
 
@@ -33,7 +32,7 @@ public:
     bool operator==(const TypeInfo &other) const override;
 
     // Array always costs 8 bytes. Real data is stored in heap memory.
-    [[nodiscard]] size_t Size() const override { return sizeof(ArrayType); }
+    [[nodiscard]] size_t Size() const override;
 
     [[nodiscard]] size_t ElemSize() const { return elem_type_.Size(); }
 
