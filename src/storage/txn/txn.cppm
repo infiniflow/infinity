@@ -204,6 +204,8 @@ public:
 
     TxnState GetTxnState() const;
 
+    TransactionType GetTxnType() const;
+
     bool IsWriteTransaction() const;
 
     void SetTxnCommitted();

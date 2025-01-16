@@ -68,8 +68,7 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) 
     // Record the start ts of the txn
     TxnTimeStamp begin_ts = current_ts_ + 1;
 
-    bool ckp_txn = txn_type == TransactionType::kCheckpoint;
-    if (ckp_txn) {
+    if (txn_type == TransactionType::kCheckpoint) {
         if (ckp_begin_ts_ != UNCOMMIT_TS) {
             // not set ckp_begin_ts_ may not truncate the wal file.
             LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, begin_ts));
@@ -395,7 +394,7 @@ void TxnManager::CleanupTxn(Txn *txn, bool commit) {
 bool TxnManager::InCheckpointProcess(TxnTimeStamp commit_ts) {
     std::lock_guard guard(locker_);
     if (commit_ts > ckp_begin_ts_) {
-        LOG_TRACE(fmt::format("Full checkpoint begin in {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
+        LOG_TRACE(fmt::format("Full/Delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
         ckp_begin_ts_ = UNCOMMIT_TS;
         return true;
     }

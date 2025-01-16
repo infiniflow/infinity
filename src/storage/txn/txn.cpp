@@ -536,6 +536,11 @@ TxnState Txn::GetTxnState() const {
     return txn_context_ptr_->state_;
 }
 
+TransactionType Txn::GetTxnType() const {
+    std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
+    return txn_context_ptr_->txn_type_;
+}
+
 bool Txn::IsWriteTransaction() const { return txn_context_ptr_->is_write_transaction_; }
 
 void Txn::SetTxnRollbacking(TxnTimeStamp rollback_ts) {
