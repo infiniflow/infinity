@@ -630,7 +630,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kDuplicatedFile", ErrorCode::kDuplicatedFile)
         .value("kConfigFileError", ErrorCode::kConfigFileError)
         .value("kLockFileError", ErrorCode::kLockFileError)
-        .value("kCatalogCorrupted", ErrorCode::kCatalogCorrupted)
+        .value("kFileCorrupted", ErrorCode::kFileCorrupted)
         .value("kDataCorrupted", ErrorCode::kDataCorrupted)
         .value("kIndexCorrupted", ErrorCode::kIndexCorrupted)
         .value("kFileNotFound", ErrorCode::kFileNotFound)

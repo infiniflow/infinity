@@ -137,7 +137,7 @@ enum ClientErrorCode : int64_t {
     kDuplicatedFile = 7002,
     kConfigFileError = 7003,
     kLockFileExists = 7004,
-    kCatalogCorrupted = 7005,
+    kFileCorrupted = 7005,
     kDataCorrupted = 7006,
     kIndexCorrupted = 7007,
     kFileNotFound = 7008,

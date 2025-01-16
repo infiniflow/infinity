@@ -65,6 +65,13 @@ public:
                                                                  const u64 last_chunk_offset,
                                                                  const TxnTimeStamp commit_ts);
 
+    static UniquePtr<BlockColumnEntry> ApplyBlockColumnSnapshot(BlockEntry *block_entry,
+                                                                BlockColumnSnapshotInfo *block_column_snapshot_info,
+                                                                TransactionID txn_id,
+                                                                TxnTimeStamp begin_ts);
+
+    SharedPtr<BlockColumnSnapshotInfo> GetSnapshotInfo() const;
+
     nlohmann::json Serialize();
 
     static UniquePtr<BlockColumnEntry> Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr);
@@ -76,7 +83,7 @@ public:
     inline const SharedPtr<DataType> &column_type() const { return column_type_; }
     inline BufferObj *buffer() const { return buffer_; }
     inline u64 column_id() const { return column_id_; }
-    inline const SharedPtr<String> &filename() const { return file_name_; }
+    inline const SharedPtr<String> &filename() const { return filename_; }
     inline const BlockEntry *block_entry() { return block_entry_; }
 
     SharedPtr<String> OutlineFilename(SizeT file_idx) const { return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx)); }
@@ -94,7 +101,6 @@ public:
 
     ColumnVector GetConstColumnVector(BufferManager *buffer_mgr, SizeT row_count);
 
-    SharedPtr<BlockColumnSnapshotInfo> GetSnapshotInfo() const;
 private:
     ColumnVector GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe, SizeT row_count);
 
@@ -144,7 +150,7 @@ private:
     SharedPtr<DataType> column_type_{};
     BufferObj *buffer_{};
 
-    SharedPtr<String> file_name_{};
+    SharedPtr<String> filename_{};
 
     mutable std::shared_mutex mutex_{};
     Vector<BufferObj *> outline_buffers_;
