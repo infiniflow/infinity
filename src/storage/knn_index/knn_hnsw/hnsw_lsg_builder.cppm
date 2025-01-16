@@ -45,24 +45,29 @@ public:
 
     ~HnswLSGBuilder();
 
-    UniquePtr<HnswIndexInMem> Make(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace = true);
+    UniquePtr<HnswIndexInMem> Make(const SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace = true);
 
     template <typename Iter, typename DataType, typename DistanceDataType>
     UniquePtr<HnswIndexInMem> MakeImplIter(Iter iter, SizeT row_count, const RowID &base_row_id, bool trace);
 
 private:
     template <typename DataType, typename DistanceDataType>
-    UniquePtr<HnswIndexInMem> MakeImpl(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace);
+    UniquePtr<HnswIndexInMem> MakeImpl(const SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace);
 
+public:
     template <typename Iter, typename DataType, typename DistanceDataType>
     UniquePtr<float[]> GetLSAvg(Iter iter, SizeT row_count, const RowID &base_row_id);
 
+private:
     UniquePtr<IVFIndexInChunk> MakeIVFIndex();
 
     IVF_Search_Params MakeIVFSearchParams() const;
 
     template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
-    UniquePtr<float[]> GetAvgByIVF(Iter iter, SizeT row_count, const IVFIndexInChunk *ivf_index);
+    UniquePtr<float[]> GetAvgByIVF(Iter iter, SizeT row_count);
+
+    template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
+    UniquePtr<float[]> GetAvgBF(Iter iter, SizeT row_count);
 
 private:
     const IndexHnsw *index_hnsw_ = nullptr;

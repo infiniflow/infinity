@@ -42,6 +42,7 @@ import logical_type;
 import embedding_info;
 import hnsw_common;
 import status;
+import merge_knn;
 
 namespace infinity {
 
@@ -61,27 +62,28 @@ public:
     IterIVFDataAccessor() {}
 
     template <typename Iter>
-    void InitEmbedding(Iter iter, SizeT row_count) {
-        embeddings_.resize(row_count);
+    void InitEmbedding(Iter iter) {
         while (true) {
             if (auto ret = iter.Next(); ret) {
                 auto &[embedding, offset] = *ret;
-                embeddings_[offset] = reinterpret_cast<const_ptr_t>(embedding);
+                embeddings_.emplace_back(reinterpret_cast<const_ptr_t>(embedding), offset);
             } else {
                 break;
             }
         }
     }
 
-    const_ptr_t GetEmbedding(SizeT offset) override { return embeddings_[offset]; }
+    const_ptr_t GetEmbedding(SizeT offset) override { return embeddings_[offset].first; }
 
     Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset) override {
         UnrecoverableError("Not implemented");
         return {};
     }
 
+    SizeT size() const { return embeddings_.size(); }
+
 private:
-    Vector<const_ptr_t> embeddings_;
+    Vector<Pair<const_ptr_t, SizeT>> embeddings_;
 };
 
 } // namespace
@@ -113,15 +115,19 @@ HnswLSGBuilder::HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef>
 
 HnswLSGBuilder::~HnswLSGBuilder() = default;
 
-UniquePtr<HnswIndexInMem>
-HnswLSGBuilder::Make(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace) {
+UniquePtr<HnswIndexInMem> HnswLSGBuilder::Make(const SegmentEntry *segment_entry,
+                                               SizeT column_id,
+                                               TxnTimeStamp begin_ts,
+                                               bool check_ts,
+                                               BufferManager *buffer_mgr,
+                                               bool trace) {
     const DataType *column_type = column_def_->type().get();
     auto *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
     switch (embedding_info->Type()) {
         case EmbeddingDataType::kElemFloat:
             return MakeImpl<float, float>(segment_entry, column_id, begin_ts, check_ts, buffer_mgr, trace);
-        case EmbeddingDataType::kElemDouble:
-            return MakeImpl<double, float>(segment_entry, column_id, begin_ts, check_ts, buffer_mgr, trace);
+        // case EmbeddingDataType::kElemDouble:
+        //     return MakeImpl<double, float>(segment_entry, column_id, begin_ts, check_ts, buffer_mgr, trace);
         default:
             UnrecoverableError("Invalid embedding data type");
             return nullptr;
@@ -129,8 +135,12 @@ HnswLSGBuilder::Make(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp 
 }
 
 template <typename DataType, typename DistanceDataType>
-UniquePtr<HnswIndexInMem>
-HnswLSGBuilder::MakeImpl(SegmentEntry *segment_entry, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts, BufferManager *buffer_mgr, bool trace) {
+UniquePtr<HnswIndexInMem> HnswLSGBuilder::MakeImpl(const SegmentEntry *segment_entry,
+                                                   SizeT column_id,
+                                                   TxnTimeStamp begin_ts,
+                                                   bool check_ts,
+                                                   BufferManager *buffer_mgr,
+                                                   bool trace) {
     OneColumnIterator<DataType> iter(segment_entry, buffer_mgr, column_id, begin_ts);
     SizeT row_count = segment_entry->row_count();
     RowID base_row_id(segment_entry->segment_id(), 0);
@@ -148,28 +158,63 @@ UniquePtr<HnswIndexInMem> HnswLSGBuilder::MakeImplIter(Iter iter, SizeT row_coun
     return hnsw_index;
 }
 
-template <typename Iter, typename DataType, typename DistanceDataType>
-UniquePtr<float[]> HnswLSGBuilder::GetLSAvg(Iter iter, SizeT row_count, const RowID &base_row_id) {
-    auto ivf_index = MakeIVFIndex();
-    {
-        IterIVFDataAccessor iter_accessor;
-        Iter iter_copy = iter;
-        iter_accessor.InitEmbedding(std::move(iter_copy), row_count);
-        ivf_index->BuildIVFIndex(base_row_id, row_count, &iter_accessor, column_def_);
+template <typename Iter>
+class SampleIter {
+public:
+    using ValueType = typename Iter::ValueType;
+
+    SampleIter(Iter iter, float ratio) : iter_(std::move(iter)), ratio_(ratio) {}
+
+    auto Next() {
+        using RtnType = decltype(iter_.Next());
+        if (ratio_ >= 1.0) {
+            return iter_.Next();
+        }
+        if (ratio_ <= 0.0) {
+            return RtnType{};
+        }
+        while (true) {
+            auto next_opt = iter_.Next();
+            if (!next_opt.has_value()) {
+                return RtnType{};
+            }
+            float r = rand() % 1000 / 1000.0;
+            if (r <= ratio_) {
+                return next_opt;
+            }
+        }
     }
 
-    UniquePtr<float[]> avg;
+private:
+    Iter iter_;
+    float ratio_;
+};
+
+// #define use_ivf
+
+template <typename Iter, typename DataType, typename DistanceDataType>
+UniquePtr<float[]> HnswLSGBuilder::GetLSAvg(Iter iter, SizeT row_count, const RowID &base_row_id) {
+
+#ifdef use_ivf
     switch (index_hnsw_->metric_type_) {
         case MetricType::kMetricL2:
-            avg = GetAvgByIVF<Iter, DataType, CompareMax, DistanceDataType>(std::move(iter), row_count, ivf_index.get());
-            break;
+            return GetAvgByIVF<Iter, DataType, CompareMax, DistanceDataType>(std::move(iter), row_count);
         case MetricType::kMetricInnerProduct:
-            avg = GetAvgByIVF<Iter, DataType, CompareMin, DistanceDataType>(std::move(iter), row_count, ivf_index.get());
-            break;
+            return GetAvgByIVF<Iter, DataType, CompareMin, DistanceDataType>(std::move(iter), row_count);
         default:
             UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
     }
-    return avg;
+#else
+    switch (index_hnsw_->metric_type_) {
+        case MetricType::kMetricL2:
+            return GetAvgBF<Iter, DataType, CompareMax, DistanceDataType>(std::move(iter), row_count);
+        case MetricType::kMetricInnerProduct:
+            return GetAvgBF<Iter, DataType, CompareMin, DistanceDataType>(std::move(iter), row_count);
+        default:
+            UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
+    }
+#endif
+    return nullptr;
 }
 
 UniquePtr<IVFIndexInChunk> HnswLSGBuilder::MakeIVFIndex() {
@@ -200,10 +245,10 @@ UniquePtr<IVFIndexInChunk> HnswLSGBuilder::MakeIVFIndex() {
         }
         parameters.push_back(new InitParameter("metric", std::move(metric)));
     }
-    {
-        String sample_raito_ = std::to_string(lsg_config_.sample_raito_);
-        parameters.push_back(new InitParameter("centroids_num_ratio", std::move(sample_raito_)));
-    }
+    // {
+    //     String sample_raito_ = std::to_string(lsg_config_.sample_raito_);
+    //     parameters.push_back(new InitParameter("centroids_num_ratio", std::move(sample_raito_)));
+    // }
     parameters.push_back(new InitParameter("storage_type", "plain"));
     {
         String data_type = EmbeddingT::EmbeddingDataType2String(embedding_info->Type());
@@ -237,7 +282,16 @@ IVF_Search_Params HnswLSGBuilder::MakeIVFSearchParams() const {
 }
 
 template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
-UniquePtr<float[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count, const IVFIndexInChunk *ivf_index) {
+UniquePtr<float[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count) {
+    auto ivf_index = MakeIVFIndex();
+
+    IterIVFDataAccessor iter_accessor;
+    SampleIter<Iter> sample_iter(iter, lsg_config_.sample_raito_);
+    iter_accessor.InitEmbedding(std::move(sample_iter));
+    SizeT sample_count = iter_accessor.size();
+    RowID base_row_id(0, 0);
+    ivf_index->BuildIVFIndex(base_row_id, sample_count, &iter_accessor, column_def_);
+
     auto avg = MakeUnique<float[]>(row_count);
 
     IVF_Search_Params ivf_search_params = MakeIVFSearchParams();
@@ -260,6 +314,61 @@ UniquePtr<float[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count, const
 
         avg[offset] = GetMean(d_ptr.get(), result_n);
     }
+    return avg;
+}
+
+template <typename Iter, typename DataType, template <typename, typename> typename Compare, typename DistanceDataType>
+UniquePtr<float[]> HnswLSGBuilder::GetAvgBF(Iter iter, SizeT row_count) {
+    const auto *embedding_info = static_cast<EmbeddingInfo *>(column_def_->type()->type_info().get());
+    SizeT dim = embedding_info->Dimension();
+
+    SampleIter<Iter> sample_iter(iter, lsg_config_.sample_raito_);
+    SizeT sample_count = row_count * lsg_config_.sample_raito_;
+    auto sample_data = MakeUnique<DataType[]>(sample_count * dim);
+    {
+        SizeT i;
+        for (i = 0; i < sample_count;) {
+            auto next_opt = sample_iter.Next();
+            if (!next_opt.has_value()) {
+                break;
+            }
+            const auto &[embedding, offset] = next_opt.value();
+            std::memcpy(sample_data.get() + i * dim, embedding, dim * sizeof(DataType));
+            ++i;
+        }
+        sample_count = i;
+    }
+
+    auto avg = MakeUnique<float[]>(row_count);
+    KnnDistanceType dist_type = KnnDistanceType::kInvalid;
+    switch (index_hnsw_->metric_type_) {
+        case MetricType::kMetricL2:
+            dist_type = KnnDistanceType::kL2;
+            break;
+        case MetricType::kMetricInnerProduct:
+            dist_type = KnnDistanceType::kInnerProduct;
+            break;
+        default:
+            UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
+    }
+    KnnDistance1<DataType, DistanceDataType> dist_f(dist_type);
+    MergeKnn<DataType, Compare, DistanceDataType> merge_heap(1, lsg_config_.ls_k_, None);
+    SizeT ls_k = std::min(lsg_config_.ls_k_, sample_count);
+    while (true) {
+        auto next_opt = iter.Next();
+        if (!next_opt.has_value()) {
+            break;
+        }
+        merge_heap.Begin();
+        const auto &[data, offset] = next_opt.value();
+        const auto *query = reinterpret_cast<const DataType *>(data);
+        merge_heap.Search(query, sample_data.get(), dim, dist_f.dist_func_, sample_count, 0 /*segment_id*/, 0 /*block_id*/);
+        merge_heap.End();
+
+        auto dist = merge_heap.GetDistances();
+        avg[offset] = GetMean(dist, ls_k);
+    }
+
     return avg;
 }
 

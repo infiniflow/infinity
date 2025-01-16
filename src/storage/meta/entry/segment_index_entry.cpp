@@ -68,6 +68,7 @@ import wal_entry;
 import infinity_context;
 import defer_op;
 import memory_indexer;
+import hnsw_lsg_builder;
 
 namespace infinity {
 
@@ -498,10 +499,18 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kHnsw: {
-            auto memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base, column_def.get(), this);
-            HnswInsertConfig insert_config;
-            insert_config.optimize_ = true;
-            memory_hnsw_index->InsertVecs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_, insert_config);
+            const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+            UniquePtr<HnswIndexInMem> memory_hnsw_index;
+            if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                LSGConfig lsg_config;
+                HnswLSGBuilder builder(index_hnsw, column_def, lsg_config);
+                memory_hnsw_index = builder.Make(segment_entry, column_def->id(), begin_ts, config.check_ts_, buffer_mgr, true);
+            } else {
+                memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base, column_def.get(), this);
+                HnswInsertConfig insert_config;
+                insert_config.optimize_ = true;
+                memory_hnsw_index->InsertVecs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_, insert_config);
+            }
 
             dumped_memindex_entry = memory_hnsw_index->Dump(this, buffer_manager_);
             dumped_memindex_entry->SaveIndexFile();
@@ -922,32 +931,40 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = nullptr;
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
-            auto memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base, column_def.get(), this);
-            const AbstractHnsw &abstract_hnsw = memory_hnsw_index->get();
+            const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+            UniquePtr<HnswIndexInMem> memory_hnsw_index;
+            if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                LSGConfig lsg_config;
+                HnswLSGBuilder builder(index_hnsw, column_def, lsg_config);
+                memory_hnsw_index = builder.Make(segment_entry, column_def->id(), begin_ts, true /*check_ts*/, buffer_mgr, true);
+            } else {
+                memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base, column_def.get(), this);
+                const AbstractHnsw &abstract_hnsw = memory_hnsw_index->get();
 
-            std::visit(
-                [&](auto &index) {
-                    using T = std::decay_t<decltype(index)>;
-                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                        return;
-                    } else {
-                        using IndexT = std::decay_t<decltype(*index)>;
-                        if constexpr (IndexT::kOwnMem) {
-                            using DataType = typename IndexT::DataType;
-                            CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry,
-                                                                                      buffer_mgr,
-                                                                                      column_def->id(),
-                                                                                      begin_ts,
-                                                                                      row_count);
-                            HnswInsertConfig insert_config;
-                            insert_config.optimize_ = true;
-                            index->InsertVecs(std::move(iter), insert_config);
+                std::visit(
+                    [&](auto &index) {
+                        using T = std::decay_t<decltype(index)>;
+                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                            return;
                         } else {
-                            UnrecoverableError("Invalid index type.");
+                            using IndexT = std::decay_t<decltype(*index)>;
+                            if constexpr (IndexT::kOwnMem) {
+                                using DataType = typename IndexT::DataType;
+                                CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry,
+                                                                                          buffer_mgr,
+                                                                                          column_def->id(),
+                                                                                          begin_ts,
+                                                                                          row_count);
+                                HnswInsertConfig insert_config;
+                                insert_config.optimize_ = true;
+                                index->InsertVecs(std::move(iter), insert_config);
+                            } else {
+                                UnrecoverableError("Invalid index type.");
+                            }
                         }
-                    }
-                },
-                abstract_hnsw);
+                    },
+                    abstract_hnsw);
+            }
             merged_chunk_index_entry = memory_hnsw_index->Dump(this, buffer_mgr);
             break;
         }

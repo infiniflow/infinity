@@ -140,12 +140,20 @@ int main(int argc, char *argv[]) {
             index_param_list->emplace_back(new InitParameter("m", std::to_string(16)));
             index_param_list->emplace_back(new InitParameter("ef_construction", std::to_string(200)));
             index_param_list->emplace_back(new InitParameter("metric", "l2"));
-            index_param_list->emplace_back(new InitParameter("encode", "lvq"));
+            index_param_list->emplace_back(new InitParameter("encode", "plain"));
+            index_param_list->emplace_back(new InitParameter("build_type", "lsg"));
             index_info->index_param_list_ = index_param_list;
         }
 
         String index_comment = "";
         query_result = infinity->CreateIndex(db_name, table_name, index_name, index_comment, index_info, CreateIndexOptions());
+
+        {
+            OptimizeOptions options;
+            options.index_name_ = index_name;
+            options.opt_params_.emplace_back(new InitParameter("compress_to_lvq"));
+            infinity->Optimize(db_name, table_name, options);
+        }
 
         if (query_result.IsOk()) {
             std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;
