@@ -334,7 +334,7 @@ Status Storage::AdminToWriter() {
         MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
     bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
-    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kCheckpoint);
+    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
     auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
     bg_processor_->Submit(force_ckp_task);
     force_ckp_task->Wait();
