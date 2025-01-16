@@ -39,12 +39,10 @@ struct DayOfMonthFunction {
 
 template <>
 inline bool DayOfMonthFunction::Run(DateT left, BigIntT &result) {
-    auto given_year = DateT::GetDatePart(left, TimeUnit::kYear);
-    auto given_month = DateT::GetDatePart(left, TimeUnit::kMonth);
-    auto given_day = DateT::GetDatePart(left, TimeUnit::kDay);
-    year_month_day ymd{year(given_year), month(given_month), day(given_day)};
+    year_month_day ymd;
+    DateT::OuterDate2YMD(left, ymd);
     sys_days sd = sys_days(ymd);
-    year_month_day start{year(given_year), month(given_month), day(1)};
+    year_month_day start{ymd.year(), ymd.month(), day(1)};
     sys_days start_sd = sys_days(start);
     auto days_diff = sd - start_sd;
     result = days_diff.count() + 1;

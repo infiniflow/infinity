@@ -43,10 +43,8 @@ struct DayOfWeekFunction {
 
 template <>
 inline bool DayOfWeekFunction::Run(DateT left, BigIntT &result) {
-    auto given_year = DateT::GetDatePart(left, TimeUnit::kYear);
-    auto given_month = DateT::GetDatePart(left, TimeUnit::kMonth);
-    auto given_day = DateT::GetDatePart(left, TimeUnit::kDay);
-    year_month_day ymd{year(given_year), month(given_month), day(given_day)};
+    year_month_day ymd;
+    DateT::OuterDate2YMD(left, ymd);
     weekday wd = weekday{ymd};
     days diff = (wd - weekday{0}) % days{7}; 
     sys_days ymd_sys_days = sys_days(ymd);

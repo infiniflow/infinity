@@ -414,5 +414,7 @@ int64_t DateType::GetDatePart(DateType input, TimeUnit unit) {
     }
     return -1;
 }
-
+bool DateType::OuterDate2YMD(DateType input, int32_t &year, int32_t &month, int32_t &day) {
+    return Date2YMD(input, year, month, day);
+}
 } // namespace infinity
