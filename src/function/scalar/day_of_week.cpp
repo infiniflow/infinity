@@ -1,0 +1,112 @@
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+module;
+#include <__chrono/weekday.h>
+#include <cstdlib>
+module day_of_week;
+import stl;
+import catalog;
+import status;
+import logical_type;
+import infinity_exception;
+import scalar_function;
+import scalar_function_set;
+import third_party;
+import internal_types;
+import data_type;
+import column_vector;
+
+namespace infinity {
+
+using namespace std::chrono;
+
+struct DayOfWeekFunction {
+    template <typename TA, typename TB>
+    static inline bool Run(TA left, TB &result) {
+        Status status = Status::NotSupport("Not implemented");
+        RecoverableError(status);
+        return false;
+    }
+
+};
+
+template <>
+inline bool DayOfWeekFunction::Run(DateT left, BigIntT &result) {
+    auto given_year = DateT::GetDatePart(left, TimeUnit::kYear);
+    auto given_month = DateT::GetDatePart(left, TimeUnit::kMonth);
+    auto given_day = DateT::GetDatePart(left, TimeUnit::kDay);
+    year_month_day ymd{year(given_year), month(given_month), day(given_day)};
+    weekday wd = weekday{ymd};
+    days diff = (wd - weekday{0}) % days{7}; 
+    sys_days ymd_sys_days = sys_days(ymd);
+    sys_days monday_sys_days = ymd_sys_days - diff;
+    result = (ymd_sys_days - monday_sys_days).count();
+    return true;
+}
+
+template <>
+inline bool DayOfWeekFunction::Run(DateTimeT left, BigIntT &result) {
+    auto given_year = DateTimeT::GetDateTimePart(left, TimeUnit::kYear);
+    auto given_month = DateTimeT::GetDateTimePart(left, TimeUnit::kMonth);
+    auto given_day = DateTimeT::GetDateTimePart(left, TimeUnit::kDay);
+    year_month_day ymd{year(given_year), month(given_month), day(given_day)};
+    weekday wd = weekday{ymd};
+    days diff = (wd - weekday{0}) % days{7}; 
+    sys_days ymd_sys_days = sys_days(ymd);
+    sys_days monday_sys_days = ymd_sys_days - diff;
+    result = (ymd_sys_days - monday_sys_days).count();
+    return true;
+}
+
+template <>
+inline bool DayOfWeekFunction::Run(TimestampT left, BigIntT &result) {
+    auto given_year = TimestampT::GetDateTimePart(left, TimeUnit::kYear);
+    auto given_month = TimestampT::GetDateTimePart(left, TimeUnit::kMonth);
+    auto given_day = TimestampT::GetDateTimePart(left, TimeUnit::kDay);
+    year_month_day ymd{year(given_year), month(given_month), day(given_day)};
+    weekday wd = weekday{ymd};
+    days diff = (wd - weekday{0}) % days{7}; 
+    sys_days ymd_sys_days = sys_days(ymd);
+    sys_days monday_sys_days = ymd_sys_days - diff;
+    result = (ymd_sys_days - monday_sys_days).count();
+    return true;
+}
+
+void RegisterDayOfWeekFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    String func_name = "dayofweek";
+
+    SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
+
+    ScalarFunction day_of_week_date_function(func_name,
+                                  {DataType(LogicalType::kDate)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<DateT, BigIntT, DayOfWeekFunction>);
+    function_set_ptr->AddFunction(day_of_week_date_function);
+
+    ScalarFunction day_of_week_datetime_function(func_name,
+                                  {DataType(LogicalType::kDateTime)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<DateTimeT, BigIntT, DayOfWeekFunction>);
+    function_set_ptr->AddFunction(day_of_week_datetime_function);
+
+    ScalarFunction day_of_week_timestamp_function(func_name,
+                                  {DataType(LogicalType::kTimestamp)},
+                                  {DataType(LogicalType::kBigInt)},
+                                  &ScalarFunction::UnaryFunctionWithFailure<TimestampT, BigIntT, DayOfWeekFunction>);
+    function_set_ptr->AddFunction(day_of_week_timestamp_function);
+
+    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+}
+
+} // namespace infinity

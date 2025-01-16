@@ -79,5 +79,10 @@ SELECT DAYOFYEAR(d2) FROM test_datetime;
 ----
 243
 
+query XV
+SELECT DAYOFWEEK(d2) FROM test_datetime;
+----
+1
+
 statement ok
 DROP TABLE test_datetime;
