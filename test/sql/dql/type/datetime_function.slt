@@ -69,5 +69,15 @@ SELECT day(ts1) FROM test_datetime;
 ----
 31
 
+query XIII
+SELECT DAYOFMONTH(ts1) FROM test_datetime;
+----
+31
+
+query XIV
+SELECT DAYOFYEAR(d2) FROM test_datetime;
+----
+243
+
 statement ok
 DROP TABLE test_datetime;
