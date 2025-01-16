@@ -500,6 +500,10 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> Txn::GetTableSnapshot(const String &
     return catalog_->GetTableSnapshot(db_name, table_name, this);
 }
 
+Status Txn::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info) {
+    return catalog_->ApplyTableSnapshot(table_snapshot_info, this);
+}
+
 Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseEntry *&) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: CreateCollection"};
 }
