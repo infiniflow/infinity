@@ -55,10 +55,8 @@ inline bool DayOfWeekFunction::Run(DateT left, BigIntT &result) {
 
 template <>
 inline bool DayOfWeekFunction::Run(DateTimeT left, BigIntT &result) {
-    auto given_year = DateTimeT::GetDateTimePart(left, TimeUnit::kYear);
-    auto given_month = DateTimeT::GetDateTimePart(left, TimeUnit::kMonth);
-    auto given_day = DateTimeT::GetDateTimePart(left, TimeUnit::kDay);
-    year_month_day ymd{year(given_year), month(given_month), day(given_day)};
+    year_month_day ymd;
+    DateTimeT::OuterDateTime2YMD(left.date, ymd);
     weekday wd = weekday{ymd};
     days diff = (wd - weekday{0}) % days{7}; 
     sys_days ymd_sys_days = sys_days(ymd);
@@ -69,10 +67,8 @@ inline bool DayOfWeekFunction::Run(DateTimeT left, BigIntT &result) {
 
 template <>
 inline bool DayOfWeekFunction::Run(TimestampT left, BigIntT &result) {
-    auto given_year = TimestampT::GetDateTimePart(left, TimeUnit::kYear);
-    auto given_month = TimestampT::GetDateTimePart(left, TimeUnit::kMonth);
-    auto given_day = TimestampT::GetDateTimePart(left, TimeUnit::kDay);
-    year_month_day ymd{year(given_year), month(given_month), day(given_day)};
+    year_month_day ymd;
+    TimestampT::OuterDateTime2YMD(left.date, ymd);
     weekday wd = weekday{ymd};
     days diff = (wd - weekday{0}) % days{7}; 
     sys_days ymd_sys_days = sys_days(ymd);

@@ -51,12 +51,10 @@ inline bool DayOfMonthFunction::Run(DateT left, BigIntT &result) {
 
 template <>
 inline bool DayOfMonthFunction::Run(DateTimeT left, BigIntT &result) {
-    auto given_year = DateTimeT::GetDateTimePart(left, TimeUnit::kYear);
-    auto given_month = DateTimeT::GetDateTimePart(left, TimeUnit::kMonth);
-    auto given_day = DateTimeT::GetDateTimePart(left, TimeUnit::kDay);
-    year_month_day ymd{year(given_year), month(given_month), day(given_day)};
+    year_month_day ymd;
+    DateTimeT::OuterDateTime2YMD(left.date, ymd);
     sys_days sd = sys_days(ymd);
-    year_month_day start{year(given_year), month(given_month), day(1)};
+    year_month_day start{ymd.year(), ymd.month(), day(1)};
     sys_days start_sd = sys_days(start);
     auto days_diff = sd - start_sd;
     result = days_diff.count() + 1;
@@ -65,12 +63,10 @@ inline bool DayOfMonthFunction::Run(DateTimeT left, BigIntT &result) {
 
 template <>
 inline bool DayOfMonthFunction::Run(TimestampT left, BigIntT &result) {
-    auto given_year = TimestampT::GetDateTimePart(left, TimeUnit::kYear);
-    auto given_month = TimestampT::GetDateTimePart(left, TimeUnit::kMonth);
-    auto given_day = TimestampT::GetDateTimePart(left, TimeUnit::kDay);
-    year_month_day ymd{year(given_year), month(given_month), day(given_day)};
+    year_month_day ymd;
+    TimestampT::OuterDateTime2YMD(left.date, ymd);
     sys_days sd = sys_days(ymd);
-    year_month_day start{year(given_year), month(given_month), day(1)};
+    year_month_day start{ymd.year(), ymd.month(), day(1)};
     sys_days start_sd = sys_days(start);
     auto days_diff = sd - start_sd;
     result = days_diff.count() + 1;
