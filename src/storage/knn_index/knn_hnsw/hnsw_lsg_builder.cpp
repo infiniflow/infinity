@@ -14,6 +14,7 @@
 
 module;
 
+#include <future>
 #include <vector>
 
 module hnsw_lsg_builder;
@@ -43,6 +44,8 @@ import embedding_info;
 import hnsw_common;
 import status;
 import merge_knn;
+import infinity_context;
+import logger;
 
 namespace infinity {
 
@@ -352,21 +355,57 @@ UniquePtr<float[]> HnswLSGBuilder::GetAvgBF(Iter iter, SizeT row_count) {
             UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
     }
     KnnDistance1<DataType, DistanceDataType> dist_f(dist_type);
-    MergeKnn<DataType, Compare, DistanceDataType> merge_heap(1, lsg_config_.ls_k_, None);
     SizeT ls_k = std::min(lsg_config_.ls_k_, sample_count);
-    while (true) {
-        auto next_opt = iter.Next();
-        if (!next_opt.has_value()) {
-            break;
-        }
-        merge_heap.Begin();
-        const auto &[data, offset] = next_opt.value();
-        const auto *query = reinterpret_cast<const DataType *>(data);
-        merge_heap.Search(query, sample_data.get(), dim, dist_f.dist_func_, sample_count, 0 /*segment_id*/, 0 /*block_id*/);
-        merge_heap.End();
+    if constexpr (SplitIter<Iter>) {
+        Iter iter_copy = iter;
+        auto iters = std::move(iter_copy).split();
+        auto &thread_pool = InfinityContext::instance().GetHnswBuildThreadPool();
+        Vector<std::future<void>> futs;
+        for (auto &splited_iter : iters) {
+            futs.emplace_back(thread_pool.push([&](int id) {
+                MergeKnn<DataType, Compare, DistanceDataType> merge_heap(1, ls_k, None);
+                while (true) {
+                    auto next_opt = splited_iter.Next();
+                    if (!next_opt.has_value()) {
+                        break;
+                    }
+                    merge_heap.Begin();
+                    const auto &[data, offset] = next_opt.value();
+                    const auto *query = reinterpret_cast<const DataType *>(data);
+                    merge_heap.Search(query, sample_data.get(), dim, dist_f.dist_func_, sample_count, 0 /*segment_id*/, 0 /*block_id*/);
+                    merge_heap.End();
 
-        auto dist = merge_heap.GetDistances();
-        avg[offset] = GetMean(dist, ls_k);
+                    auto dist = merge_heap.GetDistances();
+                    if (avg[offset] != 0) {
+                        UnrecoverableError(fmt::format("Invalid avg value: {} at {}", avg[offset], offset));
+                    }
+                    avg[offset] = GetMean(dist, ls_k);
+                }
+            }));
+        }
+        [[maybe_unused]] SizeT i = 0;
+        for (auto &fut : futs) {
+            fut.get();
+            LOG_INFO(fmt::format("Future {} finished", i++));
+        }
+
+    } else {
+        MergeKnn<DataType, Compare, DistanceDataType> merge_heap(1, ls_k, None);
+        while (true) {
+            auto next_opt = iter.Next();
+            if (!next_opt.has_value()) {
+                break;
+            }
+            merge_heap.Begin();
+            const auto &[data, offset] = next_opt.value();
+            const auto *query = reinterpret_cast<const DataType *>(data);
+            merge_heap.Search(query, sample_data.get(), dim, dist_f.dist_func_, sample_count, 0 /*segment_id*/, 0 /*block_id*/);
+            merge_heap.End();
+
+            auto dist = merge_heap.GetDistances();
+            auto avg_v = GetMean(dist, ls_k);
+            avg[offset] = avg_v;
+        }
     }
 
     return avg;
