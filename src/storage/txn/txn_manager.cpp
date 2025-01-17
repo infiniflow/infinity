@@ -69,12 +69,14 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) 
     TxnTimeStamp begin_ts = current_ts_ + 1;
 
     if (txn_type == TransactionType::kCheckpoint) {
-        if (ckp_begin_ts_ != UNCOMMIT_TS) {
-            // not set ckp_begin_ts_ may not truncate the wal file.
-            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, begin_ts));
-        } else {
+        if (ckp_begin_ts_ == UNCOMMIT_TS) {
             LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
             ckp_begin_ts_ = begin_ts;
+        } else {
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing, not start this txn",
+                                 ckp_begin_ts_,
+                                 begin_ts));
+            return nullptr;
         }
     }
 
@@ -249,12 +251,20 @@ bool TxnManager::Stopped() { return !is_running_.load(); }
 
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp commit_ts = txn->Commit();
+    if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+        std::lock_guard guard(locker_);
+        ckp_begin_ts_ = UNCOMMIT_TS;
+    }
     this->CleanupTxn(txn, true);
     return commit_ts;
 }
 
 void TxnManager::RollBackTxn(Txn *txn) {
     txn->Rollback();
+    if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+        std::lock_guard guard(locker_);
+        ckp_begin_ts_ = UNCOMMIT_TS;
+    }
     this->CleanupTxn(txn, false);
 }
 
@@ -296,7 +306,7 @@ Vector<SharedPtr<TxnContext>> TxnManager::GetTxnContextHistories() const {
         txn_context_histories.emplace_back(context_ptr);
     }
 
-    for (const auto& ongoing_txn_pair: txn_map_) {
+    for (const auto &ongoing_txn_pair : txn_map_) {
         txn_context_histories.push_back(ongoing_txn_pair.second->txn_context());
     }
 
@@ -336,7 +346,7 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 void TxnManager::CleanupTxn(Txn *txn, bool commit) {
     bool is_write_transaction = txn->IsWriteTransaction();
     TransactionID txn_id = txn->TxnID();
-    if(is_write_transaction) {
+    if (is_write_transaction) {
         // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
         TxnState txn_state = txn->GetTxnState();
         switch (txn_state) {
@@ -377,6 +387,7 @@ void TxnManager::CleanupTxn(Txn *txn, bool commit) {
             }
         }
         if (commit && add_delta_entry_task) {
+            // Submit delta entry must be after max_committed_ts_ is updated
             InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
         }
     } else {

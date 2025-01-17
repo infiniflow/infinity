@@ -206,7 +206,8 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
         file_worker_->MoveFile();
         type_ = BufferType::kPersistent;
     } else if (type_ == BufferType::kMmap) {
-        UnrecoverableError("Invalid buffer type");
+        String error_message = fmt::format("Invalid buffer type: mmap, {}", GetFilename());
+        UnrecoverableError(error_message);
     }
     return write;
 }
