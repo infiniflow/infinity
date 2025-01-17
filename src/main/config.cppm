@@ -37,6 +37,7 @@ export struct DefaultConfig {
     String default_wal_dir_ = "/var/infinity/wal";
     String default_temp_dir_ = "/var/infinity/tmp";
     String default_resource_dir_ = "/var/infinity/resource";
+    String default_persistence_dir_ = "/var/infinity/persistence";
 };
 
 export struct Config {
