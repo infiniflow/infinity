@@ -116,20 +116,17 @@ AbstractHnsw InitAbstractIndexT(const IndexHnsw *index_hnsw) {
     switch (index_hnsw->encode_type_) {
         case HnswEncodeType::kPlain: {
             if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
-                if constexpr (!OwnMem) {
-                    return nullptr;
-                }
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
-                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType, true>, SegmentOffset, true>;
+                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType, true>, SegmentOffset, OwnMem>;
                         return static_cast<HnswIndex *>(nullptr);
                     }
                     case MetricType::kMetricInnerProduct: {
-                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType, true>, SegmentOffset, true>;
+                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
                         return static_cast<HnswIndex *>(nullptr);
                     }
                     case MetricType::kMetricCosine: {
-                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType, true>, SegmentOffset, true>;
+                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType, true>, SegmentOffset, OwnMem>;
                         return static_cast<HnswIndex *>(nullptr);
                     }
                     default: {

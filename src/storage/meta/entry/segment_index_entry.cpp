@@ -714,11 +714,16 @@ void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<
     LOG_INFO(ss.str());
 }
 
-void SegmentIndexEntry::OptIndex(IndexBase *index_base,
+void SegmentIndexEntry::OptIndex(SharedPtr<IndexBase> new_index_base,
                                  TxnTableStore *txn_table_store,
                                  const Vector<UniquePtr<InitParameter>> &opt_params,
                                  bool replay) {
     SharedPtr<ChunkIndexEntry> dumped_memindex_entry = nullptr;
+    auto set_fileworker_index_def = [&](ChunkIndexEntry *chunk_index_entry) {
+        auto *index_file_worker = static_cast<IndexFileWorker *>(chunk_index_entry->GetBufferObj()->file_worker());
+        index_file_worker->SetIndexDef(new_index_base);
+    };
+
     switch (table_index_entry_->index_base()->index_type_) {
         case IndexType::kBMP: {
             Optional<BMPOptimizeOptions> ret = BMPUtil::ParseBMPOptimizeOptions(opt_params);
@@ -745,16 +750,18 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                     },
                     index);
             };
-            for (const auto &chunk_index_entry : chunk_index_entries) {
+            for (auto &chunk_index_entry : chunk_index_entries) {
                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
                 auto *abstract_bmp = static_cast<AbstractBMP *>(buffer_handle.GetDataMut());
                 optimize_index(*abstract_bmp);
                 chunk_index_entry->SaveIndexFile();
+
+                set_fileworker_index_def(chunk_index_entry.get());
             }
             if (memory_index_entry.get() != nullptr) {
                 optimize_index(memory_index_entry->get());
 
-                dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
+                // dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
             }
             break;
         }
@@ -802,10 +809,12 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                 auto *abstract_hnsw = reinterpret_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
                 optimize_index(abstract_hnsw);
                 chunk_index_entry->SaveIndexFile();
+
+                set_fileworker_index_def(chunk_index_entry.get());
             }
             if (memory_index_entry.get() != nullptr) {
                 optimize_index(memory_index_entry->get_ptr());
-                dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
+                // dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
             }
             break;
         }
@@ -814,6 +823,8 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
         }
     }
     if (dumped_memindex_entry.get() != nullptr) {
+        set_fileworker_index_def(dumped_memindex_entry.get());
+
         auto *txn = txn_table_store->GetTxn();
         AddWalIndexDump(dumped_memindex_entry.get(), txn);
         txn_table_store->AddChunkIndexStore(table_index_entry_, dumped_memindex_entry.get());

@@ -84,6 +84,15 @@ export using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, Se
                                          KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset, false> *,
                                          KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset, false> *,
                                          KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainCosVecStoreType<float, true>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainIPVecStoreType<float, true>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainL2VecStoreType<float, true>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainCosVecStoreType<u8, true>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainIPVecStoreType<u8, true>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainL2VecStoreType<u8, true>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainCosVecStoreType<i8, true>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainIPVecStoreType<i8, true>, SegmentOffset, false> *,
+                                         KnnHnsw<PlainL2VecStoreType<i8, true>, SegmentOffset, false> *,
                                          std::nullptr_t>;
 export struct HnswIndexInMem : public BaseMemIndex {
 public:
