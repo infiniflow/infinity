@@ -27,6 +27,7 @@ import keyword_iterator;
 import must_first_iterator;
 import batch_or_iterator;
 import blockmax_leaf_iterator;
+import rank_feature_doc_iterator;
 
 namespace infinity {
 
@@ -426,6 +427,26 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParam
     search->column_name_ptr_ = &column_;
     auto column_length_reader = MakeUnique<FullTextColumnLengthReader>(column_index_reader);
     search->InitBM25Info(std::move(column_length_reader), params.bm25_params.delta_term, params.bm25_params.k1, params.bm25_params.b);
+    return search;
+}
+
+std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
+    ColumnID column_id = params.table_entry->GetColumnIdByName(column_);
+    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
+    if (!column_index_reader) {
+        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
+        return nullptr;
+    }
+
+    bool fetch_position = false;
+    auto posting_iterator = column_index_reader->Lookup(term_, fetch_position);
+    if (!posting_iterator) {
+        return nullptr;
+    }
+    float boost = 1.0f;
+    auto search = MakeUnique<RankFeatureDocIterator>(std::move(posting_iterator), column_id, boost);
+    search->term_ptr_ = &term_;
+    search->column_name_ptr_ = &column_;
     return search;
 }
 
