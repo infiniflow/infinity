@@ -139,6 +139,7 @@ export enum class ErrorCode : long {
     kFileIsOpen = 3090,
     kUnknown = 3091,
     kInvalidQueryOption = 3092,
+    kFailToStartTxn = 3093,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -315,6 +316,7 @@ public:
     static Status FileIsOpen(const String &filename);
     static Status Unknown(const String &name);
     static Status InvalidQueryOption(const String &detail);
+    static Status FailToStartTxn(const String &detail);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");

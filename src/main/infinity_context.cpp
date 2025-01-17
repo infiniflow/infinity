@@ -50,7 +50,7 @@ NodeRole InfinityContext::GetServerRole() const {
     return cluster_manager_->GetNodeRole();
 }
 
-void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, bool admin_flag, DefaultConfig *default_config) {
+void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
 
     if (GetServerRole() != NodeRole::kUnInitialized) {
         LOG_ERROR("Infinity is already initialized.");
@@ -77,14 +77,6 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, bool admi
 
     session_mgr_ = MakeUnique<SessionManager>();
 
-    if (admin_flag) {
-        Status change_to_admin = ChangeServerRole(NodeRole::kAdmin);
-        if (!change_to_admin.ok()) {
-            UnrecoverableError(change_to_admin.message());
-            return;
-        }
-        return;
-    }
     Status change_result = ChangeServerRole(NodeRole::kAdmin);
     if (!change_result.ok()) {
         UnrecoverableError(change_result.message());
@@ -92,9 +84,9 @@ void InfinityContext::InitPhase1(const SharedPtr<String> &config_path, bool admi
     }
 }
 
-void InfinityContext::InitPhase2() {
+void InfinityContext::InitPhase2(bool admin_flag) {
 
-    if (config_->ServerMode() == "admin") {
+    if (config_->ServerMode() == "admin" or admin_flag) {
         // Admin mode or cluster start phase
         infinity_context_inited_ = true;
         //        fmt::print("Infinity is started as a cluster node.\n");
