@@ -774,6 +774,21 @@ void TermQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std:
     terms.push_back(term_);
 }
 
+void RankFeatureQueryNode::PrintTree(std::ostream &os, const std::string &prefix, const bool is_final) const {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << QueryNodeTypeToString(type_);
+    os << " (weight: " << weight_ << ")";
+    os << " (column: " << column_ << ")";
+    os << " (term: " << term_ << ")";
+    os << '\n';
+}
+
+void RankFeatureQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const {
+    columns.push_back(column_);
+    terms.push_back(term_);
+}
+
 void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, const bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
