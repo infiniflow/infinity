@@ -31,6 +31,7 @@ import txn_manager;
 import txn;
 import status;
 import extra_ddl_info;
+import txn_state;
 
 using namespace infinity;
 
@@ -45,7 +46,7 @@ TEST_P(DBTxnTest, test1) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -59,7 +60,7 @@ TEST_P(DBTxnTest, test1) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn2: Create
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"), TransactionType::kNormal);
 
     // Txn2: Get db1, OK
     auto [db_entry2, status2] = new_txn->GetDatabase("db1");
@@ -73,7 +74,7 @@ TEST_P(DBTxnTest, test1) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn3: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn3: Get db1, NOT OK
     auto [db_entry3, status3] = new_txn->GetDatabase("db1");
@@ -93,7 +94,7 @@ TEST_P(DBTxnTest, test20) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -103,7 +104,7 @@ TEST_P(DBTxnTest, test20) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn2: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"), TransactionType::kNormal);
 
     // Txn2: Get db1, OK
     auto [db_entry1, status1] = new_txn->GetDatabase("db1");
@@ -127,7 +128,7 @@ TEST_P(DBTxnTest, test20) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn3: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
     auto [db_entry3, status3] = new_txn->GetDatabase("db1");
@@ -147,7 +148,7 @@ TEST_P(DBTxnTest, test2) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
 
@@ -171,7 +172,7 @@ TEST_P(DBTxnTest, test2) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn2: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn2: Get db1, OK
     auto [db_entry2, status2] = new_txn->GetDatabase("db1");
@@ -189,7 +190,7 @@ TEST_P(DBTxnTest, test2) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn3: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
     auto [db_entry4, status4] = new_txn->GetDatabase("db1");
@@ -213,10 +214,10 @@ TEST_P(DBTxnTest, test3) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -242,9 +243,9 @@ TEST_P(DBTxnTest, test4) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -266,7 +267,7 @@ TEST_P(DBTxnTest, test5) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -276,7 +277,7 @@ TEST_P(DBTxnTest, test5) {
     txn_mgr->RollBackTxn(new_txn);
 
     // Txn2: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn2: Get db1, NOT OK
     auto [db_entry, status1] = new_txn->GetDatabase("db1");
@@ -296,10 +297,10 @@ TEST_P(DBTxnTest, test6) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
 
@@ -321,7 +322,7 @@ TEST_P(DBTxnTest, test6) {
     txn_mgr->CommitTxn(new_txn2);
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"));
+    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
     auto [db_entry, status1] = new_txn3->GetDatabase("db1");
@@ -341,10 +342,10 @@ TEST_P(DBTxnTest, test7) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
 
@@ -370,7 +371,7 @@ TEST_P(DBTxnTest, test7) {
     txn_mgr->CommitTxn(new_txn2);
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"));
+    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
     auto [db_entry, status1] = new_txn3->GetDatabase("db1");

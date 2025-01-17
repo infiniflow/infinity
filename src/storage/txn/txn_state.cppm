@@ -61,24 +61,25 @@ export inline String TxnState2Str(TxnState txn_state) {
     return String();
 }
 
-export enum class TxnType : i8 {
-    kRead = 0,
-    kWrite,
-    kInvalid,
+export enum class TransactionType {
+    kCheckpoint, // Develop know it's a checkpoint txn
+    kRead,       // Developer know it's a read txn
+    kNormal      // Developer doesn't know what type is this txn
 };
 
-export inline String TxnType2Str(TxnType txn_type) {
+export inline String TransactionType2Str(TransactionType txn_type) {
     switch (txn_type) {
-        case TxnType::kRead: {
+        case TransactionType::kCheckpoint: {
+            return "Checkpoint";
+        }
+        case TransactionType::kRead: {
             return "Read";
         }
-        case TxnType::kWrite: {
-            return "Write";
-        }
-        default: {
-            return "Not decided";
+        case TransactionType::kNormal: {
+            return "Normal";
         }
     }
+    return "Normal";
 }
 
 } // namespace infinity

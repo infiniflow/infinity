@@ -157,6 +157,45 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     return block_entry;
 }
 
+SharedPtr<BlockEntry>
+BlockEntry::ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *block_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_snapshot_info->block_id_, 0);
+
+    block_entry->checkpoint_row_count_ = block_snapshot_info->row_count_;
+    block_entry->row_capacity_ = block_snapshot_info->row_capacity_;
+    block_entry->block_dir_ = MakeShared<String>(block_snapshot_info->block_dir_);
+
+    for(const auto& block_column_snapshot: block_snapshot_info->column_block_snapshots_) {
+        auto column_entry = BlockColumnEntry::ApplyBlockColumnSnapshot(block_entry.get(), block_column_snapshot.get(), txn_id, begin_ts);
+        block_entry->columns_.emplace_back(std::move(column_entry));
+    }
+    // Version file rewrite
+    nlohmann::json fast_rough_filter_json = nlohmann::json::parse(block_snapshot_info->fast_rough_filter_);
+    block_entry->GetFastRoughFilter()->LoadFromJsonFile(fast_rough_filter_json);
+    return block_entry;
+}
+
+SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
+    SharedPtr<BlockSnapshotInfo> block_snapshot_info = MakeShared<BlockSnapshotInfo>();
+    block_snapshot_info->block_id_ = block_id_;
+    block_snapshot_info->row_count_ = checkpoint_row_count_;
+    block_snapshot_info->row_capacity_ = row_capacity_;
+    block_snapshot_info->block_dir_ = *block_dir_;
+
+    SizeT column_count = this->columns_.size();
+    block_snapshot_info->column_block_snapshots_.reserve(column_count);
+    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
+        SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = columns_[column_id]->GetSnapshotInfo();
+        block_snapshot_info->column_block_snapshots_.push_back(block_column_snapshot_info);
+    }
+
+    nlohmann::json json_res;
+    this->GetFastRoughFilter()->SaveToJsonFile(json_res);
+    block_snapshot_info->fast_rough_filter_ = json_res.dump();
+
+    return block_snapshot_info;
+}
+
 // Used to replay DeltaOp to update a BlockEntry
 void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data) {
     block_row_count_ = block_entry->block_row_count_;
@@ -463,21 +502,6 @@ void BlockEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *
         table_store->AddBlockColumnStore(const_cast<SegmentEntry *>(segment_entry_), this, dropped_column.get());
         dropped_columns_.emplace_back(std::move(dropped_column));
     }
-}
-
-SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
-    SharedPtr<BlockSnapshotInfo> block_snapshot_info = MakeShared<BlockSnapshotInfo>();
-    block_snapshot_info->block_id_ = block_id_;
-    block_snapshot_info->block_dir_ = *block_dir_;
-
-    SizeT column_count = this->columns_.size();
-    block_snapshot_info->column_block_snapshots_.reserve(column_count);
-    for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-        SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = columns_[column_id]->GetSnapshotInfo();
-        block_snapshot_info->column_block_snapshots_.push_back(block_column_snapshot_info);
-    }
-
-    return block_snapshot_info;
 }
 
 void BlockEntry::CheckFlush(TxnTimeStamp checkpoint_ts, bool &flush_column, bool &flush_version, bool check_commit, bool need_lock) const {

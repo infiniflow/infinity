@@ -66,7 +66,6 @@ protected:
         len_ = 0;
         offset_ = 0;
         end_offset_ = 0;
-        level_ = 0;
         is_index_ = false;
         is_raw_ = false;
     }
@@ -81,7 +80,6 @@ protected:
     u32 offset_{0};
     u32 end_offset_{0};
     u32 local_offset_{0};
-    int level_{0};
     bool is_index_{false};
     bool is_raw_{false};
     bool case_sensitive_{false};

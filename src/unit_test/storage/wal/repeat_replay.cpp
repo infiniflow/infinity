@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+
 import base_test;
 
 import stl;
@@ -44,6 +45,7 @@ import value;
 import internal_types;
 import buffer_manager;
 import physical_import;
+import txn_state;
 
 using namespace infinity;
 
@@ -74,7 +76,7 @@ TEST_P(RepeatReplayTest, append) {
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     auto TestAppend = [&](TxnManager *txn_mgr) {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
 
         Vector<SharedPtr<ColumnVector>> column_vectors;
         for (SizeT i = 0; i < table_def->columns().size(); ++i) {
@@ -101,7 +103,7 @@ TEST_P(RepeatReplayTest, append) {
         txn_mgr->CommitTxn(txn);
     };
     auto CheckTable = [&](TxnManager *txn_mgr, size_t row_cnt) {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
@@ -133,7 +135,7 @@ TEST_P(RepeatReplayTest, append) {
 
         TxnManager *txn_mgr = storage->txn_manager();
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -164,7 +166,7 @@ TEST_P(RepeatReplayTest, append) {
         TxnManager *txn_mgr = storage->txn_manager();
         CheckTable(txn_mgr, 2);
         { //  manually add delta checkpoint
-            auto *txn_force_ckp = txn_mgr->BeginTxn(MakeUnique<String>("full checkpoint"));
+            auto *txn_force_ckp = txn_mgr->BeginTxn(MakeUnique<String>("full checkpoint"), TransactionType::kCheckpoint);
             auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn_force_ckp, false /*is_full_checkpoint*/);
             storage->bg_processor()->Submit(force_ckp_task);
             force_ckp_task->Wait();
@@ -195,7 +197,7 @@ TEST_P(RepeatReplayTest, import) {
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
     auto TestImport = [&](TxnManager *txn_mgr, BufferManager *buffer_mgr) {
-        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"));
+        Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"), TransactionType::kNormal);
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
         SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
@@ -228,7 +230,7 @@ TEST_P(RepeatReplayTest, import) {
         txn_mgr->CommitTxn(txn);
     };
     auto CheckTable = [&](TxnManager *txn_mgr, size_t row_cnt) {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
@@ -256,7 +258,7 @@ TEST_P(RepeatReplayTest, import) {
         TxnManager *txn_mgr = storage->txn_manager();
         BufferManager *buffer_mgr = storage->buffer_manager();
         {
-            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
             txn->CreateTable(*db_name, table_def, ConflictType::kError);
 
@@ -290,7 +292,7 @@ TEST_P(RepeatReplayTest, import) {
         BufferManager *buffer_mgr = storage->buffer_manager();
         CheckTable(txn_mgr, 2);
         { //  manually add delta checkpoint
-            auto *txn_force_ckp = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"));
+            auto *txn_force_ckp = txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kCheckpoint);
             auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn_force_ckp, false /*is_full_checkpoint*/);
             storage->bg_processor()->Submit(force_ckp_task);
             force_ckp_task->Wait();

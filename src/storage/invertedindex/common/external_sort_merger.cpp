@@ -469,7 +469,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
         auto out_key = top.KEY();
         if (tuple_list == nullptr) {
             tuple_list = MakeShared<TermTupleList>(out_key.term_);
-            tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
+            tuple_list->Add(out_key.doc_id_, out_key.term_pos_, out_key.doc_payload_);
         } else if (idx != last_idx) {
             if (tuple_list->IsFull() || out_key.term_ != tuple_list->term_) {
                 // output
@@ -478,7 +478,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
                 }
                 tuple_list = MakeShared<TermTupleList>(out_key.term_);
             }
-            tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
+            tuple_list->Add(out_key.doc_id_, out_key.term_pos_, out_key.doc_payload_);
         }
 
         assert(idx < this->MAX_GROUP_SIZE_);

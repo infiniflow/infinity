@@ -43,6 +43,7 @@ import index_hnsw;
 import statement_common;
 import data_access_state;
 import txn_store;
+import txn_state;
 
 import base_entry;
 
@@ -63,10 +64,10 @@ TEST_P(CatalogTest, simple_test1) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // start txn2
-    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
     HashMap<String, BaseEntry *> databases;
 
@@ -121,10 +122,10 @@ TEST_P(CatalogTest, simple_test2) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // start txn2
-    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
     // create db in empty catalog should be success
     {
@@ -145,7 +146,7 @@ TEST_P(CatalogTest, simple_test2) {
 
     txn_mgr->CommitTxn(txn2);
 
-    auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
+    auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
 
     // should be visible to txn3
     {
@@ -172,8 +173,8 @@ TEST_P(CatalogTest, concurrent_test) {
 
     for (int loop = 0; loop < 1; ++loop) {
         // start txn1 && txn2
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
-        auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
         auto write_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
@@ -193,8 +194,8 @@ TEST_P(CatalogTest, concurrent_test) {
         txn_mgr->CommitTxn(txn2);
 
         // start txn3 && txn4
-        auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
-        auto *txn4 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+        auto *txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
+        auto *txn4 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
         auto read_routine = [&](Txn *txn) {
             for (int db_id = 0; db_id < 1000; ++db_id) {
@@ -215,8 +216,8 @@ TEST_P(CatalogTest, concurrent_test) {
         txn_mgr->CommitTxn(txn4);
 
         // start txn5 && txn6
-        auto *txn5 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
-        auto *txn6 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
+        auto *txn5 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        auto *txn6 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
 
         auto drop_routine = [&](int start, Txn *txn) {
             for (int db_id = start; db_id < 1000; db_id += 2) {
@@ -235,7 +236,7 @@ TEST_P(CatalogTest, concurrent_test) {
         txn_mgr->CommitTxn(txn6);
 
         // start txn7
-        auto *txn7 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"));
+        auto *txn7 = txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
 
         // check all has been dropped
         for (int db_id = 0; db_id < 1000; ++db_id) {
@@ -256,10 +257,10 @@ TEST_P(CatalogTest, get_db_info_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // start txn2
-    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
     // create db in empty catalog should be success
     {
@@ -304,7 +305,7 @@ TEST_P(CatalogTest, get_table_info_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // create table, get table info, drop table
     {
@@ -341,7 +342,7 @@ TEST_P(CatalogTest, get_table_index_info_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
 
     // create table
     {
@@ -415,7 +416,7 @@ TEST_P(CatalogTest, remove_index_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
 
     // create table
     {
@@ -485,7 +486,7 @@ TEST_P(CatalogTest, roll_back_append_test) {
     BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // create table
     {
@@ -525,7 +526,7 @@ TEST_P(CatalogTest, roll_back_delete_test) {
     BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // create table
     {
@@ -564,7 +565,7 @@ TEST_P(CatalogTest, roll_back_write_test) {
     BufferManager *buffer_mgr = infinity::InfinityContext::instance().storage()->buffer_manager();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // create table
     {

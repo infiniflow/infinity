@@ -19,14 +19,12 @@ import stl;
 module term;
 
 namespace infinity {
-const u8 Term::AND = 0;
-const u8 Term::OR = 1;
+
 String PLACE_HOLDER("<PH>");
 
 void Term::Reset() {
     text_.clear();
     word_offset_ = 0;
-    stats_ = 0;
 }
 
 Term TermList::global_temporary_;

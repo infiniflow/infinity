@@ -21,7 +21,7 @@ If you wish to embed Infinity into your Python application without the need for 
 
 1. Install the Infinity-embedded SDK:
    ```bash
-   pip install infinity-embedded-sdk==0.6.0.dev1
+   pip install infinity-embedded-sdk==0.6.0.dev2
    ```
 2. Use Infinity to conduct a dense vector search:
    ```python

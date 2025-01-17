@@ -48,8 +48,6 @@ bool NGramAnalyzer::NextInString(const char *data,
 }
 
 int NGramAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
-    unsigned char level = 0;
-
     SizeT len = input.text_.length();
     if (len == 0)
         return 0;
@@ -61,7 +59,7 @@ int NGramAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     while (cur < len && NextInString(input.text_.c_str(), len, &cur, &token_start, &token_length)) {
         if (token_length == 0)
             continue;
-        func(data, input.text_.c_str() + token_start, token_length, offset, offset + token_length, Term::AND, level, false);
+        func(data, input.text_.c_str() + token_start, token_length, offset, offset + token_length, false);
         offset++;
     }
 

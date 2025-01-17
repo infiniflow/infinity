@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "type/complex/array_type.h"
 #include "type/complex/embedding_type.h"
 #include "type/complex/multi_vector_type.h"
 #include "type/complex/row_id.h"
@@ -71,7 +72,7 @@ using TimestampT = TimestampType;
 using IntervalT = IntervalType;
 
 // Nest types
-using ArrayT = std::vector<Value>;
+using ArrayT = ArrayType;
 using TupleT = std::vector<Value>;
 // using ArrayT = ArrayType;
 // using TupleT = TupleType;

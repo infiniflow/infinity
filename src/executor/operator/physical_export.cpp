@@ -37,6 +37,7 @@ import stl;
 import logical_type;
 import embedding_info;
 import sparse_info;
+import array_info;
 import status;
 import buffer_manager;
 import default_values;
@@ -208,6 +209,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 for (SizeT select_column_idx = 0; select_column_idx < select_column_count; ++select_column_idx) {
                     Value v = column_vectors[select_column_idx].GetValue(row_idx);
                     switch (v.type().type()) {
+                        case LogicalType::kArray:
                         case LogicalType::kEmbedding:
                         case LogicalType::kMultiVector:
                         case LogicalType::kTensor:
@@ -497,6 +499,10 @@ label_return:
     return row_count;
 }
 
+SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type);
+
+SharedPtr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const Vector<u32> &block_rows_for_output);
+
 SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperatorState *export_op_state) {
     const Vector<SharedPtr<ColumnDef>> &column_defs = table_entry_->column_defs();
     Vector<ColumnID> select_columns;
@@ -516,7 +522,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     Vector<SharedPtr<arrow::Field>> fields;
     for (auto &column_id : select_columns) {
         ColumnDef *column_def = column_defs[column_id].get();
-        auto arrow_type = GetArrowType(column_def);
+        auto arrow_type = GetArrowType(*(column_def->type()));
         fields.emplace_back(::arrow::field(column_def->name(), std::move(arrow_type)));
     }
 
@@ -664,9 +670,8 @@ label_return:
     return row_count;
 }
 
-SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
-    auto &column_type = column_def->type();
-    switch (const auto column_logical_type = column_type->type(); column_logical_type) {
+SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type) {
+    switch (const auto column_logical_type = column_data_type.type(); column_logical_type) {
         case LogicalType::kBoolean:
             return arrow::boolean();
         case LogicalType::kTinyInt:
@@ -695,8 +700,7 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
         case LogicalType::kVarchar:
             return arrow::utf8();
         case LogicalType::kSparse: {
-            const auto *sparse_info = static_cast<const SparseInfo *>(column_def->type()->type_info().get());
-
+            const auto *sparse_info = static_cast<const SparseInfo *>(column_data_type.type_info().get());
             SharedPtr<arrow::DataType> index_type;
             Optional<SharedPtr<arrow::DataType>> value_type = None;
             switch (sparse_info->IndexType()) {
@@ -775,7 +779,7 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
-            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_type->type_info().get());
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_data_type.type_info().get());
             const SizeT dimension = embedding_info->Dimension();
             SharedPtr<arrow::DataType> arrow_embedding_elem_type;
             switch (embedding_info->Type()) {
@@ -839,11 +843,15 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
             UnrecoverableError("Unreachable code!");
             return {};
         }
+        case LogicalType::kArray: {
+            const auto *array_info = static_cast<const ArrayInfo *>(column_data_type.type_info().get());
+            auto element_arrow_type = GetArrowType(array_info->ElemType());
+            return ::arrow::list(std::move(element_arrow_type));
+        }
         case LogicalType::kRowID:
         case LogicalType::kInterval:
         case LogicalType::kHugeInt:
         case LogicalType::kDecimal:
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kPoint:
         case LogicalType::kLine:
@@ -863,12 +871,9 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
     return nullptr;
 }
 
-SharedPtr<arrow::Array>
-PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &column_vector, const Vector<u32> &block_rows_for_output) {
-    SharedPtr<arrow::ArrayBuilder> array_builder = nullptr;
-    auto &column_type = column_def->type();
-
-    switch (const auto column_logical_type = column_type->type(); column_logical_type) {
+SharedPtr<arrow::ArrayBuilder> GetArrowBuilder(const DataType &column_type) {
+    SharedPtr<arrow::ArrayBuilder> array_builder{};
+    switch (const auto column_logical_type = column_type.type(); column_logical_type) {
         case LogicalType::kBoolean: {
             array_builder = MakeShared<arrow::BooleanBuilder>();
             break;
@@ -923,7 +928,7 @@ PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &colum
             break;
         }
         case LogicalType::kSparse: {
-            const auto *sparse_info = static_cast<const SparseInfo *>(column_def->type()->type_info().get());
+            const auto *sparse_info = static_cast<const SparseInfo *>(column_type.type_info().get());
             SharedPtr<arrow::ArrayBuilder> index_builder = nullptr;
             SharedPtr<arrow::ArrayBuilder> value_builder = nullptr;
             switch (sparse_info->IndexType()) {
@@ -1016,7 +1021,7 @@ PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &colum
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
-            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_type->type_info().get());
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_type.type_info().get());
             SharedPtr<::arrow::ArrayBuilder> embedding_element_builder;
             switch (embedding_info->Type()) {
                 case EmbeddingDataType::kElemBit: {
@@ -1085,11 +1090,16 @@ PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &colum
             UnrecoverableError("Unreachable code!");
             break;
         }
+        case LogicalType::kArray: {
+            const auto *array_info = static_cast<const ArrayInfo *>(column_type.type_info().get());
+            auto element_arrow_builder = GetArrowBuilder(array_info->ElemType());
+            array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), element_arrow_builder);
+            break;
+        }
         case LogicalType::kRowID:
         case LogicalType::kInterval:
         case LogicalType::kHugeInt:
         case LogicalType::kDecimal:
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kPoint:
         case LogicalType::kLine:
@@ -1106,10 +1116,16 @@ PhysicalExport::BuildArrowArray(ColumnDef *column_def, const ColumnVector &colum
             UnrecoverableError(error_message);
         }
     }
+    return array_builder;
+}
+
+SharedPtr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const Vector<u32> &block_rows_for_output) {
+    auto &column_type = column_def->type();
+    SharedPtr<arrow::ArrayBuilder> array_builder = GetArrowBuilder(*column_type);
 
     for (const auto idx : block_rows_for_output) {
         auto value = column_vector.GetValue(idx);
-        value.AppendToArrowArray(column_type, array_builder);
+        value.AppendToArrowArray(*column_type, array_builder.get());
     }
 
     SharedPtr<arrow::Array> array;

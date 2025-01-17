@@ -41,6 +41,7 @@ import table_entry;
 import table_entry_type;
 import segment_entry;
 import block_entry;
+import txn_state;
 
 using namespace infinity;
 
@@ -62,7 +63,7 @@ TEST_P(SegmentEntryTest, decode_index_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("decode"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("decode"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -105,7 +106,7 @@ TEST_P(SegmentEntryTest, segment_entry_to_string_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -128,7 +129,7 @@ TEST_P(SegmentEntryTest, set_sealed_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -147,7 +148,7 @@ TEST_P(SegmentEntryTest, set_compacting_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -167,7 +168,7 @@ TEST_P(SegmentEntryTest, set_no_delete_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -188,7 +189,7 @@ TEST_P(SegmentEntryTest, set_deprecated_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -210,7 +211,7 @@ TEST_P(SegmentEntryTest, roll_back_compact_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -233,7 +234,7 @@ TEST_P(SegmentEntryTest, check_row_visible_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -251,7 +252,7 @@ TEST_P(SegmentEntryTest, check_rows_visible_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -273,7 +274,7 @@ TEST_P(SegmentEntryTest, append_data_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("set"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);

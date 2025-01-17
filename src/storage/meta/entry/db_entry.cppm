@@ -30,6 +30,7 @@ import column_def;
 import meta_map;
 import random;
 import cleanup_scanner;
+import snapshot_info;
 
 namespace infinity {
 
@@ -129,6 +130,8 @@ public:
                     TxnTimeStamp begin_ts);
 
     TableEntry *GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 

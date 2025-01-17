@@ -113,6 +113,11 @@ public:
                                                          TxnTimeStamp begin_ts,
                                                          TransactionID txn_id);
 
+    static SharedPtr<SegmentEntry> ApplySegmentSnapshot(TableEntry *table_entry,
+                                                        SegmentSnapshotInfo *segment_snapshot_info,
+                                                        TransactionID txn_id,
+                                                        TxnTimeStamp begin_ts);
+
     void UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data);
 
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
