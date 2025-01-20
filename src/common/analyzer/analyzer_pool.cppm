@@ -45,6 +45,7 @@ public:
     static constexpr std::string_view IK = "ik";
     static constexpr std::string_view KEYWORD = "keyword";
     static constexpr std::string_view WHITESPACE = "whitespace";
+    static constexpr std::string_view RANKFEATURES = "rankfeatures";
 
 private:
     CacheType cache_{};

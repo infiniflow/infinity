@@ -275,6 +275,11 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         match_node->minimum_should_match_option_ = ParseMinimumShouldMatchOption(iter->second);
                     }
 
+                    // option: rank_features
+                    if (iter = search_ops.options_.find("rank_features"); iter != search_ops.options_.end()) {
+                        match_node->rank_features_option_ = ParseRankFeaturesOption(iter->second);
+                    }
+
                     // option: threshold
                     if (iter = search_ops.options_.find("threshold"); iter != search_ops.options_.end()) {
                         match_node->score_threshold_ = DataType::StringToValue<FloatT>(iter->second);
