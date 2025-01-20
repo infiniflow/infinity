@@ -54,6 +54,9 @@ import day;
 import hour;
 import minute;
 import second;
+import day_of_month;
+import day_of_week;
+import day_of_year;
 import not_func;
 import or_func;
 import plus;
@@ -162,6 +165,9 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterHourFunction(catalog_ptr_);
     RegisterMinuteFunction(catalog_ptr_);
     RegisterSecondFunction(catalog_ptr_);
+    RegisterDayOfYearFunction(catalog_ptr_);
+    RegisterDayOfMonthFunction(catalog_ptr_);
+    RegisterDayOfWeekFunction(catalog_ptr_);
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}

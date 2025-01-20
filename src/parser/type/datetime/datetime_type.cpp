@@ -108,4 +108,14 @@ bool DateTimeType::IsDateTimeValid(int32_t year, int32_t month, int32_t day, int
     return TimeType::IsTimeValid(hour, minute, second) and DateType::IsDateValid(year, month, day);
 }
 
+
+bool DateTimeType::OuterDateTime2YMD(int32_t days, std::chrono::year_month_day &ymd) {
+    int32_t year, month, day;
+    bool result = DateType::Date2YMD(days, year, month, day);
+    if (result) {
+        ymd = std::chrono::year_month_day(std::chrono::year(year), std::chrono::month(month), std::chrono::day(day));
+    }
+    return result;
+}
+
 } // namespace infinity
