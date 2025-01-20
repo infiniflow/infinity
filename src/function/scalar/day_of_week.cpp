@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module;
-#include <__chrono/weekday.h>
-#include <cstdlib>
+#include <chrono>
 module day_of_week;
 import stl;
 import catalog;
