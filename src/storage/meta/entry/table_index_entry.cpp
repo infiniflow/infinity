@@ -538,7 +538,7 @@ void TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<Uniq
             }
             std::unique_lock w_lock(rw_locker_);
             for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-                segment_index_entry->OptIndex(index_base_.get(), txn_table_store, opt_params, false /*replay*/);
+                segment_index_entry->OptIndex(index_base_, txn_table_store, opt_params, false /*replay*/);
             }
             break;
         }
@@ -549,24 +549,30 @@ void TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<Uniq
             if (!params) {
                 break;
             }
-            auto *hnsw_index = static_cast<IndexHnsw *>(index_base_.get());
             if (params->compress_to_lvq) {
+                auto *hnsw_index = static_cast<IndexHnsw *>(index_base_.get());
                 if (hnsw_index->encode_type_ != HnswEncodeType::kPlain) {
                     LOG_WARN("Not implemented");
                     break;
                 }
-                IndexHnsw old_index_hnsw = *hnsw_index;
-                hnsw_index->encode_type_ = HnswEncodeType::kLVQ;
-                txn_table_store->AddIndexStore(this);
+                auto new_index_hnsw = MakeShared<IndexHnsw>(*hnsw_index);
+                // IndexHnsw old_index_hnsw = *hnsw_index;
+                new_index_hnsw->encode_type_ = HnswEncodeType::kLVQ;
+                if (new_index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                    new_index_hnsw->build_type_ = HnswBuildType::kPlain;
+                }
+
                 if (!replay) {
                     for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-                        segment_index_entry->OptIndex(static_cast<IndexBase *>(&old_index_hnsw), txn_table_store, opt_params, false /*replay*/);
+                        segment_index_entry->OptIndex(static_pointer_cast<IndexBase>(new_index_hnsw), txn_table_store, opt_params, false /*replay*/);
                     }
                 }
+                index_base_ = static_pointer_cast<IndexBase>(new_index_hnsw);
+                txn_table_store->AddIndexStore(this);
             }
             if (params->lvq_avg) {
                 for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-                    segment_index_entry->OptIndex(hnsw_index, txn_table_store, opt_params, false /*replay*/);
+                    segment_index_entry->OptIndex(index_base_, txn_table_store, opt_params, false /*replay*/);
                 }
             }
             break;

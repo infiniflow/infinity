@@ -32,6 +32,7 @@ import multivector_util;
 import internal_types;
 import column_vector;
 import fix_heap;
+import block_column_iter;
 
 namespace infinity {
 
@@ -51,45 +52,34 @@ export template <bool CheckTS>
 class SegmentIter {
 public:
     SegmentIter(const SegmentEntry *entry, BufferManager *buffer_mgr, Vector<ColumnID> &&column_ids, TxnTimeStamp iterate_ts)
-        : entry_(entry), buffer_mgr_(buffer_mgr), column_ids_(std::move(column_ids)), iterate_ts_(iterate_ts), block_entry_iter_(entry) {
-        auto *block_entry = block_entry_iter_.Next();
-        if (block_entry->block_id() != 0) {
-            String error_message = "First block id is not 0";
-            UnrecoverableError(error_message);
-        }
-        if (block_entry == nullptr) {
-            block_iter_ = None;
-        } else {
-            block_iter_ = BlockIter<CheckTS>(block_entry, buffer_mgr, column_ids_, iterate_ts_);
-        }
-    }
+        : entry_(entry), buffer_mgr_(buffer_mgr), column_ids_(std::move(column_ids)), iterate_ts_(iterate_ts), block_entry_iter_(entry) {}
 
     Optional<Pair<Vector<const void *>, SegmentOffset>> Next() {
         if (!block_iter_.has_value()) {
-            return None;
+            auto *block_entry = block_entry_iter_.Next();
+            if (block_entry == nullptr) {
+                return None;
+            }
+            block_iter_ = BlockIter<CheckTS>(block_entry, buffer_mgr_, column_ids_, iterate_ts_);
+            ++block_idx_;
         }
-        if (auto ret = block_iter_->Next(); ret) {
-            auto &[vec, offset] = *ret;
-            // FIXME: segment_entry should store the block capacity
-            return std::make_pair(std::move(vec), static_cast<SegmentOffset>(offset + block_idx_ * DEFAULT_BLOCK_CAPACITY));
-        }
-        block_idx_++;
-        auto *block_entry = block_entry_iter_.Next();
-        if (block_entry == nullptr) {
+        auto ret = block_iter_->Next();
+        if (!ret.has_value()) {
             block_iter_ = None;
-            return None;
+            return Next();
         }
-        if (block_entry->block_id() != block_idx_) {
-            String error_message = "Block id is not continuous";
-            UnrecoverableError(error_message);
-        }
-        block_iter_ = BlockIter<CheckTS>(block_entry, buffer_mgr_, column_ids_, iterate_ts_);
-        return Next();
+        auto &[vec, offset] = *ret;
+        return std::make_pair(std::move(vec), static_cast<SegmentOffset>(offset + (block_idx_ - 1) * DEFAULT_BLOCK_CAPACITY));
     }
 
     const SharedPtr<ColumnVector> &column_vector(SizeT col_id) const { return block_iter_->column_vector(col_id); }
 
-    SizeT offset() const { return block_idx_ * DEFAULT_BLOCK_CAPACITY + block_iter_->offset(); }
+    SizeT offset() const { return block_iter_.has_value() ? (block_idx_ - 1) * DEFAULT_BLOCK_CAPACITY + block_iter_->offset() : 0; }
+
+    const Vector<ColumnID> &column_ids() const { return column_ids_; }
+    BufferManager *buffer_mgr() const { return buffer_mgr_; }
+
+    BlockEntryIter block_entry_iter() && { return std::move(block_entry_iter_); }
 
 private:
     const SegmentEntry *const entry_;
@@ -102,9 +92,15 @@ private:
     Optional<BlockIter<CheckTS>> block_iter_;
 };
 
+export template <typename Iter>
+concept SplitIter = requires(Iter iter) { typename Iter::Split; };
+
 export template <typename DataType, bool CheckTS = true>
 class OneColumnIterator {
 public:
+    using ValueType = const DataType *;
+    using Split = void;
+
     OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts)
         : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts) {}
 
@@ -119,6 +115,24 @@ public:
 
     SizeT offset() const { return segment_iter_.offset(); }
 
+    Vector<MemIndexInserterIter<DataType>> split() && {
+        Vector<MemIndexInserterIter<DataType>> ret;
+        auto column_id = segment_iter_.column_ids()[0];
+        auto *buffer_mgr = segment_iter_.buffer_mgr();
+        auto block_entry_iter = std::move(segment_iter_).block_entry_iter();
+        while (true) {
+            auto *block_entry = block_entry_iter.Next();
+            if (block_entry == nullptr) {
+                break;
+            }
+            SegmentOffset block_offset = block_entry->block_id() * DEFAULT_BLOCK_CAPACITY;
+            auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            MemIndexInserterIter<DataType> block_iter(block_offset, block_column_entry, buffer_mgr, 0, block_entry->row_count());
+            ret.emplace_back(std::move(block_iter));
+        }
+        return ret;
+    }
+
 private:
     SegmentIter<CheckTS> segment_iter_;
 };
@@ -126,6 +140,8 @@ private:
 export template <typename DataType, bool CheckTS>
 class CappedOneColumnIterator : public OneColumnIterator<DataType, CheckTS> {
 public:
+    using ValueType = const DataType *;
+
     CappedOneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT cap)
         : OneColumnIterator<DataType, CheckTS>(entry, buffer_mgr, column_id, iterate_ts), cap_(cap) {}
 
@@ -143,6 +159,8 @@ private:
 export template <typename ElementT, bool CheckTS>
 class OneColumnIterator<MultiVectorRef<ElementT>, CheckTS> {
 public:
+    using ValueType = const ElementT *;
+
     OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT ele_size)
         : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts), ele_size_(ele_size) {}
 
@@ -178,6 +196,8 @@ private:
 export template <typename DataType, typename IdxType, bool CheckTS>
 class OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> {
 public:
+    using ValueType = SparseVecRef<DataType, IdxType>;
+
     OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts)
         : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts) {}
 
@@ -209,6 +229,8 @@ private:
 export template <typename DataType, typename IdxType, bool CheckTS>
 class CappedOneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> : public OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> {
 public:
+    using ValueType = SparseVecRef<DataType, IdxType>;
+
     CappedOneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT cap)
         : OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS>(entry, buffer_mgr, column_id, iterate_ts), cap_(cap) {}
 

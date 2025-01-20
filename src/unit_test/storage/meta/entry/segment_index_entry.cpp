@@ -221,16 +221,16 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
         TxnTableStore *txn_table_store = txn1->GetTxnTableStore(table_entry);
         SharedPtr<SegmentIndexEntry> segment_index_entry;
         EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));
-        segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false);
+        segment_index_entry->OptIndex(index_entry->table_index_def(), txn_table_store, opt_params, false);
 
         opt_params.clear();
         opt_params.emplace_back(MakeUnique<InitParameter>("lvq_avg", ""));
-        segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false);
+        segment_index_entry->OptIndex(index_entry->table_index_def(), txn_table_store, opt_params, false);
 
         opt_params.clear();
         opt_params.emplace_back(MakeUnique<InitParameter>("compress_to_lvq", ""));
         opt_params.emplace_back(MakeUnique<InitParameter>("lvq_avg", ""));
-        EXPECT_THROW(segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false),
+        EXPECT_THROW(segment_index_entry->OptIndex(index_entry->table_index_def(), txn_table_store, opt_params, false),
                      RecoverableException);
         txn_mgr->CommitTxn(txn1);
     }
@@ -302,7 +302,7 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test) {
         TxnTableStore *txn_table_store = txn1->GetTxnTableStore(table_entry);
         SharedPtr<SegmentIndexEntry> segment_index_entry;
         EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));
-        segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false);
+        segment_index_entry->OptIndex(index_entry->table_index_def(), txn_table_store, opt_params, false);
         txn_mgr->CommitTxn(txn1);
     }
 

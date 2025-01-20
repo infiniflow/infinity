@@ -114,7 +114,7 @@ TEST_F(DistFuncTest, test2) {
         LVQ8Data lvq2 = lvq_store.GetVec(i);
 
         const auto &vec_store_meta = lvq_store.vec_store_meta();
-        float dist1 = distance(lvq1, lvq2, vec_store_meta);
+        float dist1 = distance(lvq1, i, lvq_store);
 
         Vector<float> qv1(dim);
         Vector<float> qv2(dim);

@@ -58,6 +58,27 @@ String HnswEncodeTypeToString(HnswEncodeType encode_type) {
     }
 }
 
+String HnswBuildTypeToString(HnswBuildType build_type) {
+    switch (build_type) {
+        case HnswBuildType::kPlain:
+            return "plain";
+        case HnswBuildType::kLSG:
+            return "lsg";
+        default:
+            return "invalid";
+    }
+}
+
+HnswBuildType StringToHnswBuildType(const String &str) {
+    if (str == "plain") {
+        return HnswBuildType::kPlain;
+    } else if (str == "lsg") {
+        return HnswBuildType::kLSG;
+    } else {
+        return HnswBuildType::kInvalid;
+    }
+}
+
 SharedPtr<IndexBase> IndexHnsw::Make(SharedPtr<String> index_name,
                                      SharedPtr<String> index_comment,
                                      const String &file_name,
@@ -68,6 +89,7 @@ SharedPtr<IndexBase> IndexHnsw::Make(SharedPtr<String> index_name,
     SizeT block_size = HNSW_BLOCK_SIZE;
     MetricType metric_type = MetricType::kInvalid;
     HnswEncodeType encode_type = HnswEncodeType::kPlain;
+    HnswBuildType build_type = HnswBuildType::kPlain;
     for (const auto *param : index_param_list) {
         if (param->param_name_ == "m") {
             M = std::stoi(param->param_value_);
@@ -77,6 +99,8 @@ SharedPtr<IndexBase> IndexHnsw::Make(SharedPtr<String> index_name,
             metric_type = StringToMetricType(param->param_value_);
         } else if (param->param_name_ == "encode") {
             encode_type = StringToHnswEncodeType(param->param_value_);
+        } else if (param->param_name_ == "build_type") {
+            build_type = StringToHnswBuildType(param->param_value_);
         } else if (param->param_name_ == "block_size") {
             block_size = std::stoi(param->param_value_);
         } else {
@@ -101,6 +125,7 @@ SharedPtr<IndexBase> IndexHnsw::Make(SharedPtr<String> index_name,
                                  std::move(column_names),
                                  metric_type,
                                  encode_type,
+                                 build_type,
                                  M,
                                  ef_construction,
                                  block_size);
@@ -110,8 +135,8 @@ bool IndexHnsw::operator==(const IndexHnsw &other) const {
     if (this->index_type_ != other.index_type_ || this->file_name_ != other.file_name_ || this->column_names_ != other.column_names_) {
         return false;
     }
-    return metric_type_ == other.metric_type_ && encode_type_ == other.encode_type_ && M_ == other.M_ && ef_construction_ == other.ef_construction_ &&
-           block_size_ == other.block_size_;
+    return metric_type_ == other.metric_type_ && encode_type_ == other.encode_type_ && build_type_ == other.build_type_ && M_ == other.M_ &&
+           ef_construction_ == other.ef_construction_ && block_size_ == other.block_size_;
 }
 
 bool IndexHnsw::operator!=(const IndexHnsw &other) const { return !(*this == other); }
@@ -120,6 +145,7 @@ i32 IndexHnsw::GetSizeInBytes() const {
     SizeT size = IndexBase::GetSizeInBytes();
     size += sizeof(metric_type_);
     size += sizeof(encode_type_);
+    size += sizeof(build_type_);
     size += sizeof(M_);
     size += sizeof(ef_construction_);
     size += sizeof(block_size_);
@@ -130,6 +156,7 @@ void IndexHnsw::WriteAdv(char *&ptr) const {
     IndexBase::WriteAdv(ptr);
     WriteBufAdv(ptr, metric_type_);
     WriteBufAdv(ptr, encode_type_);
+    WriteBufAdv(ptr, build_type_);
     WriteBufAdv(ptr, M_);
     WriteBufAdv(ptr, ef_construction_);
     WriteBufAdv(ptr, block_size_);
@@ -137,7 +164,8 @@ void IndexHnsw::WriteAdv(char *&ptr) const {
 
 String IndexHnsw::ToString() const {
     std::stringstream ss;
-    ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << block_size_;
+    ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << HnswBuildTypeToString(build_type_) << ", " << M_ << ", "
+       << ef_construction_ << ", " << block_size_;
     return ss.str();
 }
 
@@ -152,6 +180,7 @@ nlohmann::json IndexHnsw::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
     res["metric_type"] = MetricTypeToString(metric_type_);
     res["encode_type"] = HnswEncodeTypeToString(encode_type_);
+    res["build_type"] = HnswBuildTypeToString(build_type_);
     res["M"] = M_;
     res["ef_construction"] = ef_construction_;
     res["block_size"] = block_size_;

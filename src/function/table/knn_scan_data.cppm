@@ -74,6 +74,8 @@ public:
 
 export class KnnDistanceBase1 {
 public:
+    static UniquePtr<KnnDistanceBase1> Make(EmbeddingDataType embedding_type, KnnDistanceType distance_type);
+
     const KnnDistanceType dist_type_{};
     explicit KnnDistanceBase1(const KnnDistanceType dist_type) : dist_type_(dist_type) {}
     virtual ~KnnDistanceBase1() = default;
@@ -132,10 +134,6 @@ public:
     KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx, bool execute_block_scan_job);
 
     ~KnnScanFunctionData() final = default;
-
-private:
-    template <typename QueryDataType, typename DistType>
-    void Init();
 
 public:
     KnnScanSharedData *knn_scan_shared_data_;

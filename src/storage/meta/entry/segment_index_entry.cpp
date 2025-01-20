@@ -68,6 +68,7 @@ import wal_entry;
 import infinity_context;
 import defer_op;
 import memory_indexer;
+import hnsw_lsg_builder;
 
 namespace infinity {
 
@@ -498,10 +499,18 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kHnsw: {
-            auto memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base, column_def.get(), this);
-            HnswInsertConfig insert_config;
-            insert_config.optimize_ = true;
-            memory_hnsw_index->InsertVecs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_, insert_config);
+            const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+            UniquePtr<HnswIndexInMem> memory_hnsw_index;
+            if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                LSGConfig lsg_config;
+                HnswLSGBuilder builder(index_hnsw, column_def, lsg_config);
+                memory_hnsw_index = builder.Make(segment_entry, column_def->id(), begin_ts, config.check_ts_, buffer_mgr, true);
+            } else {
+                memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base, column_def.get(), this);
+                HnswInsertConfig insert_config;
+                insert_config.optimize_ = true;
+                memory_hnsw_index->InsertVecs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_, insert_config);
+            }
 
             dumped_memindex_entry = memory_hnsw_index->Dump(this, buffer_manager_);
             dumped_memindex_entry->SaveIndexFile();
@@ -705,11 +714,16 @@ void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<
     LOG_INFO(ss.str());
 }
 
-void SegmentIndexEntry::OptIndex(IndexBase *index_base,
+void SegmentIndexEntry::OptIndex(SharedPtr<IndexBase> new_index_base,
                                  TxnTableStore *txn_table_store,
                                  const Vector<UniquePtr<InitParameter>> &opt_params,
                                  bool replay) {
     SharedPtr<ChunkIndexEntry> dumped_memindex_entry = nullptr;
+    auto set_fileworker_index_def = [&](ChunkIndexEntry *chunk_index_entry) {
+        auto *index_file_worker = static_cast<IndexFileWorker *>(chunk_index_entry->GetBufferObj()->file_worker());
+        index_file_worker->SetIndexDef(new_index_base);
+    };
+
     switch (table_index_entry_->index_base()->index_type_) {
         case IndexType::kBMP: {
             Optional<BMPOptimizeOptions> ret = BMPUtil::ParseBMPOptimizeOptions(opt_params);
@@ -736,11 +750,13 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                     },
                     index);
             };
-            for (const auto &chunk_index_entry : chunk_index_entries) {
+            for (auto &chunk_index_entry : chunk_index_entries) {
                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
                 auto *abstract_bmp = static_cast<AbstractBMP *>(buffer_handle.GetDataMut());
                 optimize_index(*abstract_bmp);
                 chunk_index_entry->SaveIndexFile();
+
+                set_fileworker_index_def(chunk_index_entry.get());
             }
             if (memory_index_entry.get() != nullptr) {
                 optimize_index(memory_index_entry->get());
@@ -793,6 +809,8 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                 auto *abstract_hnsw = reinterpret_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
                 optimize_index(abstract_hnsw);
                 chunk_index_entry->SaveIndexFile();
+
+                set_fileworker_index_def(chunk_index_entry.get());
             }
             if (memory_index_entry.get() != nullptr) {
                 optimize_index(memory_index_entry->get_ptr());
@@ -805,6 +823,8 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
         }
     }
     if (dumped_memindex_entry.get() != nullptr) {
+        set_fileworker_index_def(dumped_memindex_entry.get());
+
         auto *txn = txn_table_store->GetTxn();
         AddWalIndexDump(dumped_memindex_entry.get(), txn);
         txn_table_store->AddChunkIndexStore(table_index_entry_, dumped_memindex_entry.get());
@@ -922,32 +942,40 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = nullptr;
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
-            auto memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base, column_def.get(), this);
-            const AbstractHnsw &abstract_hnsw = memory_hnsw_index->get();
+            const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+            UniquePtr<HnswIndexInMem> memory_hnsw_index;
+            if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                LSGConfig lsg_config;
+                HnswLSGBuilder builder(index_hnsw, column_def, lsg_config);
+                memory_hnsw_index = builder.Make(segment_entry, column_def->id(), begin_ts, true /*check_ts*/, buffer_mgr, true);
+            } else {
+                memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base, column_def.get(), this);
+                const AbstractHnsw &abstract_hnsw = memory_hnsw_index->get();
 
-            std::visit(
-                [&](auto &index) {
-                    using T = std::decay_t<decltype(index)>;
-                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                        return;
-                    } else {
-                        using IndexT = std::decay_t<decltype(*index)>;
-                        if constexpr (IndexT::kOwnMem) {
-                            using DataType = typename IndexT::DataType;
-                            CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry,
-                                                                                      buffer_mgr,
-                                                                                      column_def->id(),
-                                                                                      begin_ts,
-                                                                                      row_count);
-                            HnswInsertConfig insert_config;
-                            insert_config.optimize_ = true;
-                            index->InsertVecs(std::move(iter), insert_config);
+                std::visit(
+                    [&](auto &index) {
+                        using T = std::decay_t<decltype(index)>;
+                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                            return;
                         } else {
-                            UnrecoverableError("Invalid index type.");
+                            using IndexT = std::decay_t<decltype(*index)>;
+                            if constexpr (IndexT::kOwnMem) {
+                                using DataType = typename IndexT::DataType;
+                                CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry,
+                                                                                          buffer_mgr,
+                                                                                          column_def->id(),
+                                                                                          begin_ts,
+                                                                                          row_count);
+                                HnswInsertConfig insert_config;
+                                insert_config.optimize_ = true;
+                                index->InsertVecs(std::move(iter), insert_config);
+                            } else {
+                                UnrecoverableError("Invalid index type.");
+                            }
                         }
-                    }
-                },
-                abstract_hnsw);
+                    },
+                    abstract_hnsw);
+            }
             merged_chunk_index_entry = memory_hnsw_index->Dump(this, buffer_mgr);
             break;
         }

@@ -168,7 +168,7 @@ private:
 
     mutable std::shared_mutex rw_locker_{};
     TableIndexMeta *table_index_meta_{};
-    const SharedPtr<IndexBase> index_base_{};
+    SharedPtr<IndexBase> index_base_{};
     const SharedPtr<String> index_dir_{};
     SharedPtr<ColumnDef> column_def_{};
 
