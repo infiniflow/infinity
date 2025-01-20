@@ -761,7 +761,7 @@ void SegmentIndexEntry::OptIndex(SharedPtr<IndexBase> new_index_base,
             if (memory_index_entry.get() != nullptr) {
                 optimize_index(memory_index_entry->get());
 
-                // dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
+                dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
             }
             break;
         }
@@ -814,7 +814,7 @@ void SegmentIndexEntry::OptIndex(SharedPtr<IndexBase> new_index_base,
             }
             if (memory_index_entry.get() != nullptr) {
                 optimize_index(memory_index_entry->get_ptr());
-                // dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
+                dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
             }
             break;
         }

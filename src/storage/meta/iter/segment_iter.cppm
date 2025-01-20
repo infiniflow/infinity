@@ -74,7 +74,7 @@ public:
 
     const SharedPtr<ColumnVector> &column_vector(SizeT col_id) const { return block_iter_->column_vector(col_id); }
 
-    SizeT offset() const { return (block_idx_ - 1) * DEFAULT_BLOCK_CAPACITY + block_iter_->offset(); }
+    SizeT offset() const { return block_iter_.has_value() ? (block_idx_ - 1) * DEFAULT_BLOCK_CAPACITY + block_iter_->offset() : 0; }
 
     const Vector<ColumnID> &column_ids() const { return column_ids_; }
     BufferManager *buffer_mgr() const { return buffer_mgr_; }

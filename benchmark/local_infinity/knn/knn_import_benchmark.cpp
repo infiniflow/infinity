@@ -49,6 +49,7 @@ enum class BuildType : i8 {
 enum class EncodeType : i8 {
     PLAIN,
     LVQ,
+    CompressToLVQ,
 };
 
 struct BenchmarkArgs {
@@ -116,6 +117,7 @@ const Map<String, BuildType> BenchmarkArgs::build_type_map = {
 const Map<String, EncodeType> BenchmarkArgs::encode_type_map = {
     {"plain", EncodeType::PLAIN},
     {"lvq", EncodeType::LVQ},
+    {"compress_to_lvq", EncodeType::CompressToLVQ},
 };
 
 int main(int argc, char *argv[]) {
@@ -187,12 +189,15 @@ int main(int argc, char *argv[]) {
             index_param_list->emplace_back(new InitParameter("ef_construction", std::to_string(args.ef_construction_)));
             index_param_list->emplace_back(new InitParameter("metric", "l2"));
             if (args.build_type_ == BuildType::LSG) {
+                if (args.encode_type_ == EncodeType::LVQ) {
+                    UnrecoverableError("Invalid encode type");
+                }
                 index_param_list->emplace_back(new InitParameter("encode", "plain"));
                 index_param_list->emplace_back(new InitParameter("build_type", "lsg"));
             } else if (args.build_type_ == BuildType::PLAIN) {
                 if (args.encode_type_ == EncodeType::LVQ) {
                     index_param_list->emplace_back(new InitParameter("encode", "lvq"));
-                } else if (args.encode_type_ == EncodeType::PLAIN) {
+                } else if (args.encode_type_ == EncodeType::PLAIN || args.encode_type_ == EncodeType::CompressToLVQ) {
                     index_param_list->emplace_back(new InitParameter("encode", "plain"));
                 } else {
                     UnrecoverableError("Invalid encode type");
@@ -212,7 +217,7 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        if (args.build_type_ == BuildType::LSG && args.encode_type_ == EncodeType::LVQ) {
+        if (args.encode_type_ == EncodeType::CompressToLVQ) {
             OptimizeOptions options;
             options.index_name_ = index_name;
             options.opt_params_.emplace_back(new InitParameter("compress_to_lvq"));
