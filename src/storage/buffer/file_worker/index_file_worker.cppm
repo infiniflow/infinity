@@ -46,6 +46,8 @@ public:
     FileWorkerType Type() const override { return FileWorkerType::kIndexFile; }
 
     ~IndexFileWorker() override = default;
+
+    void SetIndexDef(SharedPtr<IndexBase> index_base) { index_base_ = std::move(index_base); }
 };
 
 } // namespace infinity

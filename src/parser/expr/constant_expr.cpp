@@ -119,6 +119,18 @@ std::string ConstantExpr::ToString() const {
         case LiteralType::kEmptyArray: {
             return {};
         }
+        case LiteralType::kCurlyBracketsArray: {
+            std::ostringstream oss;
+            oss << '{';
+            for (size_t i = 0; i < curly_brackets_array_.size(); ++i) {
+                if (i > 0) {
+                    oss << ',';
+                }
+                oss << curly_brackets_array_[i]->ToString();
+            }
+            oss << '}';
+            return std::move(oss).str();
+        }
     }
 }
 
@@ -182,6 +194,13 @@ int32_t ConstantExpr::GetSizeInBytes() const {
         case LiteralType::kInterval: {
             size += sizeof(int32_t);
             size += sizeof(int64_t);
+            break;
+        }
+        case LiteralType::kCurlyBracketsArray: {
+            size += sizeof(int64_t);
+            for (const auto &val : curly_brackets_array_) {
+                size += val->GetSizeInBytes();
+            }
             break;
         }
     }
@@ -263,6 +282,13 @@ void ConstantExpr::WriteAdv(char *&ptr) const {
             WriteBufAdv<int64_t>(ptr, double_sparse_array_.second.size());
             for (size_t i = 0; i < double_sparse_array_.second.size(); ++i) {
                 WriteBufAdv<double>(ptr, double_sparse_array_.second[i]);
+            }
+            break;
+        }
+        case LiteralType::kCurlyBracketsArray: {
+            WriteBufAdv<int64_t>(ptr, curly_brackets_array_.size());
+            for (const auto &val : curly_brackets_array_) {
+                val->WriteAdv(ptr);
             }
             break;
         }
@@ -363,6 +389,14 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(const char *&ptr, int32_t maxb
             }
             break;
         }
+        case LiteralType::kCurlyBracketsArray: {
+            const size_t len = ReadBufAdv<int64_t>(ptr);
+            for (size_t i = 0; i < len; ++i) {
+                auto sub_arr = std::static_pointer_cast<ConstantExpr>(ReadAdv(ptr, ptr_end - ptr));
+                const_expr->curly_brackets_array_.push_back(std::move(sub_arr));
+            }
+            break;
+        }
     }
     maxbytes = ptr_end - ptr;
     ParserAssert(maxbytes >= 0, "ptr goes out of range when reading constant expression");
@@ -433,6 +467,14 @@ nlohmann::json ConstantExpr::Serialize() const {
             j["value"] = std::move(sub_array_j);
             break;
         }
+        case LiteralType::kCurlyBracketsArray: {
+            nlohmann::json sub_array_j(nlohmann::detail::value_t::array);
+            for (const auto &val : curly_brackets_array_) {
+                sub_array_j.emplace_back(val->Serialize());
+            }
+            j["value"] = std::move(sub_array_j);
+            break;
+        }
     }
     return j;
 }
@@ -494,6 +536,13 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(const nlohmann::json &cons
         case LiteralType::kDoubleSparseArray: {
             const_expr->double_sparse_array_.first = constant_expr["value"]["indices"].get<std::vector<int64_t>>();
             const_expr->double_sparse_array_.second = constant_expr["value"]["data"].get<std::vector<double>>();
+            break;
+        }
+        case LiteralType::kCurlyBracketsArray: {
+            for (const nlohmann::json &array = constant_expr["value"]; const auto &val : array) {
+                auto sub_arr = std::static_pointer_cast<ConstantExpr>(Deserialize(val));
+                const_expr->curly_brackets_array_.push_back(std::move(sub_arr));
+            }
             break;
         }
     }

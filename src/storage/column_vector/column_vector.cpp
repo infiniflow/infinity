@@ -1024,7 +1024,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         String error_message = "Column vector isn't initialized.";
         UnrecoverableError(error_message);
     }
-    if (index > tail_index_) {
+    if (index > tail_index_ || index >= capacity_) {
         String error_message =
             fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
                         std::to_string(index),
@@ -1259,7 +1259,7 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         String error_message = "Column vector isn't initialized.";
         UnrecoverableError(error_message);
     }
-    if (index > capacity_) {
+    if (index >= capacity_) {
         String error_message = fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_);
         UnrecoverableError(error_message);
     }
@@ -1894,7 +1894,9 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             break;
         }
         case LogicalType::kArray: {
-            //TODO
+            // TODO: '{', '}' in varchar? varchar with or without quotes?
+            RecoverableError(Status::NotSupport("Cannot AppendByStringView to Array now."));
+            break;
         }
         case LogicalType::kHugeInt:
         case LogicalType::kDecimal:
@@ -2450,6 +2452,20 @@ Vector<Pair<Span<const char>, SizeT>> ColumnVector::GetTensorArrayRaw(SizeT idx)
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
     const TensorArrayT &src_tensor_array = reinterpret_cast<const TensorArrayT *>(data_ptr_)[idx];
     return ColumnVector::GetTensorArray(src_tensor_array, buffer_.get(), embedding_info);
+}
+
+Value ColumnVector::GetArrayValue(const ArrayT &source) const {
+    if (data_type_->type() != LogicalType::kArray) {
+        UnrecoverableError("Attempt to get array value from non-array column vector");
+    }
+    return GetArrayValueRecursively(*data_type_, reinterpret_cast<const char *>(&source));
+}
+
+void ColumnVector::SetArrayValue(ArrayT &target, const Value &value) {
+    if (value.type() != *data_type_) {
+        UnrecoverableError("Attempt to set array value with different type");
+    }
+    SetArrayValueRecursively(value, reinterpret_cast<char *>(&target));
 }
 
 //////////////////////////////tensor end////////////////////////////////////

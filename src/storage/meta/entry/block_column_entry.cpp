@@ -265,6 +265,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
 
             break;
         }
+        case LogicalType::kArray:
         case LogicalType::kTensor:
         case LogicalType::kSparse:
         case LogicalType::kTensorArray:
@@ -283,7 +284,6 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             }
             break;
         }
-        case LogicalType::kArray:
         case LogicalType::kTuple:
             //        case kPath:
             //        case kPolygon:

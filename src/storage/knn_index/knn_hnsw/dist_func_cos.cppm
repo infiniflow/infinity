@@ -37,6 +37,7 @@ public:
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
     using DistanceType = typename VecStoreMeta::DistanceType;
+    using LVQDist = LVQCosDist<DataType, i8>;
 
 private:
     using SIMDFuncType = f32 (*)(const DataType *, const DataType *, SizeT);
@@ -68,11 +69,20 @@ public:
         }
     }
 
-    DistanceType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
-        return -SIMDFunc(v1, v2, vec_store_meta.dim());
+    template <typename DataStore>
+    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
+        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.dim());
     }
 
-    LVQCosDist<DataType, i8> ToLVQDistance(SizeT dim) &&;
+    template <typename DataStore>
+    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+        return Inner(v1, data_store.GetVec(v2_i), data_store.dim());
+    }
+
+    LVQDist ToLVQDistance(SizeT dim) &&;
+
+private:
+    DistanceType Inner(const StoreType &v1, const StoreType &v2, SizeT dim) const { return -SIMDFunc(v1, v2, dim); }
 };
 
 export template <typename DataType, typename CompressType>
@@ -147,8 +157,19 @@ public:
         }
     }
 
+    template <typename DataStore>
+    DistanceType operator()(VertexType v1_i, VertexType v2_i, const DataStore &data_store) const {
+        return Inner(data_store.GetVec(v1_i), data_store.GetVec(v2_i), data_store.vec_store_meta());
+    }
+
+    template <typename DataStore>
+    DistanceType operator()(const StoreType &v1, VertexType v2_i, const DataStore &data_store, VertexType v1_i = kInvalidVertex) const {
+        return Inner(v1, data_store.GetVec(v2_i), data_store.vec_store_meta());
+    }
+
+private:
     template <typename VecStoreMeta>
-    DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
+    DistanceType Inner(const StoreType &v1, const StoreType &v2, VecStoreMeta &vec_store_meta) const {
         SizeT dim = vec_store_meta.dim();
         i32 c1c2_ip = SIMDFunc(v1->compress_vec_, v2->compress_vec_, dim);
         auto scale1 = v1->scale_;

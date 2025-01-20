@@ -184,6 +184,7 @@ int main(int argc, char *argv[]) {
             }
         }
     }
+    float elapsed_s_sum = 0;
     for (size_t times = 0; times < total_times + 2; ++times) {
         std::cout << "--- Start to run search benchmark: " << std::endl;
         std::vector<std::vector<uint64_t>> query_results(query_count);
@@ -240,6 +241,7 @@ int main(int argc, char *argv[]) {
             auto elapsed_ns = profiler.Elapsed();
             auto elapsed_s = elapsed_ns / (1'000'000'000.0);
             results.push_back(fmt::format("Total cost : {} s", elapsed_s));
+            elapsed_s_sum += elapsed_s;
         }
         {
             size_t correct_1 = 0, correct_10 = 0, correct_100 = 0;
@@ -270,5 +272,8 @@ int main(int argc, char *argv[]) {
     for (const auto &item : results) {
         std::cout << item << std::endl;
     }
+    float elapsed_s_avg = elapsed_s_sum / total_times;
+    std::cout << "Average cost : " << elapsed_s_avg << " s" << std::endl;
+
     Infinity::LocalUnInit();
 }
