@@ -23,21 +23,15 @@ struct RowID;
 export module hnsw_lsg_builder;
 
 import stl;
+import index_hnsw;
 
 namespace infinity {
 
 struct HnswIndexInMem;
-class IndexHnsw;
 class BufferManager;
 struct IVF_Search_Params;
 class KnnDistanceBase1;
 class IVFIndexInChunk;
-
-export struct LSGConfig {
-    float sample_raito_ = 0.01;
-    SizeT ls_k_ = 10;
-    float alpha_ = 1.0;
-};
 
 export class HnswLSGBuilder {
 public:
