@@ -88,8 +88,7 @@ struct StringValueInfo : public ExtraValueInfo {
     static constexpr ExtraValueInfoType TYPE = ExtraValueInfoType::STRING_VALUE_INFO;
 
 public:
-    explicit StringValueInfo(const String &str_p) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(str_p) {}
-    explicit StringValueInfo(const std::string_view &str_view) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(str_view) {}
+    explicit StringValueInfo(const std::string_view str_view) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(str_view) {}
     explicit StringValueInfo(String &&str_p) : ExtraValueInfo(ExtraValueInfoType::STRING_VALUE_INFO), str_(std::move(str_p)) {}
 
     const String &GetString() { return str_; }
@@ -267,9 +266,11 @@ public:
 
     static Value MakeRow(RowID input);
 
-    // static Value MakeVarchar(const String &str);
+    static Value MakeVarchar(String str);
 
-    static Value MakeVarchar(const std::string_view str_view);
+    static Value MakeVarchar(std::string_view str_view);
+
+    static Value MakeVarchar(const char *ptr);
 
     static Value MakeVarchar(const char *ptr, SizeT len);
 

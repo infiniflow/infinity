@@ -517,41 +517,43 @@ Value Value::MakeRow(RowID input) {
     return value;
 }
 
-// Value Value::MakeVarchar(const String &str) {
-//     Value value(LogicalType::kVarchar);
-//     value.value_info_ = MakeShared<StringValueInfo>(str);
-//     return value;
-// }
+Value Value::MakeVarchar(String str) {
+    Value value(LogicalType::kVarchar);
+    value.value_info_ = MakeShared<StringValueInfo>(std::move(str));
+    return value;
+}
 
-Value Value::MakeVarchar(const std::string_view str_view) {
+Value Value::MakeVarchar(std::string_view str_view) {
     Value value(LogicalType::kVarchar);
     value.value_info_ = MakeShared<StringValueInfo>(str_view);
     return value;
 }
 
-Value Value::MakeVarchar(const char *ptr, SizeT len) {
-    String tmp_str(ptr, len);
+Value Value::MakeVarchar(const char *ptr) {
     Value value(LogicalType::kVarchar);
-    value.value_info_ = MakeShared<StringValueInfo>(String(ptr, len));
+    value.value_info_ = MakeShared<StringValueInfo>(std::string_view{ptr});
+    return value;
+}
+
+Value Value::MakeVarchar(const char *ptr, SizeT len) {
+    Value value(LogicalType::kVarchar);
+    value.value_info_ = MakeShared<StringValueInfo>(std::string_view{ptr, len});
     return value;
 }
 
 Value Value::MakeVarchar(const VarcharT &input) {
     Value value(LogicalType::kVarchar);
     if (input.IsInlined()) {
-        String tmp_str(input.short_.data_, input.length_);
-        value.value_info_ = MakeShared<StringValueInfo>(std::move(tmp_str));
+        value.value_info_ = MakeShared<StringValueInfo>(std::string_view{input.short_.data_, input.length_});
     } else {
-        String error_message = "Value::MakeVarchar(VectorVarchar) is unsupported!";
-        UnrecoverableError(error_message);
+        UnrecoverableError("Value::MakeVarchar(VectorVarchar) is not supported!");
     }
     return value;
 }
 
 Value Value::MakeEmbedding(const_ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        String error_message = fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
     const SizeT len = embedding_info->Size();
@@ -562,8 +564,7 @@ Value Value::MakeEmbedding(const_ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
 
 Value Value::MakeMultiVector(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        String error_message = fmt::format("Value::MakeMultiVector(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Value::MakeMultiVector(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
@@ -577,8 +578,7 @@ Value Value::MakeMultiVector(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> t
 
 Value Value::MakeMultiVector(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        String error_message = fmt::format("Value::MakeMultiVector(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Value::MakeMultiVector(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
     const SizeT len = embedding_info->Size();
@@ -596,8 +596,7 @@ Value Value::MakeMultiVector(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, Shared
 
 Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        String error_message = fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Value::MakeTensor(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
@@ -611,8 +610,7 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
 
 Value Value::MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        String error_message = fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Value::MakeTensor(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
     const SizeT len = embedding_info->Size();
@@ -629,8 +627,7 @@ Value Value::MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<T
 
 Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        String error_message = fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0) {
@@ -644,7 +641,7 @@ Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
 
 Value Value::MakeArray(Vector<Value> array_elements, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kArray) {
-        UnrecoverableError(fmt::format("Value::MakeArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+        UnrecoverableError(fmt::format("Value::MakeArray(type_info_ptr={}) is not supported!", type_info_ptr->ToString()));
     }
     Value value(LogicalType::kArray, std::move(type_info_ptr));
     value.value_info_ = MakeShared<ArrayValueInfo>(std::move(array_elements));
@@ -672,8 +669,7 @@ Value Value::MakeSparse(SizeT nnz, UniquePtr<char[]> indice_ptr, UniquePtr<char[
 
 void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
-        String error_message = fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
     }
     const auto embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
@@ -687,8 +683,7 @@ void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
 
 void Value::AppendToTensorArray(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
-        String error_message = fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString());
-        UnrecoverableError(error_message);
+        UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
     }
     auto &tensor_array_info = value_info_->Get<TensorArrayValueInfo>();
     tensor_array_info.AppendTensor(ptr_bytes);
@@ -1340,7 +1335,7 @@ i64 Value::ToInteger() const {
 }
 
 f32 Value::ToFloat() const {
-    if(type_.type() == LogicalType::kFloat) {
+    if (type_.type() == LogicalType::kFloat) {
         return static_cast<f32>(value_.float32);
     }
     String error_message = fmt::format("Attempt to output {} as float", type_.ToString());
@@ -1349,7 +1344,7 @@ f32 Value::ToFloat() const {
 }
 
 f64 Value::ToDouble() const {
-    if(type_.type() == LogicalType::kDouble) {
+    if (type_.type() == LogicalType::kDouble) {
         return static_cast<f64>(value_.float64);
     }
     String error_message = fmt::format("Attempt to output {} as double", type_.ToString());
@@ -1493,14 +1488,14 @@ String Value::ToString() const {
         case LogicalType::kArray: {
             const auto &array_elements = this->GetArray();
             std::ostringstream oss;
-            oss << '[';
+            oss << '{';
             for (SizeT i = 0; i < array_elements.size(); ++i) {
                 oss << array_elements[i].ToString();
                 if (i != array_elements.size() - 1) {
                     oss << ',';
                 }
             }
-            oss << ']';
+            oss << '}';
             return std::move(oss).str();
         }
         case LogicalType::kDecimal:
