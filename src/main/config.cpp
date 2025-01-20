@@ -396,6 +396,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
         // Persistence Dir
         String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
+        if (default_config != nullptr) {
+            persistence_dir = default_config->default_persistence_dir_;
+        }
         UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
         global_options_.AddOption(std::move(persistence_dir_option));
 

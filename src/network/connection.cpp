@@ -262,6 +262,11 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 object_width = 16;
                 break;
             }
+            case LogicalType::kArray: {
+                object_id = 25;
+                object_width = -1;
+                break;
+            }
             case LogicalType::kTensor:
             case LogicalType::kTensorArray:
             case LogicalType::kMultiVector:

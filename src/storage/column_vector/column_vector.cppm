@@ -291,6 +291,10 @@ public:
 
     Vector<Pair<Span<const char>, SizeT>> GetTensorArrayRaw(SizeT idx) const;
 
+    Value GetArrayValue(const ArrayT &source) const;
+
+    void SetArrayValue(ArrayT &target, const Value &value);
+
 private:
     Value GetArrayValueRecursively(const DataType &data_type, const char *data_ptr) const;
 

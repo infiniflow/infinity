@@ -26,6 +26,15 @@ import hnsw_common;
 import infinity_exception;
 import profiler;
 
+// import hnsw_lsg_builder;
+// import index_hnsw;
+// import internal_types;
+// import index_base;
+// import column_def;
+// import embedding_info;
+// import logical_type;
+// import data_type;
+
 using namespace infinity;
 
 enum class ModeType : i8 {
@@ -52,6 +61,8 @@ enum class BuildType : i8 {
     PLAIN,
     LVQ,
     CompressToLVQ,
+    LSGBuild,
+    LSGCompressToLVQ,
 };
 
 String BuildTypeToString(BuildType build_type) {
@@ -62,6 +73,10 @@ String BuildTypeToString(BuildType build_type) {
             return "lvq";
         case BuildType::CompressToLVQ:
             return "clvq";
+        case BuildType::LSGBuild:
+            return "lsg";
+        case BuildType::LSGCompressToLVQ:
+            return "clvq_lsg";
     }
 }
 
@@ -76,7 +91,13 @@ public:
     void Parse(int argc, char *argv[]) {
         Map<String, ModeType> mode_map = {{"build", ModeType::BUILD}, {"query", ModeType::QUERY}, {"compress", ModeType::COMPRESS}};
         Map<String, BenchmarkType> benchmark_type_map = {{"sift", BenchmarkType::SIFT}, {"gist", BenchmarkType::GIST}};
-        Map<String, BuildType> build_type_map = {{"plain", BuildType::PLAIN}, {"lvq", BuildType::LVQ}, {"clvq", BuildType::CompressToLVQ}};
+        Map<String, BuildType> build_type_map = {
+            {"plain", BuildType::PLAIN},
+            {"lvq", BuildType::LVQ},
+            {"clvq", BuildType::CompressToLVQ},
+            {"lsg", BuildType::LSGBuild},
+            {"clvq_lsg", BuildType::LSGCompressToLVQ},
+        };
 
         app_.add_option("--mode", mode_type_, "mode")->required()->transform(CLI::CheckedTransformer(mode_map, CLI::ignore_case));
         app_.add_option("--benchmark_type", benchmark_type_, "benchmark type")
@@ -92,6 +113,9 @@ public:
 
         app_.add_option("--ef", ef_, "ef")->required(false);
         app_.add_option("--test_n", test_n_, "test n")->required(false);
+
+        app_.add_option("--lsg_k", lsg_k_, "lsg k")->required(false);
+        app_.add_option("--topk", query_topk_, "topk")->required(false);
 
         try {
             app_.parse(argc, argv);
@@ -131,8 +155,11 @@ public:
     SizeT M_ = 16;
     SizeT ef_construction_ = 200;
 
-    SizeT ef_ = 200;
+    SizeT ef_ = 0;
     SizeT test_n_ = 1;
+
+    SizeT lsg_k_ = 10;
+    SizeT query_topk_ = 0;
 
 public:
     Path data_path_;
@@ -145,9 +172,74 @@ private:
     CLI::App app_;
 };
 
-using LabelT = i32;
+using LabelT = u32;
 using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
+using HnswLSG = KnnHnsw<PlainL2VecStoreType<float, true>, LabelT>;
 using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, i8>, LabelT>;
+
+// SharedPtr<String> index_name = MakeShared<String>("index_name");
+// String filename = "filename";
+// Vector<String> column_names = {"col_name"};
+
+// UniquePtr<IndexHnsw> MakeLSGIndexHnsw(const BenchmarkOption &option) {
+//     MetricType metric_type = MetricType::kMetricL2;
+//     HnswEncodeType encode_type = HnswEncodeType::kPlain;
+//     HnswBuildType build_type = HnswBuildType::kLSG;
+//     SizeT M = option.M_;
+//     SizeT ef_construction = option.ef_construction_;
+//     SizeT block_size = option.chunk_size_;
+//     return MakeUnique<IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size);
+// }
+
+// UniquePtr<ColumnDef> MakeColumnDef(SizeT dim) {
+//     auto embeddingInfo = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, dim);
+//     auto data_type = MakeShared<DataType>(LogicalType::kEmbedding, embeddingInfo);
+//     return MakeUnique<ColumnDef>(0, data_type, column_names[0], std::set<ConstraintType>());
+// }
+
+UniquePtr<float[]> GetAvgBF(SizeT vec_num, SizeT dim, const float *data, SizeT ls_k, SizeT sample_num) {
+    auto avg = MakeUnique<float[]>(vec_num);
+    Vector<SizeT> sample_idx(sample_num);
+    for (SizeT i = 0; i < sample_num; ++i) {
+        sample_idx[i] = rand() % vec_num;
+    }
+    auto task = [&](SizeT start_i, SizeT end_i) {
+        Vector<float> distances(sample_num);
+        for (SizeT i = start_i; i < end_i; ++i) {
+            const float *v = data + i * dim;
+            for (SizeT j = 0; j < sample_num; ++j) {
+                const float *v2 = data + sample_idx[j] * dim;
+
+                float distance = 0;
+                for (SizeT k = 0; k < dim; ++k) {
+                    float diff = v[k] - v2[k];
+                    distance += diff * diff;
+                }
+                distances[j] = distance;
+            }
+            std::sort(distances.begin(), distances.end());
+            avg[i] = 0;
+            for (SizeT j = 0; j < ls_k; ++j) {
+                avg[i] += distances[j];
+            }
+            avg[i] /= ls_k;
+        }
+    };
+    Vector<std::thread> threads;
+    SizeT thread_num = 16;
+    SizeT task_size = (vec_num - 1) / thread_num + 1;
+
+    for (SizeT i = 0; i < thread_num; ++i) {
+        SizeT start_i = i * task_size;
+        SizeT end_i = std::min(start_i + task_size, vec_num);
+        threads.emplace_back(task, start_i, end_i);
+    }
+    for (auto &thread : threads) {
+        thread.join();
+    }
+
+    return avg;
+}
 
 template <typename HnswT, typename HnswT2>
 void Build(const BenchmarkOption &option) {
@@ -157,6 +249,24 @@ void Build(const BenchmarkOption &option) {
 
     profiler.Begin();
     auto hnsw = HnswT::Make(option.chunk_size_, option.max_chunk_num_, dim, option.M_, option.ef_construction_);
+
+    if constexpr (std::is_same_v<HnswT, HnswLSG>) {
+        // auto column_def = MakeColumnDef(dim);
+        // auto index_hnsw = MakeLSGIndexHnsw(option);
+        // LSGConfig lsg_config;
+        // lsg_config.ls_k_ = 10;
+        // HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def), lsg_config);
+        // DenseVectorIter<float, LabelT> iter(data.get(), dim, vec_num);
+        // UniquePtr<float[]> avg = lsg_builder.GetLSAvg<decltype(iter), float, float>(std::move(iter), vec_num, RowID(0, 0));
+
+        SizeT sample_num = 10000;
+        SizeT ls_k = 10;
+        auto avg = GetAvgBF(vec_num, dim, data.get(), ls_k, sample_num);
+
+        float alpha = 1.0;
+        hnsw->distance().SetLSGParam(alpha, std::move(avg));
+    }
+
     DenseVectorIter<float, LabelT> iter(data.get(), dim, vec_num);
     hnsw->StoreData(iter);
     data.reset();
@@ -215,14 +325,16 @@ void Query(const BenchmarkOption &option) {
 
     auto [query_num, query_dim, query_data] = benchmark::DecodeFvecsDataset<float>(option.query_path_);
     auto [gt_num, topk, gt_data] = benchmark::DecodeFvecsDataset<i32>(option.groundtruth_path_);
+    SizeT query_topk = topk;
+    if (option.query_topk_ != 0) {
+        query_topk = option.query_topk_;
+    }
     if (gt_num != query_num) {
         UnrecoverableError("gt_num != query_num");
     }
-    KnnSearchOption search_option{.ef_ = option.ef_};
+    Vector<Vector<LabelT>> results(query_num, Vector<LabelT>(query_topk));
 
-    Vector<Vector<LabelT>> results(query_num, Vector<LabelT>(topk));
-
-    for (SizeT i = 0; i < option.test_n_; ++i) {
+    auto test = [&](SizeT i, const KnnSearchOption &search_option) {
         profiler.Begin();
         Vector<std::thread> query_threads;
         Atomic<i32> cur_i = 0;
@@ -232,11 +344,11 @@ void Query(const BenchmarkOption &option) {
                 SizeT i;
                 while ((i = cur_i.fetch_add(1)) < query_num) {
                     const float *query = query_data.get() + i * query_dim;
-                    Vector<Pair<float, LabelT>> pairs = hnsw->KnnSearchSorted(query, topk, search_option);
-                    if (pairs.size() < SizeT(topk)) {
+                    Vector<Pair<float, LabelT>> pairs = hnsw->KnnSearchSorted(query, query_topk, search_option);
+                    if (pairs.size() < SizeT(query_topk)) {
                         UnrecoverableError("result_n != topk");
                     }
-                    for (i32 j = 0; j < topk; ++j) {
+                    for (SizeT j = 0; j < query_topk; ++j) {
                         results[i][j] = pairs[j].second;
                     }
                 }
@@ -247,27 +359,42 @@ void Query(const BenchmarkOption &option) {
         }
         profiler.End();
 
-        std::cout << fmt::format("Test {} / {}", i + 1, option.test_n_) << std::endl;
-        std::cout << fmt::format("Query time: {}", profiler.ElapsedToString(1000)) << std::endl;
-    }
-
-    i32 correct = 0;
-    for (SizeT i = 0; i < query_num; ++i) {
-        HashSet<LabelT> gt_set(gt_data.get() + i * topk, gt_data.get() + (i + 1) * topk);
-        for (i32 j = 0; j < topk; ++j) {
-            if (gt_set.contains(results[i][j])) {
-                correct++;
+        std::cout << fmt::format("Test {} / {}, Query time: {}", i + 1, option.test_n_, profiler.ElapsedToString(1000)) << std::endl;
+    };
+    auto cal_recall = [&](const KnnSearchOption &search_option) {
+        i32 correct = 0;
+        for (SizeT i = 0; i < query_num; ++i) {
+            HashSet<LabelT> gt_set(gt_data.get() + i * topk, gt_data.get() + i * topk + query_topk);
+            for (SizeT j = 0; j < query_topk; ++j) {
+                if (gt_set.contains(results[i][j])) {
+                    correct++;
+                }
             }
         }
+        float recall = float(correct) / (query_num * query_topk);
+        std::cout << fmt::format("ef: {}, recall: {}", search_option.ef_, recall) << std::endl;
+    };
+    if (option.ef_ == 0) {
+        for (SizeT ef = 100; ef <= 1000; ef += 100) {
+            KnnSearchOption search_option{.ef_ = ef};
+            for (SizeT i = 0; i < option.test_n_; ++i) {
+                test(i, search_option);
+            }
+            cal_recall(search_option);
+        }
+    } else {
+        for (SizeT i = 0; i < option.test_n_; ++i) {
+            KnnSearchOption search_option{.ef_ = option.ef_};
+            test(i, search_option);
+            cal_recall(search_option);
+        }
     }
-    float recall = float(correct) / (query_num * topk);
-    std::cout << "recall: " << recall << std::endl;
 }
 
 template <typename HnswT, typename HnswT2>
 void Compress(const BenchmarkOption &option) {
-    if (option.build_type_ != BuildType::PLAIN) {
-        UnrecoverableError("Compress only support plain build type");
+    if (option.build_type_ != BuildType::PLAIN && option.build_type_ != BuildType::LSGBuild) {
+        UnrecoverableError("Compress only support plain build or lsg build");
     }
 
     auto [index_file, index_status] = VirtualStore::Open(option.index_save_path_.string(), FileAccessMode::kRead);
@@ -276,7 +403,14 @@ void Compress(const BenchmarkOption &option) {
     }
     auto hnsw = HnswT::Load(*index_file);
 
-    String new_index_name = BenchmarkOption::IndexName(option.benchmark_type_, BuildType::CompressToLVQ, option.M_, option.ef_construction_);
+    String new_index_name;
+    if constexpr (std::is_same_v<HnswT, Hnsw>) {
+        new_index_name = BenchmarkOption::IndexName(option.benchmark_type_, BuildType::CompressToLVQ, option.M_, option.ef_construction_);
+    } else if constexpr (std::is_same_v<HnswT, HnswLSG>) {
+        new_index_name = BenchmarkOption::IndexName(option.benchmark_type_, BuildType::LSGCompressToLVQ, option.M_, option.ef_construction_);
+    } else {
+        UnrecoverableError("Unsupport compress type");
+    }
     Path new_index_save_path = option.index_dir_ / fmt::format("{}.bin", new_index_name);
 
     auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
@@ -305,6 +439,14 @@ int main(int argc, char *argv[]) {
                     Build<Hnsw, HnswLVQ>(option);
                     break;
                 }
+                case BuildType::LSGBuild: {
+                    Build<HnswLSG, HnswLSG>(option);
+                    break;
+                }
+                case BuildType::LSGCompressToLVQ: {
+                    Build<HnswLSG, HnswLVQ>(option);
+                    break;
+                }
             }
             break;
         }
@@ -315,15 +457,32 @@ int main(int argc, char *argv[]) {
                     break;
                 }
                 case BuildType::LVQ:
-                case BuildType::CompressToLVQ: {
+                case BuildType::CompressToLVQ:
+                case BuildType::LSGCompressToLVQ: {
                     Query<HnswLVQ>(option);
+                    break;
+                }
+                case BuildType::LSGBuild: {
+                    Query<HnswLSG>(option);
                     break;
                 }
             }
             break;
         }
         case ModeType::COMPRESS: {
-            Compress<Hnsw, HnswLVQ>(option);
+            switch (option.build_type_) {
+                case BuildType::PLAIN: {
+                    Compress<Hnsw, HnswLVQ>(option);
+                    break;
+                }
+                case BuildType::LSGBuild: {
+                    Compress<HnswLSG, HnswLVQ>(option);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Unsupport compress type");
+                }
+            }
             break;
         }
     }

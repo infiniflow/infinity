@@ -429,6 +429,9 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
             // TODO: more type check and setting
             if (base_statement->type_ == StatementType::kFlush) {
                 new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kCheckpoint);
+                if (new_txn == nullptr) {
+                    RecoverableError(Status::FailToStartTxn("System is checkpointing"));
+                }
             } else {
                 new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
             }

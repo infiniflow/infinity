@@ -15,6 +15,7 @@
 module;
 
 #include <tuple>
+#include <unistd.h>
 
 module background_process;
 
@@ -126,7 +127,27 @@ void BGTaskProcessor::Process() {
                             std::unique_lock<std::mutex> locker(task_mutex_);
                             task_text_ = task->ToString();
                         }
-                        wal_manager_->Checkpoint(is_full_checkpoint);
+
+                        SizeT retry_count = 0;
+                        while (true) {
+                            bool success = true;
+                            try {
+                                wal_manager_->Checkpoint(is_full_checkpoint);
+                            } catch (RecoverableException &e) {
+                                LOG_WARN(fmt::format("Background checkpoint failed: {}", e.what()));
+                                success = false;
+                            }
+
+                            if (is_full_checkpoint && !success) {
+                                // Full checkpoint and meet checkpoint conflict, retry
+                                ++retry_count;
+                                LOG_WARN(fmt::format("Full checkpoint conflict, retry count: {}", retry_count));
+                                sleep(retry_count * 1);
+                                continue;
+                            }
+                            break;
+                        }
+
                         LOG_DEBUG("Checkpoint in background done");
                     }
                     break;

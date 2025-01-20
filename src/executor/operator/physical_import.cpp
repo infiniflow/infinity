@@ -19,6 +19,7 @@ module;
 // #include "zsv/common.h"
 // }
 
+#include <cassert>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -53,6 +54,7 @@ import column_vector;
 import default_values;
 import embedding_info;
 import sparse_info;
+import array_info;
 import column_def;
 import constant_expr;
 import wal_entry;
@@ -1245,6 +1247,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                     }
                     break;
                 }
+                case LogicalType::kArray:
                 case LogicalType::kMultiVector:
                 case LogicalType::kTensor:
                 case LogicalType::kTensorArray: {
@@ -1270,7 +1273,6 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                 case LogicalType::kInterval:
                 case LogicalType::kHugeInt:
                 case LogicalType::kDecimal:
-                case LogicalType::kArray:
                 case LogicalType::kTuple:
                 case LogicalType::kPoint:
                 case LogicalType::kLine:
@@ -1702,6 +1704,8 @@ ParquetTensorHandler(SharedPtr<arrow::ListArray> list_array, const EmbeddingInfo
 
 } // namespace
 
+Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<arrow::Array> &array, u64 value_idx);
+
 void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
     switch (const auto column_data_logical_type = column_vector.data_type()->type(); column_data_logical_type) {
         case LogicalType::kBoolean: {
@@ -1898,11 +1902,15 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             column_vector.AppendValue(std::move(value));
             break;
         }
+        case LogicalType::kArray: {
+            auto v = GetValueFromParquetRecursively(*column_vector.data_type(), array, value_idx);
+            column_vector.AppendValue(std::move(v));
+            break;
+        }
         case LogicalType::kRowID:
         case LogicalType::kInterval:
         case LogicalType::kHugeInt:
         case LogicalType::kDecimal:
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kPoint:
         case LogicalType::kLine:
@@ -1917,6 +1925,303 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
         case LogicalType::kInvalid: {
             String error_message = "Not implement: Invalid data type.";
             UnrecoverableError(error_message);
+        }
+    }
+}
+
+template <typename IndexType, typename IndexArray, typename DataType, typename DataArray>
+Value GetSparseValueFromParquet(const SharedPtr<SparseInfo> &sparse_info,
+                                const SharedPtr<IndexArray> &index_array,
+                                const SharedPtr<DataArray> &data_array,
+                                const i64 start_offset,
+                                const i64 end_offset) {
+    Vector<IndexType> index_vec;
+    Vector<DataType> data_vec;
+    for (i64 j = start_offset; j < end_offset; ++j) {
+        index_vec.push_back(index_array->Value(j));
+        if constexpr (!std::is_same_v<DataType, bool>) {
+            data_vec.push_back(data_array->Value(j));
+        }
+    }
+    const char *raw_data_ptr = nullptr;
+    if constexpr (!std::is_same_v<DataType, bool>) {
+        raw_data_ptr = reinterpret_cast<const char *>(data_vec.data());
+    }
+    return Value::MakeSparse(raw_data_ptr, reinterpret_cast<const char *>(index_vec.data()), index_vec.size(), sparse_info);
+}
+
+template <typename IndexType, typename IndexArray>
+Value GetSparseValueFromParquet(const SharedPtr<SparseInfo> &sparse_info,
+                                const SharedPtr<IndexArray> &index_array,
+                                const SharedPtr<arrow::ListArray> &data_array,
+                                const i64 start_offset,
+                                const i64 end_offset) {
+    switch (sparse_info->DataType()) {
+        case EmbeddingDataType::kElemBit: {
+            return GetSparseValueFromParquet<IndexType, IndexArray, bool, arrow::BooleanArray>(sparse_info,
+                                                                                               index_array,
+                                                                                               nullptr,
+                                                                                               start_offset,
+                                                                                               end_offset);
+        }
+        case EmbeddingDataType::kElemUInt8: {
+            const auto uint8_value_array = std::static_pointer_cast<arrow::UInt8Array>(data_array->values());
+            return GetSparseValueFromParquet<IndexType, IndexArray, u8, arrow::UInt8Array>(sparse_info,
+                                                                                           index_array,
+                                                                                           uint8_value_array,
+                                                                                           start_offset,
+                                                                                           end_offset);
+        }
+        case EmbeddingDataType::kElemInt8: {
+            const auto int8_value_array = std::static_pointer_cast<arrow::Int8Array>(data_array->values());
+            return GetSparseValueFromParquet<IndexType, IndexArray, i8, arrow::Int8Array>(sparse_info,
+                                                                                          index_array,
+                                                                                          int8_value_array,
+                                                                                          start_offset,
+                                                                                          end_offset);
+        }
+        case EmbeddingDataType::kElemInt16: {
+            const auto int16_value_array = std::static_pointer_cast<arrow::Int16Array>(data_array->values());
+            return GetSparseValueFromParquet<IndexType, IndexArray, i16, arrow::Int16Array>(sparse_info,
+                                                                                            index_array,
+                                                                                            int16_value_array,
+                                                                                            start_offset,
+                                                                                            end_offset);
+        }
+        case EmbeddingDataType::kElemInt32: {
+            const auto int32_value_array = std::static_pointer_cast<arrow::Int32Array>(data_array->values());
+            return GetSparseValueFromParquet<IndexType, IndexArray, i32, arrow::Int32Array>(sparse_info,
+                                                                                            index_array,
+                                                                                            int32_value_array,
+                                                                                            start_offset,
+                                                                                            end_offset);
+        }
+        case EmbeddingDataType::kElemInt64: {
+            const auto int64_value_array = std::static_pointer_cast<arrow::Int64Array>(data_array->values());
+            return GetSparseValueFromParquet<IndexType, IndexArray, i64, arrow::Int64Array>(sparse_info,
+                                                                                            index_array,
+                                                                                            int64_value_array,
+                                                                                            start_offset,
+                                                                                            end_offset);
+        }
+        case EmbeddingDataType::kElemFloat16: {
+            const auto float16_value_array = std::static_pointer_cast<arrow::HalfFloatArray>(data_array->values());
+            return GetSparseValueFromParquet<IndexType, IndexArray, Float16T, arrow::HalfFloatArray>(sparse_info,
+                                                                                                     index_array,
+                                                                                                     float16_value_array,
+                                                                                                     start_offset,
+                                                                                                     end_offset);
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            const auto float_value_array = std::static_pointer_cast<arrow::FloatArray>(data_array->values());
+            return GetSparseValueFromParquet<IndexType, IndexArray, BFloat16T, arrow::FloatArray>(sparse_info,
+                                                                                                  index_array,
+                                                                                                  float_value_array,
+                                                                                                  start_offset,
+                                                                                                  end_offset);
+        }
+        case EmbeddingDataType::kElemFloat: {
+            const auto float_value_array = std::static_pointer_cast<arrow::FloatArray>(data_array->values());
+            return GetSparseValueFromParquet<IndexType, IndexArray, float, arrow::FloatArray>(sparse_info,
+                                                                                              index_array,
+                                                                                              float_value_array,
+                                                                                              start_offset,
+                                                                                              end_offset);
+        }
+        case EmbeddingDataType::kElemDouble: {
+            const auto double_value_array = std::static_pointer_cast<arrow::DoubleArray>(data_array->values());
+            return GetSparseValueFromParquet<IndexType, IndexArray, double, arrow::DoubleArray>(sparse_info,
+                                                                                                index_array,
+                                                                                                double_value_array,
+                                                                                                start_offset,
+                                                                                                end_offset);
+        }
+        case EmbeddingDataType::kElemInvalid: {
+            UnrecoverableError("Invalid sparse data type.");
+            return Value::MakeInvalid();
+        }
+    }
+}
+
+Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<arrow::Array> &array, u64 value_idx) {
+    switch (const auto data_logical_type = data_type.type(); data_logical_type) {
+        case LogicalType::kBoolean: {
+            auto value = std::static_pointer_cast<arrow::BooleanArray>(array)->Value(value_idx);
+            return Value::MakeBool(value);
+        }
+        case LogicalType::kTinyInt: {
+            auto value = std::static_pointer_cast<arrow::Int8Array>(array)->Value(value_idx);
+            return Value::MakeTinyInt(value);
+        }
+        case LogicalType::kSmallInt: {
+            auto value = std::static_pointer_cast<arrow::Int16Array>(array)->Value(value_idx);
+            return Value::MakeSmallInt(value);
+        }
+        case LogicalType::kInteger: {
+            auto value = std::static_pointer_cast<arrow::Int32Array>(array)->Value(value_idx);
+            return Value::MakeInt(value);
+        }
+        case LogicalType::kBigInt: {
+            auto value = std::static_pointer_cast<arrow::Int64Array>(array)->Value(value_idx);
+            return Value::MakeBigInt(value);
+        }
+        case LogicalType::kFloat16: {
+            auto value = std::static_pointer_cast<arrow::HalfFloatArray>(array)->Value(value_idx);
+            const Float16T float16_value(value);
+            return Value::MakeFloat16(float16_value);
+        }
+        case LogicalType::kBFloat16: {
+            auto value = std::static_pointer_cast<arrow::FloatArray>(array)->Value(value_idx);
+            const BFloat16T bfloat16_value(value);
+            return Value::MakeBFloat16(bfloat16_value);
+        }
+        case LogicalType::kFloat: {
+            auto value = std::static_pointer_cast<arrow::FloatArray>(array)->Value(value_idx);
+            return Value::MakeFloat(value);
+        }
+        case LogicalType::kDouble: {
+            auto value = std::static_pointer_cast<arrow::DoubleArray>(array)->Value(value_idx);
+            return Value::MakeDouble(value);
+        }
+        case LogicalType::kDate: {
+            auto value = std::static_pointer_cast<arrow::Date32Array>(array)->Value(value_idx);
+            const DateT date_value(value);
+            return Value::MakeDate(date_value);
+        }
+        case LogicalType::kTime: {
+            auto value = std::static_pointer_cast<arrow::Time32Array>(array)->Value(value_idx);
+            const TimeT time_value(value);
+            return Value::MakeTime(time_value);
+        }
+        case LogicalType::kDateTime: {
+            auto value = std::static_pointer_cast<arrow::TimestampArray>(array)->Value(value_idx);
+            const DateTimeT datetime_value(value);
+            return Value::MakeDateTime(datetime_value);
+        }
+        case LogicalType::kTimestamp: {
+            auto value = std::static_pointer_cast<arrow::TimestampArray>(array)->Value(value_idx);
+            const TimestampT timestamp_value(value);
+            return Value::MakeTimestamp(timestamp_value);
+        }
+        case LogicalType::kVarchar: {
+            String value_str = std::static_pointer_cast<arrow::StringArray>(array)->GetString(value_idx);
+            return Value::MakeVarchar(std::move(value_str));
+        }
+        case LogicalType::kEmbedding: {
+            auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type.type_info().get());
+            if (auto fixed_list_array = std::dynamic_pointer_cast<arrow::FixedSizeListArray>(array); fixed_list_array.get() != nullptr) {
+                auto [data, size] = ParquetEmbeddingHandler(fixed_list_array, embedding_info, value_idx);
+                return Value::MakeEmbedding(data.get(), data_type.type_info());
+            }
+            auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
+            auto [data, size] = ParquetEmbeddingHandler(list_array, embedding_info, value_idx);
+            return Value::MakeEmbedding(data.get(), data_type.type_info());
+        }
+        case LogicalType::kSparse: {
+            const auto sparse_info = std::dynamic_pointer_cast<SparseInfo>(data_type.type_info());
+            auto struct_array = std::static_pointer_cast<arrow::StructArray>(array);
+            auto index_raw_array = struct_array->GetFieldByName("index");
+            auto index_array = std::static_pointer_cast<arrow::ListArray>(index_raw_array);
+            i64 start_offset = index_array->value_offset(value_idx);
+            i64 end_offset = index_array->value_offset(value_idx + 1);
+            SharedPtr<arrow::ListArray> data_array;
+            auto value_raw_array = struct_array->GetFieldByName("value");
+            if (value_raw_array.get() != nullptr) {
+                data_array = std::static_pointer_cast<arrow::ListArray>(value_raw_array);
+                i64 start_offset1 = index_array->value_offset(value_idx);
+                i64 end_offset1 = index_array->value_offset(value_idx + 1);
+                if (start_offset != start_offset1 || end_offset != end_offset1) {
+                    RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+                }
+            }
+            switch (sparse_info->IndexType()) {
+                case EmbeddingDataType::kElemInt8: {
+                    const auto int8_index_array = std::static_pointer_cast<arrow::Int8Array>(index_array->values());
+                    return GetSparseValueFromParquet<i8, arrow::Int8Array>(sparse_info, int8_index_array, data_array, start_offset, end_offset);
+                }
+                case EmbeddingDataType::kElemInt16: {
+                    const auto int16_index_array = std::static_pointer_cast<arrow::Int16Array>(index_array->values());
+                    return GetSparseValueFromParquet<i16, arrow::Int16Array>(sparse_info, int16_index_array, data_array, start_offset, end_offset);
+                }
+                case EmbeddingDataType::kElemInt32: {
+                    const auto int32_index_array = std::static_pointer_cast<arrow::Int32Array>(index_array->values());
+                    return GetSparseValueFromParquet<i32, arrow::Int32Array>(sparse_info, int32_index_array, data_array, start_offset, end_offset);
+                }
+                case EmbeddingDataType::kElemInt64: {
+                    const auto int64_index_array = std::static_pointer_cast<arrow::Int64Array>(index_array->values());
+                    return GetSparseValueFromParquet<i64, arrow::Int64Array>(sparse_info, int64_index_array, data_array, start_offset, end_offset);
+                }
+                default: {
+                    UnrecoverableError("Invalid sparse index type.");
+                    return Value::MakeInvalid();
+                }
+            }
+        }
+        case LogicalType::kMultiVector:
+        case LogicalType::kTensor: {
+            auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(data_type.type_info());
+            auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
+            Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(list_array, embedding_info.get(), value_idx);
+            Vector<Pair<ptr_t, SizeT>> embedding_data;
+            for (const auto &[data_ptr, data_bytes] : embedding_vec) {
+                embedding_data.emplace_back(data_ptr.get(), data_bytes);
+            }
+            if (data_logical_type == LogicalType::kMultiVector) {
+                return Value::MakeMultiVector(embedding_data, std::move(embedding_info));
+            }
+            assert(data_logical_type == LogicalType::kTensor);
+            return Value::MakeTensor(embedding_data, std::move(embedding_info));
+        }
+        case LogicalType::kTensorArray: {
+            const auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(data_type.type_info());
+            auto value = Value::MakeTensorArray(embedding_info);
+            auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
+            i64 start_offset = list_array->value_offset(value_idx);
+            i64 end_offset = list_array->value_offset(value_idx + 1);
+            auto tensor_array = std::static_pointer_cast<arrow::ListArray>(list_array->values());
+            for (i64 j = start_offset; j < end_offset; ++j) {
+                Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(tensor_array, embedding_info.get(), j);
+                Vector<Pair<ptr_t, SizeT>> embedding_data;
+                for (auto &data : embedding_vec) {
+                    embedding_data.push_back({data.first.get(), data.second});
+                }
+                value.AppendToTensorArray(embedding_data);
+            }
+            return value;
+        }
+        case LogicalType::kArray: {
+            auto array_info = std::static_pointer_cast<ArrayInfo>(data_type.type_info());
+            const auto &elem_type = array_info->ElemType();
+            const auto list_array = std::static_pointer_cast<arrow::ListArray>(array);
+            const auto start_offset = list_array->value_offset(value_idx);
+            const auto end_offset = list_array->value_offset(value_idx + 1);
+            const auto array_elements = list_array->values();
+            Vector<Value> array_value_vec;
+            for (auto j = start_offset; j < end_offset; ++j) {
+                auto v = GetValueFromParquetRecursively(elem_type, array_elements, j);
+                array_value_vec.push_back(std::move(v));
+            }
+            return Value::MakeArray(std::move(array_value_vec), std::move(array_info));
+        }
+        case LogicalType::kRowID:
+        case LogicalType::kInterval:
+        case LogicalType::kHugeInt:
+        case LogicalType::kDecimal:
+        case LogicalType::kTuple:
+        case LogicalType::kPoint:
+        case LogicalType::kLine:
+        case LogicalType::kLineSeg:
+        case LogicalType::kBox:
+        case LogicalType::kCircle:
+        case LogicalType::kUuid:
+        case LogicalType::kMixed:
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kEmptyArray:
+        case LogicalType::kInvalid: {
+            String error_message = "Not implement: Invalid data type.";
+            UnrecoverableError(error_message);
+            return Value::MakeInvalid();
         }
     }
 }

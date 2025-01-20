@@ -104,6 +104,8 @@ private:
 export template <typename DataType>
 class MemIndexInserterIter {
 public:
+    using ValueType = const DataType *;
+
     MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
         : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr, offset + size))),
           ele_size_(entry->column_type()->Size()), cur_(offset), end_(offset + size) {}
@@ -130,6 +132,8 @@ private:
 export template <typename ElementT>
 class MemIndexInserterIter<MultiVectorRef<ElementT>> {
 public:
+    using ValueType = const ElementT *;
+
     MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
         : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr, offset + size))),
           ele_size_(entry->column_type()->type_info()->Size()), cur_(offset), end_(offset + size) {}
@@ -164,6 +168,8 @@ private:
 export template <typename DataType, typename IdxType>
 class MemIndexInserterIter<SparseVecRef<DataType, IdxType>> {
 public:
+    using ValueType = SparseVecRef<DataType, IdxType>;
+
     MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
         : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr, offset + size))),
           ele_size_(entry->column_type()->Size()), cur_(offset), end_(offset + size) {}

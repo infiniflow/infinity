@@ -12,23 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "array_info.h"
-#include "type/complex/array_type.h"
+module;
+
+export module array_cast;
+
+import bound_cast_func;
+import data_type;
 
 namespace infinity {
 
-bool ArrayInfo::operator==(const TypeInfo &other) const {
-    if (other.type() != TypeInfoType::kArray) {
-        return false;
-    }
-    auto *array_info_ptr = dynamic_cast<const ArrayInfo *>(&other);
-    return this->elem_type_ == array_info_ptr->elem_type_;
-}
-
-size_t ArrayInfo::Size() const { return sizeof(ArrayType); }
-
-std::string ArrayInfo::ToString() const { return elem_type_.ToString(); }
-
-nlohmann::json ArrayInfo::Serialize() const { return elem_type_.Serialize(); }
+export BoundCastFunc BindArrayCast(const DataType &source, const DataType &target);
 
 } // namespace infinity

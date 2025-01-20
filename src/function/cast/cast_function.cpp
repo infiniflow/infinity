@@ -14,8 +14,9 @@
 
 module;
 
-import third_party;
+module cast_function;
 
+import third_party;
 import infinity_exception;
 import bound_cast_func;
 import bool_cast;
@@ -27,13 +28,12 @@ import tensor_cast;
 import tensor_array_cast;
 import multi_vector_cast;
 import empty_array_cast;
+import array_cast;
 import logger;
 import stl;
 import sparse_cast;
 import third_party;
 import logical_type;
-
-module cast_function;
 
 namespace infinity {
 
@@ -94,13 +94,15 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         case LogicalType::kEmptyArray: {
             return BindEmptyArrayCast(source, target);
         }
+        case LogicalType::kArray: {
+            return BindArrayCast(source, target);
+        }
         case LogicalType::kDecimal:
         case LogicalType::kDate:
         case LogicalType::kTime:
         case LogicalType::kDateTime:
         case LogicalType::kTimestamp:
         case LogicalType::kInterval:
-        case LogicalType::kArray:
         case LogicalType::kTuple:
         case LogicalType::kPoint:
         case LogicalType::kLine:
