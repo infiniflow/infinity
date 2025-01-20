@@ -11,7 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+module;
+#include <math.h>
 module century;
+
 import stl;
 import catalog;
 import status;
@@ -44,7 +47,7 @@ inline bool CenturyFunction::Run(DateT left, BigIntT &result) {
     } else if (year < 0) {
         result = static_cast<i64>(floor(year / 100));
     } else {
-        Status status = Status::InvalidParameterValue("Invalid input: There is no year 0 in the AD/BC dating system.");
+        Status status = Status::InvalidParameterValue("Date", "0", "There is no year 0 in the AD/BC dating system.");
         RecoverableError(status);
         return false;
     }
@@ -59,7 +62,7 @@ inline bool CenturyFunction::Run(DateTimeT left, BigIntT &result) {
     } else if (year < 0) {
         result = static_cast<i64>(floor(year / 100));
     } else {
-        Status status = Status::InvalidParameterValue("Invalid input: There is no year 0 in the AD/BC dating system.");
+        Status status = Status::InvalidParameterValue("DateTime", "0", "There is no year 0 in the AD/BC dating system.");
         RecoverableError(status);
         return false;
     }
@@ -75,7 +78,7 @@ inline bool CenturyFunction::Run(TimestampT left, BigIntT &result) {
     } else if (year < 0) {
         result = static_cast<i64>(floor(year / 100));
     } else {
-        Status status = Status::InvalidParameterValue("Invalid input: There is no year 0 in the AD/BC dating system.");
+        Status status = Status::InvalidParameterValue("TimeStamp", "0", "There is no year 0 in the AD/BC dating system.");
         RecoverableError(status);
         return false;
     }

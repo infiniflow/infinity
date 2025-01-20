@@ -44,7 +44,7 @@ template <>
 inline bool WeekdayFunction::Run(DateT left, BigIntT &result) {
     year_month_day ymd;
     DateT::OuterDate2YMD(left, ymd);
-    result = weekday{ymd};
+    result = static_cast<i64>(weekday{ymd}.c_encoding());
     return true;
 }
 
@@ -52,7 +52,7 @@ template <>
 inline bool WeekdayFunction::Run(DateTimeT left, BigIntT &result) {
     year_month_day ymd;
     DateTimeT::OuterDateTime2YMD(left.date, ymd);
-    result = weekday{ymd};
+    result = static_cast<i64>(weekday{ymd}.c_encoding());
     return true;
 }
 
@@ -60,7 +60,7 @@ template <>
 inline bool WeekdayFunction::Run(TimestampT left, BigIntT &result) {
     year_month_day ymd;
     TimestampT::OuterDateTime2YMD(left.date, ymd);
-    result = weekday{ymd};
+    result = static_cast<i64>(weekday{ymd}.c_encoding());
     return true;
 }
 

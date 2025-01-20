@@ -39,7 +39,7 @@ struct EpochFunction {
 
 template <>
 inline bool EpochFunction::Run(DateT left, BigIntT &result) {
-    result = DateT::GetDatePart(left, TimeUnit::kYear);
+    result = left.GetEpochTime();
     return true;
 }
 

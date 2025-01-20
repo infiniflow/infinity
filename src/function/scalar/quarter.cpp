@@ -64,7 +64,7 @@ inline bool QuarterFunction::Run(DateT left, BigIntT &result) {
             result = 4;
             break;
         default:
-            Status status = Status::InvalidParameterValue("Invalid input: Your Month is Invalid.");
+            Status status = Status::InvalidParameterValue("Date", "month", "Your month is invalid");
             RecoverableError(status);
             return false;
     }
@@ -98,7 +98,7 @@ inline bool QuarterFunction::Run(DateTimeT left, BigIntT &result) {
             result = 4;
             break;
         default:
-            Status status = Status::InvalidParameterValue("Invalid input: Your Month is Invalid.");
+            Status status = Status::InvalidParameterValue("Datetime", "month", "Your month is invalid");
             RecoverableError(status);
             return false;
     }
@@ -132,7 +132,7 @@ inline bool QuarterFunction::Run(TimestampT left, BigIntT &result) {
             result = 4;
             break;
         default:
-            Status status = Status::InvalidParameterValue("Invalid input: Your Month is Invalid.");
+            Status status = Status::InvalidParameterValue("TimeStamp", "month", "Your month is invalid");
             RecoverableError(status);
             return false;
     }
