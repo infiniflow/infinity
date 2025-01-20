@@ -59,6 +59,8 @@ public:
     static bool Subtract(DateTypeStd input, IntervalType interval, DateTypeStd &output);
 
     static int64_t GetDatePart(DateTypeStd input, TimeUnit unit);
+
+    static bool OuterDate2YMD(int32_t days, std::chrono::year_month_day &ymd);
 };
 
 } // namespace infinity
