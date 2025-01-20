@@ -291,7 +291,6 @@ void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush log mainloop begin");
 
     Deque<Txn *> txn_batch{};
-    TxnManager *txn_mgr = storage_->txn_manager();
     ClusterManager *cluster_manager = nullptr;
     while (running_.load()) {
         wait_flush_.DequeueBulk(txn_batch);
@@ -313,9 +312,10 @@ void WalManager::Flush() {
 
             if (entry->cmds_.empty()) {
                 continue;
-                // UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
-            if (txn_mgr->InCheckpointProcess(entry->commit_ts_)) {
+
+            if(txn->GetTxnType() == TransactionType::kCheckpoint) {
+                LOG_TRACE(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file", txn->BeginTS(), txn->CommitTS()));
                 this->SwapWalFile(max_commit_ts_, true);
             }
 
@@ -472,7 +472,9 @@ bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task)
 void WalManager::Checkpoint(bool is_full_checkpoint) {
     TxnManager *txn_mgr = storage_->txn_manager();
     Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), TransactionType::kCheckpoint);
-
+    if (txn == nullptr) {
+        RecoverableError(Status::FailToStartTxn("System is checkpointing"));
+    }
     if (is_full_checkpoint) {
         FullCheckpointInner(txn);
     } else {

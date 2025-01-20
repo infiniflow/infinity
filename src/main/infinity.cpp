@@ -120,7 +120,7 @@ void Infinity::LocalInit(const String &path, const String &config_path) {
 
         default_config->default_log_level_ = LogLevel::kInfo;
         default_config->default_log_to_stdout_ = false;
-        InfinityContext::instance().InitPhase1(nullptr, false, default_config.get());
+        InfinityContext::instance().InitPhase1(nullptr, default_config.get());
     }
     InfinityContext::instance().InitPhase2();
 }

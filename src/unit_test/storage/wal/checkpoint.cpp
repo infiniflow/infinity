@@ -500,7 +500,7 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
 
         infinity::InfinityContext::instance().UnInit();
     }
-    RemoveOldWal(wal_dir);
+//    RemoveOldWal(wal_dir);
     {
         infinity::InfinityContext::instance().InitPhase1(nullptr /*config_path*/);
         infinity::InfinityContext::instance().InitPhase2();
