@@ -48,6 +48,7 @@ import like;
 import minus;
 import modulo;
 import multiply;
+import century;
 import year;
 import month;
 import day;
@@ -57,6 +58,11 @@ import second;
 import day_of_month;
 import day_of_week;
 import day_of_year;
+import era;
+import epoch;
+import weekday;
+import week_of_year;
+import quarter;
 import not_func;
 import or_func;
 import plus;
@@ -159,6 +165,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterPositionFunction(catalog_ptr_);
 
     // date and time functions
+    RegisterCenturyFunction(catalog_ptr_);
     RegisterYearFunction(catalog_ptr_);
     RegisterMonthFunction(catalog_ptr_);
     RegisterDayFunction(catalog_ptr_);
@@ -168,6 +175,11 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterDayOfYearFunction(catalog_ptr_);
     RegisterDayOfMonthFunction(catalog_ptr_);
     RegisterDayOfWeekFunction(catalog_ptr_);
+    RegisterEraFunction(catalog_ptr);
+    RegisterEpochFunction(catalog_ptr);
+    RegisterQuarterFunction(catalog_ptr);
+    RegisterWeekdayFunction(catalog_ptr);
+    RegisterWeekOfYearFunction(catalog_ptr);
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}
