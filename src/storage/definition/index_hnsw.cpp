@@ -84,14 +84,17 @@ LSGConfig LSGConfig::FromString(const String &str) {
     // example: "sample_raito=0.01,ls_k=10,alpha=1.0"
     LSGConfig lsg_config;
     std::string_view sv(str);
-    while (true) {
+    bool end = false;
+    do {
         auto r = sv.find(',');
         if (r == std::string_view::npos) {
             r = sv.size();
-            break;
+            end = true;
         }
         auto kv = sv.substr(0, r);
-        sv.remove_prefix(r + 1);
+        if (!end) {
+            sv.remove_prefix(r + 1);
+        }
         auto pos = kv.find('=');
         if (pos == std::string_view::npos) {
             Status status = Status::InvalidIndexParam(String(kv));
@@ -109,7 +112,7 @@ LSGConfig LSGConfig::FromString(const String &str) {
             Status status = Status::InvalidIndexParam(String(key));
             RecoverableError(status);
         }
-    }
+    } while (!end);
     return lsg_config;
 }
 
