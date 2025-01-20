@@ -14,10 +14,9 @@
 
 module;
 
-import stl;
-
 export module day_of_year;
 
+import stl;
 namespace infinity {
 
 class Catalog;
