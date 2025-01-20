@@ -175,11 +175,11 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterDayOfYearFunction(catalog_ptr_);
     RegisterDayOfMonthFunction(catalog_ptr_);
     RegisterDayOfWeekFunction(catalog_ptr_);
-    RegisterEraFunction(catalog_ptr);
-    RegisterEpochFunction(catalog_ptr);
-    RegisterQuarterFunction(catalog_ptr);
-    RegisterWeekdayFunction(catalog_ptr);
-    RegisterWeekOfYearFunction(catalog_ptr);
+    RegisterEraFunction(catalog_ptr_);
+    RegisterEpochFunction(catalog_ptr_);
+    RegisterQuarterFunction(catalog_ptr_);
+    RegisterWeekdayFunction(catalog_ptr_);
+    RegisterWeekOfYearFunction(catalog_ptr_);
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}
