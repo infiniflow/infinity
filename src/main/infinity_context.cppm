@@ -54,8 +54,8 @@ public:
 
     NodeRole GetServerRole() const;
 
-    void InitPhase1(const SharedPtr<String> &config_path, bool admin_flag = false, DefaultConfig *default_config = nullptr);
-    void InitPhase2();
+    void InitPhase1(const SharedPtr<String> &config_path, DefaultConfig *default_config = nullptr);
+    void InitPhase2(bool admin_flag = false);
     //    void InitAdminMode(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
     Status
     ChangeServerRole(NodeRole target_role, bool from_leader = false, const String &node_name = {}, String leader_ip = {}, u16 leader_port = {});

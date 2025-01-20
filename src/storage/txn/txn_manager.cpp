@@ -68,14 +68,15 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) 
     // Record the start ts of the txn
     TxnTimeStamp begin_ts = current_ts_ + 1;
 
-    bool ckp_txn = txn_type == TransactionType::kCheckpoint;
-    if (ckp_txn) {
-        if (ckp_begin_ts_ != UNCOMMIT_TS) {
-            // not set ckp_begin_ts_ may not truncate the wal file.
-            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, begin_ts));
-        } else {
+    if (txn_type == TransactionType::kCheckpoint) {
+        if (ckp_begin_ts_ == UNCOMMIT_TS) {
             LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
             ckp_begin_ts_ = begin_ts;
+        } else {
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing, not start this txn",
+                                 ckp_begin_ts_,
+                                 begin_ts));
+            return nullptr;
         }
     }
 
@@ -194,27 +195,27 @@ void TxnManager::SendToWAL(Txn *txn) {
 
     std::lock_guard guard(locker_);
     if (wait_conflict_ck_.empty()) {
-        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
+        String error_message = fmt::format("TxnManager::SendToWAL wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
         UnrecoverableError(error_message);
     }
     if (wait_conflict_ck_.begin()->first > commit_ts) {
-        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
+        String error_message = fmt::format("TxnManager::SendToWAL wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
                                            wait_conflict_ck_.begin()->first,
                                            txn->CommitTS());
         UnrecoverableError(error_message);
     }
     if (wal_entry) {
-        wait_conflict_ck_.at(commit_ts) = wal_entry;
+        wait_conflict_ck_.at(commit_ts) = txn;
     } else {
         wait_conflict_ck_.erase(commit_ts); // rollback
     }
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
-        Vector<WalEntry *> wal_entries;
+        Vector<Txn *> txn_array;
         do {
-            wal_entries.push_back(wait_conflict_ck_.begin()->second);
+            txn_array.push_back(wait_conflict_ck_.begin()->second);
             wait_conflict_ck_.erase(wait_conflict_ck_.begin());
         } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
-        wal_mgr_->PutEntries(wal_entries);
+        wal_mgr_->SubmitTxn(txn_array);
     }
 }
 
@@ -250,12 +251,20 @@ bool TxnManager::Stopped() { return !is_running_.load(); }
 
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp commit_ts = txn->Commit();
+    if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+        std::lock_guard guard(locker_);
+        ckp_begin_ts_ = UNCOMMIT_TS;
+    }
     this->CleanupTxn(txn, true);
     return commit_ts;
 }
 
 void TxnManager::RollBackTxn(Txn *txn) {
     txn->Rollback();
+    if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+        std::lock_guard guard(locker_);
+        ckp_begin_ts_ = UNCOMMIT_TS;
+    }
     this->CleanupTxn(txn, false);
 }
 
@@ -297,7 +306,7 @@ Vector<SharedPtr<TxnContext>> TxnManager::GetTxnContextHistories() const {
         txn_context_histories.emplace_back(context_ptr);
     }
 
-    for (const auto& ongoing_txn_pair: txn_map_) {
+    for (const auto &ongoing_txn_pair : txn_map_) {
         txn_context_histories.push_back(ongoing_txn_pair.second->txn_context());
     }
 
@@ -337,7 +346,7 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 void TxnManager::CleanupTxn(Txn *txn, bool commit) {
     bool is_write_transaction = txn->IsWriteTransaction();
     TransactionID txn_id = txn->TxnID();
-    if(is_write_transaction) {
+    if (is_write_transaction) {
         // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
         TxnState txn_state = txn->GetTxnState();
         switch (txn_state) {
@@ -378,6 +387,7 @@ void TxnManager::CleanupTxn(Txn *txn, bool commit) {
             }
         }
         if (commit && add_delta_entry_task) {
+            // Submit delta entry must be after max_committed_ts_ is updated
             InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
         }
     } else {
@@ -395,7 +405,7 @@ void TxnManager::CleanupTxn(Txn *txn, bool commit) {
 bool TxnManager::InCheckpointProcess(TxnTimeStamp commit_ts) {
     std::lock_guard guard(locker_);
     if (commit_ts > ckp_begin_ts_) {
-        LOG_TRACE(fmt::format("Full checkpoint begin in {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
+        LOG_TRACE(fmt::format("Full/Delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
         ckp_begin_ts_ = UNCOMMIT_TS;
         return true;
     }
