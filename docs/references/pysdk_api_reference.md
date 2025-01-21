@@ -908,6 +908,13 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"encode"`: *Optional*
       - `"plain"`: (Default) Plain encoding.
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
+    - `"build_type"`: *Optional*
+      - `"plain"`: (Default) Plain build.
+      - `"lsg"`: Local scaling graph.
+    - `"lsg_config"`: *Optional* - A dictionary with each key-value pair corresponding to a parameter setting of the local scaling graph:
+      - `"sample_raito"`: *Optional* - Defaults to `"0.01"`. The ratio of the number of samples in the dataset (base).
+      - `"ls_k"`: *Optional* - Defaults to `"10"`. The number of nearest neighbors of the selected knn mean in local scaling.
+      - `"alpha"`: *Optional* - Defaults to `"1.0"`. The smoothing factor in local scaling.
   - Parameter settings for an IVF index:
     - `"metric"` *Required* - The distance metric to use in a similarity search.
       - `"ip"`: Inner product.
@@ -1131,6 +1138,35 @@ table_object.create_index(
     None
 )
 ```
+
+---
+
+### optimize_index
+
+```python
+table_obj.optimize(index_name, opt_params: dict[str, str])
+```
+
+Optimize an index by its name.
+
+#### Parameters
+
+##### index_name: `str`, *Required*
+
+A non-empty string indicating the name of the index to optimize.
+
+##### opt_params: `dict[str, str]`, *Required*
+
+A dictionary specifying the optimization parameters for the selected index type. Each key-value pair in the dictionary corresponds to a parameter and its value:
+
+- Parameters settings for an HNSW index:
+  - `"compress_to_lvq"`: *Optional* - Defaults to `"false"`. Compress existing plain HNSW index to LVQ index.
+  - `"lvq_avg"`: *Optional* - Defaults to `"false"`. Calculate the average of the LVQ index.
+- Parameters settings for an BMP index:
+  - `"topk"`: *Optional* - Optimize bmp index for topk search.
+  - `"bp_reorder"`: *Optional* - Defaults to `"false"`. Reorder internal sequence of the bmp index by heuristic rules(binary partition).
+
+---
 
 ---
 

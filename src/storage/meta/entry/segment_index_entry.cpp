@@ -502,8 +502,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
             UniquePtr<HnswIndexInMem> memory_hnsw_index;
             if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
-                LSGConfig lsg_config;
-                HnswLSGBuilder builder(index_hnsw, column_def, lsg_config);
+                HnswLSGBuilder builder(index_hnsw, column_def);
                 memory_hnsw_index = builder.Make(segment_entry, column_def->id(), begin_ts, config.check_ts_, buffer_mgr, true);
             } else {
                 memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base, column_def.get(), this);
@@ -945,8 +944,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
             UniquePtr<HnswIndexInMem> memory_hnsw_index;
             if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
-                LSGConfig lsg_config;
-                HnswLSGBuilder builder(index_hnsw, column_def, lsg_config);
+                HnswLSGBuilder builder(index_hnsw, column_def);
                 memory_hnsw_index = builder.Make(segment_entry, column_def->id(), begin_ts, true /*check_ts*/, buffer_mgr, true);
             } else {
                 memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base, column_def.get(), this);

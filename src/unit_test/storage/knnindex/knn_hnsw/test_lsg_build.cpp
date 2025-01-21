@@ -48,11 +48,12 @@ protected:
         metric_type = MetricType::kMetricL2;
         encode_type = HnswEncodeType::kPlain;
         build_type = HnswBuildType::kLSG;
+        lsg_config = LSGConfig();
     }
 
     UniquePtr<IndexHnsw> MakeIndexHnsw() {
         return MakeUnique<
-            IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size);
+            IndexHnsw>(index_name, nullptr, filename, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size, lsg_config);
     }
 
     UniquePtr<ColumnDef> MakeColumnDef() {
@@ -74,12 +75,14 @@ protected:
     MetricType metric_type;
     HnswEncodeType encode_type;
     HnswBuildType build_type;
+    Optional<LSGConfig> lsg_config;
 
     using LabelT = u32;
 };
 
 TEST_F(LSGBuildTest, test_avg) {
     element_size = 128;
+    lsg_config->sample_raito_ = 0.1;
 
     auto data = MakeUnique<float[]>(dim * element_size);
     std::mt19937 rng;
@@ -94,20 +97,18 @@ TEST_F(LSGBuildTest, test_avg) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
 
-    LSGConfig lsg_config;
-    lsg_config.sample_raito_ = 0.1;
-    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def), std::move(lsg_config));
+    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def));
 
     auto avg = lsg_builder.GetLSAvg<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0));
 
     auto avg_gt = MakeUnique<float[]>(element_size);
     {
-        SizeT sample_num = element_size * lsg_config.sample_raito_;
+        SizeT sample_num = element_size * lsg_config->sample_raito_;
         Vector<SizeT> sample_idx(sample_num);
         for (SizeT i = 0; i < sample_num; ++i) {
             sample_idx[i] = rand() % element_size;
         }
-        SizeT ls_k = std::min(lsg_config.ls_k_, sample_num);
+        SizeT ls_k = std::min(lsg_config->ls_k_, sample_num);
         auto distances = MakeUnique<float[]>(sample_num);
         for (SizeT i = 0; i < element_size; ++i) {
             const float *v = data.get() + i * dim;
@@ -141,6 +142,7 @@ TEST_F(LSGBuildTest, test_avg) {
 
 TEST_F(LSGBuildTest, test1) {
     dim = 16;
+    lsg_config->sample_raito_ = 0.1;
 
     auto data = MakeUnique<float[]>(dim * element_size);
 
@@ -154,16 +156,14 @@ TEST_F(LSGBuildTest, test1) {
     auto index_hnsw = MakeIndexHnsw();
     auto column_def = MakeColumnDef();
 
-    LSGConfig lsg_config;
-    lsg_config.sample_raito_ = 0.1;
-
-    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def), std::move(lsg_config));
+    HnswLSGBuilder lsg_builder(index_hnsw.get(), std::move(column_def));
 
     auto iter = DenseVectorIter<f32, LabelT>(data.get(), dim, element_size);
 
     UniquePtr<HnswIndexInMem> hnsw_index = lsg_builder.MakeImplIter<decltype(iter), f32, f32>(std::move(iter), element_size, RowID(0, 0), false);
 
-    auto search_index = [](HnswIndexInMem *hnsw_index, const float *query, i32 topk, const KnnSearchOption &search_option) -> Vector<Pair<f32, LabelT>> {
+    auto search_index =
+        [](HnswIndexInMem *hnsw_index, const float *query, i32 topk, const KnnSearchOption &search_option) -> Vector<Pair<f32, LabelT>> {
         return std::visit(
             [&](auto &&index) {
                 using T = std::decay_t<decltype(index)>;
