@@ -1252,3 +1252,106 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_select_day_of_week" + suffix)
         assert res.error_code == ErrorCode.OK
+
+    
+    def test_select_weekday(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_weekday" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_weekday" + suffix,
+                            {"c1": {"type": "date"},
+                             "c2": {"type": "datetime"},
+                             "c3": {"type": "timestamp"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_weekday" + suffix)
+        table_obj.insert(
+            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+
+        res, extra_res = table_obj.output(["weekday(c1)", "weekday(c2)", "weekday(c3)"]).to_pl()
+        print(res)
+        assert res['weekday(c1)'][0] == 4, "The value of weekday(c1) should be 4"
+        assert res['weekday(c2)'][0] == 4, "The value of weekday(c2) should be 4"
+        assert res['weekday(c3)'][0] == 4, "The value of weekday(c3) should be 4"
+
+        res = db_obj.drop_table("test_select_weekday" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_era(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_era" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_era" + suffix,
+                            {"c1": {"type": "date"},
+                             "c2": {"type": "datetime"},
+                             "c3": {"type": "timestamp"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_era" + suffix)
+        table_obj.insert(
+            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+
+        res, extra_res = table_obj.output(["era(c1)", "era(c2)", "era(c3)"]).to_pl()
+        print(res)
+        assert res['era(c1)'][0] == 4, "The value of era(c1) should be 4"
+        assert res['era(c2)'][0] == 4, "The value of era(c2) should be 4"
+        assert res['era(c3)'][0] == 4, "The value of era(c3) should be 4"
+
+        res = db_obj.drop_table("test_select_era" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_epoch(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_epoch" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_epoch" + suffix,
+                            {"c1": {"type": "date"},
+                             "c2": {"type": "datetime"},
+                             "c3": {"type": "timestamp"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_epoch" + suffix)
+        table_obj.insert(
+            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+
+        res, extra_res = table_obj.output(["epoch(c1)", "epoch(c2)", "epoch(c3)"]).to_pl()
+        print(res)
+        assert res['epoch(c1)'][0] == 4, "The value of epoch(c1) should be 4"
+        assert res['epoch(c2)'][0] == 4, "The value of epoch(c2) should be 4"
+        assert res['epoch(c3)'][0] == 4, "The value of epoch(c3) should be 4"
+
+        res = db_obj.drop_table("test_select_epoch" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_quarter(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_quarter" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_quarter" + suffix,
+                            {"c1": {"type": "date"},
+                             "c2": {"type": "datetime"},
+                             "c3": {"type": "timestamp"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_quarter" + suffix)
+        table_obj.insert(
+            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+
+        res, extra_res = table_obj.output(["quarter(c1)", "quarter(c2)", "quarter(c3)"]).to_pl()
+        print(res)
+        assert res['quarter(c1)'][0] == 4, "The value of quarter(c1) should be 4"
+        assert res['quarter(c2)'][0] == 4, "The value of quarter(c2) should be 4"
+        assert res['quarter(c3)'][0] == 4, "The value of quarter(c3) should be 4"
+
+        res = db_obj.drop_table("test_select_quarter" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+    def test_select_century(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_century" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_century" + suffix,
+                            {"c1": {"type": "date"},
+                             "c2": {"type": "datetime"},
+                             "c3": {"type": "timestamp"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_century" + suffix)
+        table_obj.insert(
+            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+
+        res, extra_res = table_obj.output(["century(c1)", "century(c2)", "century(c3)"]).to_pl()
+        print(res)
+        assert res['century(c1)'][0] == 4, "The value of century(c1) should be 4"
+        assert res['century(c2)'][0] == 4, "The value of century(c2) should be 4"
+        assert res['century(c3)'][0] == 4, "The value of century(c3) should be 4"
+
+        res = db_obj.drop_table("test_select_century" + suffix)
+        assert res.error_code == ErrorCode.OK
+
+
