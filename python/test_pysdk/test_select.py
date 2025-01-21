@@ -1373,3 +1373,25 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_select_week_of_year" + suffix)
         assert res.error_code == ErrorCode.OK
+
+    def test_select_date_part(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_date_part" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_date_part" + suffix,
+                            {"c1": {"type": "date"},
+                             "c2": {"type": "datetime"},
+                             "c3": {"type": "timestamp"},
+                             "c4": {"type": "varchar", "constraints": ["primary key", "not null"]},
+                             "c5": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_date_part" + suffix)
+        table_obj.insert(
+            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11", "c4":"year", "c5":"month"}])
+
+        res, extra_res = table_obj.output(["datepart(c4, c1)", "datepart(c4, c2)", "datepart(c5, c3)"]).to_pl()
+        print(res)
+        assert res['(c4 datepart c1)'][0] == 2025, "The value of c4 datepart c1 should be 2025"
+        assert res['(c4 datepart c2)'][0] == 2025, "The value of c4 datepart c2 should be 2025"
+        assert res['(c5 datepart c3)'][0] == 1, "The value of c5 datepart c3 should be 1"
+
+        res = db_obj.drop_table("test_select_date_part" + suffix)
+        assert res.error_code == ErrorCode.OK
