@@ -11,8 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 module;
-#include <math.h>
+#include <cmath>
 module century;
 
 import stl;
@@ -43,9 +44,9 @@ template <>
 inline bool CenturyFunction::Run(DateT left, BigIntT &result) {
     auto year = DateT::GetDatePart(left, TimeUnit::kYear);
     if (year > 0) {
-        result = static_cast<i64>(ceil(year / 100));
+        result = static_cast<i64>(ceil(year / 100.0));
     } else if (year < 0) {
-        result = static_cast<i64>(floor(year / 100));
+        result = static_cast<i64>(floor(year / 100.0));
     } else {
         Status status = Status::InvalidParameterValue("Date", "0", "There is no year 0 in the AD/BC dating system.");
         RecoverableError(status);
@@ -58,9 +59,9 @@ template <>
 inline bool CenturyFunction::Run(DateTimeT left, BigIntT &result) {
     auto year = DateTimeT::GetDateTimePart(left, TimeUnit::kYear);
     if (year > 0) {
-        result = static_cast<i64>(ceil(year / 100));
+        result = static_cast<i64>(ceil(year / 100.0));
     } else if (year < 0) {
-        result = static_cast<i64>(floor(year / 100));
+        result = static_cast<i64>(floor(year / 100.0));
     } else {
         Status status = Status::InvalidParameterValue("DateTime", "0", "There is no year 0 in the AD/BC dating system.");
         RecoverableError(status);
@@ -74,9 +75,9 @@ template <>
 inline bool CenturyFunction::Run(TimestampT left, BigIntT &result) {
     auto year = TimestampT::GetDateTimePart(left, TimeUnit::kYear);
     if (year > 0) {
-        result = static_cast<i64>(ceil(year / 100));
+        result = static_cast<i64>(ceil(year / 100.0));
     } else if (year < 0) {
-        result = static_cast<i64>(floor(year / 100));
+        result = static_cast<i64>(floor(year / 100.0));
     } else {
         Status status = Status::InvalidParameterValue("TimeStamp", "0", "There is no year 0 in the AD/BC dating system.");
         RecoverableError(status);
