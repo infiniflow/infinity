@@ -85,7 +85,6 @@ inline void DatePartFunction::InitDatePartFunction() {
 
 template <>
 inline bool DatePartFunction::Run(VarcharT &left, DateT right, BigIntT &result) {
-    InitDatePartFunction();
     auto input = left.ToString();
     auto it = time_unit_map.find(input);
     if (it == time_unit_map.end()) {
@@ -114,7 +113,6 @@ inline bool DatePartFunction::Run(VarcharT &left, DateT right, BigIntT &result) 
 
 template <>
 inline bool DatePartFunction::Run(VarcharT &left, DateTimeT right, BigIntT &result) {
-    InitDatePartFunction();
     auto input = left.ToString();
     auto it = time_unit_map.find(input);
     if (it == time_unit_map.end()) {
@@ -152,7 +150,6 @@ inline bool DatePartFunction::Run(VarcharT &left, DateTimeT right, BigIntT &resu
 
 template <>
 inline bool DatePartFunction::Run(VarcharT &left, TimestampT right, BigIntT &result) {
-    InitDatePartFunction();
     auto input = left.ToString();
     auto it = time_unit_map.find(input);
     if (it == time_unit_map.end()) {
@@ -190,7 +187,7 @@ inline bool DatePartFunction::Run(VarcharT &left, TimestampT right, BigIntT &res
 
 void RegisterDatePartFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "datepart";
-
+    DatePartFunction::InitDatePartFunction();
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction date_part_date_function(func_name,
