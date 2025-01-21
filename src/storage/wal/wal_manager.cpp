@@ -314,8 +314,10 @@ void WalManager::Flush() {
                 continue;
             }
 
-            if(txn->GetTxnType() == TransactionType::kCheckpoint) {
-                LOG_TRACE(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file", txn->BeginTS(), txn->CommitTS()));
+            if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+                LOG_INFO(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file",
+                                      txn->BeginTS(),
+                                      txn->CommitTS()));
                 this->SwapWalFile(max_commit_ts_, true);
             }
 
@@ -383,6 +385,7 @@ void WalManager::Flush() {
         try {
             auto file_size = VirtualStore::GetFileSize(wal_path_);
             if (file_size > cfg_wal_size_threshold_) {
+                LOG_INFO(fmt::format("WAL size: {} is larger than threshold: {}", file_size, cfg_wal_size_threshold_));
                 this->SwapWalFile(max_commit_ts_, true);
             }
         } catch (RecoverableException &e) {
@@ -446,6 +449,7 @@ void WalManager::FlushLogByReplication(const Vector<String> &synced_logs, bool o
 
         // Rename the old WAL file and open new WAL file, use the max_commit_ts. If duplicate filename, just remove current WAL file and create a new
         // one.
+        LOG_INFO("FlushLogByReplication, rename old WAL file and open new WAL");
         SwapWalFile(max_commit_ts, false);
     }
 
@@ -621,12 +625,17 @@ i64 WalManager::GetLastCkpWalSize() {
  * current wal file.
  */
 void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_duplicate) {
+    if(max_commit_ts <= last_swap_wal_ts_) {
+        LOG_WARN(fmt::format("Skip swap wal file, max_commit_ts: {} <= last_swap_wal_ts_: {}", max_commit_ts, last_swap_wal_ts_));
+        return ;
+    }
+
     if (ofs_.is_open()) {
         ofs_.close();
     }
 
     String new_file_path = fmt::format("{}/{}", wal_dir_, WalFile::WalFilename(max_commit_ts));
-    LOG_INFO(fmt::format("Wal {} swap to new path: {}", wal_path_, new_file_path));
+    LOG_INFO(fmt::format("Wal {} swap to new path: {}, error_if_duplicate: {}", wal_path_, new_file_path, error_if_duplicate));
 
     if (VirtualStore::Exists(new_file_path)) {
         if (error_if_duplicate) {
@@ -651,6 +660,8 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_dup
         String error_message = fmt::format("Failed to open wal file: {}", wal_path_);
         UnrecoverableError(error_message);
     }
+
+    last_swap_wal_ts_ = max_commit_ts;
     LOG_INFO(fmt::format("Open new wal file {}", wal_path_));
 }
 
