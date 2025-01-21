@@ -1,0 +1,69 @@
+statement ok
+DROP TABLE IF EXISTS simple_groupby;
+
+statement ok
+CREATE TABLE simple_groupby (c1 INTEGER, c2 INTEGER, c3 FLOAT);
+
+statement ok
+INSERT INTO simple_groupby VALUES
+(1,1,1.0),
+(2,2,2.0),
+(1,3,3.0),
+(2,1,4.0),
+(1,2,5.0),
+(2,3,6.0),
+(1,1,7.0),
+(2,2,8.0),
+(1,3,1.0),
+(2,1,2.0),
+(1,2,3.0),
+(2,3,4.0);
+
+query IIR rowsort
+SELECT c1, c2, SUM(c3) FROM simple_groupby GROUP BY c1, c2;
+----
+1 1 8.000000
+1 2 8.000000
+1 3 4.000000
+2 1 6.000000
+2 2 10.000000
+2 3 10.000000
+
+query IRI rowsort
+SELECT c1, c3, SUM(c2) FROM simple_groupby GROUP BY c1, c3;
+----
+1 1.000000 4
+1 3.000000 5
+1 5.000000 2
+1 7.000000 1
+2 2.000000 3
+2 4.000000 4
+2 6.000000 3
+2 8.000000 2
+
+query RII rowsort
+SELECT c3, SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3;
+----
+1.000000 2 4
+2.000000 4 3
+3.000000 2 5
+4.000000 4 4
+5.000000 1 2
+6.000000 2 3
+7.000000 1 1
+8.000000 2 2
+
+query RIII rowsort
+SELECT c3, COUNT(c3), SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3;
+----
+1.000000 2 2 4
+2.000000 2 4 3
+3.000000 2 2 5
+4.000000 2 4 4
+5.000000 1 1 2
+6.000000 1 2 3
+7.000000 1 1 1
+8.000000 1 2 2
+
+statement ok
+DROP TABLE simple_groupby;

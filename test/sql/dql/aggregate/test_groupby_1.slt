@@ -2,19 +2,15 @@ statement ok
 DROP TABLE IF EXISTS simple_groupby;
 
 statement ok
-CREATE TABLE simple_groupby (c1 INTEGER , c2 FLOAT);
+CREATE TABLE simple_groupby (c1 INTEGER, c2 FLOAT);
 
 statement ok
-INSERT INTO simple_groupby VALUES (1,1.0),(2,2.0),(1, 3.0),(2,4.0),(1,5.0);
-
-query IR
-SELECT * FROM simple_groupby;
-----
-1 1.000000
-2 2.000000
-1 3.000000
-2 4.000000
-1 5.000000
+INSERT INTO simple_groupby VALUES
+(1,1.0),
+(2,2.0),
+(1,3.0),
+(2,4.0),
+(1,5.0);
 
 query IR rowsort
 SELECT c1, SUM(c2) FROM simple_groupby GROUP BY c1;

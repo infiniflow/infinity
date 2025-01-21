@@ -72,13 +72,13 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     Vector<SharedPtr<ColumnDef>> groupby_columns;
     groupby_columns.reserve(group_count);
 
-    Vector<SharedPtr<DataType>> types;
-    types.reserve(group_count);
+    Vector<SharedPtr<DataType>> groupby_types;
+    groupby_types.reserve(group_count);
 
     for (i64 idx = 0; auto &expr : groups_) {
         SharedPtr<ColumnDef> col_def = MakeShared<ColumnDef>(idx, MakeShared<DataType>(expr->Type()), expr->Name(), std::set<ConstraintType>());
         groupby_columns.emplace_back(col_def);
-        types.emplace_back(MakeShared<DataType>(expr->Type()));
+        groupby_types.emplace_back(MakeShared<DataType>(expr->Type()));
         ++idx;
     }
 
@@ -100,7 +100,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
 
         groupby_table->data_blocks_.emplace_back(DataBlock::MakeUniquePtr());
         DataBlock *output_data_block = groupby_table->data_blocks_.back().get();
-        output_data_block->Init(types);
+        output_data_block->Init(groupby_types);
 
         ExpressionEvaluator groupby_executor;
         groupby_executor.Init(input_data_block);
@@ -112,7 +112,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     }
 
     // 2. Use the unique key to get the row list of the same key.
-    hash_table_.Init(types);
+    hash_table_.Init(groupby_types);
 
     SizeT block_count = groupby_table->DataBlockCount();
     for (SizeT block_id = 0; block_id < block_count; ++block_id) {
@@ -237,98 +237,7 @@ void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &in
 
                 // Forloop each column
                 for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-                    switch (types[column_id]->type()) {
-                        case LogicalType::kBoolean: {
-                            ((BooleanT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
-                                ((BooleanT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            break;
-                        }
-                        case LogicalType::kTinyInt: {
-                            ((TinyIntT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
-                                ((TinyIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            break;
-                        }
-                        case LogicalType::kSmallInt: {
-                            ((SmallIntT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
-                                ((SmallIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            break;
-                        }
-                        case LogicalType::kInteger: {
-                            ((IntegerT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
-                                ((IntegerT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            break;
-                        }
-                        case LogicalType::kBigInt: {
-                            ((BigIntT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
-                                ((BigIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            break;
-                        }
-                        case LogicalType::kHugeInt: {
-                            String error_message = "Not implement: HugeInt data shuffle";
-                            UnrecoverableError(error_message);
-                            break;
-                        }
-                        case LogicalType::kFloat: {
-                            ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
-                                ((FloatT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            break;
-                        }
-                        case LogicalType::kDouble: {
-                            ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
-                                ((DoubleT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            break;
-                        }
-                        case LogicalType::kDecimal: {
-                            String error_message = "Not implement: data shuffle.";
-                            UnrecoverableError(error_message);
-                            break;
-                        }
-                        case LogicalType::kVarchar: {
-                            String error_message = "Not implement: data shuffle.";
-                            UnrecoverableError(error_message);
-                            break;
-                        }
-                        case LogicalType::kDate: {
-                            ((DateT *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
-                                ((DateT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            break;
-                        }
-                        case LogicalType::kRowID: {
-                            ((RowID *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx] =
-                                ((RowID *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                            break;
-                        }
-                        case LogicalType::kTime: {
-                            String error_message = "Not implement: data shuffle.";
-                            UnrecoverableError(error_message);
-                            break;
-                        }
-                        case LogicalType::kDateTime: {
-                            String error_message = "Not implement: data shuffle.";
-                            UnrecoverableError(error_message);
-                            break;
-                        }
-                        case LogicalType::kTimestamp: {
-                            String error_message = "Not implement: data shuffle.";
-                            UnrecoverableError(error_message);
-                            break;
-                        }
-                        case LogicalType::kInterval: {
-                            String error_message = "Not implement: data shuffle.";
-                            UnrecoverableError(error_message);
-                            break;
-                        }
-                        case LogicalType::kMixed: {
-                            String error_message = "Not implement: data shuffle.";
-                            UnrecoverableError(error_message);
-                            break;
-                        }
-                        default: {
-                            String error_message = "Not implement: data shuffle.";
-                            UnrecoverableError(error_message);
-                            break;
-                        }
-                    }
+                    output_datablock->column_vectors[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors[column_id], input_offset, 1);
                 }
 
                 ++output_row_idx;
@@ -339,10 +248,6 @@ void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &in
             String error_message = fmt::format("Expected block size: {}, but only copied data size: {}", datablock_size, output_row_idx);
             UnrecoverableError(error_message);
             break;
-        }
-
-        for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-            output_datablock->column_vectors[column_id]->Finalize(datablock_size);
         }
 
         output_datablock->Finalize();
@@ -367,9 +272,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
 
     SharedPtr<DataBlock> output_datablock = nullptr;
     const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
-//    SizeT row_count = hash_table_.hash_table_.size();
-#if 1
-    for (SizeT block_row_idx = 0; const auto &item : hash_table_.hash_table_) {
+    for (const auto &item : hash_table_.hash_table_) {
         // Each hash bucket will generate one data block.
         output_datablock = DataBlock::Make();
         output_datablock->Init(types);
@@ -380,209 +283,12 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
 
         // Only the first position of the column vector has value.
         for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-            switch (types[column_id]->type()) {
-                case LogicalType::kBoolean: {
-                    ((BooleanT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((BooleanT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kTinyInt: {
-                    ((TinyIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((TinyIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kSmallInt: {
-                    ((SmallIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((SmallIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kInteger: {
-                    ((IntegerT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((IntegerT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kBigInt: {
-                    ((BigIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((BigIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kHugeInt: {
-                    String error_message = "Not implement: data shuffle.";
-                    UnrecoverableError(error_message);
-                    break;
-                }
-                case LogicalType::kFloat: {
-                    ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((FloatT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kDouble: {
-                    ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((DoubleT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kDecimal: {
-                    String error_message = "Not implement: data shuffle.";
-                    UnrecoverableError(error_message);
-                    break;
-                }
-                case LogicalType::kVarchar: {
-                    String error_message = "Not implement: data shuffle.";
-                    UnrecoverableError(error_message);
-                    break;
-                }
-                case LogicalType::kDate: {
-                    ((DateT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((DateT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kTime: {
-                    String error_message = "Not implement: data shuffle.";
-                    UnrecoverableError(error_message);
-                    break;
-                }
-                case LogicalType::kDateTime: {
-                    String error_message = "Not implement: data shuffle.";
-                    UnrecoverableError(error_message);
-                    break;
-                }
-                case LogicalType::kTimestamp: {
-                    String error_message = "Not implement: data shuffle.";
-                    UnrecoverableError(error_message);
-                    break;
-                }
-                case LogicalType::kInterval: {
-                    String error_message = "Not implement: data shuffle.";
-                    UnrecoverableError(error_message);
-                    break;
-                }
-                case LogicalType::kMixed: {
-                    String error_message = "Not implement: data shuffle.";
-                    UnrecoverableError(error_message);
-                    break;
-                }
-                default: {
-                    String error_message = "Not implement: data shuffle.";
-                    UnrecoverableError(error_message);
-                    break;
-                }
-            }
-
-            output_datablock->column_vectors[column_id]->Finalize(block_row_idx + 1);
+            output_datablock->column_vectors[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors[column_id], input_offset, 1);
         }
 
         output_datablock->Finalize();
         output_table->Append(output_datablock);
     }
-#else
-    for (SizeT row_id = 0, block_row_idx = 0; const auto &item : hash_table_.hash_table_) {
-        // DEFAULT VECTOR SIZE buckets will generate one data block.
-        if (row_id % DEFAULT_VECTOR_SIZE == 0) {
-            if (output_datablock.get() != nullptr) {
-                for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-                    output_datablock->column_vectors[column_id]->tail_index_ = block_row_idx;
-                }
-
-                output_datablock->Finalize();
-                output_table->Append(output_datablock);
-                block_row_idx = 0;
-            }
-
-            output_datablock = DataBlock::Make();
-            output_datablock->Init(types);
-        }
-
-        SizeT input_block_id = item.second.begin()->first;
-        SizeT input_offset = item.second.begin()->second.front();
-
-        for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-            switch (types[column_id].type()) {
-                case LogicalType::kBoolean: {
-                    ((BooleanT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((BooleanT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kTinyInt: {
-                    ((TinyIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((TinyIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kSmallInt: {
-                    ((SmallIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((SmallIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kInteger: {
-                    ((IntegerT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((IntegerT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kBigInt: {
-                    ((BigIntT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((BigIntT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kHugeInt: {
-                    NotImplementError("HugeInt data shuffle isn't implemented.")
-                }
-                case LogicalType::kFloat: {
-                    ((FloatT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((FloatT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kDouble: {
-                    ((DoubleT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =
-                        ((DoubleT *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset];
-                    break;
-                }
-                case LogicalType::kDecimal: {
-                    NotImplementError("Decimal data shuffle isn't implemented.")
-                }
-                case LogicalType::kVarchar: {
-                    NotImplementError("Varchar data shuffle isn't implemented.")
-                }
-                case LogicalType::kDate: {
-                    NotImplementError("Date data shuffle isn't implemented.")
-                }
-                case LogicalType::kTime: {
-                    NotImplementError("Time data shuffle isn't implemented.")
-                }
-                case LogicalType::kDateTime: {
-                    NotImplementError("Datetime data shuffle isn't implemented.")
-                }
-                case LogicalType::kTimestamp: {
-                    NotImplementError("Timestamp data shuffle isn't implemented.")
-                }
-                case LogicalType::kTimestampTZ: {
-                    NotImplementError("TimestampTZ data shuffle isn't implemented.")
-                }
-                case LogicalType::kInterval: {
-                    NotImplementError("Interval data shuffle isn't implemented.")
-                }
-                case LogicalType::kMixed: {
-                    NotImplementError("Heterogeneous data shuffle isn't implemented.")
-                }
-                default: {
-                    ExecutorError("Unexpected data type")
-                }
-            }
-        }
-
-        ++block_row_idx;
-        ++row_id;
-
-        if (row_id == row_count) {
-            // All hash table data are checked
-            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-                output_datablock->column_vectors[column_id]->tail_index_ = block_row_idx;
-            }
-
-            output_datablock->Finalize();
-            output_table->Append(output_datablock);
-            break;
-        }
-    }
-#endif
 }
 
 bool PhysicalAggregate::SimpleAggregateExecute(const Vector<UniquePtr<DataBlock>> &input_blocks,
