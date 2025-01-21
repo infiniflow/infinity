@@ -232,6 +232,12 @@ private:
 
     static void HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
+    template <typename T>
+    static void
+    HandleArrayTypeRecursively(String &output_str, const DataType &data_type, const T &data_value, const SharedPtr<ColumnVector> &column_vector);
+
+    static void HandleArrayType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+
     static void
     HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
