@@ -23,7 +23,6 @@ struct RowID;
 export module hnsw_lsg_builder;
 
 import stl;
-import index_hnsw;
 
 namespace infinity {
 
@@ -32,10 +31,11 @@ class BufferManager;
 struct IVF_Search_Params;
 class KnnDistanceBase1;
 class IVFIndexInChunk;
+class IndexHnsw;
 
 export class HnswLSGBuilder {
 public:
-    HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef> column_def, LSGConfig lsg_config);
+    HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef> column_def);
 
     ~HnswLSGBuilder();
 
@@ -66,7 +66,6 @@ private:
 private:
     const IndexHnsw *index_hnsw_ = nullptr;
     const SharedPtr<ColumnDef> column_def_ = nullptr;
-    const LSGConfig lsg_config_;
 
     UniquePtr<KnnDistanceBase1> knn_distance_;
 };

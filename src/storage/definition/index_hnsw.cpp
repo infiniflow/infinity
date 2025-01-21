@@ -179,6 +179,9 @@ SharedPtr<IndexBase> IndexHnsw::Make(SharedPtr<String> index_name,
     if (build_type != HnswBuildType::kLSG && lsg_config) {
         lsg_config = None;
     }
+    if (build_type == HnswBuildType::kLSG && !lsg_config) {
+        lsg_config = LSGConfig();
+    }
 
     if (metric_type == MetricType::kInvalid) {
         Status status = Status::InvalidIndexParam("Metric type");
