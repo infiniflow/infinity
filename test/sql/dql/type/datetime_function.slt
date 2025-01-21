@@ -84,5 +84,50 @@ SELECT DAYOFWEEK(d2) FROM test_datetime;
 ----
 1
 
+query XVI
+SELECT weekofyear(d1) FROM test_datetime;
+----
+1
+
+query XVII
+SELECT quarter(d1) FROM test_datetime;
+----
+1
+
+query XVIII
+SELECT quarter(d2) FROM test_datetime;
+----
+3
+
+query XIV
+SELECT epoch(d1) FROM test_datetime;
+----
+0
+
+query XV
+SELECT weekday(d1) FROM test_datetime;
+----
+4
+
+query XVI
+SELECT era(d1) FROM test_datetime;
+----
+1
+
+query XVII
+SELECT century(d1) FROM test_datetime;
+----
+20
+
+query XVIII
+SELECT datepart('year', d1) FROM test_datetime;
+----
+1970
+
+query XVIV
+SELECT datepart('mon', d1) FROM test_datetime;
+----
+1
+
 statement ok
 DROP TABLE test_datetime;
