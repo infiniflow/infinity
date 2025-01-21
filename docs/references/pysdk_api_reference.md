@@ -910,12 +910,11 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
     - `"build_type"`: *Optional*
       - `"plain"`: (Default) Plain build.
-      - `"lsg"`: local scaling graph.
-    - `"lsg_config"`: *Optional* - A dictionary specifying the parameter settings for the local scaling graph. Each key-value pair in the dictionary corresponds to a parameter and its value:
-      - Parameters for the local scaling graph:
-        - `"sample_raito"`: *Optional* - Defaults to `"0.01"`. The ratio of number of samples sampled in the dataset (base).
-        - `"ls_k"`: *Optional* - Defaults to `"10"`. The number of nearest neighbors of the selected knn mean $\mu_i$ in Local Scaling.
-        - `"alpha"`: *Optional* - Defaults to `"1.0"`. smoothing factor in Local Scaling.
+      - `"lsg"`: Local scaling graph.
+    - `"lsg_config"`: *Optional* - A dictionary with each key-value pair corresponding to a parameter setting of the local scaling graph:
+      - `"sample_raito"`: *Optional* - Defaults to `"0.01"`. The ratio of the number of samples in the dataset (base).
+      - `"ls_k"`: *Optional* - Defaults to `"10"`. The number of nearest neighbors of the selected knn mean in local scaling.
+      - `"alpha"`: *Optional* - Defaults to `"1.0"`. The smoothing factor in local scaling.
   - Parameter settings for an IVF index:
     - `"metric"` *Required* - The distance metric to use in a similarity search.
       - `"ip"`: Inner product.
@@ -1142,7 +1141,7 @@ table_object.create_index(
 
 ---
 
-### optimize index
+### optimize_index
 
 ```python
 table_obj.optimize(index_name, opt_params: dict[str, str])
