@@ -180,6 +180,7 @@ private:
     // Flush and Checkpoint threads access following members
     mutable std::mutex mutex2_{};
     TxnTimeStamp max_commit_ts_{};
+    TxnTimeStamp last_swap_wal_ts_{};
     i64 wal_size_{};
     i64 last_ckp_wal_size_{};
     Atomic<bool> checkpoint_in_progress_{false};
