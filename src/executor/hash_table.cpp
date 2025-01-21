@@ -16,57 +16,59 @@ module;
 
 #include <string>
 import stl;
-
+import logical_type;
 import column_vector;
-
+import status;
 import infinity_exception;
+import third_party;
+import internal_types;
 
 module hash_table;
 
-#if 0
 namespace infinity {
 
-void HashTable::Init(const Vector<DataType> &types) {
+void HashTable::Init(const Vector<SharedPtr<DataType>> &types) {
     types_ = types;
     SizeT type_count = types.size();
     for (SizeT idx = 0; idx < type_count; ++idx) {
-        const DataType &data_type = types[idx];
+        const DataType &data_type = *types[idx];
         switch (data_type.type()) {
-            case kBoolean:
-            case kTinyInt:
-            case kSmallInt:
-            case kInteger:
-            case kBigInt:
-            case kHugeInt:
-            case kFloat:
-            case kDouble:
-            case kDecimal:
-            case kVarchar:
-            case kDate:
-            case kTime:
-            case kDateTime:
-            case kMixed: {
+            case LogicalType::kBoolean:
+            case LogicalType::kTinyInt:
+            case LogicalType::kSmallInt:
+            case LogicalType::kInteger:
+            case LogicalType::kBigInt:
+            case LogicalType::kHugeInt:
+            case LogicalType::kFloat:
+            case LogicalType::kDouble:
+            case LogicalType::kDecimal:
+            case LogicalType::kVarchar:
+            case LogicalType::kDate:
+            case LogicalType::kTime:
+            case LogicalType::kDateTime:
+            case LogicalType::kMixed: {
                 break; // All these type can be hashed.
             }
-            case kTimestamp:
-            case kInterval:
-            case kArray:
-            case kTuple:
-            case kPoint:
-            case kLine:
-            case kLineSeg:
-            case kBox:
-//            case kPath:
-//            case kPolygon:
-            case kCircle:
-//            case kBitmap:
-            case kUuid:
-//            case kBlob:
-            case kEmbedding:
-            case kRowID:
-            case kNull:
-            case kMissing:
-            case kInvalid: {
+            case LogicalType::kTimestamp:
+            case LogicalType::kInterval:
+            case LogicalType::kArray:
+            case LogicalType::kTuple:
+            case LogicalType::kPoint:
+            case LogicalType::kLine:
+            case LogicalType::kLineSeg:
+            case LogicalType::kBox:
+                //            case kPath:
+                //            case kPolygon:
+            case LogicalType::kCircle:
+                //            case kBitmap:
+            case LogicalType::kUuid:
+                //            case kBlob:
+            case LogicalType::kEmbedding:
+            case LogicalType::kRowID:
+            case LogicalType::kNull:
+            case LogicalType::kMissing:
+            case LogicalType::kInvalid:
+            default: {
                 RecoverableError(Status::NotSupport(fmt::format("Attempt to construct hash key for type: {}", data_type.ToString())));
             }
         }
@@ -94,23 +96,24 @@ void HashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT blo
                 continue;
             }
 
-            DataType &data_type = types_[column_id];
-            if (data_type.type() == kMixed) {
+            const DataType &data_type = *types_[column_id];
+            if (data_type.type() == LogicalType::kMixed) {
                 // Only float/boolean/integer/string can be built as hash key. Array/Tuple will be treated as null
                 RecoverableError(Status::NotSupport("Attempt to construct hash key for heterogeneous type"));
             }
 
-            if (data_type.type() == kVarchar) {
-                VarcharT *vchar_ptr = &((VarcharT *)(columns[column_id]->data_ptr_))[row_id];
+            if (data_type.type() == LogicalType::kVarchar) {
+                VarcharT *vchar_ptr = &((VarcharT *)(columns[column_id]->data()))[row_id];
                 if (vchar_ptr->IsInlined()) {
-                    std::memcpy(target_ptr, vchar_ptr->prefix, vchar_ptr->length);
+                    std::memcpy(target_ptr, vchar_ptr->short_.data_, vchar_ptr->length_);
+                    offset += (vchar_ptr->length_ + 1);
                 } else {
-                    std::memcpy(target_ptr, vchar_ptr->ptr, vchar_ptr->length);
+                    std::memcpy(target_ptr, vchar_ptr->vector_.prefix_, VARCHAR_PREFIX_LEN);
+                    offset += (VARCHAR_PREFIX_LEN + 1);
                 }
-                offset += (vchar_ptr->length + 1);
             } else {
-                SizeT type_size = types_[column_id].Size();
-                std::memcpy(target_ptr, columns[column_id]->data_ptr_ + type_size * row_id, type_size);
+                SizeT type_size = types_[column_id]->Size();
+                std::memcpy(target_ptr, columns[column_id]->data() + type_size * row_id, type_size);
                 offset += (type_size + 1);
             }
         }
@@ -121,4 +124,3 @@ void HashTable::Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT blo
 }
 
 } // namespace infinity
-#endif

@@ -63,7 +63,7 @@ public:
         return 0;
     }
 
-    void GroupByInputTable(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table);
+    void GroupByInputTable(const Vector<UniquePtr<DataBlock>> &input_blocks, Vector<UniquePtr<DataBlock>> &output_blocks);
 
     void GenerateGroupByResult(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table);
 
@@ -89,7 +89,6 @@ public:
     Vector<HashRange> GetHashRanges(i64 parallel_count) const;
 
 private:
-    SharedPtr<DataTable> input_table_{};
     u64 groupby_index_{};
     u64 aggregate_index_{};
 };

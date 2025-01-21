@@ -25,12 +25,12 @@ namespace infinity {
 
 export class HashTable {
 public:
-    void Init(const Vector<DataType> &types);
+    void Init(const Vector<SharedPtr<DataType>> &types);
 
     void Append(const Vector<SharedPtr<ColumnVector>> &columns, SizeT block_id, SizeT row_count);
 
 public:
-    Vector<DataType> types_{};
+    Vector<SharedPtr<DataType>> types_{};
     SizeT key_size_{};
 
     // Key -> (block id -> row array)
