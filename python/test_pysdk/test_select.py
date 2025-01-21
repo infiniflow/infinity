@@ -1253,7 +1253,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_select_day_of_week" + suffix)
         assert res.error_code == ErrorCode.OK
 
-    
     def test_select_weekday(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_weekday" + suffix, ConflictType.Ignore)
@@ -1263,13 +1262,13 @@ class TestInfinity:
                              "c3": {"type": "timestamp"}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_select_weekday" + suffix)
         table_obj.insert(
-            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+            [{"c1":"2025-01-16", "c2":  "2025-01-31 21:44:33", "c3":"2025-01-26 20:45:11"}])
 
         res, extra_res = table_obj.output(["weekday(c1)", "weekday(c2)", "weekday(c3)"]).to_pl()
         print(res)
         assert res['weekday(c1)'][0] == 4, "The value of weekday(c1) should be 4"
-        assert res['weekday(c2)'][0] == 4, "The value of weekday(c2) should be 4"
-        assert res['weekday(c3)'][0] == 4, "The value of weekday(c3) should be 4"
+        assert res['weekday(c2)'][0] == 5, "The value of weekday(c2) should be 5"
+        assert res['weekday(c3)'][0] == 0, "The value of weekday(c3) should be 0"
 
         res = db_obj.drop_table("test_select_weekday" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1283,13 +1282,13 @@ class TestInfinity:
                              "c3": {"type": "timestamp"}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_select_era" + suffix)
         table_obj.insert(
-            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+            [{"c1":"2025-01-16", "c2":  "44-01-16 21:44:33", "c3":"-25-01-16 20:45:11"}])
 
         res, extra_res = table_obj.output(["era(c1)", "era(c2)", "era(c3)"]).to_pl()
         print(res)
         assert res['era(c1)'][0] == 1, "The value of era(c1) should be 1"
         assert res['era(c2)'][0] == 1, "The value of era(c2) should be 1"
-        assert res['era(c3)'][0] == 1, "The value of era(c3) should be 1"
+        assert res['era(c3)'][0] == 0, "The value of era(c3) should be 0"
 
         res = db_obj.drop_table("test_select_era" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1363,13 +1362,13 @@ class TestInfinity:
                              "c3": {"type": "timestamp"}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_select_week_of_year" + suffix)
         table_obj.insert(
-            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+            [{"c1":"2025-01-16", "c2":  "2025-01-01 21:44:33", "c3":"2017-12-16 20:45:11"}])
 
         res, extra_res = table_obj.output(["weekofyear(c1)", "weekofyear(c2)", "weekofyear(c3)"]).to_pl()
         print(res)
-        assert res['weekofyear(c1)'][0] == 4, "The value of weekofyear(c1) should be 4"
-        assert res['weekofyear(c2)'][0] == 4, "The value of weekofyear(c2) should be 4"
-        assert res['weekofyear(c3)'][0] == 4, "The value of weekofyear(c3) should be 4"
+        assert res['weekofyear(c1)'][0] == 3, "The value of weekofyear(c1) should be 3"
+        assert res['weekofyear(c2)'][0] == 1, "The value of weekofyear(c2) should be 1"
+        assert res['weekofyear(c3)'][0] == 50, "The value of weekofyear(c3) should be 50"
 
         res = db_obj.drop_table("test_select_week_of_year" + suffix)
         assert res.error_code == ErrorCode.OK

@@ -44,9 +44,12 @@ template <>
 inline bool WeekOfYearFunction::Run(DateT left, BigIntT &result) {
     year_month_day ymd;
     DateT::OuterDate2YMD(left, ymd);
-    year_month_weekday ymw = year_month_weekday{ymd};
-    weekday_indexed wi = ymw.weekday_indexed();
-    result = wi.weekday().iso_encoding();
+    year_month_day ymd_first{ymd.year(), month(1), day(1)};
+    sys_days target_day = sys_days{ymd};
+    sys_days first_day = sys_days{ymd_first};
+    days days_diff = target_day - first_day;
+    result = (days_diff.count() / 7) + 1;
+
     return true;
 }
 
@@ -54,9 +57,11 @@ template <>
 inline bool WeekOfYearFunction::Run(DateTimeT left, BigIntT &result) {
     year_month_day ymd;
     DateTimeT::OuterDateTime2YMD(left.date, ymd);
-    year_month_weekday ymw = year_month_weekday{ymd};
-    weekday_indexed wi = ymw.weekday_indexed();
-    result = wi.weekday().iso_encoding();
+    year_month_day ymd_first{ymd.year(), month(1), day(1)};
+    sys_days target_day = sys_days{ymd};
+    sys_days first_day = sys_days{ymd_first};
+    days days_diff = target_day - first_day;
+    result = (days_diff.count() / 7) + 1;
     return true;
 }
 
@@ -64,9 +69,11 @@ template <>
 inline bool WeekOfYearFunction::Run(TimestampT left, BigIntT &result) {
     year_month_day ymd;
     TimestampT::OuterDateTime2YMD(left.date, ymd);
-    year_month_weekday ymw = year_month_weekday{ymd};
-    weekday_indexed wi = ymw.weekday_indexed();
-    result = wi.weekday().iso_encoding();
+    year_month_day ymd_first{ymd.year(), month(1), day(1)};
+    sys_days target_day = sys_days{ymd};
+    sys_days first_day = sys_days{ymd_first};
+    days days_diff = target_day - first_day;
+    result = (days_diff.count() / 7) + 1;
     return true;
 }
 
