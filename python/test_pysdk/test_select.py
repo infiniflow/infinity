@@ -1287,9 +1287,9 @@ class TestInfinity:
 
         res, extra_res = table_obj.output(["era(c1)", "era(c2)", "era(c3)"]).to_pl()
         print(res)
-        assert res['era(c1)'][0] == 4, "The value of era(c1) should be 4"
-        assert res['era(c2)'][0] == 4, "The value of era(c2) should be 4"
-        assert res['era(c3)'][0] == 4, "The value of era(c3) should be 4"
+        assert res['era(c1)'][0] == 1, "The value of era(c1) should be 1"
+        assert res['era(c2)'][0] == 1, "The value of era(c2) should be 1"
+        assert res['era(c3)'][0] == 1, "The value of era(c3) should be 1"
 
         res = db_obj.drop_table("test_select_era" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1323,13 +1323,13 @@ class TestInfinity:
                              "c3": {"type": "timestamp"}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_select_quarter" + suffix)
         table_obj.insert(
-            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+            [{"c1":"2025-01-16", "c2":  "2025-04-16 21:44:33", "c3":"2025-09-16 20:45:11"}])
 
         res, extra_res = table_obj.output(["quarter(c1)", "quarter(c2)", "quarter(c3)"]).to_pl()
         print(res)
-        assert res['quarter(c1)'][0] == 4, "The value of quarter(c1) should be 4"
-        assert res['quarter(c2)'][0] == 4, "The value of quarter(c2) should be 4"
-        assert res['quarter(c3)'][0] == 4, "The value of quarter(c3) should be 4"
+        assert res['quarter(c1)'][0] == 1, "The value of quarter(c1) should be 1"
+        assert res['quarter(c2)'][0] == 2, "The value of quarter(c2) should be 2"
+        assert res['quarter(c3)'][0] == 3, "The value of quarter(c3) should be 3"
 
         res = db_obj.drop_table("test_select_quarter" + suffix)
         assert res.error_code == ErrorCode.OK
@@ -1343,15 +1343,33 @@ class TestInfinity:
                              "c3": {"type": "timestamp"}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_select_century" + suffix)
         table_obj.insert(
-            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+            [{"c1":"2025-01-16", "c2":  "1925-01-16 21:44:33", "c3":"25-01-16 20:45:11"}])
 
         res, extra_res = table_obj.output(["century(c1)", "century(c2)", "century(c3)"]).to_pl()
         print(res)
-        assert res['century(c1)'][0] == 4, "The value of century(c1) should be 4"
-        assert res['century(c2)'][0] == 4, "The value of century(c2) should be 4"
-        assert res['century(c3)'][0] == 4, "The value of century(c3) should be 4"
+        assert res['century(c1)'][0] == 21, "The value of century(c1) should be 21"
+        assert res['century(c2)'][0] == 20, "The value of century(c2) should be 20"
+        assert res['century(c3)'][0] == 1, "The value of century(c3) should be 1"
 
         res = db_obj.drop_table("test_select_century" + suffix)
         assert res.error_code == ErrorCode.OK
 
+    def test_select_week_of_year(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_select_week_of_year" + suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_week_of_year" + suffix,
+                            {"c1": {"type": "date"},
+                             "c2": {"type": "datetime"},
+                             "c3": {"type": "timestamp"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_select_week_of_year" + suffix)
+        table_obj.insert(
+            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
 
+        res, extra_res = table_obj.output(["weekofyear(c1)", "weekofyear(c2)", "weekofyear(c3)"]).to_pl()
+        print(res)
+        assert res['weekofyear(c1)'][0] == 4, "The value of weekofyear(c1) should be 4"
+        assert res['weekofyear(c2)'][0] == 4, "The value of weekofyear(c2) should be 4"
+        assert res['weekofyear(c3)'][0] == 4, "The value of weekofyear(c3) should be 4"
+
+        res = db_obj.drop_table("test_select_week_of_year" + suffix)
+        assert res.error_code == ErrorCode.OK
