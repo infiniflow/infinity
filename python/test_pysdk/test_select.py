@@ -1303,13 +1303,13 @@ class TestInfinity:
                              "c3": {"type": "timestamp"}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_select_epoch" + suffix)
         table_obj.insert(
-            [{"c1":"2025-01-16", "c2":  "2025-01-16 21:44:33", "c3":"2025-01-16 20:45:11"}])
+            [{"c1":"1970-01-01", "c2":  "1970-01-01 21:44:33", "c3":"1970-01-01 20:45:11"}])
 
         res, extra_res = table_obj.output(["epoch(c1)", "epoch(c2)", "epoch(c3)"]).to_pl()
         print(res)
-        assert res['epoch(c1)'][0] == 4, "The value of epoch(c1) should be 4"
-        assert res['epoch(c2)'][0] == 4, "The value of epoch(c2) should be 4"
-        assert res['epoch(c3)'][0] == 4, "The value of epoch(c3) should be 4"
+        assert res['epoch(c1)'][0] == 0, "The value of epoch(c1) should be 0"
+        assert res['epoch(c2)'][0] == 78273, "The value of epoch(c2) should be 78273"
+        assert res['epoch(c3)'][0] == 74711 , "The value of epoch(c3) should be 74711"
 
         res = db_obj.drop_table("test_select_epoch" + suffix)
         assert res.error_code == ErrorCode.OK
