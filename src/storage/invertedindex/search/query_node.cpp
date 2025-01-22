@@ -27,6 +27,8 @@ import keyword_iterator;
 import must_first_iterator;
 import batch_or_iterator;
 import blockmax_leaf_iterator;
+import rank_feature_doc_iterator;
+import rank_features_doc_iterator;
 
 namespace infinity {
 
@@ -390,6 +392,11 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
     }
 }
 
+std::unique_ptr<QueryNode> RankFeaturesQueryNode::InnerGetNewOptimizedQueryTree() {
+    UnrecoverableError("OptimizeInPlaceInner: Unexpected case! RankFeaturesQueryNode should not exist in parser output");
+    return nullptr;
+}
+
 // 4. deal with "and_not":
 // "and_not" does not exist in parser output, it is generated during optimization
 
@@ -426,6 +433,25 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParam
     search->column_name_ptr_ = &column_;
     auto column_length_reader = MakeUnique<FullTextColumnLengthReader>(column_index_reader);
     search->InitBM25Info(std::move(column_length_reader), params.bm25_params.delta_term, params.bm25_params.k1, params.bm25_params.b);
+    return search;
+}
+
+std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
+    ColumnID column_id = params.table_entry->GetColumnIdByName(column_);
+    ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
+    if (!column_index_reader) {
+        RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
+        return nullptr;
+    }
+
+    bool fetch_position = false;
+    auto posting_iterator = column_index_reader->Lookup(term_, fetch_position);
+    if (!posting_iterator) {
+        return nullptr;
+    }
+    auto search = MakeUnique<RankFeatureDocIterator>(std::move(posting_iterator), column_id, boost_);
+    search->term_ptr_ = &term_;
+    search->column_name_ptr_ = &column_;
     return search;
 }
 
@@ -685,6 +711,25 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
     }
 }
 
+std::unique_ptr<DocIterator> RankFeaturesQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    const auto next_params = params.RemoveMSM();
+    for (auto &child : children_) {
+        auto iter = child->CreateSearch(next_params, false);
+        if (!iter) {
+            // no need to continue if any child is invalid
+            return nullptr;
+        }
+        sub_doc_iters.emplace_back(std::move(iter));
+    }
+    if (sub_doc_iters.empty()) {
+        return nullptr;
+    } else {
+        return MakeUnique<RankFeaturesDocIterator>(std::move(sub_doc_iters));
+    }
+}
+
 std::unique_ptr<DocIterator> KeywordQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
     Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
@@ -749,6 +794,21 @@ void TermQueryNode::PrintTree(std::ostream &os, const std::string &prefix, const
 }
 
 void TermQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const {
+    columns.push_back(column_);
+    terms.push_back(term_);
+}
+
+void RankFeatureQueryNode::PrintTree(std::ostream &os, const std::string &prefix, const bool is_final) const {
+    os << prefix;
+    os << (is_final ? "└──" : "├──");
+    os << QueryNodeTypeToString(type_);
+    os << " (weight: " << weight_ << ")";
+    os << " (column: " << column_ << ")";
+    os << " (term: " << term_ << ")";
+    os << '\n';
+}
+
+void RankFeatureQueryNode::GetQueryColumnsTerms(std::vector<std::string> &columns, std::vector<std::string> &terms) const {
     columns.push_back(column_);
     terms.push_back(term_);
 }

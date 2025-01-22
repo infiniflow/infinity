@@ -59,7 +59,7 @@ int NGramAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     while (cur < len && NextInString(input.text_.c_str(), len, &cur, &token_start, &token_length)) {
         if (token_length == 0)
             continue;
-        func(data, input.text_.c_str() + token_start, token_length, offset, offset + token_length, false);
+        func(data, input.text_.c_str() + token_start, token_length, offset, offset + token_length, false, 0);
         offset++;
     }
 

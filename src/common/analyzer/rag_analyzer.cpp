@@ -1438,7 +1438,7 @@ int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
         Split(output, blank_pattern_, tokens);
     unsigned offset = 0;
     for (auto &t : tokens) {
-        func(data, t.c_str(), t.size(), offset++, 0, false);
+        func(data, t.c_str(), t.size(), offset++, 0, false, 0);
     }
     return 0;
 }

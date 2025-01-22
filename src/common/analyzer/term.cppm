@@ -41,11 +41,12 @@ public:
 
 export class TermList : public Deque<Term> {
 public:
-    void Add(const char *text, const u32 len, const u32 offset, const u32 end_offset) {
+    void Add(const char *text, const u32 len, const u32 offset, const u32 end_offset, const u16 payload = 0) {
         push_back(global_temporary_);
         back().text_.assign(text, len);
         back().word_offset_ = offset;
         back().end_offset_ = end_offset;
+        back().payload_ = payload;
     }
 
     void Add(cppjieba::Word &cut_word) {
@@ -54,18 +55,20 @@ public:
         back().word_offset_ = cut_word.offset;
     }
 
-    void Add(const String &token, const u32 offset, const u32 end_offset) {
+    void Add(const String &token, const u32 offset, const u32 end_offset, const u16 payload = 0) {
         push_back(global_temporary_);
         back().text_ = token;
         back().word_offset_ = offset;
         back().end_offset_ = end_offset;
+        back().payload_ = payload;
     }
 
-    void Add(String &token, const u32 offset, const u32 end_offset) {
+    void Add(String &token, const u32 offset, const u32 end_offset, const u16 payload = 0) {
         push_back(global_temporary_);
         std::swap(back().text_, token);
         back().word_offset_ = offset;
         back().end_offset_ = end_offset;
+        back().payload_ = payload;
     }
 
 private:

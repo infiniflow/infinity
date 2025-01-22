@@ -66,6 +66,7 @@ public:
 
     SharedPtr<CommonQueryFilter> common_query_filter_{};
     MinimumShouldMatchOption minimum_should_match_option_{};
+    RankFeaturesOption rank_features_option_{};
     f32 score_threshold_{};
     FulltextSimilarity ft_similarity_{FulltextSimilarity::kBM25};
     BM25Params bm25_params_;

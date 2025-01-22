@@ -49,4 +49,14 @@ export struct BM25Params {
     float delta_phrase = 0.0F;
 };
 
+export struct RankFeatureOption {
+    String field_;
+    String feature_;
+    float boost_;
+};
+
+export using RankFeaturesOption = Vector<RankFeatureOption>;
+
+export RankFeaturesOption ParseRankFeaturesOption(std::string_view input_str);
+
 } // namespace infinity

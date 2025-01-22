@@ -37,6 +37,7 @@ import internal_types;
 import column_def;
 import data_type;
 import segment_entry;
+import hash_table;
 
 namespace infinity {
 
@@ -74,6 +75,7 @@ export struct AggregateOperatorState : public OperatorState {
         : OperatorState(PhysicalOperatorType::kAggregate), states_(std::move(states)) {}
 
     Vector<UniquePtr<char[]>> states_;
+    HashTable hash_table_;
 };
 
 // Merge Aggregate
@@ -83,6 +85,7 @@ export struct MergeAggregateOperatorState : public OperatorState {
     /// Since merge agg is the first op, no previous operator state. This ptr is to get input data.
     // Vector<UniquePtr<DataBlock>> input_data_blocks_{nullptr};
     UniquePtr<DataBlock> input_data_block_{nullptr};
+    MergeHashTable hash_table_;
     bool input_complete_{false};
 };
 

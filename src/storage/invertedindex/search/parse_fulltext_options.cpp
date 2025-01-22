@@ -14,7 +14,9 @@
 
 module;
 
+#include <re2/re2.h>
 #include <vector>
+
 module parse_fulltext_options;
 
 import stl;
@@ -125,6 +127,62 @@ u32 GetMinimumShouldMatchParameter(const MinimumShouldMatchOption &option_vec, c
                                    return get_result_from_i64(cnt);
                                }},
                       match_option);
+}
+
+void Split(const std::string_view &input, const String &split_pattern, Vector<String> &result, bool keep_delim = false) {
+    re2::RE2 pattern(split_pattern);
+    re2::StringPiece leftover(input.data());
+    re2::StringPiece last_end = leftover;
+    re2::StringPiece extracted_delim_token;
+
+    while (RE2::FindAndConsume(&leftover, pattern, &extracted_delim_token)) {
+        std::string_view token(last_end.data(), extracted_delim_token.data() - last_end.data());
+        if (!token.empty()) {
+            result.push_back(String(token.data(), token.size()));
+        }
+        if (keep_delim)
+            result.push_back(String(extracted_delim_token.data(), extracted_delim_token.size()));
+        last_end = leftover;
+    }
+
+    if (!leftover.empty()) {
+        result.push_back(String(leftover.data(), leftover.size()));
+    }
+}
+
+void ParseRankFeatureOption(std::string_view input_str, RankFeatureOption &feature_option) {
+    Vector<String> feature_strs;
+    Split(input_str, "^", feature_strs);
+    if (feature_strs.size() == 2) {
+        feature_option.field_ = feature_strs[0];
+        feature_option.feature_ = feature_strs[1];
+        feature_option.boost_ = 1.0f;
+    } else if (feature_strs.size() == 3) {
+        feature_option.field_ = feature_strs[0];
+        feature_option.feature_ = feature_strs[1];
+        const auto boost_str = feature_strs[2];
+        try {
+            feature_option.boost_ = std::stof(boost_str);
+        } catch (const std::exception &e) {
+            RecoverableError(
+                Status::SyntaxError(std::format("Invalid rank_features parameter format: Failed to parse float value in option '{}'.", input_str)));
+        }
+    } else {
+        RecoverableError(
+            Status::SyntaxError(std::format("Invalid rank_features parameter format: Expect 3 parts separated by '^', but get: '{}'.", input_str)));
+    }
+}
+
+RankFeaturesOption ParseRankFeaturesOption(std::string_view input_str) {
+    RankFeaturesOption result;
+    Vector<String> feature_strs;
+    Split(input_str, ",", feature_strs);
+    for (auto &feature_str : feature_strs) {
+        RankFeatureOption feature_option;
+        ParseRankFeatureOption(feature_str, feature_option);
+        result.push_back(feature_option);
+    }
+    return result;
 }
 
 } // namespace infinity
