@@ -73,6 +73,8 @@ public:
     static int64_t GetDatePart(DateType input, TimeUnit unit);
 
     static bool OuterDate2YMD(DateType input, int32_t &year, int32_t &month, int32_t &day);
+
+    static bool OuterYMD2Date(DateType input, int32_t &year, int32_t &month, int32_t &day);
 };
 
 } // namespace infinity
