@@ -193,16 +193,16 @@ void FileWorker::CleanupFile() const {
 
     String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
     if (VirtualStore::Exists(path)) {
+        LOG_INFO(fmt::format("Clean file: {}", path));
         VirtualStore::DeleteFile(path);
-        LOG_INFO(fmt::format("Cleaned file: {}", path));
     }
 }
 
 void FileWorker::CleanupTempFile() const {
     String path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
     if (VirtualStore::Exists(path)) {
+        LOG_INFO(fmt::format("Clean file: {}", path));
         VirtualStore::DeleteFile(path);
-        LOG_INFO(fmt::format("Cleaned file: {}", path));
     } else {
         String error_message = fmt::format("Cleanup: File {} not found for deletion", path);
         UnrecoverableError(error_message);

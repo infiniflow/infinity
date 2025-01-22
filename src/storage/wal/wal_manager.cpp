@@ -316,8 +316,8 @@ void WalManager::Flush() {
 
             if (txn->GetTxnType() == TransactionType::kCheckpoint) {
                 LOG_INFO(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file",
-                                      txn->BeginTS(),
-                                      txn->CommitTS()));
+                                     txn->BeginTS(),
+                                     txn->CommitTS()));
                 this->SwapWalFile(max_commit_ts_, true);
             }
 
@@ -625,9 +625,9 @@ i64 WalManager::GetLastCkpWalSize() {
  * current wal file.
  */
 void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_duplicate) {
-    if(max_commit_ts <= last_swap_wal_ts_) {
+    if (max_commit_ts <= last_swap_wal_ts_) {
         LOG_WARN(fmt::format("Skip swap wal file, max_commit_ts: {} <= last_swap_wal_ts_: {}", max_commit_ts, last_swap_wal_ts_));
-        return ;
+        return;
     }
 
     if (ofs_.is_open()) {
@@ -641,6 +641,7 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_dup
         if (error_if_duplicate) {
             UnrecoverableError(fmt::format("File: {}, exists!", new_file_path));
         } else {
+            LOG_INFO(fmt::format("Delete WAL file: {}", wal_path_));
             VirtualStore::DeleteFile(wal_path_);
         }
     } else {

@@ -419,22 +419,25 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
         String posting_file = index_prefix + POSTING_SUFFIX;
         String dict_file = index_prefix + DICT_SUFFIX;
         if (pm != nullptr) {
+            LOG_INFO(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, posting_file, dict_file));
+
             PersistResultHandler handler(pm);
             PersistWriteResult result1 = pm->Cleanup(posting_file);
             PersistWriteResult result2 = pm->Cleanup(dict_file);
             handler.HandleWriteResult(result1);
             handler.HandleWriteResult(result2);
-            LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}", index_prefix, posting_file, dict_file));
+
         } else {
             String absolute_posting_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), posting_file);
             String absolute_dict_file = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), dict_file);
 
-            VirtualStore::DeleteFile(absolute_posting_file);
-            VirtualStore::DeleteFile(absolute_dict_file);
-            LOG_DEBUG(fmt::format("Cleaned chunk index entry {}, posting: {}, dictionary file: {}",
+            LOG_INFO(fmt::format("Clean chunk index entry {}, posting: {}, dictionary file: {}",
                                   index_prefix,
                                   absolute_posting_file,
                                   absolute_dict_file));
+
+            VirtualStore::DeleteFile(absolute_posting_file);
+            VirtualStore::DeleteFile(absolute_dict_file);
         }
         if (info_tracer) {
             info_tracer->AddCleanupInfo(std::move(posting_file));
