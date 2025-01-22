@@ -319,6 +319,7 @@ TxnTimeStamp TxnManager::GetNewTimeStamp() { return current_ts_ + 1; }
 
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
     TxnTimeStamp least_ts = UNCOMMIT_TS;
+    TxnTimeStamp last_checkpoint_ts = UNCOMMIT_TS;
     {
         std::unique_lock w_lock(locker_);
         TxnTimeStamp first_uncommitted_begin_ts = current_ts_;
@@ -333,7 +334,7 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
         }
 
         // Get the earlier txn ts between current ongoing txn and last checkpoint ts
-        TxnTimeStamp last_checkpoint_ts = wal_mgr_->LastCheckpointTS();
+        last_checkpoint_ts = wal_mgr_->LastCheckpointTS();
         least_ts = std::min(first_uncommitted_begin_ts, last_checkpoint_ts);
 
         // Get the earlier txn ts between current least txn and checking conflict TS
