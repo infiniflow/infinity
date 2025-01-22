@@ -44,7 +44,8 @@ void HashTableBase::Init(Vector<SharedPtr<DataType>> types) {
             case LogicalType::kDouble:
             case LogicalType::kDate:
             case LogicalType::kTime:
-            case LogicalType::kDateTime: {
+            case LogicalType::kDateTime:
+            case LogicalType::kTimestamp: {
                 SizeT type_size = data_type.Size();
                 key_size += type_size;
                 break; // All these type can be hashed.

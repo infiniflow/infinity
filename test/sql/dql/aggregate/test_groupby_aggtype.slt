@@ -42,5 +42,11 @@ SELECT c1, COUNT(c2) FROM simple_groupby GROUP BY c1;
 1 3
 2 2
 
+query IF rowsort
+SELECT c1, AVG(c2) FROM simple_groupby GROUP BY c1;
+----
+1 3.000000
+2 3.000000
+
 statement ok
 DROP TABLE simple_groupby;
