@@ -228,24 +228,26 @@ void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &in
         output_datablock->Init(types, datablock_capacity);
 
         // Loop each block
-        SizeT output_row_idx = 0;
+        SizeT output_data_num = 0;
         for (const auto &vec_pair : item.second) {
             SizeT input_block_id = vec_pair.first;
 
+            // Forloop each column
+            for (SizeT column_id = 0; column_id < column_count; ++column_id) {
             // Loop each row of same block
             for (const auto input_offset : vec_pair.second) {
 
-                // Forloop each column
-                for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-                    output_datablock->column_vectors[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors[column_id], input_offset, 1);
+                    output_datablock->column_vectors[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors[column_id],
+                                                                            input_offset,
+                                                                            1);
+                    ++output_data_num;
                 }
-
-                ++output_row_idx;
             }
         }
 
-        if (output_row_idx != datablock_size) {
-            String error_message = fmt::format("Expected block size: {}, but only copied data size: {}", datablock_size, output_row_idx);
+        if (output_data_num != datablock_size * column_count) {
+            String error_message =
+                fmt::format("Expected block size: {}, but only copied data size: {}", datablock_size * column_count, output_data_num);
             UnrecoverableError(error_message);
             break;
         }
