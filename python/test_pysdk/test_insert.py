@@ -9,7 +9,7 @@ from common import common_values
 import infinity
 import infinity_embedded
 import infinity.index as index
-from infinity.common import ConflictType, InfinityException, SparseVector
+from infinity.common import ConflictType, InfinityException, SparseVector, Array
 from infinity.errors import ErrorCode
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -653,6 +653,63 @@ class TestInfinity:
         res = db_obj.drop_table("test_insert_tensor_array"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def _test_insert_array(self, suffix):
+        """
+        target: test insert array column
+        method: create table with array column
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_array" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_array" + suffix, {"c1": {"type": "array,array,array,int"}},
+                                        ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert(
+            [{"c1": Array(Array(Array(1, 2), Array(3, 4)), Array(Array(5, 6)), Array(Array()), Array())}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": Array(Array(Array()))}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": Array(Array())}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": Array()}])
+        assert res.error_code == ErrorCode.OK
+        res, extra_result = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res,
+                                      pd.DataFrame({'c1': ([[[1, 2], [3, 4]], [[5, 6]], [[]], []], [[[]]], [[]], [])}))
+        res = db_obj.drop_table("test_insert_array" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_insert_array_varchar(self, suffix):
+        """
+        target: test insert array column
+        method: create table with array column
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_array_varchar" + suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_array_varchar" + suffix,
+                                        {"c1": {"type": "array,array,array,varchar"}},
+                                        ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": Array(Array(Array("hello", "world"), Array("!")), Array(
+            Array("Hi! This is an example of long text! Hi! This is an example of long text!")), Array(Array()),
+                                             Array())}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": Array(Array(Array()))}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": Array(Array())}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": Array()}])
+        assert res.error_code == ErrorCode.OK
+        res, extra_result = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (
+        [[["hello", "world"], ["!"]], [["Hi! This is an example of long text! Hi! This is an example of long text!"]],
+         [[]], []], [[[]]], [[]], [])}))
+        res = db_obj.drop_table("test_insert_array_varchar" + suffix, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def test_insert(self, suffix):
         # self.test_infinity_obj._test_version()
         self._test_insert_basic(suffix)
@@ -674,6 +731,8 @@ class TestInfinity:
         self._test_insert_multivector(suffix)
         self._test_insert_tensor(suffix)
         self._test_insert_tensor_array(suffix)
+        self._test_insert_array(suffix)
+        self._test_insert_array_varchar(suffix)
 
     def test_insert_rows_mismatch(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")

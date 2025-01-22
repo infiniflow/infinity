@@ -24,7 +24,7 @@ import numpy as np
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
-from infinity.common import InfinityException, SparseVector
+from infinity.common import InfinityException, SparseVector, Array
 from infinity.errors import ErrorCode
 
 
@@ -493,7 +493,10 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
                 case _:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                             f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
-
+        case Array():
+            children_list = [get_remote_constant_expr_from_python_value(child) for child in value.elements]
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.CurlyBracketsArray,
+                                                      curly_brackets_array=children_list)
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
     return constant_expression
@@ -706,6 +709,10 @@ def get_data_type(column_info: dict) -> ttypes.DataType:
         raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, f"Column definition without data type")
     datatype = column_info["type"].lower()
     column_big_info = [item.strip() for item in datatype.split(",")]
+    return get_data_type_from_column_big_info(column_big_info)
+
+
+def get_data_type_from_column_big_info(column_big_info: list) -> ttypes.DataType:
     column_big_info_first_str = column_big_info[0]
     match column_big_info_first_str:
         case "vector" | "multivector" | "tensor" | "tensorarray":
@@ -716,9 +723,16 @@ def get_data_type(column_info: dict) -> ttypes.DataType:
             sparse_type = get_sparse_type(column_big_info)
             return sparse_type
             # return get_sparse_info(column_info, column_defs, column_name, index)
+        case "array":
+            array_type = ttypes.DataType()
+            array_type.logic_type = ttypes.LogicType.Array
+            array_type.physical_type = ttypes.PhysicalType()
+            array_type.physical_type.array_type = ttypes.ArrayType()
+            array_type.physical_type.array_type.element_data_type = get_data_type_from_column_big_info(column_big_info[1:])
+            return array_type
         case _:
             proto_column_type = ttypes.DataType()
-            match datatype:
+            match column_big_info_first_str:
                 case "int8":
                     proto_column_type.logic_type = ttypes.LogicType.TinyInt
                 case "int16":
@@ -753,7 +767,7 @@ def get_data_type(column_info: dict) -> ttypes.DataType:
                 case "interval":
                     proto_column_type.logic_type = ttypes.LogicType.Interval
                 case _:
-                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
+                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {column_big_info_first_str}")
             return proto_column_type
 
 
