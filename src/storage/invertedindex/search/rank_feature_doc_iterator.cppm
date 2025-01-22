@@ -33,7 +33,7 @@ public:
 
     ~RankFeatureDocIterator() override;
 
-    DocIteratorType GetType() const override { return DocIteratorType::kTermDocIterator; }
+    DocIteratorType GetType() const override { return DocIteratorType::kRankFeatureDocIterator; }
 
     String Name() const override { return "RankFeatureDocIterator"; }
 
@@ -46,6 +46,8 @@ public:
     float Score() override;
 
     void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
+
+    void BatchDecodeTo(RowID buffer_start_doc_id, RowID buffer_end_doc_id, u16 *payload_ptr);
 
     const String *term_ptr_ = nullptr;
     const String *column_name_ptr_ = nullptr;

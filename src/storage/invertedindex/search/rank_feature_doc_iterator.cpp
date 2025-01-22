@@ -53,4 +53,16 @@ void RankFeatureDocIterator::PrintTree(std::ostream &os, const String &prefix, b
     os << '\n';
 }
 
+void RankFeatureDocIterator::BatchDecodeTo(const RowID buffer_start_doc_id, const RowID buffer_end_doc_id, u16 *payload_ptr) {
+    auto iter_doc_id = iter_->DocID();
+    assert((buffer_start_doc_id <= iter_doc_id && iter_doc_id < buffer_end_doc_id));
+    while (iter_doc_id < buffer_end_doc_id) {
+        const auto pos = iter_doc_id - buffer_start_doc_id;
+        const auto payload = iter_->GetCurrentDocPayload();
+        payload_ptr[pos] = payload;
+        iter_doc_id = iter_->SeekDoc(iter_doc_id + 1);
+    }
+    doc_id_ = iter_doc_id;
+}
+
 } // namespace infinity
