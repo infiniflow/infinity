@@ -1293,81 +1293,64 @@ option(WITH_ALL_TESTS "Build all test, rather than a small subset" ON)
 #  test_util/testharness.cc)
 #  target_link_libraries(testharness gtest)
 #endif()
+#
+#if(WITH_BENCHMARK_TOOLS)
+#  add_executable(db_bench${ARTIFACT_SUFFIX}
+#    tools/simulated_hybrid_file_system.cc
+#    tools/db_bench.cc
+#    tools/db_bench_tool.cc)
+#  target_link_libraries(db_bench${ARTIFACT_SUFFIX}
+#    ${ROCKSDB_LIB} ${THIRDPARTY_LIBS})
+#
+#  add_executable(cache_bench${ARTIFACT_SUFFIX}
+#    cache/cache_bench.cc
+#    cache/cache_bench_tool.cc)
+#  target_link_libraries(cache_bench${ARTIFACT_SUFFIX}
+#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
+#
+#  add_executable(memtablerep_bench${ARTIFACT_SUFFIX}
+#    memtable/memtablerep_bench.cc)
+#  target_link_libraries(memtablerep_bench${ARTIFACT_SUFFIX}
+#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
+#
+#  add_executable(range_del_aggregator_bench${ARTIFACT_SUFFIX}
+#    db/range_del_aggregator_bench.cc)
+#  target_link_libraries(range_del_aggregator_bench${ARTIFACT_SUFFIX}
+#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
+#
+#  add_executable(table_reader_bench${ARTIFACT_SUFFIX}
+#    table/table_reader_bench.cc)
+#  target_link_libraries(table_reader_bench${ARTIFACT_SUFFIX}
+#    ${ROCKSDB_LIB} testharness ${GFLAGS_LIB} ${FOLLY_LIBS})
+#
+#  add_executable(filter_bench${ARTIFACT_SUFFIX}
+#    util/filter_bench.cc)
+#  target_link_libraries(filter_bench${ARTIFACT_SUFFIX}
+#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
+#
+#  add_executable(hash_table_bench${ARTIFACT_SUFFIX}
+#    utilities/persistent_cache/hash_table_bench.cc)
+#  target_link_libraries(hash_table_bench${ARTIFACT_SUFFIX}
+#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
+#endif()
 
-if(WITH_BENCHMARK_TOOLS)
-  add_executable(db_bench${ARTIFACT_SUFFIX}
-    tools/simulated_hybrid_file_system.cc
-    tools/db_bench.cc
-    tools/db_bench_tool.cc)
-  target_link_libraries(db_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${THIRDPARTY_LIBS})
-
-  add_executable(cache_bench${ARTIFACT_SUFFIX}
-    cache/cache_bench.cc
-    cache/cache_bench_tool.cc)
-  target_link_libraries(cache_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-
-  add_executable(memtablerep_bench${ARTIFACT_SUFFIX}
-    memtable/memtablerep_bench.cc)
-  target_link_libraries(memtablerep_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-
-  add_executable(range_del_aggregator_bench${ARTIFACT_SUFFIX}
-    db/range_del_aggregator_bench.cc)
-  target_link_libraries(range_del_aggregator_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-
-  add_executable(table_reader_bench${ARTIFACT_SUFFIX}
-    table/table_reader_bench.cc)
-  target_link_libraries(table_reader_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} testharness ${GFLAGS_LIB} ${FOLLY_LIBS})
-
-  add_executable(filter_bench${ARTIFACT_SUFFIX}
-    util/filter_bench.cc)
-  target_link_libraries(filter_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-
-  add_executable(hash_table_bench${ARTIFACT_SUFFIX}
-    utilities/persistent_cache/hash_table_bench.cc)
-  target_link_libraries(hash_table_bench${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-endif()
-
-option(WITH_TRACE_TOOLS "build with trace tools" ON)
-if(WITH_TRACE_TOOLS)
-  add_executable(block_cache_trace_analyzer${ARTIFACT_SUFFIX}
-    tools/block_cache_analyzer/block_cache_trace_analyzer_tool.cc)
-  target_link_libraries(block_cache_trace_analyzer${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-
-  add_executable(trace_analyzer${ARTIFACT_SUFFIX}
-    tools/trace_analyzer.cc)
-  target_link_libraries(trace_analyzer${ARTIFACT_SUFFIX}
-    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-
-endif()
-
-if(WITH_CORE_TOOLS OR WITH_TOOLS)
-  add_subdirectory(tools)
-  add_custom_target(core_tools
-    DEPENDS ${core_tool_deps})
-endif()
-
-if(WITH_TOOLS)
-  add_subdirectory(db_stress_tool)
-  add_custom_target(tools
-    DEPENDS ${tool_deps})
-endif()
+#option(WITH_TRACE_TOOLS "build with trace tools" ON)
+#if(WITH_TRACE_TOOLS)
+#  add_executable(block_cache_trace_analyzer${ARTIFACT_SUFFIX}
+#    tools/block_cache_analyzer/block_cache_trace_analyzer_tool.cc)
+#  target_link_libraries(block_cache_trace_analyzer${ARTIFACT_SUFFIX}
+#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
+#
+#  add_executable(trace_analyzer${ARTIFACT_SUFFIX}
+#    tools/trace_analyzer.cc)
+#  target_link_libraries(trace_analyzer${ARTIFACT_SUFFIX}
+#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
+#
+#endif()
 
 option(WITH_EXAMPLES "build with examples" OFF)
 if(WITH_EXAMPLES)
   add_subdirectory(examples)
-endif()
-
-option(WITH_BENCHMARK "build benchmark tests" OFF)
-if(WITH_BENCHMARK)
-  add_subdirectory(${PROJECT_SOURCE_DIR}/microbench/)
 endif()
 
 add_subdirectory(examples)
