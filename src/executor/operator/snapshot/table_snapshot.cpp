@@ -52,6 +52,9 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
     SharedPtr<TableSnapshotInfo> table_snapshot;
     Status status;
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    if(!status.ok()) {
+        return status;
+    }
     txn_ptr->ApplyTableSnapshot(table_snapshot);
     return Status::OK();
 }
