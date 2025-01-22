@@ -87,6 +87,9 @@ public:
                                                      BufferManager *buffer_mgr,
                                                      TransactionID txn_id);
 
+    static SharedPtr<BlockEntry>
+    ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *block_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
+
     void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
 
 public:
@@ -196,6 +199,7 @@ public:
     void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 
     SharedPtr<BlockSnapshotInfo> GetSnapshotInfo() const;
+
 public:
     // Setter, Used in import, segment append block, and block append block in compact
     inline void IncreaseRowCount(SizeT increased_row_count) { block_row_count_ += increased_row_count; }

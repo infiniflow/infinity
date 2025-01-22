@@ -39,6 +39,7 @@ import table_entry;
 import table_entry_type;
 import segment_entry;
 import block_entry;
+import txn_state;
 
 using namespace infinity;
 
@@ -53,7 +54,7 @@ void InsertData(const String &db_name, const String &table_name) {
     };
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
+    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
     auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
     EXPECT_TRUE(status.ok());
 
@@ -91,7 +92,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TableEntryTest, decode_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
 
     // create table, drop table
     {
@@ -126,7 +127,7 @@ TEST_P(TableEntryTest, create_no_name_index_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
 
     // create table
     {
@@ -182,7 +183,7 @@ TEST_P(TableEntryTest, remove_index_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
 
     // create table
     {
@@ -249,7 +250,7 @@ TEST_P(TableEntryTest, table_indexes_test) {
     Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
 
     // start txn1
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
 
     // create table
     {
@@ -320,7 +321,7 @@ TEST_P(TableEntryTest, get_fulltext_analyzers_test) {
 
     // create table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -342,7 +343,7 @@ TEST_P(TableEntryTest, get_fulltext_analyzers_test) {
 
     // CreateIndex
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         Vector<String> columns1{"col1"};
         Vector<InitParameter *> parameters1;
         SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
@@ -368,7 +369,7 @@ TEST_P(TableEntryTest, get_fulltext_analyzers_test) {
 
     // drop index
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
         auto status = txn1->DropIndexByName("default_db", "tbl1", "fulltext_index", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -376,7 +377,7 @@ TEST_P(TableEntryTest, get_fulltext_analyzers_test) {
 
     // drop table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -388,7 +389,7 @@ TEST_P(TableEntryTest, optimize_fulltext_index_test) {
 
     // create table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -410,7 +411,7 @@ TEST_P(TableEntryTest, optimize_fulltext_index_test) {
 
     // CreateIndex
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         Vector<String> columns1{"col1"};
         Vector<InitParameter *> parameters1;
         SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
@@ -434,7 +435,7 @@ TEST_P(TableEntryTest, optimize_fulltext_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -445,7 +446,7 @@ TEST_P(TableEntryTest, optimize_fulltext_index_test) {
 
     // drop index
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
         auto status = txn1->DropIndexByName("default_db", "tbl1", "fulltext_index", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -453,7 +454,7 @@ TEST_P(TableEntryTest, optimize_fulltext_index_test) {
 
     // drop table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -465,7 +466,7 @@ TEST_P(TableEntryTest, roll_back_committed_write_test) {
 
     // create table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -492,7 +493,7 @@ TEST_P(TableEntryTest, roll_back_committed_write_test) {
         };
         TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
         auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
         EXPECT_TRUE(status.ok());
 
@@ -533,7 +534,7 @@ TEST_P(TableEntryTest, roll_back_committed_write_test) {
 
     // drop table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -545,7 +546,7 @@ TEST_P(TableEntryTest, roll_back_uncommitted_write_test) {
 
     // create table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -572,7 +573,7 @@ TEST_P(TableEntryTest, roll_back_uncommitted_write_test) {
         };
         TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
         auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
         EXPECT_TRUE(status.ok());
 
@@ -611,7 +612,7 @@ TEST_P(TableEntryTest, roll_back_uncommitted_write_test) {
 
     // drop table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -623,7 +624,7 @@ TEST_P(TableEntryTest, compact_test) {
 
     // create table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -644,7 +645,7 @@ TEST_P(TableEntryTest, compact_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("compact"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -658,7 +659,7 @@ TEST_P(TableEntryTest, compact_test) {
 
     // drop table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -670,7 +671,7 @@ TEST_P(TableEntryTest, check_any_delete_test) {
 
     // create table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -691,7 +692,7 @@ TEST_P(TableEntryTest, check_any_delete_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("check"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -701,13 +702,13 @@ TEST_P(TableEntryTest, check_any_delete_test) {
         txn1->Delete(table_entry, delete_row_ids);
         txn_mgr->CommitTxn(txn1);
 
-        auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("check"));
+        auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
         EXPECT_TRUE(table_entry->CheckAnyDelete(txn2->BeginTS()));
     }
 
     // drop table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -725,7 +726,7 @@ TEST_P(TableEntryTest, serialize_test) {
 
     // create table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -748,7 +749,7 @@ TEST_P(TableEntryTest, serialize_test) {
 
     // CreateIndex
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         Vector<String> columns1{"col1"};
         Vector<InitParameter *> parameters1;
         SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
@@ -772,7 +773,7 @@ TEST_P(TableEntryTest, serialize_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -784,7 +785,7 @@ TEST_P(TableEntryTest, serialize_test) {
 
     // drop table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -797,7 +798,7 @@ TEST_P(TableEntryTest, deserialize_test) {
 
     // create table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -820,7 +821,7 @@ TEST_P(TableEntryTest, deserialize_test) {
 
     // CreateIndex
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         Vector<String> columns1{"col1"};
         Vector<InitParameter *> parameters1;
         SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
@@ -844,7 +845,7 @@ TEST_P(TableEntryTest, deserialize_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -857,7 +858,7 @@ TEST_P(TableEntryTest, deserialize_test) {
 
     // drop table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
@@ -869,7 +870,7 @@ TEST_P(TableEntryTest, get_colunm_id_by_name_test) {
 
     // create table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -891,7 +892,7 @@ TEST_P(TableEntryTest, get_colunm_id_by_name_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         auto [table_entry, table_status] = txn1->GetTableByName(db_name, table_name);
@@ -901,7 +902,7 @@ TEST_P(TableEntryTest, get_colunm_id_by_name_test) {
 
     // drop table
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);

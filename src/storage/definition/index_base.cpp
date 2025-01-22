@@ -130,10 +130,16 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(const char *&ptr, int32_t maxbytes) {
         case IndexType::kHnsw: {
             MetricType metric_type = ReadBufAdv<MetricType>(ptr);
             HnswEncodeType encode_type = ReadBufAdv<HnswEncodeType>(ptr);
+            HnswBuildType build_type = ReadBufAdv<HnswBuildType>(ptr);
             SizeT M = ReadBufAdv<SizeT>(ptr);
             SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
             SizeT block_size = ReadBufAdv<SizeT>(ptr);
-            res = MakeShared<IndexHnsw>(index_name, index_comment, file_name, column_names, metric_type, encode_type, M, ef_construction, block_size);
+            Optional<LSGConfig> lsg_config = None;
+            if (ReadBufAdv<bool>(ptr)) {
+                lsg_config = LSGConfig::ReadAdv(ptr);
+            }
+            res = MakeShared<
+                IndexHnsw>(index_name, index_comment, file_name, column_names, metric_type, encode_type, build_type, M, ef_construction, block_size, lsg_config);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -240,15 +246,25 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             SizeT block_size = index_def_json["block_size"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             HnswEncodeType encode_type = StringToHnswEncodeType(index_def_json["encode_type"]);
+            HnswBuildType build_type = HnswBuildType::kPlain;
+            if (index_def_json.contains("build_type")) {
+                build_type = StringToHnswBuildType(index_def_json["build_type"]);
+            }
+            Optional<LSGConfig> lsg_config = None;
+            if (index_def_json.contains("lsg_config")) {
+                lsg_config = LSGConfig::FromString(index_def_json["lsg_config"]);
+            }
             res = MakeShared<IndexHnsw>(index_name,
                                         index_comment,
                                         file_name,
                                         std::move(column_names),
                                         metric_type,
                                         encode_type,
+                                        build_type,
                                         M,
                                         ef_construction,
-                                        block_size);
+                                        block_size,
+                                        lsg_config);
             break;
         }
         case IndexType::kDiskAnn: {

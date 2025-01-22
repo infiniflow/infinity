@@ -95,11 +95,6 @@ public:
     inline char delimiter() const { return delimiter_; }
 
 private:
-    SharedPtr<arrow::DataType> GetArrowType(ColumnDef *column_def);
-
-    SharedPtr<arrow::Array> BuildArrowArray(ColumnDef *column_def, const ColumnVector &column_vectors, const Vector<u32> &block_rows_for_output);
-
-private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 

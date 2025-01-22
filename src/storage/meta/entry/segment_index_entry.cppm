@@ -51,6 +51,7 @@ class EMVBIndexInMem;
 class BMPIndexInMem;
 class BaseMemIndex;
 class MemoryIndexer;
+class TxnStore;
 
 export struct PopulateEntireConfig {
     bool prepare_;
@@ -92,7 +93,7 @@ public:
 
     void CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts);
 
-    void OptIndex(IndexBase *index_base, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
+    void OptIndex(SharedPtr<IndexBase> index_base, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
@@ -116,7 +117,7 @@ public:
     SharedPtr<String> index_dir() const { return index_dir_; }
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void MemIndexInsert(SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count, TxnTimeStamp commit_ts, BufferManager *buffer_manager);
+    void MemIndexInsert(SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count, TxnTimeStamp commit_ts, BufferManager *buffer_manager, TxnStore *txn_store);
 
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();

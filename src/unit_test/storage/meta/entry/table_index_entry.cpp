@@ -37,6 +37,7 @@ import constant_expr;
 import parsed_expr;
 import base_table_ref;
 
+import txn_state;
 import base_entry;
 import table_entry;
 import table_index_entry;
@@ -55,7 +56,7 @@ void InsertData(const String &db_name, const String &table_name);
 
 void CreateTable() {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
     Vector<SharedPtr<ColumnDef>> columns;
     {
         std::set<ConstraintType> constraints;
@@ -78,7 +79,7 @@ void CreateTable() {
 
 void CreateIndex() {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
     Vector<String> columns1{"col1"};
     Vector<InitParameter *> parameters1;
     SharedPtr<String> index_name = MakeShared<String>("fulltext_index");
@@ -102,7 +103,7 @@ void CreateIndex() {
 
 void DropIndex() {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop index"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
     auto status = txn1->DropIndexByName("default_db", "tbl1", "fulltext_index", ConflictType::kError);
     EXPECT_TRUE(status.ok());
     txn_mgr->CommitTxn(txn1);
@@ -110,7 +111,7 @@ void DropIndex() {
 
 void DropTable() {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
     auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
     EXPECT_TRUE(status.ok());
     txn_mgr->CommitTxn(txn1);
@@ -123,7 +124,7 @@ TEST_P(TableIndexEntryTest, decode_index_test) {
     CreateIndex();
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("decode"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("decode"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "fulltext_index";
@@ -153,7 +154,7 @@ TEST_P(TableIndexEntryTest, deserialize_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("serialize"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "fulltext_index";
@@ -179,7 +180,7 @@ TEST_P(TableIndexEntryTest, get_mem_index_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("GetMemIndex"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("GetMemIndex"), TransactionType::kRead);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "fulltext_index";
@@ -196,7 +197,7 @@ TEST_P(TableIndexEntryTest, opt_hnsw_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -213,7 +214,7 @@ TEST_P(TableIndexEntryTest, opt_hnsw_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
         Vector<String> columns{"col1"};
         Vector<InitParameter *> parameters;
         parameters.emplace_back(new InitParameter("metric", "l2"));
@@ -244,7 +245,7 @@ TEST_P(TableIndexEntryTest, opt_hnsw_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "idx1";
@@ -275,7 +276,7 @@ TEST_P(TableIndexEntryTest, opt_bmp_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -292,7 +293,7 @@ TEST_P(TableIndexEntryTest, opt_bmp_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
         Vector<String> columns{"col1"};
         Vector<InitParameter *> parameters;
         parameters.emplace_back(new InitParameter("block_size", "16"));
@@ -321,7 +322,7 @@ TEST_P(TableIndexEntryTest, opt_bmp_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "idx1";

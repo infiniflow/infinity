@@ -28,6 +28,7 @@
 namespace infinity {
 
 class DataType;
+struct InitParameter;
 
 enum class TableElementType {
     kConstraint,
@@ -58,6 +59,11 @@ struct ColumnType {
     int64_t precision;
     int64_t scale;
     EmbeddingDataType embedding_type_;
+    std::vector<std::unique_ptr<ColumnType>> element_types_;
+    ColumnType(LogicalType logical_type, int64_t width, int64_t precision, int64_t scale, EmbeddingDataType embedding_type)
+        : logical_type_(logical_type), width(width), precision(precision), scale(scale), embedding_type_(embedding_type) {}
+    static std::pair<std::shared_ptr<DataType>, std::string>
+    GetDataTypeFromColumnType(const ColumnType &column_type, const std::vector<std::unique_ptr<InitParameter>> &index_param_list);
 };
 
 class TableConstraint : public TableElement {
@@ -90,12 +96,9 @@ public:
               std::set<ConstraintType> constraints,
               std::shared_ptr<ParsedExpr> default_expr = nullptr);
 
-    ColumnDef(LogicalType logical_type,
-              const std::shared_ptr<TypeInfo> &type_info_ptr,
-              std::string comment,
-              std::shared_ptr<ParsedExpr> default_expr = nullptr);
+    ColumnDef(std::shared_ptr<DataType> column_type, std::string comment, std::shared_ptr<ParsedExpr> default_expr = nullptr);
 
-    ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr, std::shared_ptr<ParsedExpr> default_expr = nullptr);
+    explicit ColumnDef(std::shared_ptr<DataType> column_type, std::shared_ptr<ParsedExpr> default_expr = nullptr);
 
     inline ~ColumnDef() override = default;
 
@@ -133,4 +136,5 @@ public:
     std::shared_ptr<ParsedExpr> default_expr_{nullptr};
     bool build_bloom_filter_{};
 };
+
 } // namespace infinity

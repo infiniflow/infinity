@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 #include <utility>
 
 #include "type/data_type.h"
-#include "type/logical_type.h"
 #include "type/type_info.h"
 
 namespace infinity {
@@ -33,11 +32,15 @@ public:
     bool operator==(const TypeInfo &other) const override;
 
     // Array always costs 8 bytes. Real data is stored in heap memory.
-    [[nodiscard]] size_t Size() const override { return 8u; }
+    [[nodiscard]] size_t Size() const override;
+
+    [[nodiscard]] size_t ElemSize() const { return elem_type_.Size(); }
 
     [[nodiscard]] nlohmann::json Serialize() const override;
 
-    [[nodiscard]] inline std::string ToString() const override { return "array(" + elem_type_.ToString() + ")"; }
+    [[nodiscard]] std::string ToString() const override;
+
+    [[nodiscard]] const DataType &ElemType() const { return elem_type_; }
 
 private:
     DataType elem_type_;

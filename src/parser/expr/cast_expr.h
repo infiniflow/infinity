@@ -24,8 +24,7 @@ namespace infinity {
 
 class CastExpr final : public ParsedExpr {
 public:
-    explicit CastExpr(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info_ptr)
-        : ParsedExpr(ParsedExprType::kCast), data_type_(logical_type, std::move(type_info_ptr)) {}
+    explicit CastExpr(DataType data_type) : ParsedExpr(ParsedExprType::kCast), data_type_(std::move(data_type)) {}
 
     ~CastExpr() final;
 

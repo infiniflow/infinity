@@ -18,6 +18,7 @@
 #include "parser_assert.h"
 #include "time_type.h"
 #include <string>
+#include <chrono>
 
 namespace infinity {
 
@@ -76,6 +77,8 @@ struct DateTimeType {
     static int64_t GetDateTimePart(DateTimeType input, TimeUnit unit);
 
     int64_t GetEpochTime() const;
+
+    static bool OuterDateTime2YMD(int32_t days, std::chrono::year_month_day &ymd);
 
 private:
     static bool YMDHMS2DateTime(int32_t year, int32_t month, int32_t day, int32_t hour, int32_t minute, int32_t second, DateTimeType &datetime);

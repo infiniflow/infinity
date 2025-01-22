@@ -15,10 +15,59 @@
 #include "column_def.h"
 #include "expr/constant_expr.h"
 #include "expr/parsed_expr.h"
+#include "statement/statement_common.h"
 #include "type/data_type.h"
+#include "type/info/array_info.h"
+#include "type/info/decimal_info.h"
+#include "type/info/embedding_info.h"
+#include "type/info/sparse_info.h"
 #include "type/serialize.h"
 
 namespace infinity {
+
+std::pair<std::shared_ptr<DataType>, std::string>
+ColumnType::GetDataTypeFromColumnType(const ColumnType &column_type, const std::vector<std::unique_ptr<InitParameter>> &index_param_list) {
+    std::shared_ptr<TypeInfo> type_info_ptr{};
+    switch (column_type.logical_type_) {
+        case LogicalType::kDecimal: {
+            type_info_ptr = DecimalInfo::Make(column_type.precision, column_type.scale);
+            if (!type_info_ptr) {
+                return {nullptr, "Fail to create decimal info."};
+            }
+            break;
+        }
+        case LogicalType::kEmbedding:
+        case LogicalType::kMultiVector:
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray: {
+            type_info_ptr = EmbeddingInfo::Make(column_type.embedding_type_, column_type.width);
+            break;
+        }
+        case LogicalType::kSparse: {
+            const auto store_type = SparseInfo::ParseStoreType(index_param_list);
+            type_info_ptr = SparseInfo::Make(column_type.embedding_type_, column_type.width, store_type);
+            if (!type_info_ptr) {
+                return {nullptr, "Fail to create sparse info."};
+            }
+            break;
+        }
+        case LogicalType::kArray: {
+            if (column_type.element_types_.size() != 1) {
+                return {nullptr, "ArrayInfo::Make: column_type.element_types_ is nullptr or size is not 1"};
+            }
+            const auto [element_result, fail_reason] = GetDataTypeFromColumnType(*(column_type.element_types_.front()), index_param_list);
+            if (!element_result) {
+                return {nullptr, std::format("Fail to create element type for array. Reason: {}", fail_reason)};
+            }
+            type_info_ptr = ArrayInfo::Make(std::move(*element_result));
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+    return std::make_pair(std::make_shared<DataType>(column_type.logical_type_, std::move(type_info_ptr)), std::string{});
+}
 
 std::unordered_map<std::string, ConstraintType> string_to_constraint_type = {
     {"primary key", ConstraintType::kPrimaryKey},
@@ -63,8 +112,7 @@ ColumnDef::ColumnDef(int64_t id,
       constraints_(std::move(constraints)), comment_(std::move(comment)), default_expr_(std::move(default_expr)) {
     // TODO: type check for default_expr
     if (!default_expr_) {
-        auto const_expr = new ConstantExpr(LiteralType::kNull);
-        default_expr_ = std::shared_ptr<ParsedExpr>(const_expr);
+        default_expr_ = std::make_shared<ConstantExpr>(LiteralType::kNull);
     }
 }
 
@@ -77,29 +125,22 @@ ColumnDef::ColumnDef(int64_t id,
       constraints_(std::move(constraints)), default_expr_(std::move(default_expr)) {
     // TODO: type check for default_expr
     if (!default_expr_) {
-        auto const_expr = new ConstantExpr(LiteralType::kNull);
-        default_expr_ = std::shared_ptr<ParsedExpr>(const_expr);
+        default_expr_ = std::make_shared<ConstantExpr>(LiteralType::kNull);
     }
 }
 
-ColumnDef::ColumnDef(LogicalType logical_type, const std::shared_ptr<TypeInfo> &type_info_ptr, std::shared_ptr<ParsedExpr> default_expr)
-    : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)),
-      default_expr_(std::move(default_expr)) {
+ColumnDef::ColumnDef(std::shared_ptr<DataType> column_type, std::shared_ptr<ParsedExpr> default_expr)
+    : TableElement(TableElementType::kColumn), column_type_(std::move(column_type)), default_expr_(std::move(default_expr)) {
     if (!default_expr_) {
-        auto const_expr = new ConstantExpr(LiteralType::kNull);
-        default_expr_ = std::shared_ptr<ParsedExpr>(const_expr);
+        default_expr_ = std::make_shared<ConstantExpr>(LiteralType::kNull);
     }
 }
 
-ColumnDef::ColumnDef(LogicalType logical_type,
-                     const std::shared_ptr<TypeInfo> &type_info_ptr,
-                     std::string comment,
-                     std::shared_ptr<ParsedExpr> default_expr)
-    : TableElement(TableElementType::kColumn), column_type_(std::make_shared<DataType>(logical_type, type_info_ptr)), comment_(std::move(comment)),
+ColumnDef::ColumnDef(std::shared_ptr<DataType> column_type, std::string comment, std::shared_ptr<ParsedExpr> default_expr)
+    : TableElement(TableElementType::kColumn), column_type_(std::move(column_type)), comment_(std::move(comment)),
       default_expr_(std::move(default_expr)) {
     if (!default_expr_) {
-        auto const_expr = new ConstantExpr(LiteralType::kNull);
-        default_expr_ = std::shared_ptr<ParsedExpr>(const_expr);
+        default_expr_ = std::make_shared<ConstantExpr>(LiteralType::kNull);
     }
 }
 

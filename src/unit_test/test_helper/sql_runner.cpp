@@ -80,13 +80,13 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
         UnrecoverableError(parsed_result->error_message_);
     }
 
-    query_context_ptr->BeginTxn();
-
     //    LogicalPlanner logical_planner(query_context_ptr.get());
     //    Optimizer optimizer(query_context_ptr.get());
     //    PhysicalPlanner physical_planner(query_context_ptr.get());
     //    FragmentBuilder fragment_builder(query_context_ptr.get());
     BaseStatement *statement = (*parsed_result->statements_ptr_)[0];
+
+    query_context_ptr->BeginTxn(statement);
 
     SharedPtr<BindContext> bind_context;
     query_context_ptr->logical_planner()->Build(statement, bind_context);

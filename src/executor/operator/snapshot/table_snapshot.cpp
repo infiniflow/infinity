@@ -24,6 +24,7 @@ import status;
 import third_party;
 import config;
 import infinity_exception;
+import snapshot_info;
 
 namespace infinity {
 
@@ -44,6 +45,15 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     return Status::OK();
 }
 
-Status Snapshot::RestoreTableSnapshot() { return Status::OK(); }
+Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name) {
+    Txn *txn_ptr = query_context->GetTxn();
+    String snapshot_dir = query_context->global_config()->SnapshotDir();
+
+    SharedPtr<TableSnapshotInfo> table_snapshot;
+    Status status;
+    std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
+    txn_ptr->ApplyTableSnapshot(table_snapshot);
+    return Status::OK();
+}
 
 } // namespace infinity

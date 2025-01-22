@@ -59,6 +59,7 @@ import cluster_manager;
 import admin_statement;
 import cleanup_scanner;
 import global_resource_usage;
+import txn_state;
 
 module wal_manager;
 
@@ -149,13 +150,11 @@ void WalManager::Stop() {
     LOG_INFO("WAL manager is stopped.");
 }
 
-// Session request to persist an entry. Assuming txn_id of the entry has
-// been initialized.
-void WalManager::PutEntries(Vector<WalEntry *> wal_entries) {
+void WalManager::SubmitTxn(Vector<Txn *> &txn_array) {
     if (!running_.load()) {
         return;
     }
-    wait_flush_.EnqueueBulk(wal_entries);
+    wait_flush_.EnqueueBulk(txn_array);
 }
 
 TxnTimeStamp WalManager::LastCheckpointTS() const {
@@ -291,29 +290,34 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
 void WalManager::Flush() {
     LOG_TRACE("WalManager::Flush log mainloop begin");
 
-    Deque<WalEntry *> log_batch{};
-    TxnManager *txn_mgr = storage_->txn_manager();
+    Deque<Txn *> txn_batch{};
     ClusterManager *cluster_manager = nullptr;
     while (running_.load()) {
-        wait_flush_.DequeueBulk(log_batch);
-        if (log_batch.empty()) {
+        wait_flush_.DequeueBulk(txn_batch);
+        if (txn_batch.empty()) {
             LOG_WARN("WalManager::Dequeue empty batch logs");
             continue;
         }
 
-        for (const auto &entry : log_batch) {
-            // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
-            if (entry == nullptr) {
+        for (const auto &txn : txn_batch) {
+            if (txn == nullptr) {
                 // terminate entry
+                LOG_INFO("Terminate WAL Manager flush thread");
                 running_ = false;
                 break;
             }
 
+            WalEntry *entry = txn->GetWALEntry();
+            // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
+
             if (entry->cmds_.empty()) {
                 continue;
-                // UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
-            if (txn_mgr->InCheckpointProcess(entry->commit_ts_)) {
+
+            if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+                LOG_INFO(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file",
+                                     txn->BeginTS(),
+                                     txn->CommitTS()));
                 this->SwapWalFile(max_commit_ts_, true);
             }
 
@@ -370,18 +374,18 @@ void WalManager::Flush() {
             cluster_manager->SyncLogs();
         }
 
-        for (const auto &entry : log_batch) {
-            Txn *txn = txn_mgr->GetTxn(entry->txn_id_);
-            if (txn != nullptr) {
-                txn->CommitBottom();
-            }
+        // Commit bottom
+        for (const auto &txn : txn_batch) {
+            txn->CommitBottom();
+            // TODO: if txn is checkpoint, swap WAL file
         }
-        log_batch.clear();
+        txn_batch.clear();
 
         // Check if the wal file is too large, swap to a new one.
         try {
             auto file_size = VirtualStore::GetFileSize(wal_path_);
             if (file_size > cfg_wal_size_threshold_) {
+                LOG_INFO(fmt::format("WAL size: {} is larger than threshold: {}", file_size, cfg_wal_size_threshold_));
                 this->SwapWalFile(max_commit_ts_, true);
             }
         } catch (RecoverableException &e) {
@@ -445,6 +449,7 @@ void WalManager::FlushLogByReplication(const Vector<String> &synced_logs, bool o
 
         // Rename the old WAL file and open new WAL file, use the max_commit_ts. If duplicate filename, just remove current WAL file and create a new
         // one.
+        LOG_INFO("FlushLogByReplication, rename old WAL file and open new WAL");
         SwapWalFile(max_commit_ts, false);
     }
 
@@ -470,8 +475,10 @@ bool WalManager::TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task)
 // Do checkpoint for transactions which lsn no larger than the given one.
 void WalManager::Checkpoint(bool is_full_checkpoint) {
     TxnManager *txn_mgr = storage_->txn_manager();
-    Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), true /*is_checkpoint*/);
-
+    Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), TransactionType::kCheckpoint);
+    if (txn == nullptr) {
+        RecoverableError(Status::FailToStartTxn("System is checkpointing"));
+    }
     if (is_full_checkpoint) {
         FullCheckpointInner(txn);
     } else {
@@ -618,17 +625,23 @@ i64 WalManager::GetLastCkpWalSize() {
  * current wal file.
  */
 void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_duplicate) {
+    if (max_commit_ts <= last_swap_wal_ts_) {
+        LOG_WARN(fmt::format("Skip swap wal file, max_commit_ts: {} <= last_swap_wal_ts_: {}", max_commit_ts, last_swap_wal_ts_));
+        return;
+    }
+
     if (ofs_.is_open()) {
         ofs_.close();
     }
 
     String new_file_path = fmt::format("{}/{}", wal_dir_, WalFile::WalFilename(max_commit_ts));
-    LOG_INFO(fmt::format("Wal {} swap to new path: {}", wal_path_, new_file_path));
+    LOG_INFO(fmt::format("Wal {} swap to new path: {}, error_if_duplicate: {}", wal_path_, new_file_path, error_if_duplicate));
 
     if (VirtualStore::Exists(new_file_path)) {
         if (error_if_duplicate) {
             UnrecoverableError(fmt::format("File: {}, exists!", new_file_path));
         } else {
+            LOG_INFO(fmt::format("Delete WAL file: {}", wal_path_));
             VirtualStore::DeleteFile(wal_path_);
         }
     } else {
@@ -648,6 +661,8 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts, bool error_if_dup
         String error_message = fmt::format("Failed to open wal file: {}", wal_path_);
         UnrecoverableError(error_message);
     }
+
+    last_swap_wal_ts_ = max_commit_ts;
     LOG_INFO(fmt::format("Open new wal file {}", wal_path_));
 }
 
@@ -1165,7 +1180,7 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
         txn_id,
         begin_ts);
 
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts, TransactionType::kNormal);
     auto base_table_ref = MakeShared<BaseTableRef>(table_entry, table_entry->GetBlockIndex(fake_txn.get()));
     table_index_entry->CreateIndexPrepare(base_table_ref.get(), fake_txn.get(), false, true);
 
@@ -1255,7 +1270,7 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
         UnrecoverableError(error_message);
     }
 
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts, TransactionType::kNormal);
     auto table_store = fake_txn->GetTxnTableStore(table_entry);
     table_store->Delete(cmd.row_ids_);
     Catalog::Delete(table_store->GetTableEntry(), fake_txn->TxnID(), (void *)table_store, fake_txn->CommitTS(), table_store->GetDeleteStateRef());
@@ -1308,7 +1323,7 @@ void WalManager::WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id,
         String error_message = fmt::format("Wal Replay: Get index failed {}", status.message());
         UnrecoverableError(error_message);
     }
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts, TransactionType::kNormal);
 
     TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
@@ -1385,7 +1400,7 @@ void WalManager::WalCmdAddColumnsReplay(WalCmdAddColumns &cmd, TransactionID txn
     }
 
     SharedPtr<TableEntry> new_table_entry = table_entry->Clone();
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts, TransactionType::kNormal);
     auto *txn_table_store = fake_txn->GetTxnTableStore(table_entry);
     new_table_entry->AddColumns(cmd.column_defs_, txn_table_store);
     new_table_entry->commit_ts_ = commit_ts;
@@ -1414,7 +1429,7 @@ void WalManager::WalCmdDropColumnsReplay(WalCmdDropColumns &cmd, TransactionID t
     }
 
     SharedPtr<TableEntry> new_table_entry = table_entry->Clone();
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts, TransactionType::kNormal);
     auto *txn_table_store = fake_txn->GetTxnTableStore(table_entry);
     new_table_entry->DropColumns(cmd.column_names_, txn_table_store);
     new_table_entry->commit_ts_ = commit_ts;
@@ -1437,7 +1452,7 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
         UnrecoverableError(error_message);
     }
 
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts);
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts, TransactionType::kNormal);
     auto table_store = fake_txn->GetTxnTableStore(table_entry);
     table_store->Append(cmd.block_);
 

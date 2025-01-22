@@ -452,6 +452,8 @@ Status Status::InvalidQueryOption(const String &detail) {
     return Status(ErrorCode::kUnknown, MakeUnique<String>(fmt::format("Invalid query option: {}", detail)));
 }
 
+Status Status::FailToStartTxn(const String &detail) { return Status(ErrorCode::kFailToStartTxn, MakeUnique<String>(detail)); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));
@@ -515,8 +517,8 @@ Status Status::LockFileError(const String &path, const String &error_msg) {
     return Status(ErrorCode::kLockFileError, MakeUnique<String>(fmt::format("Lock file error: {}, {}", path, error_msg)));
 }
 
-Status Status::CatalogCorrupted(const String &path) {
-    return Status(ErrorCode::kCatalogCorrupted, MakeUnique<String>(fmt::format("Catalog: {} is corrupted", path)));
+Status Status::FileCorrupted(const String &path) {
+    return Status(ErrorCode::kFileCorrupted, MakeUnique<String>(fmt::format("Catalog: {} is corrupted", path)));
 }
 
 Status Status::DataCorrupted(const String &path) {

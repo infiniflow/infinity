@@ -47,6 +47,7 @@ import table_entry_type;
 import segment_entry;
 import segment_index_entry;
 import block_entry;
+import txn_state;
 
 using namespace infinity;
 
@@ -69,7 +70,7 @@ TEST_P(SegmentIndexEntryTest, decode_index_test) {
     InsertData("default_db", "tbl1");
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("decode"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("decode"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "fulltext_index";
@@ -96,7 +97,7 @@ TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -113,7 +114,7 @@ TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
         Vector<String> columns{"col1"};
         Vector<InitParameter *> parameters;
         parameters.emplace_back(new InitParameter("metric", "l2"));
@@ -141,7 +142,7 @@ TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create_file_worker"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create_file_worker"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "idx1";
@@ -159,7 +160,7 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -176,7 +177,7 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
         Vector<String> columns{"col1"};
         Vector<InitParameter *> parameters;
         parameters.emplace_back(new InitParameter("metric", "l2"));
@@ -207,7 +208,7 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "idx1";
@@ -220,16 +221,16 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
         TxnTableStore *txn_table_store = txn1->GetTxnTableStore(table_entry);
         SharedPtr<SegmentIndexEntry> segment_index_entry;
         EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));
-        segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false);
+        segment_index_entry->OptIndex(index_entry->table_index_def(), txn_table_store, opt_params, false);
 
         opt_params.clear();
         opt_params.emplace_back(MakeUnique<InitParameter>("lvq_avg", ""));
-        segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false);
+        segment_index_entry->OptIndex(index_entry->table_index_def(), txn_table_store, opt_params, false);
 
         opt_params.clear();
         opt_params.emplace_back(MakeUnique<InitParameter>("compress_to_lvq", ""));
         opt_params.emplace_back(MakeUnique<InitParameter>("lvq_avg", ""));
-        EXPECT_THROW(segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false),
+        EXPECT_THROW(segment_index_entry->OptIndex(index_entry->table_index_def(), txn_table_store, opt_params, false),
                      RecoverableException);
         txn_mgr->CommitTxn(txn1);
     }
@@ -241,7 +242,7 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -258,7 +259,7 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
         Vector<String> columns{"col1"};
         Vector<InitParameter *> parameters;
         parameters.emplace_back(new InitParameter("block_size", "16"));
@@ -287,7 +288,7 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("opt"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "idx1";
@@ -301,7 +302,7 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test) {
         TxnTableStore *txn_table_store = txn1->GetTxnTableStore(table_entry);
         SharedPtr<SegmentIndexEntry> segment_index_entry;
         EXPECT_TRUE(index_entry->GetOrCreateSegment(0, txn1, segment_index_entry));
-        segment_index_entry->OptIndex(const_cast<IndexBase *>(index_entry->index_base()), txn_table_store, opt_params, false);
+        segment_index_entry->OptIndex(index_entry->table_index_def(), txn_table_store, opt_params, false);
         txn_mgr->CommitTxn(txn1);
     }
 
@@ -314,7 +315,7 @@ TEST_P(SegmentIndexEntryTest, flush_fulltext_test) {
     CreateIndex();
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("flush"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("flush"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "fulltext_index";
@@ -333,7 +334,7 @@ TEST_P(SegmentIndexEntryTest, flush_bmp_test) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         Vector<SharedPtr<ColumnDef>> columns;
         {
             std::set<ConstraintType> constraints;
@@ -350,7 +351,7 @@ TEST_P(SegmentIndexEntryTest, flush_bmp_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
         Vector<String> columns{"col1"};
         Vector<InitParameter *> parameters;
         parameters.emplace_back(new InitParameter("block_size", "16"));
@@ -379,7 +380,7 @@ TEST_P(SegmentIndexEntryTest, flush_bmp_test) {
     }
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("flush"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("flush"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "idx1";
@@ -399,7 +400,7 @@ TEST_P(SegmentIndexEntryTest, cleanup_test) {
     CreateIndex();
 
     {
-        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("flush"));
+        auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("flush"), TransactionType::kNormal);
         const String &db_name = "default_db";
         const String &table_name = "tbl1";
         const String &index_name = "fulltext_index";

@@ -48,6 +48,22 @@ import like;
 import minus;
 import modulo;
 import multiply;
+import century;
+import year;
+import month;
+import day;
+import hour;
+import minute;
+import second;
+import date_part;
+import day_of_month;
+import day_of_week;
+import day_of_year;
+import era;
+import epoch;
+import weekday;
+import week_of_year;
+import quarter;
 import not_func;
 import or_func;
 import plus;
@@ -59,6 +75,7 @@ import md5;
 import lower;
 import upper;
 import regex;
+import reverse;
 import ltrim;
 import rtrim;
 import trim;
@@ -142,10 +159,29 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterLowerFunction(catalog_ptr_);
     RegisterUpperFunction(catalog_ptr_);
     RegisterRegexFunction(catalog_ptr_);
+    RegisterReverseFunction(catalog_ptr_);
     RegisterLtrimFunction(catalog_ptr_);
     RegisterRtrimFunction(catalog_ptr_);
     RegisterTrimFunction(catalog_ptr_);
     RegisterPositionFunction(catalog_ptr_);
+
+    // date and time functions
+    RegisterCenturyFunction(catalog_ptr_);
+    RegisterYearFunction(catalog_ptr_);
+    RegisterMonthFunction(catalog_ptr_);
+    RegisterDayFunction(catalog_ptr_);
+    RegisterHourFunction(catalog_ptr_);
+    RegisterMinuteFunction(catalog_ptr_);
+    RegisterSecondFunction(catalog_ptr_);
+    RegisterDatePartFunction(catalog_ptr_);
+    RegisterDayOfYearFunction(catalog_ptr_);
+    RegisterDayOfMonthFunction(catalog_ptr_);
+    RegisterDayOfWeekFunction(catalog_ptr_);
+    RegisterEraFunction(catalog_ptr_);
+    RegisterEpochFunction(catalog_ptr_);
+    RegisterQuarterFunction(catalog_ptr_);
+    RegisterWeekdayFunction(catalog_ptr_);
+    RegisterWeekOfYearFunction(catalog_ptr_);
 }
 
 void BuiltinFunctions::RegisterTableFunction() {}

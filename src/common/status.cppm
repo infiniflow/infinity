@@ -139,6 +139,7 @@ export enum class ErrorCode : long {
     kFileIsOpen = 3090,
     kUnknown = 3091,
     kInvalidQueryOption = 3092,
+    kFailToStartTxn = 3093,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -162,7 +163,7 @@ export enum class ErrorCode : long {
     kDuplicatedFile = 7002,
     kConfigFileError = 7003,
     kLockFileError = 7004,
-    kCatalogCorrupted = 7005,
+    kFileCorrupted = 7005,
     kDataCorrupted = 7006,
     kIndexCorrupted = 7007,
     kFileNotFound = 7008,
@@ -315,6 +316,7 @@ public:
     static Status FileIsOpen(const String &filename);
     static Status Unknown(const String &name);
     static Status InvalidQueryOption(const String &detail);
+    static Status FailToStartTxn(const String &detail);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");
@@ -338,7 +340,7 @@ public:
     static Status DuplicatedFile(const String &filename);
     static Status ConfigFileError(const String &path, const String &detailed_info);
     static Status LockFileError(const String &path, const String &error_msg);
-    static Status CatalogCorrupted(const String &path);
+    static Status FileCorrupted(const String &path);
     static Status DataCorrupted(const String &path);
     static Status IndexCorrupted(const String &path);
     static Status FileNotFound(const String &path);

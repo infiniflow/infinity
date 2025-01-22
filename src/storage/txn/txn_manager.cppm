@@ -41,7 +41,7 @@ public:
 
     ~TxnManager();
 
-    Txn *BeginTxn(UniquePtr<String> txn_text, bool ckp_txn = false);
+    Txn *BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type);
 
     Txn *GetTxn(TransactionID txn_id) const;
 
@@ -123,11 +123,11 @@ private:
     Map<TxnTimeStamp, Txn *> committing_txns_; // the txns in committing stage
     Set<TxnTimeStamp> checking_ts_{};          // the begin ts of txn that is used to check conflict
 
-    Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
+    Map<TxnTimeStamp, Txn *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> current_ts_{}; // The next txn ts
     Atomic<TxnTimeStamp> max_committed_ts_{};
-    TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
+    Atomic<TxnTimeStamp> ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager
     atomic_bool is_running_{false};

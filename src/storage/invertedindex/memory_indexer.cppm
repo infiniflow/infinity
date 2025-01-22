@@ -71,6 +71,8 @@ public:
     // Insert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count, bool offline = false);
 
+    UniquePtr<std::binary_semaphore> AsyncInsert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count);
+
     // InsertGap insert some empty documents. This is for abnormal case.
     void InsertGap(u32 row_count);
 

@@ -58,6 +58,7 @@ import admin_executor;
 import persistence_manager;
 import global_resource_usage;
 import infinity_context;
+import txn_state;
 
 namespace infinity {
 
@@ -421,8 +422,20 @@ QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_state
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     if (session_ptr_->GetTxn() == nullptr) {
-        bool is_checkpoint = base_statement != nullptr && base_statement->type_ == StatementType::kFlush;
-        Txn *new_txn = storage_->txn_manager()->BeginTxn(nullptr, is_checkpoint);
+        Txn *new_txn = nullptr;
+        if(base_statement == nullptr) {
+            new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(""), TransactionType::kNormal);
+        } else {
+            // TODO: more type check and setting
+            if (base_statement->type_ == StatementType::kFlush) {
+                new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kCheckpoint);
+                if (new_txn == nullptr) {
+                    RecoverableError(Status::FailToStartTxn("System is checkpointing"));
+                }
+            } else {
+                new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(base_statement->ToString()), TransactionType::kNormal);
+            }
+        }
         session_ptr_->SetTxn(new_txn);
     }
 }

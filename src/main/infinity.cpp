@@ -116,10 +116,11 @@ void Infinity::LocalInit(const String &path, const String &config_path) {
         default_config->default_wal_dir_ = fmt::format("{}/wal", path);
         default_config->default_temp_dir_ = fmt::format("{}/tmp", path);
         default_config->default_resource_dir_ = fmt::format("{}/resource", path);
+        default_config->default_persistence_dir_ = fmt::format("{}/persistence", path);
 
         default_config->default_log_level_ = LogLevel::kInfo;
         default_config->default_log_to_stdout_ = false;
-        InfinityContext::instance().InitPhase1(nullptr, false, default_config.get());
+        InfinityContext::instance().InitPhase1(nullptr, default_config.get());
     }
     InfinityContext::instance().InitPhase2();
 }

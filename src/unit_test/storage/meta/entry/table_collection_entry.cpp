@@ -40,7 +40,7 @@ import logical_type;
 import extra_ddl_info;
 import column_def;
 import data_type;
-
+import txn_state;
 import table_entry;
 
 using namespace infinity;
@@ -104,7 +104,7 @@ TEST_P(TableEntryTest, test2) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"));
+    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -147,7 +147,7 @@ TEST_P(TableEntryTest, test2) {
 
     {
         // Txn2: Create, OK
-        new_txn = txn_mgr->BeginTxn(MakeUnique<String>("insert data"));
+        new_txn = txn_mgr->BeginTxn(MakeUnique<String>("insert data"), TransactionType::kNormal);
 
         // Txn2: Get db1, OK
         auto [table_entry, s2] = new_txn->GetTableByName("db1", "tbl1");
@@ -188,7 +188,7 @@ TEST_P(TableEntryTest, test2) {
 
     {
         // Txn2: Create, OK
-        new_txn = txn_mgr->BeginTxn(MakeUnique<String>("insert data"));
+        new_txn = txn_mgr->BeginTxn(MakeUnique<String>("insert data"), TransactionType::kNormal);
 
         //        {
         //            // Get column 0 and column 2 from global storage;

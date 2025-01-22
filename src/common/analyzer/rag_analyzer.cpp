@@ -1430,7 +1430,6 @@ void RAGAnalyzer::FineGrainedTokenize(const String &tokens, Vector<String> &resu
 }
 
 int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
-    unsigned level = 0;
     Vector<String> tokens;
     String output = Tokenize(input.text_);
     if (fine_grained_) {
@@ -1439,7 +1438,7 @@ int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
         Split(output, blank_pattern_, tokens);
     unsigned offset = 0;
     for (auto &t : tokens) {
-        func(data, t.c_str(), t.size(), offset++, 0, Term::AND, level, false);
+        func(data, t.c_str(), t.size(), offset++, 0, false);
     }
     return 0;
 }

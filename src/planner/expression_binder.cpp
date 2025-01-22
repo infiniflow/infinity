@@ -64,6 +64,7 @@ import query_context;
 import logger;
 import embedding_info;
 import sparse_info;
+import array_info;
 import parsed_expr;
 import function_expr;
 import constant_expr;
@@ -370,6 +371,53 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
         }
         case LiteralType::kEmptyArray: {
             Value value = Value::MakeEmptyArray();
+            return MakeShared<ValueExpression>(value);
+        }
+        case LiteralType::kCurlyBracketsArray: {
+            Vector<Value> element_values;
+            for (const auto &element : expr.curly_brackets_array_) {
+                const auto elem_expr = BuildValueExpr(*element, nullptr, 0, false);
+                auto *val_expr = dynamic_cast<const ValueExpression *>(elem_expr.get());
+                element_values.emplace_back(val_expr->GetValue());
+            }
+            // check types
+            DataType common_element_type{LogicalType::kInvalid};
+            for (const auto &element : element_values) {
+                if (common_element_type.type() == LogicalType::kInvalid) {
+                    common_element_type = element.type();
+                } else if (common_element_type != element.type()) {
+                    // try cast
+                    try {
+                        CastFunction::GetBoundFunc(element.type(), common_element_type);
+                    } catch (...) {
+                        try {
+                            CastFunction::GetBoundFunc(common_element_type, element.type());
+                            common_element_type = element.type();
+                        } catch (...) {
+                            RecoverableError(Status::SyntaxError(fmt::format("Array elements have incompatible types: {} and {}",
+                                                                             common_element_type.ToString(),
+                                                                             element.type().ToString())));
+                        }
+                    }
+                }
+            }
+            // do necessary cast
+            for (auto &element : element_values) {
+                if (element.type() != common_element_type) {
+                    // cast
+                    BoundCastFunc cast = CastFunction::GetBoundFunc(element.type(), common_element_type);
+                    auto element_column_vector = MakeShared<ColumnVector>(MakeShared<DataType>(element.type()));
+                    element_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+                    element_column_vector->AppendValue(element);
+                    auto cast_column_vector = MakeShared<ColumnVector>(MakeShared<DataType>(common_element_type));
+                    cast_column_vector->Initialize(ColumnVectorType::kFlat, DEFAULT_VECTOR_SIZE);
+                    CastParameters cast_parameters;
+                    cast.function(element_column_vector, cast_column_vector, 1, cast_parameters);
+                    Value cast_val = cast_column_vector->GetValue(0);
+                    element = std::move(cast_val);
+                }
+            }
+            Value value = Value::MakeArray(std::move(element_values), ArrayInfo::Make(std::move(common_element_type)));
             return MakeShared<ValueExpression>(value);
         }
     }

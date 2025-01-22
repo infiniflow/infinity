@@ -51,7 +51,7 @@ TxnManager::~TxnManager() {
 #endif
 }
 
-Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
+Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_type) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "TxnManager is not running, cannot create txn";
@@ -67,18 +67,21 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
 
     // Record the start ts of the txn
     TxnTimeStamp begin_ts = current_ts_ + 1;
-    if (ckp_txn) {
-        if (ckp_begin_ts_ != UNCOMMIT_TS) {
-            // not set ckp_begin_ts_ may not truncate the wal file.
-            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, begin_ts));
-        } else {
+
+    if (txn_type == TransactionType::kCheckpoint) {
+        if (ckp_begin_ts_ == UNCOMMIT_TS) {
             LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
             ckp_begin_ts_ = begin_ts;
+        } else {
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing, not start this txn",
+                                 ckp_begin_ts_,
+                                 begin_ts));
+            return nullptr;
         }
     }
 
     // Create txn instance
-    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, new_txn_id, begin_ts, std::move(txn_text)));
+    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, new_txn_id, begin_ts, std::move(txn_text), txn_type));
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
@@ -192,27 +195,27 @@ void TxnManager::SendToWAL(Txn *txn) {
 
     std::lock_guard guard(locker_);
     if (wait_conflict_ck_.empty()) {
-        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
+        String error_message = fmt::format("TxnManager::SendToWAL wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
         UnrecoverableError(error_message);
     }
     if (wait_conflict_ck_.begin()->first > commit_ts) {
-        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
+        String error_message = fmt::format("TxnManager::SendToWAL wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
                                            wait_conflict_ck_.begin()->first,
                                            txn->CommitTS());
         UnrecoverableError(error_message);
     }
     if (wal_entry) {
-        wait_conflict_ck_.at(commit_ts) = wal_entry;
+        wait_conflict_ck_.at(commit_ts) = txn;
     } else {
         wait_conflict_ck_.erase(commit_ts); // rollback
     }
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
-        Vector<WalEntry *> wal_entries;
+        Vector<Txn *> txn_array;
         do {
-            wal_entries.push_back(wait_conflict_ck_.begin()->second);
+            txn_array.push_back(wait_conflict_ck_.begin()->second);
             wait_conflict_ck_.erase(wait_conflict_ck_.begin());
         } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
-        wal_mgr_->PutEntries(wal_entries);
+        wal_mgr_->SubmitTxn(txn_array);
     }
 }
 
@@ -248,12 +251,20 @@ bool TxnManager::Stopped() { return !is_running_.load(); }
 
 TxnTimeStamp TxnManager::CommitTxn(Txn *txn) {
     TxnTimeStamp commit_ts = txn->Commit();
+    if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+        std::lock_guard guard(locker_);
+        ckp_begin_ts_ = UNCOMMIT_TS;
+    }
     this->CleanupTxn(txn, true);
     return commit_ts;
 }
 
 void TxnManager::RollBackTxn(Txn *txn) {
     txn->Rollback();
+    if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+        std::lock_guard guard(locker_);
+        ckp_begin_ts_ = UNCOMMIT_TS;
+    }
     this->CleanupTxn(txn, false);
 }
 
@@ -295,7 +306,7 @@ Vector<SharedPtr<TxnContext>> TxnManager::GetTxnContextHistories() const {
         txn_context_histories.emplace_back(context_ptr);
     }
 
-    for (const auto& ongoing_txn_pair: txn_map_) {
+    for (const auto &ongoing_txn_pair : txn_map_) {
         txn_context_histories.push_back(ongoing_txn_pair.second->txn_context());
     }
 
@@ -333,77 +344,68 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 }
 
 void TxnManager::CleanupTxn(Txn *txn, bool commit) {
-    TxnType txn_type = txn->GetTxnType();
+    bool is_write_transaction = txn->IsWriteTransaction();
     TransactionID txn_id = txn->TxnID();
-    switch (txn_type) {
-        case TxnType::kRead: {
-            // For read-only Txn only remove txn from txn_map
+    if (is_write_transaction) {
+        // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
+        TxnState txn_state = txn->GetTxnState();
+        switch (txn_state) {
+            case TxnState::kCommitting: {
+                txn->SetTxnCommitted();
+                break;
+            }
+            case TxnState::kRollbacking: {
+                txn->SetTxnRollbacked();
+                break;
+            }
+            default: {
+                String error_message = fmt::format("Invalid transaction status: {}", TxnState2Str(txn_state));
+                UnrecoverableError(error_message);
+            }
+        }
+        SharedPtr<AddDeltaEntryTask> add_delta_entry_task = txn->MakeAddDeltaEntryTask();
+        {
+            // cleanup the txn from committing_txn and txm_map
+            auto commit_ts = txn->CommitTS();
             std::lock_guard guard(locker_);
-            //            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
-            //            if (txn_contexts_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
-            //                txn_contexts_.pop_front();
-            //            }
-            //            txn_contexts_.push_back(txn_ptr);
-            txn_map_.erase(txn_id);
-            break;
-        }
-        case TxnType::kWrite: {
-            // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
-            TxnState txn_state = txn->GetTxnState();
-            switch (txn_state) {
-                case TxnState::kCommitting: {
-                    txn->SetTxnCommitted();
-                    break;
-                }
-                case TxnState::kRollbacking: {
-                    txn->SetTxnRollbacked();
-                    break;
-                }
-                default: {
-                    String error_message = fmt::format("Invalid transaction status: {}", TxnState2Str(txn_state));
-                    UnrecoverableError(error_message);
-                }
+            SizeT remove_n = committing_txns_.erase(commit_ts);
+            if (remove_n == 0) {
+                UnrecoverableError("Txn not found in committing_txns_");
             }
-            SharedPtr<AddDeltaEntryTask> add_delta_entry_task = txn->MakeAddDeltaEntryTask();
-            {
-                // cleanup the txn from committing_txn and txm_map
-                auto commit_ts = txn->CommitTS();
-                std::lock_guard guard(locker_);
-                SizeT remove_n = committing_txns_.erase(commit_ts);
-                if (remove_n == 0) {
-                    UnrecoverableError("Txn not found in committing_txns_");
-                }
-                SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
-                if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
-                    txn_context_histories_.pop_front();
-                }
-                txn_context_histories_.push_back(txn_ptr->txn_context());
-                remove_n = txn_map_.erase(txn_id);
-                if (remove_n == 0) {
-                    String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
-                    UnrecoverableError(error_message);
-                }
-                if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
-                    max_committed_ts_ = commit_ts;
-                }
+            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+            if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+                txn_context_histories_.pop_front();
             }
-            if (commit && add_delta_entry_task) {
-                InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
+            txn_context_histories_.push_back(txn_ptr->txn_context());
+            remove_n = txn_map_.erase(txn_id);
+            if (remove_n == 0) {
+                String error_message = fmt::format("Txn: {} not found in txn map", txn_id);
+                UnrecoverableError(error_message);
             }
-            break;
+            if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
+                max_committed_ts_ = commit_ts;
+            }
         }
-        case TxnType::kInvalid: {
-            String error_message = "Txn type is invalid";
-            UnrecoverableError(error_message);
-            break;
+        if (commit && add_delta_entry_task) {
+            // Submit delta entry must be after max_committed_ts_ is updated
+            InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
         }
+    } else {
+        // For read-only Txn only remove txn from txn_map
+        std::lock_guard guard(locker_);
+        //            SharedPtr<Txn> txn_ptr = txn_map_[txn_id];
+        //            if (txn_contexts_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
+        //                txn_contexts_.pop_front();
+        //            }
+        //            txn_contexts_.push_back(txn_ptr);
+        txn_map_.erase(txn_id);
     }
 }
 
 bool TxnManager::InCheckpointProcess(TxnTimeStamp commit_ts) {
     std::lock_guard guard(locker_);
     if (commit_ts > ckp_begin_ts_) {
-        LOG_TRACE(fmt::format("Full checkpoint begin in {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
+        LOG_TRACE(fmt::format("Full/Delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
         ckp_begin_ts_ = UNCOMMIT_TS;
         return true;
     }

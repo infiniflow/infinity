@@ -70,7 +70,6 @@ void IKAnalyzer::Reset() {
 int IKAnalyzer::GetLastUselessCharNum() { return context_->GetLastUselessCharNum(); }
 
 int IKAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
-    unsigned level = 0;
     unsigned offset = 0;
     std::wstring line = CharacterUtil::UTF8ToUTF16(input.text_);
     context_->Reset();
@@ -91,7 +90,7 @@ int IKAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     while ((lexeme = context_->GetNextLexeme()) != nullptr) {
         std::wstring text = lexeme->GetLexemeText();
         String token = CharacterUtil::UTF16ToUTF8(text);
-        func(data, token.c_str(), token.size(), offset++, 0, Term::AND, level, false);
+        func(data, token.c_str(), token.size(), offset++, 0, false);
         delete lexeme;
     };
     return 0;

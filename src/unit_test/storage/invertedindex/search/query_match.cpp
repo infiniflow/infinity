@@ -41,6 +41,7 @@ import term_doc_iterator;
 import logger;
 import column_index_reader;
 import parse_fulltext_options;
+import txn_state;
 
 using namespace infinity;
 
@@ -178,12 +179,12 @@ void QueryMatchTest::CreateDBAndTable(const String &db_name, const String &table
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         txn->DropTableCollectionByName(db_name, table_name, ConflictType::kIgnore);
         last_commit_ts_ = txn_mgr->CommitTxn(txn);
     }
     {
-        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         txn->CreateTable(db_name, table_def, ConflictType::kError);
 
         auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
@@ -201,7 +202,7 @@ void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name
     Vector<String> col_name_list{"text"};
     String index_file_name = index_name + ".json";
     {
-        auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
         auto status0 = txn_idx->DropIndexByName(db_name, table_name, index_name, ConflictType::kIgnore);
         // EXPECT_TRUE(status0.ok());
 
@@ -266,7 +267,7 @@ void QueryMatchTest::InsertData(const String &db_name, const String &table_name)
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
 
-    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"));
+    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
     auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
     EXPECT_TRUE(status.ok());
 
@@ -308,7 +309,7 @@ void QueryMatchTest::QueryMatch(const String &db_name,
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
 
-    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("query match"));
+    auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("query match"), TransactionType::kRead);
 
     auto [table_entry, status_table] = txn->GetTableByName(db_name, table_name);
     EXPECT_TRUE(status_table.ok());

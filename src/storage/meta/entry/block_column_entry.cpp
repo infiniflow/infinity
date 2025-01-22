@@ -63,7 +63,7 @@ BlockColumnEntry::~BlockColumnEntry() {}
 
 BlockColumnEntry::BlockColumnEntry(const BlockColumnEntry &other)
     : BaseEntry(other), block_entry_(other.block_entry_), column_id_(other.column_id_), column_type_(other.column_type_), buffer_(other.buffer_),
-      file_name_(other.file_name_) {
+      filename_(other.filename_) {
     std::shared_lock lock(other.mutex_);
     outline_buffers_ = other.outline_buffers_;
     last_chunk_offset_ = other.last_chunk_offset_;
@@ -87,7 +87,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
     auto begin_ts = txn->BeginTS();
     block_column_entry->begin_ts_ = begin_ts;
 
-    block_column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
+    block_column_entry->filename_ = MakeShared<String>(std::to_string(column_id) + ".col");
     block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
 
     DataType *column_type = block_column_entry->column_type_.get();
@@ -102,7 +102,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
     auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                   block_entry->block_dir(),
-                                                  block_column_entry->file_name_,
+                                                  block_column_entry->filename_,
                                                   total_data_size,
                                                   buffer_mgr->persistence_manager());
 
@@ -118,7 +118,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                                         const u64 last_chunk_offset,
                                                                         const TxnTimeStamp commit_ts) {
     UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
-    column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
+    column_entry->filename_ = MakeShared<String>(std::to_string(column_id) + ".col");
     column_entry->column_type_ = block_entry->GetColumnType(column_id);
     column_entry->commit_ts_ = commit_ts;
 
@@ -130,7 +130,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                   block_entry->block_dir(),
-                                                  column_entry->file_name_,
+                                                  column_entry->filename_,
                                                   total_data_size,
                                                   buffer_manager->persistence_manager());
 
@@ -159,7 +159,38 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     return column_entry;
 }
 
-String BlockColumnEntry::FilePath() const { return Path(*block_entry_->block_dir()) / *file_name_; }
+UniquePtr<BlockColumnEntry> BlockColumnEntry::ApplyBlockColumnSnapshot(BlockEntry *block_entry,
+                                                                       BlockColumnSnapshotInfo *block_column_snapshot_info,
+                                                                       TransactionID txn_id,
+                                                                       TxnTimeStamp begin_ts) {
+    ColumnID column_id = block_column_snapshot_info->column_id_;
+    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
+    block_column_entry->filename_ = MakeShared<String>(block_column_snapshot_info->filename_);
+    block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
+
+    // column_entry->buffer_
+    // column_entry->outline need to be updated;
+
+    block_column_entry->last_chunk_offset_ = block_column_snapshot_info->last_chunk_offset_;
+    return block_column_entry;
+}
+
+SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() const {
+    SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
+    block_column_snapshot_info->column_id_ = column_id_;
+    block_column_snapshot_info->filename_ = *filename_;
+    block_column_snapshot_info->last_chunk_offset_ = last_chunk_offset_;
+    SizeT outline_count = outline_buffers_.size();
+    for (SizeT file_idx = 0; file_idx < outline_count; ++file_idx) {
+        String outline_file_path = *OutlineFilename(file_idx);
+        SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
+        outline_snapshot_info->filename_ = outline_file_path;
+        block_column_snapshot_info->outline_snapshots_.emplace_back(outline_snapshot_info);
+    }
+    return block_column_snapshot_info;
+}
+
+String BlockColumnEntry::FilePath() const { return Path(*block_entry_->block_dir()) / *filename_; }
 
 SharedPtr<String> BlockColumnEntry::FileDir() const { return block_entry_->block_dir(); }
 
@@ -171,27 +202,13 @@ ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr, S
     return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadOnly, row_count);
 }
 
-SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() const {
-    SharedPtr<BlockColumnSnapshotInfo> block_column_snapshot_info = MakeShared<BlockColumnSnapshotInfo>();
-    block_column_snapshot_info->column_id_ = column_id_;
-    block_column_snapshot_info->filename_ = *file_name_;
-    SizeT outline_count = outline_buffers_.size();
-    for (SizeT file_idx = 0; file_idx < outline_count; ++file_idx) {
-        String outline_file_path = *OutlineFilename(file_idx);
-        SharedPtr<OutlineSnapshotInfo> outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
-        outline_snapshot_info->filename_ = outline_file_path;
-        block_column_snapshot_info->outline_snapshots_.emplace_back(outline_snapshot_info);
-    }
-    return block_column_snapshot_info;
-}
-
 ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe, SizeT row_count) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       block_entry_->block_dir(),
-                                                      this->file_name_,
+                                                      this->filename_,
                                                       0,
                                                       buffer_mgr->persistence_manager());
         this->buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
@@ -204,7 +221,7 @@ ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, c
 }
 
 Vector<String> BlockColumnEntry::FilePaths() const {
-    Vector<String> res = {VirtualStore::ConcatenatePath(*FileDir(), *file_name_)};
+    Vector<String> res = {VirtualStore::ConcatenatePath(*FileDir(), *filename_)};
     for (SizeT file_idx = 0; file_idx < outline_buffers_.size(); ++file_idx) {
         String outline_file_path = *OutlineFilename(file_idx);
         res.push_back(VirtualStore::ConcatenatePath(*FileDir(), outline_file_path));
@@ -248,6 +265,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
 
             break;
         }
+        case LogicalType::kArray:
         case LogicalType::kTensor:
         case LogicalType::kSparse:
         case LogicalType::kTensorArray:
@@ -266,7 +284,6 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             }
             break;
         }
-        case LogicalType::kArray:
         case LogicalType::kTuple:
             //        case kPath:
             //        case kPolygon:

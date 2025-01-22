@@ -35,6 +35,7 @@ import logical_type;
 import extra_ddl_info;
 import column_def;
 import data_type;
+import txn_state;
 
 using namespace infinity;
 
@@ -84,7 +85,7 @@ TEST_P(TableTxnTest, test1) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -98,7 +99,7 @@ TEST_P(TableTxnTest, test1) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn2: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn2: Create duplicated tbl1, NOT OK
     Status status2 = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
@@ -119,7 +120,7 @@ TEST_P(TableTxnTest, test2) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -151,7 +152,7 @@ TEST_P(TableTxnTest, test2) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn2: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn2: Create duplicated tbl1, NOT OK
     Status status6 = new_txn->CreateTable("db1", MockTableDesc(), ConflictType::kError);
@@ -171,7 +172,7 @@ TEST_P(TableTxnTest, test3) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -185,7 +186,7 @@ TEST_P(TableTxnTest, test3) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn2: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn2: Drop tbl1, OK
     Status status2 = new_txn->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
@@ -199,7 +200,7 @@ TEST_P(TableTxnTest, test3) {
     txn_mgr->CommitTxn(new_txn);
 
     // Txn3: Create, OK
-    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"));
+    new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
     // Txn3: Get tbl1, OK
     auto [table_entry4, status4] = new_txn->GetTableByName("db1", "tbl1");
@@ -218,10 +219,10 @@ TEST_P(TableTxnTest, test4) {
     using namespace infinity;
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -254,7 +255,7 @@ TEST_P(TableTxnTest, test5) {
     using namespace infinity;
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -264,10 +265,10 @@ TEST_P(TableTxnTest, test5) {
     txn_mgr->CommitTxn(new_txn1);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn2: Create tbl1, OK
     Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
@@ -292,7 +293,7 @@ TEST_P(TableTxnTest, test6) {
     using namespace infinity;
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -302,10 +303,10 @@ TEST_P(TableTxnTest, test6) {
     txn_mgr->CommitTxn(new_txn1);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn2: Create tbl1, OK
     Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
@@ -326,7 +327,7 @@ TEST_P(TableTxnTest, test7) {
     using namespace infinity;
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -340,7 +341,7 @@ TEST_P(TableTxnTest, test7) {
     txn_mgr->RollBackTxn(new_txn1);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn3: Get db1, NOT OK
     auto [db_entry2, s2] = new_txn2->GetDatabase("db1");
@@ -360,7 +361,7 @@ TEST_P(TableTxnTest, test8) {
     using namespace infinity;
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -370,7 +371,7 @@ TEST_P(TableTxnTest, test8) {
     txn_mgr->CommitTxn(new_txn1);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn2: Create tbl1, OK
     Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
@@ -380,7 +381,7 @@ TEST_P(TableTxnTest, test8) {
     txn_mgr->RollBackTxn(new_txn2);
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
     auto [db_entry, s2] = new_txn3->GetDatabase("db1");
@@ -406,7 +407,7 @@ TEST_P(TableTxnTest, test9) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -416,14 +417,14 @@ TEST_P(TableTxnTest, test9) {
     txn_mgr->CommitTxn(new_txn1);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn2: Create tbl1, OK
     Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);
     EXPECT_TRUE(s1.ok());
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn3: Create tbl1, NOT OK, WW conflict
     Status s2 = new_txn3->CreateTable("db1", MockTableDesc(), ConflictType::kError);
@@ -449,7 +450,7 @@ TEST_P(TableTxnTest, test10) {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
 
     // Txn1: Create, OK
-    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"));
+    Txn *new_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn1: Create db1, OK
     Status status = new_txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -459,10 +460,10 @@ TEST_P(TableTxnTest, test10) {
     txn_mgr->CommitTxn(new_txn1);
 
     // Txn2: Create, OK
-    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn3: Create, OK
-    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+    Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn2: Create tbl1, OK
     Status s1 = new_txn2->CreateTable("db1", MockTableDesc(), ConflictType::kError);

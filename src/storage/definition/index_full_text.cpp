@@ -44,7 +44,7 @@ SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
                                          Vector<String> column_names,
                                          const Vector<InitParameter *> &index_param_list) {
     String analyzer_name{};
-    u64 flag = OPTION_FLAG_ALL;
+    optionflag_t flag = OPTION_FLAG_ALL;
     SizeT param_count = index_param_list.size();
     for (SizeT param_idx = 0; param_idx < param_count; ++param_idx) {
         InitParameter *parameter = index_param_list[param_idx];
@@ -54,6 +54,16 @@ SharedPtr<IndexBase> IndexFullText::Make(SharedPtr<String> index_name,
             analyzer_name = parameter->param_value_;
         } else if (para_name == "flag") {
             flag = std::strtoul(parameter->param_value_.c_str(), nullptr, 10);
+        } else if (para_name == "realtime") {
+            String realtime_str = parameter->param_value_;
+            ToLowerString(realtime_str);
+            if (realtime_str == "true") {
+                FlagAddRealtime(flag);
+            } else if (realtime_str != "false") {
+                LOG_WARN(fmt::format("Unknown parameter value: {}, {}", para_name, parameter->param_value_));
+            }
+        } else {
+            LOG_WARN(fmt::format("Unknown parameter: {}", para_name));
         }
     }
     if (analyzer_name.empty()) {

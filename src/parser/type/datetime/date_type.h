@@ -40,6 +40,8 @@ struct DateType {
 
     int32_t value{0};
 
+    int64_t GetEpochTime() const;
+
 private:
     static bool ConvertFromString(const char *date_ptr, size_t length, DateType &date, size_t &end_length);
 
@@ -69,6 +71,8 @@ public:
     static bool Subtract(DateType input, IntervalType interval, DateType &output);
 
     static int64_t GetDatePart(DateType input, TimeUnit unit);
+
+    static bool OuterDate2YMD(DateType input, int32_t &year, int32_t &month, int32_t &day);
 };
 
 } // namespace infinity

@@ -1,0 +1,133 @@
+statement ok
+DROP TABLE IF EXISTS test_datetime;
+
+statement ok
+CREATE TABLE test_datetime (i INTEGER, d1 DATE, d2 DATETIME, t1 TIME, ts1 TIMESTAMP);
+
+# insert
+
+statement ok
+INSERT INTO test_datetime VALUES (1, DATE '1970-1-1', DATETIME '5570-8-31 0:0:0', TIME '0:0:0', TIMESTAMP '6570-12-31 12:0:0');
+
+query I
+SELECT year(d1) FROM test_datetime;
+----
+1970
+
+query II
+SELECT month(d1) FROM test_datetime;
+----
+1
+
+query III
+SELECT day(d1) FROM test_datetime;
+----
+1
+
+query IV
+SELECT hour(t1) FROM test_datetime;
+----
+0
+
+query V
+SELECT minute(t1) FROM test_datetime;
+----
+0
+
+query VI
+SELECT second(t1) FROM test_datetime;
+----
+0
+
+query VII
+SELECT hour(d2) FROM test_datetime;
+----
+0
+
+query VIII
+SELECT minute(d2) FROM test_datetime;
+----
+0
+
+query IX
+SELECT second(d2) FROM test_datetime;
+----
+0
+
+query X
+SELECT year(ts1) FROM test_datetime;
+----
+6570
+
+query XI
+SELECT month(ts1) FROM test_datetime;
+----
+12
+
+query XII
+SELECT day(ts1) FROM test_datetime;
+----
+31
+
+query XIII
+SELECT DAYOFMONTH(ts1) FROM test_datetime;
+----
+31
+
+query XIV
+SELECT DAYOFYEAR(d2) FROM test_datetime;
+----
+243
+
+query XV
+SELECT DAYOFWEEK(d2) FROM test_datetime;
+----
+1
+
+query XVI
+SELECT weekofyear(d1) FROM test_datetime;
+----
+1
+
+query XVII
+SELECT quarter(d1) FROM test_datetime;
+----
+1
+
+query XVIII
+SELECT quarter(d2) FROM test_datetime;
+----
+3
+
+query XIV
+SELECT epoch(d1) FROM test_datetime;
+----
+0
+
+query XV
+SELECT weekday(d1) FROM test_datetime;
+----
+4
+
+query XVI
+SELECT era(d1) FROM test_datetime;
+----
+1
+
+query XVII
+SELECT century(d1) FROM test_datetime;
+----
+20
+
+query XVIII
+SELECT datepart('year', d1) FROM test_datetime;
+----
+1970
+
+query XVIV
+SELECT datepart('mon', d1) FROM test_datetime;
+----
+1
+
+statement ok
+DROP TABLE test_datetime;

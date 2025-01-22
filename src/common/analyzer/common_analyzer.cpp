@@ -38,9 +38,7 @@ void CommonLanguageAnalyzer::InitStemmer(Language language) { stemmer_->Init(lan
 int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     Parse(input.text_);
 
-    unsigned char top_and_or_bit = Term::AND;
     int temp_offset = 0;
-    int last_word_offset = -1;
 
     while (NextToken()) {
         if (len_ == 0)
@@ -52,23 +50,14 @@ int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType 
         if (remove_stopwords_ && IsStopword())
             continue;
 
-        if (cjk_) {
-            int cur_word_offset = offset_;
-            if (cur_word_offset == last_word_offset)
-                top_and_or_bit = Term::OR;
-            else
-                top_and_or_bit = Term::AND;
-            last_word_offset = cur_word_offset;
-        }
-
         if (is_index_) {
             if (IsSpecialChar()) {
-                func(data, token_, len_, offset_, end_offset_, Term::AND, level_, true);
+                func(data, token_, len_, offset_, end_offset_, true);
                 temp_offset = offset_;
                 continue;
             }
             if (is_raw_) {
-                func(data, token_, len_, offset_, end_offset_, Term::OR, level_, false);
+                func(data, token_, len_, offset_, end_offset_, false);
                 temp_offset = offset_;
                 continue;
             }
@@ -88,37 +77,37 @@ int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType 
                 bool lowercase_is_different = memcmp(token_, lowercase_term, len_) != 0;
 
                 if (stemming_term_str_size && stem_only_) {
-                    func(data, stem_term.c_str(), stemming_term_str_size, offset_, end_offset_, Term::OR, level_ + 1, false);
+                    func(data, stem_term.c_str(), stemming_term_str_size, offset_, end_offset_, false);
                     temp_offset = offset_;
                 } else if (stemming_term_str_size || (case_sensitive_ && contain_lower_ && lowercase_is_different)) {
                     /// have more than one output
                     if (case_sensitive_) {
-                        func(data, token_, len_, offset_, end_offset_, Term::OR, level_ + 1, false);
+                        func(data, token_, len_, offset_, end_offset_, false);
                         temp_offset = offset_;
                     } else {
-                        func(data, lowercase_term, len_, offset_, end_offset_, Term::OR, level_ + 1, false);
+                        func(data, lowercase_term, len_, offset_, end_offset_, false);
                         temp_offset = offset_;
                     }
                     if (stemming_term_str_size) {
-                        func(data, stem_term.c_str(), stemming_term_str_size, offset_, end_offset_, Term::OR, level_ + 1, false);
+                        func(data, stem_term.c_str(), stemming_term_str_size, offset_, end_offset_, false);
                         temp_offset = offset_;
                     }
                     if (case_sensitive_ && contain_lower_ && lowercase_is_different) {
-                        func(data, lowercase_term, len_, offset_, end_offset_, Term::OR, level_ + 1, false);
+                        func(data, lowercase_term, len_, offset_, end_offset_, false);
                         temp_offset = offset_;
                     }
                 } else {
                     /// have only one output
                     if (case_sensitive_) {
-                        func(data, token_, len_, offset_, end_offset_, Term::AND, level_, false);
+                        func(data, token_, len_, offset_, end_offset_, false);
                         temp_offset = offset_;
                     } else {
-                        func(data, lowercase_term, len_, offset_, end_offset_, Term::AND, level_, false);
+                        func(data, lowercase_term, len_, offset_, end_offset_, false);
                         temp_offset = offset_;
                     }
                 }
             } else {
-                func(data, token_, len_, offset_, end_offset_, top_and_or_bit, level_, false);
+                func(data, token_, len_, offset_, end_offset_, false);
                 temp_offset = offset_;
             }
         }

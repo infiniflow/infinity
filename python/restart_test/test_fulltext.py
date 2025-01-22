@@ -9,10 +9,11 @@ from infinity import index
 from infinity.errors import ErrorCode
 from restart_util import *
 from util import RtnThread
+import pickle
 
 
-@pytest.mark.slow
 class TestFullText:
+    @pytest.mark.slow
     @pytest.mark.parametrize(
         "config",
         [
@@ -37,7 +38,9 @@ class TestFullText:
         infinity_runner.clear()
 
         decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
-        decorator2 = infinity_runner_decorator_factory(config, uri, infinity_runner, shutdown_out=True)
+        decorator2 = infinity_runner_decorator_factory(
+            config, uri, infinity_runner, shutdown_out=True
+        )
 
         @decorator
         def part1(infinity_obj):
@@ -220,6 +223,124 @@ class TestFullText:
             db_obj.drop_table(gt_table_name, ConflictType.Error)
 
         part3()
+
+    def test_fulltext_realtime(self, infinity_runner: InfinityRunner):
+        enwiki_path = "test/data/csv/enwiki_9999.csv"
+        enwiki_size = 10000
+        config = "test/data/config/restart_test/test_fulltext/1.toml"
+        uri = common_values.TEST_LOCAL_HOST
+        infinity_runner.clear()
+
+        decorator = infinity_runner_decorator_factory(config, uri, infinity_runner)
+
+        matching_text = "American"
+        test_num = 100
+
+        @decorator
+        def get_gt_list(infinity_obj):
+            gt_res_list = []
+            gt_table_name = "test_fulltext_gt"
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(gt_table_name, ConflictType.Ignore)
+
+            gt_table_obj = db_obj.create_table(
+                gt_table_name,
+                {
+                    "id": {"type": "int"},
+                    "title": {"type": "varchar"},
+                    "date": {"type": "varchar"},
+                    "body": {"type": "varchar"},
+                },
+                ConflictType.Error,
+            )
+            enwiki_gen1 = EnwikiGenerator.gen_factory(enwiki_path)(enwiki_size)
+            for id, (title, date, body) in enumerate(enwiki_gen1):
+                gt_table_obj.insert(
+                    [{"id": id, "title": title, "date": date, "body": body}]
+                )
+            gt_table_obj.create_index(
+                "ft_index",
+                index.IndexInfo("body", index.IndexType.FullText),
+                ConflictType.Error,
+            )
+
+            for i in range(test_num):
+                bound = enwiki_size // test_num * (i + 1)
+                gt_res = (
+                    gt_table_obj.output(["id"])
+                    .match_text(
+                        fields="body",
+                        matching_text=matching_text,
+                        topn=3,
+                        extra_options=None,
+                    )
+                    .filter("id<{}".format(bound))
+                    .to_result()
+                )
+                gt_data_dict, _, _ = gt_res
+                gt_res_list.append(gt_data_dict)
+
+            db_obj.drop_table(gt_table_name, ConflictType.Error)
+            return gt_res_list
+
+        pickle_dir = "tmp"
+        if not os.path.exists(pickle_dir):
+            os.makedirs(pickle_dir)
+        gt_filename = f"{pickle_dir}/gt_res_list_{enwiki_size}.pkl"
+        if os.path.exists(gt_filename):
+            with open(gt_filename, "rb") as f:
+                gt_res_list = pickle.load(f)
+        else:
+            gt_res_list = get_gt_list()
+            with open(gt_filename, "wb") as f:
+                pickle.dump(gt_res_list, f)
+
+        @decorator
+        def test(infinity_obj):
+            table_name = "test_fulltext"
+            db_obj = infinity_obj.get_database("default_db")
+            db_obj.drop_table(table_name, ConflictType.Ignore)
+
+            table_obj = db_obj.create_table(
+                table_name,
+                {
+                    "id": {"type": "int"},
+                    "title": {"type": "varchar"},
+                    "date": {"type": "varchar"},
+                    "body": {"type": "varchar"},
+                },
+                ConflictType.Error,
+            )
+            table_obj.create_index(
+                "ft_index",
+                index.IndexInfo("body", index.IndexType.FullText, {"realtime": "true"}),
+                ConflictType.Error,
+            )
+
+            enwiki_gen2 = EnwikiGenerator.gen_factory(enwiki_path)(enwiki_size)
+            query_everytime = False
+            for id, (title, date, body) in enumerate(enwiki_gen2):
+                table_obj.insert(
+                    [{"id": id, "title": title, "date": date, "body": body}]
+                )
+                if (id + 1) % (enwiki_size // test_num) == 0 or query_everytime:
+                    gt_i = (id + 1) // (enwiki_size // test_num) - 1
+                    res = (
+                        table_obj.output(["id"])
+                        .match_text(
+                            fields="body",
+                            matching_text=matching_text,
+                            topn=3,
+                            extra_options=None,
+                        )
+                        .to_result()
+                    )
+                    data_dict, _, _ = res
+                    assert data_dict == gt_res_list[gt_i]
+
+            db_obj.drop_table(table_name, ConflictType.Error)
+
+        test()
 
 
 if __name__ == "__main__":

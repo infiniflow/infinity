@@ -28,8 +28,12 @@ import statement_common;
 
 namespace infinity {
 
+class KnnScanSharedData;
+
 export class MergeKnnBase {
 public:
+    static UniquePtr<MergeKnnBase> Make(KnnScanSharedData *knn_scan_shared_data);
+
     virtual ~MergeKnnBase() = default;
 };
 

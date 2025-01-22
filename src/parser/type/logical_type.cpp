@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "type/logical_type.h"
+#include "complex/array_type.h"
 #include "complex/sparse_type.h"
 #include <memory>
 #include <string>
@@ -199,7 +200,7 @@ static int64_t type_size[] = {
     8, // Interval
 
     // Nested types
-    8, // Array
+    sizeof(ArrayType), // Array
     4, // Tuple
 
     // Geography

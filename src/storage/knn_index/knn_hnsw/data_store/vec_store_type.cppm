@@ -25,6 +25,7 @@ import dist_func_l2;
 import dist_func_ip;
 import dist_func_sparse_ip;
 import sparse_util;
+import dist_func_lsg_wrapper;
 
 namespace infinity {
 
@@ -37,7 +38,7 @@ class LVQL2VecStoreType;
 export template <typename DataT, typename CompressT>
 class LVQIPVecStoreType;
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class PlainCosVecStoreType {
 public:
     using DataType = DataT;
@@ -49,7 +50,7 @@ public:
     using QueryVecType = const DataType *;
     using StoreType = typename Meta<true>::StoreType;
     using QueryType = typename Meta<true>::QueryType;
-    using Distance = PlainCosDist<DataType>;
+    using Distance = std::conditional_t<LSG, PlainCosLSGDist<DataType>, PlainCosDist<DataType>>;
 
     static constexpr bool HasOptimize = false;
 
@@ -59,7 +60,7 @@ public:
     }
 };
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class PlainL2VecStoreType {
 public:
     using DataType = DataT;
@@ -71,7 +72,7 @@ public:
     using QueryVecType = const DataType *;
     using StoreType = typename Meta<true>::StoreType;
     using QueryType = typename Meta<true>::QueryType;
-    using Distance = PlainL2Dist<DataType>;
+    using Distance = std::conditional_t<LSG, PlainL2LSGDist<DataType>, PlainL2Dist<DataType>>;
 
     static constexpr bool HasOptimize = false;
 
@@ -81,7 +82,7 @@ public:
     }
 };
 
-export template <typename DataT>
+export template <typename DataT, bool LSG = false>
 class PlainIPVecStoreType {
 public:
     using DataType = DataT;
@@ -93,7 +94,7 @@ public:
     using QueryVecType = const DataType *;
     using StoreType = typename Meta<true>::StoreType;
     using QueryType = typename Meta<true>::QueryType;
-    using Distance = PlainIPDist<DataType>;
+    using Distance = std::conditional_t<LSG, PlainIPLSGDist<DataType>, PlainIPDist<DataType>>;
 
     static constexpr bool HasOptimize = false;
 

@@ -42,6 +42,7 @@ Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapsho
             if (entry.path().stem() == snapshot_name) {
                 String extension = entry.path().extension();
                 if (extension == ".json" or extension == ".lz4") {
+                    LOG_INFO(fmt::format("Delete file: {}", entry.path().string()));
                     VirtualStore::DeleteFile(entry.path().string());
                     found = true;
                 }

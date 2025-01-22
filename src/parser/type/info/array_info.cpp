@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2025 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,22 +13,22 @@
 // limitations under the License.
 
 #include "array_info.h"
-#include "parser_assert.h"
+#include "type/complex/array_type.h"
 
 namespace infinity {
 
 bool ArrayInfo::operator==(const TypeInfo &other) const {
-    if (other.type() != TypeInfoType::kArray)
+    if (other.type() != TypeInfoType::kArray) {
         return false;
-
-    auto *array_info_ptr = (ArrayInfo *)(&other);
-
+    }
+    auto *array_info_ptr = dynamic_cast<const ArrayInfo *>(&other);
     return this->elem_type_ == array_info_ptr->elem_type_;
 }
 
-nlohmann::json ArrayInfo::Serialize() const {
-    ParserError("ArrayInfo::Serialize");
-    return nlohmann::json();
-}
+size_t ArrayInfo::Size() const { return sizeof(ArrayType); }
+
+std::string ArrayInfo::ToString() const { return elem_type_.ToString(); }
+
+nlohmann::json ArrayInfo::Serialize() const { return elem_type_.Serialize(); }
 
 } // namespace infinity

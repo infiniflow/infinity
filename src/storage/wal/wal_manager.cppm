@@ -79,9 +79,7 @@ public:
 
     void Stop();
 
-    // Session request to persist an entry. Assuming txn_id of the entry has
-    // been initialized.
-    void PutEntries(Vector<WalEntry *> wal_entries);
+    void SubmitTxn(Vector<Txn *> &txn_batch);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
@@ -173,7 +171,7 @@ private:
     Thread flush_thread_{};
 
     // TxnManager and Flush thread access following members
-    BlockingQueue<WalEntry *> wait_flush_{"WalManager"};
+    BlockingQueue<Txn *> wait_flush_{"WalManager"};
 
     // Only Flush thread access following members
     std::ofstream ofs_{};
@@ -182,6 +180,7 @@ private:
     // Flush and Checkpoint threads access following members
     mutable std::mutex mutex2_{};
     TxnTimeStamp max_commit_ts_{};
+    TxnTimeStamp last_swap_wal_ts_{};
     i64 wal_size_{};
     i64 last_ckp_wal_size_{};
     Atomic<bool> checkpoint_in_progress_{false};

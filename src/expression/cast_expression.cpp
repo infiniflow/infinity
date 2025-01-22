@@ -159,6 +159,14 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                     return false;
             }
         }
+        case LogicalType::kArray: {
+            switch (target.type()) {
+                case LogicalType::kArray:
+                    return true;
+                default:
+                    return false;
+            }
+        }
         default: {
             String error_message = fmt::format("Invalid cast from {} to {}", source.ToString(), target.ToString());
             UnrecoverableError(error_message);

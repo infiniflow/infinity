@@ -129,11 +129,9 @@ inline TermList GetTermListFromAnalyzer(const std::string &analyzer_name, Analyz
             }
             last_term.text_ = term.text_;
             last_term.word_offset_ = term.word_offset_;
-            last_term.stats_ = term.stats_;
         } else {
             if (term.text_.size() < last_term.text_.size()) {
                 last_term.text_ = term.text_;
-                last_term.stats_ = term.stats_;
             }
         }
     }

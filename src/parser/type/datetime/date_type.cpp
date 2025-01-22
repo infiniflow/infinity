@@ -414,5 +414,12 @@ int64_t DateType::GetDatePart(DateType input, TimeUnit unit) {
     }
     return -1;
 }
+bool DateType::OuterDate2YMD(DateType input, int32_t &year, int32_t &month, int32_t &day) {
+    return Date2YMD(input, year, month, day);
+}
 
+int64_t DateType::GetEpochTime() const {
+    constexpr int64_t TotalSecondsInDay = 24 * 60 * 60;
+    return GetValue() * TotalSecondsInDay;
+}
 } // namespace infinity

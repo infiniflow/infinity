@@ -769,6 +769,7 @@ class DataStoreIter {
 public:
     using StoreType = typename VecStoreT::StoreType;
     using InnerIter = DataStoreInnerIter<VecStoreT, LabelType>;
+    using ValueType = StoreType;
 
     DataStoreIter(const DataStore<VecStoreT, LabelType, true> *data_store) : data_store_iter_(data_store), inner_iter_(None) {}
 

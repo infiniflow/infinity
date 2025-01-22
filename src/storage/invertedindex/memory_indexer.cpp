@@ -165,6 +165,44 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
     }
 }
 
+UniquePtr<std::binary_semaphore> MemoryIndexer::AsyncInsert(SharedPtr<ColumnVector> column_vector, u32 row_offset, u32 row_count) {
+    if (is_spilled_) {
+        Load();
+    }
+
+    u64 seq_inserted(0);
+    u32 doc_count(0);
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        seq_inserted = seq_inserted_++;
+        doc_count = doc_count_;
+        doc_count_ += row_count;
+    }
+
+    auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
+    auto sema = MakeUnique<std::binary_semaphore>(0);
+
+    IncreaseMemoryUsage(sizeof(u32) * row_count);
+    PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
+    auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
+    inverter->InitAnalyzer(this->analyzer_);
+    inverter->AddSema(sema.get());
+    auto func = [this, task, inverter](int id) {
+        // LOG_INFO(fmt::format("online inverter {} begin", id));
+        SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
+        column_length_sum_ += column_length_sum;
+        this->ring_inverted_.Put(task->task_seq_, inverter);
+        // LOG_INFO(fmt::format("online inverter {} end", id));
+        CommitSync(100);
+    };
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        inflight_tasks_++;
+    }
+    inverting_thread_pool_.push(std::move(func));
+    return sema;
+}
+
 void MemoryIndexer::InsertGap(u32 row_count) {
     if (is_spilled_) {
         Load();
@@ -246,6 +284,12 @@ SizeT MemoryIndexer::CommitSync(SizeT wait_if_empty_ms) {
         for (auto &inverter : inverters) {
             mem_usage_change.Add(inverter->GeneratePosting());
             num_generated += inverter->GetMerged();
+
+            if (const auto &semas = inverter->semas(); !semas.empty()) {
+                for (auto sema : semas) {
+                    sema->release();
+                }
+            }
         }
     }
     if (num_generated > 0) {
@@ -332,7 +376,11 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         posting_file_writer->Sync();
         dict_file_writer->Sync();
         fst_builder.Finish();
+
+        LOG_INFO(fmt::format("Merge from FST file: {}, to DICT file: {}", tmp_fst_file, tmp_dict_file));
         VirtualStore::Merge(tmp_dict_file, tmp_fst_file);
+
+        LOG_INFO(fmt::format("Delete FST file: {}", tmp_fst_file));
         VirtualStore::DeleteFile(tmp_fst_file);
     }
     auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
@@ -482,6 +530,7 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     String last_term_str;
     std::string_view last_term;
     u32 last_doc_id = INVALID_DOCID;
+    u32 last_doc_payload = 0;
     UniquePtr<PostingWriter> posting;
 
     while (count > 0) {
@@ -508,7 +557,7 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
             if (term != last_term) {
                 assert(last_term < term);
                 if (last_doc_id != INVALID_DOCID) {
-                    posting->EndDocument(last_doc_id, 0);
+                    posting->EndDocument(last_doc_id, last_doc_payload);
                 }
                 if (posting.get()) {
                     TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
@@ -521,23 +570,26 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
                 last_term_str = String(term);
                 last_term = std::string_view(last_term_str);
                 last_doc_id = INVALID_DOCID;
+                last_doc_payload = 0;
             }
             for (SizeT i = 0; i < doc_pos_list_size; ++i) {
-                u32 &doc_id = temp_term_tuple->doc_pos_list_[i].first;
-                u32 &term_pos = temp_term_tuple->doc_pos_list_[i].second;
+                u32 &doc_id = std::get<0>(temp_term_tuple->doc_pos_list_[i]);
+                u32 &term_pos = std::get<1>(temp_term_tuple->doc_pos_list_[i]);
+                u16 &doc_payload = std::get<2>(temp_term_tuple->doc_pos_list_[i]);
 
                 if (last_doc_id != INVALID_DOCID && last_doc_id != doc_id) {
                     assert(last_doc_id < doc_id);
                     assert(posting.get() != nullptr);
-                    posting->EndDocument(last_doc_id, 0);
+                    posting->EndDocument(last_doc_id, last_doc_payload);
                 }
                 last_doc_id = doc_id;
+                last_doc_payload = doc_payload;
                 posting->AddPosition(term_pos);
             }
         }
     }
     if (last_doc_id != INVALID_DOCID) {
-        posting->EndDocument(last_doc_id, 0);
+        posting->EndDocument(last_doc_id, last_doc_payload);
         TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
         posting->Dump(posting_file_writer, term_meta);
         SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
@@ -547,7 +599,11 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     posting_file_writer->Sync();
     dict_file_writer->Sync();
     fst_builder.Finish();
+
+    LOG_INFO(fmt::format("Merge from FST file: {}, to DICT file: {}", tmp_fst_file, tmp_dict_file));
     VirtualStore::Merge(tmp_dict_file, tmp_fst_file);
+
+    LOG_INFO(fmt::format("Delete FST file: {}", tmp_fst_file));
     VirtualStore::DeleteFile(tmp_fst_file);
 
     auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
