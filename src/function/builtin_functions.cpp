@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "type/logical_type.h"
 module;
 
 module builtin_functions;
@@ -212,6 +213,18 @@ void BuiltinFunctions::RegisterSpecialFunction() {
     SharedPtr<SpecialFunction> score_factors_function =
         MakeShared<SpecialFunction>("SCORE_FACTORS", DataType(LogicalType::kVarchar), 7, SpecialType::kScoreFactors);
     Catalog::AddSpecialFunction(catalog_ptr_.get(), score_factors_function);
+
+    SharedPtr<SpecialFunction> current_date_function =
+        MakeShared<SpecialFunction>("CURRENT_DATE", DataType(LogicalType::kDate), 8, SpecialType::kCurrentDate);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), current_date_function);
+
+    SharedPtr<SpecialFunction> current_time_function =
+        MakeShared<SpecialFunction>("CURRENT_TIME", DataType(LogicalType::kTime), 9, SpecialType::kCurrentTime);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), current_time_function);
+
+    SharedPtr<SpecialFunction> current_timestamp_function =
+        MakeShared<SpecialFunction>("CURRENT_TIMESTAMP", DataType(LogicalType::kTimestamp), 10, SpecialType::KCurrentTimestamp);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), current_timestamp_function);
 
     auto createts_function =
         MakeShared<SpecialFunction>("CREATE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_CREATE, SpecialType::kCreateTs);
