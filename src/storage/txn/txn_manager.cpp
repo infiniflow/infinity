@@ -318,25 +318,29 @@ TxnTimeStamp TxnManager::CurrentTS() const { return current_ts_; }
 TxnTimeStamp TxnManager::GetNewTimeStamp() { return current_ts_ + 1; }
 
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
-    std::lock_guard guard(locker_);
-    TxnTimeStamp first_uncommitted_begin_ts = current_ts_;
-    // Get earliest txn of the ongoing transactions
-    while (!beginned_txns_.empty()) {
-        auto first_txn = beginned_txns_.front().lock();
-        if (first_txn.get() != nullptr) {
-            first_uncommitted_begin_ts = first_txn->BeginTS();
-            break;
+    TxnTimeStamp least_ts = UNCOMMIT_TS;
+    TxnTimeStamp last_checkpoint_ts = UNCOMMIT_TS;
+    {
+        std::unique_lock w_lock(locker_);
+        TxnTimeStamp first_uncommitted_begin_ts = current_ts_;
+        // Get earliest txn of the ongoing transactions
+        while (!beginned_txns_.empty()) {
+            auto first_txn = beginned_txns_.front().lock();
+            if (first_txn.get() != nullptr) {
+                first_uncommitted_begin_ts = first_txn->BeginTS();
+                break;
+            }
+            beginned_txns_.pop_front();
         }
-        beginned_txns_.pop_front();
-    }
 
-    // Get the earlier txn ts between current ongoing txn and last checkpoint ts
-    TxnTimeStamp last_checkpoint_ts = wal_mgr_->LastCheckpointTS();
-    TxnTimeStamp least_ts = std::min(first_uncommitted_begin_ts, last_checkpoint_ts);
+        // Get the earlier txn ts between current ongoing txn and last checkpoint ts
+        last_checkpoint_ts = wal_mgr_->LastCheckpointTS();
+        least_ts = std::min(first_uncommitted_begin_ts, last_checkpoint_ts);
 
-    // Get the earlier txn ts between current least txn and checking conflict TS
-    if (!checking_ts_.empty()) {
-        least_ts = std::min(least_ts, *checking_ts_.begin());
+        // Get the earlier txn ts between current least txn and checking conflict TS
+        if (!checking_ts_.empty()) {
+            least_ts = std::min(least_ts, *checking_ts_.begin());
+        }
     }
 
     LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", least_ts, last_checkpoint_ts));
