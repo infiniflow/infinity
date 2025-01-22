@@ -498,6 +498,39 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr.function_expr = func_expr
 
                     select_list.append(parsed_expr)
+
+                case "_current_date":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "currentdate"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    select_list.append(parsed_expr)
+
+                case "_current_time":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "currenttime"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    select_list.append(parsed_expr)
+                case "_current_timestamp":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "currenttimestamp"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    select_list.append(parsed_expr)
+
                 case "_score_factors":
                     func_expr = WrapFunctionExpr()
                     func_expr.func_name = "score_factors"
