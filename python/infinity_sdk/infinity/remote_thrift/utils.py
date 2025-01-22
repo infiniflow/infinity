@@ -241,6 +241,21 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
                 expr_type = ttypes.ParsedExprType(function_expr=func_expr)
                 parsed_expr = ttypes.ParsedExpr(type=expr_type)
                 return parsed_expr
+            case "_current_date":
+                func_expr = ttypes.FunctionExpr(function_name="currentdate", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_current_time":
+                func_expr = ttypes.FunctionExpr(function_name="currenttime", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_current_timestamp":
+                func_expr = ttypes.FunctionExpr(function_name="currenttimestamp", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
             case "_similarity":
                 func_expr = ttypes.FunctionExpr(function_name="similarity", arguments=[])
                 expr_type = ttypes.ParsedExprType(function_expr=func_expr)
