@@ -376,7 +376,11 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         posting_file_writer->Sync();
         dict_file_writer->Sync();
         fst_builder.Finish();
+
+        LOG_INFO(fmt::format("Merge from FST file: {}, to DICT file: {}", tmp_fst_file, tmp_dict_file));
         VirtualStore::Merge(tmp_dict_file, tmp_fst_file);
+
+        LOG_INFO(fmt::format("Delete FST file: {}", tmp_fst_file));
         VirtualStore::DeleteFile(tmp_fst_file);
     }
     auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);
@@ -595,7 +599,11 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     posting_file_writer->Sync();
     dict_file_writer->Sync();
     fst_builder.Finish();
+
+    LOG_INFO(fmt::format("Merge from FST file: {}, to DICT file: {}", tmp_fst_file, tmp_dict_file));
     VirtualStore::Merge(tmp_dict_file, tmp_fst_file);
+
+    LOG_INFO(fmt::format("Delete FST file: {}", tmp_fst_file));
     VirtualStore::DeleteFile(tmp_fst_file);
 
     auto [file_handle, status] = VirtualStore::Open(tmp_column_length_file, FileAccessMode::kWrite);

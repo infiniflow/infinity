@@ -77,8 +77,8 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
     bool found = false;
     for (const auto &full_info : full_infos) {
         if (full_info.max_commit_ts_ < max_commit_ts) {
+            LOG_INFO(fmt::format("WalManager::Checkpoint delete full catalog file: {}", full_info.path_));
             VirtualStore::DeleteFile(full_info.path_);
-            LOG_DEBUG(fmt::format("WalManager::Checkpoint delete catalog file: {}", full_info.path_));
             if (upload_catalog) {
                 const String filename = Path(full_info.path_).filename();
                 VirtualStore::RemoveObject(filename);
@@ -93,8 +93,8 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
     }
     for (const auto &delta_info : delta_infos) {
         if (delta_info.max_commit_ts_ <= max_commit_ts) {
+            LOG_INFO(fmt::format("WalManager::Checkpoint delete delta catalog file: {}", delta_info.path_));
             VirtualStore::DeleteFile(delta_info.path_);
-            LOG_DEBUG(fmt::format("WalManager::Checkpoint delete catalog file: {}", delta_info.path_));
             if (upload_catalog) {
                 const String filename = Path(delta_info.path_).filename();
                 VirtualStore::RemoveObject(filename);
@@ -246,8 +246,8 @@ void WalFile::RecycleWalFile(TxnTimeStamp max_commit_ts, const String &wal_dir) 
     auto [cur_wal_info, wal_infos] = ParseWalFilenames(wal_dir);
     for (const auto &wal_info : wal_infos) {
         if (wal_info.max_commit_ts_ <= max_commit_ts) {
-            VirtualStore::DeleteFile(wal_info.path_);
             LOG_INFO(fmt::format("WalManager::Checkpoint delete wal file: {}", wal_info.path_));
+            VirtualStore::DeleteFile(wal_info.path_);
         }
     }
 }
