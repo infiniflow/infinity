@@ -339,6 +339,7 @@ void DataBlock::AppendWith(const DataBlock *other) {
     for (SizeT idx = 0; idx < column_count; ++idx) {
         this->column_vectors[idx]->AppendWith(*other->column_vectors[idx]);
     }
+    row_count_ += other->row_count_;
 }
 
 void DataBlock::AppendWith(const DataBlock *other, SizeT from, SizeT count) {
@@ -358,6 +359,7 @@ void DataBlock::AppendWith(const DataBlock *other, SizeT from, SizeT count) {
     for (SizeT idx = 0; idx < column_count; ++idx) {
         this->column_vectors[idx]->AppendWith(*other->column_vectors[idx], from, count);
     }
+    row_count_ += count;
 }
 
 void DataBlock::InsertVector(const SharedPtr<ColumnVector> &vector, SizeT index) {

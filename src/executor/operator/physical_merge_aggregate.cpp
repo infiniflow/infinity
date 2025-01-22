@@ -90,19 +90,17 @@ void PhysicalMergeAggregate::GroupByMergeAggregateExecute(MergeAggregateOperator
     }
 
     DataBlock *last_data_block = op_state->data_block_array_.back().get();
-    Pair<SizeT, SizeT> block_row_id = {op_state->data_block_array_.size() - 1, last_data_block->row_count()};
     for (SizeT row_id = 0; row_id < input_block->row_count(); ++row_id) {
         if (last_data_block->available_capacity() == 0) {
             Vector<SharedPtr<DataType>> types = last_data_block->types();
             op_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
             last_data_block = op_state->data_block_array_.back().get();
             last_data_block->Init(std::move(types), input_block->capacity());
-            block_row_id = {op_state->data_block_array_.size() - 1, 0};
         }
+        Pair<SizeT, SizeT> block_row_id = {op_state->data_block_array_.size() - 1, last_data_block->row_count()};
         bool found = hash_table.GetOrInsert(input_groupby_columns, row_id, block_row_id);
         if (!found) {
             last_data_block->AppendWith(input_block.get(), row_id, 1);
-            block_row_id.second = last_data_block->row_count();
             continue;
         }
         SizeT agg_count = agg_op->aggregates_.size();

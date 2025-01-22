@@ -65,5 +65,22 @@ SELECT c3, COUNT(c3), SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3;
 7.000000 1 1 1
 8.000000 1 2 2
 
+query IIR rowsort
+SELECT c1, c2, SUM(c3) FROM simple_groupby WHERE c1 > 1 GROUP BY c1, c2;
+----
+2 1 6.000000
+2 2 10.000000
+2 3 10.000000
+
+statement ok
+DELETE FROM simple_groupby WHERE c1 <= 1;
+
+query IIR rowsort
+SELECT c1, c2, SUM(c3) FROM simple_groupby GROUP BY c1, c2;
+----
+2 1 6.000000
+2 2 10.000000
+2 3 10.000000
+
 statement ok
 DROP TABLE simple_groupby;
