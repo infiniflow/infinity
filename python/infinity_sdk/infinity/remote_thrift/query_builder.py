@@ -513,6 +513,27 @@ class InfinityThriftQueryBuilder(ABC):
                     order_by_flag: bool = order_by_expr[1] == SortType.Asc
                     order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
                     sort_list.append(order_by_expr)
+                case "_current_date":
+                    func_expr = FunctionExpr(function_name="currentdate", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
+                    sort_list.append(order_by_expr)
+                case "_current_time":
+                    func_expr = FunctionExpr(function_name="currenttime", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
+                    sort_list.append(order_by_expr)
+                case "_current_date":
+                    func_expr = FunctionExpr(function_name="currenttimestamp", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    order_by_flag: bool = order_by_expr[1] == SortType.Asc
+                    order_by_expr = OrderByExpr(expr=parsed_expr, asc=order_by_flag)
+                    sort_list.append(order_by_expr)
                 case _:
                     parsed_expr = parse_expr(maybe_parse(order_by_expr_str))
                     order_by_flag: bool = order_by_expr[1] == SortType.Asc
