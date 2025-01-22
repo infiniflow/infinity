@@ -100,7 +100,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
 
         groupby_table->data_blocks_.emplace_back(DataBlock::MakeUniquePtr());
         DataBlock *output_data_block = groupby_table->data_blocks_.back().get();
-        output_data_block->Init(groupby_types);
+        output_data_block->Init(groupby_types, 1);
 
         ExpressionEvaluator groupby_executor;
         groupby_executor.Init(input_data_block);
@@ -173,7 +173,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
         SizeT input_data_block_count = grouped_input_datablocks.size();
         for (SizeT block_idx = 0; block_idx < input_data_block_count; ++block_idx) {
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
-            output_data_block->Init(output_types);
+            output_data_block->Init(output_types, 1);
             DataBlock *input_block = grouped_input_datablocks[block_idx].get();
             // Loop aggregate expression
             ExpressionEvaluator evaluator;
@@ -197,6 +197,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     }
 
     // 4. generate the result to output
+    output_groupby_table->ShrinkBlocks();
     for (SizeT block_idx = 0; block_idx < output_groupby_table->DataBlockCount(); ++block_idx) {
         SharedPtr<DataBlock> output_data_block = output_groupby_table->GetDataBlockById(block_idx);
         aggregate_operator_state->data_block_array_.push_back(MakeUnique<DataBlock>(std::move(*output_data_block)));
@@ -277,7 +278,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
     for (const auto &item : hash_table_.hash_table_) {
         // Each hash bucket will generate one data block.
         output_datablock = DataBlock::Make();
-        output_datablock->Init(types);
+        output_datablock->Init(types, 1);
 
         // Only get the first row(block id and row offset of the block) of the bucket
         SizeT input_block_id = item.second.begin()->first;
