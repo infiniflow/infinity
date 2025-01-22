@@ -128,6 +128,7 @@ struct TermQueryNode : public QueryNode {
 struct RankFeatureQueryNode : public QueryNode {
     std::string term_;
     std::string column_;
+    float boost_;
 
     RankFeatureQueryNode() : QueryNode(QueryNodeType::TERM) {}
 
@@ -200,6 +201,12 @@ struct AndNotQueryNode final : public MultiQueryNode {
 
 struct OrQueryNode final : public MultiQueryNode {
     OrQueryNode() : MultiQueryNode(QueryNodeType::OR) {}
+    std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
+    std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
+};
+
+struct RankFeaturesQueryNode final : public MultiQueryNode {
+    RankFeaturesQueryNode() : MultiQueryNode(QueryNodeType::OR) {}
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
     std::unique_ptr<DocIterator> CreateSearch(CreateSearchParams params, bool is_top_level) const override;
 };

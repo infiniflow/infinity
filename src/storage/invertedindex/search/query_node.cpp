@@ -28,6 +28,7 @@ import must_first_iterator;
 import batch_or_iterator;
 import blockmax_leaf_iterator;
 import rank_feature_doc_iterator;
+import rank_features_doc_iterator;
 
 namespace infinity {
 
@@ -391,6 +392,11 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
     }
 }
 
+std::unique_ptr<QueryNode> RankFeaturesQueryNode::InnerGetNewOptimizedQueryTree() {
+    UnrecoverableError("OptimizeInPlaceInner: Unexpected case! RankFeaturesQueryNode should not exist in parser output");
+    return nullptr;
+}
+
 // 4. deal with "and_not":
 // "and_not" does not exist in parser output, it is generated during optimization
 
@@ -443,8 +449,7 @@ std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSear
     if (!posting_iterator) {
         return nullptr;
     }
-    float boost = 1.0f;
-    auto search = MakeUnique<RankFeatureDocIterator>(std::move(posting_iterator), column_id, boost);
+    auto search = MakeUnique<RankFeatureDocIterator>(std::move(posting_iterator), column_id, boost_);
     search->term_ptr_ = &term_;
     search->column_name_ptr_ = &column_;
     return search;
@@ -703,6 +708,25 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const CreateSearchParams 
         return MakeUnique<OrIterator>(std::move(sub_doc_iters));
     } else {
         return MakeUnique<MinimumShouldMatchWrapper<OrIterator>>(std::move(sub_doc_iters), params.minimum_should_match);
+    }
+}
+
+std::unique_ptr<DocIterator> RankFeaturesQueryNode::CreateSearch(const CreateSearchParams params, const bool is_top_level) const {
+    Vector<std::unique_ptr<DocIterator>> sub_doc_iters;
+    sub_doc_iters.reserve(children_.size());
+    const auto next_params = params.RemoveMSM();
+    for (auto &child : children_) {
+        auto iter = child->CreateSearch(next_params, false);
+        if (!iter) {
+            // no need to continue if any child is invalid
+            return nullptr;
+        }
+        sub_doc_iters.emplace_back(std::move(iter));
+    }
+    if (sub_doc_iters.empty()) {
+        return nullptr;
+    } else {
+        return MakeUnique<RankFeaturesDocIterator>(std::move(sub_doc_iters));
     }
 }
 
