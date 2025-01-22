@@ -26,6 +26,7 @@ import internal_types;
 import third_party;
 import column_def;
 import logger;
+import default_values;
 
 namespace infinity {
 
@@ -96,6 +97,8 @@ public:
 
     // Currently this method is used in aggregate operator.
     void UnionWith(const SharedPtr<DataTable> &other);
+
+    void ShrinkBlocks(SizeT block_capacity = DEFAULT_VECTOR_SIZE);
 
 public:
     SharedPtr<TableDef> definition_ptr_{};

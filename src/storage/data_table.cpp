@@ -156,4 +156,35 @@ const String &DataTable::GetColumnNameById(SizeT idx) const { return definition_
 
 SharedPtr<DataType> DataTable::GetColumnTypeById(SizeT idx) const { return definition_ptr_->columns()[idx]->type(); }
 
+void DataTable::ShrinkBlocks(SizeT block_capacity) {
+    if (data_blocks_.empty()) {
+        return;
+    }
+    auto types = data_blocks_[0]->types();
+    Vector<SharedPtr<DataBlock>> data_blocks = std::move(data_blocks_);
+
+    data_blocks_.emplace_back(DataBlock::MakeUniquePtr());
+    auto *data_block = data_blocks_.back().get();
+    data_block->Init(types, block_capacity);
+    for (SizeT block_i = 0; block_i < data_blocks.size(); ++block_i) {
+        SizeT block_offset = 0;
+        auto *input_block = data_blocks[block_i].get();
+        while (block_offset < input_block->row_count()) {
+            SizeT append_count = std::min(data_block->available_capacity(), input_block->row_count() - block_offset);
+            if (append_count) {
+                data_block->AppendWith(input_block, block_offset, append_count);
+            }
+            block_offset += append_count;
+            if (data_block->available_capacity() == 0) {
+                data_blocks_.emplace_back(DataBlock::MakeUniquePtr());
+                data_block = data_blocks_.back().get();
+                data_block->Init(types, block_capacity);
+            }
+        }
+    }
+    for (auto &data_block : data_blocks_) {
+        data_block->Finalize();
+    }
+}
+
 } // namespace infinity
