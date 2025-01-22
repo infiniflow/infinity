@@ -1,7 +1,0 @@
-name: setup-folly
-runs:
-  using: composite
-  steps:
-  - name: Checkout folly sources
-    run: make checkout_folly
-    shell: bash
