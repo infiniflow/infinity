@@ -145,7 +145,7 @@ Tuple<UniquePtr<LocalFileHandle>, Status> VirtualStore::Open(const String &path,
         }
     }
     if (fd == -1) {
-        String error_message = fmt::format("File open failed: {}", strerror(errno));
+        String error_message = fmt::format("File: {} open failed: {}", path, strerror(errno));
         return {nullptr, Status::IOError(error_message)};
     }
     return {MakeUnique<LocalFileHandle>(fd, path, access_mode), Status::OK()};

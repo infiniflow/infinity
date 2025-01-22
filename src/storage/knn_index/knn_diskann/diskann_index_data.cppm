@@ -375,6 +375,7 @@ public:
             SaveSampleData(*train_data_handle, *train_data_ids_handle, train_data, train_data_ids);
             // train_data.reset();
             // train_data_ids.reset();
+            LOG_INFO(fmt::format("Delete diskann mem index file: {}", mem_index_file_path_.string()));
             VirtualStore::DeleteFile(mem_index_file_path_); // delete mem index file
             LOG_TRACE(fmt::format("Finished saving sample data"));
         }
