@@ -49,11 +49,23 @@ public:
     }
 
 protected:
-    typedef void (*HookType)(void *data, const char *text, const u32 len, const u32 offset, const u32 end_offset, const bool is_special_char);
+    typedef void (*HookType)(void *data,
+                             const char *text,
+                             const u32 len,
+                             const u32 offset,
+                             const u32 end_offset,
+                             const bool is_special_char,
+                             const u16 payload);
 
     virtual int AnalyzeImpl(const Term &input, void *data, HookType func) { return -1; }
 
-    static void AppendTermList(void *data, const char *text, const u32 len, const u32 offset, const u32 end_offset, const bool is_special_char) {
+    static void AppendTermList(void *data,
+                               const char *text,
+                               const u32 len,
+                               const u32 offset,
+                               const u32 end_offset,
+                               const bool is_special_char,
+                               const u16 payload) {
         void **parameters = (void **)data;
         TermList *output = (TermList *)parameters[0];
         Analyzer *analyzer = (Analyzer *)parameters[1];
@@ -62,9 +74,9 @@ protected:
             return;
         if (is_special_char && analyzer->convert_to_placeholder_) {
             if (output->empty() == true || output->back().text_.compare(PLACE_HOLDER) != 0)
-                output->Add(PLACE_HOLDER.c_str(), PLACE_HOLDER.length(), offset, end_offset);
+                output->Add(PLACE_HOLDER.c_str(), PLACE_HOLDER.length(), offset, end_offset, payload);
         } else {
-            output->Add(text, len, offset, end_offset);
+            output->Add(text, len, offset, end_offset, payload);
         }
     }
 

@@ -34,6 +34,7 @@ import ngram_analyzer;
 import rag_analyzer;
 import whitespace_analyzer;
 import ik_analyzer;
+import rank_features_analyzer;
 import logger;
 
 namespace infinity {
@@ -329,6 +330,9 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 return {MakeUnique<WhitespaceAnalyzer>(), Status::OK()};
             }
             return {MakeUnique<WhitespaceAnalyzer>(name.substr(suffix_pos + 1)), Status::OK()};
+        }
+        case Str2Int(RANKFEATURES.data()): {
+            return {MakeUnique<RankFeaturesAnalyzer>(), Status::OK()};
         }
         default: {
             if (std::filesystem::is_regular_file(name)) {

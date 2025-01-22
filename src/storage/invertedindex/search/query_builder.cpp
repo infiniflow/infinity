@@ -16,6 +16,9 @@ module;
 
 #include <iostream>
 #include <vector>
+
+#include "query_node.h"
+
 module query_builder;
 
 import stl;
@@ -72,6 +75,17 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
         LOG_DEBUG(std::move(oss).str());
     }
 #endif
+    if (!context.rank_features_option_.empty()) {
+        auto rank_features_node = std::make_unique<RankFeaturesQueryNode>();
+        for (auto rank_feature : context.rank_features_option_) {
+            auto rank_feature_node = std::make_unique<RankFeatureQueryNode>();
+            rank_feature_node->term_ = rank_feature.feature_;
+            rank_feature_node->column_ = rank_feature.field_;
+            rank_feature_node->boost_ = rank_feature.boost_;
+            rank_features_node->Add(std::move(rank_feature_node));
+        }
+        // auto rank_features_iter = rank_features_node->CreateSearch(params);
+    }
     return result;
 }
 

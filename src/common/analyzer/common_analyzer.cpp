@@ -52,12 +52,12 @@ int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType 
 
         if (is_index_) {
             if (IsSpecialChar()) {
-                func(data, token_, len_, offset_, end_offset_, true);
+                func(data, token_, len_, offset_, end_offset_, true, 0);
                 temp_offset = offset_;
                 continue;
             }
             if (is_raw_) {
-                func(data, token_, len_, offset_, end_offset_, false);
+                func(data, token_, len_, offset_, end_offset_, false, 0);
                 temp_offset = offset_;
                 continue;
             }
@@ -77,37 +77,37 @@ int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType 
                 bool lowercase_is_different = memcmp(token_, lowercase_term, len_) != 0;
 
                 if (stemming_term_str_size && stem_only_) {
-                    func(data, stem_term.c_str(), stemming_term_str_size, offset_, end_offset_, false);
+                    func(data, stem_term.c_str(), stemming_term_str_size, offset_, end_offset_, false, 0);
                     temp_offset = offset_;
                 } else if (stemming_term_str_size || (case_sensitive_ && contain_lower_ && lowercase_is_different)) {
                     /// have more than one output
                     if (case_sensitive_) {
-                        func(data, token_, len_, offset_, end_offset_, false);
+                        func(data, token_, len_, offset_, end_offset_, false, 0);
                         temp_offset = offset_;
                     } else {
-                        func(data, lowercase_term, len_, offset_, end_offset_, false);
+                        func(data, lowercase_term, len_, offset_, end_offset_, false, 0);
                         temp_offset = offset_;
                     }
                     if (stemming_term_str_size) {
-                        func(data, stem_term.c_str(), stemming_term_str_size, offset_, end_offset_, false);
+                        func(data, stem_term.c_str(), stemming_term_str_size, offset_, end_offset_, false, 0);
                         temp_offset = offset_;
                     }
                     if (case_sensitive_ && contain_lower_ && lowercase_is_different) {
-                        func(data, lowercase_term, len_, offset_, end_offset_, false);
+                        func(data, lowercase_term, len_, offset_, end_offset_, false, 0);
                         temp_offset = offset_;
                     }
                 } else {
                     /// have only one output
                     if (case_sensitive_) {
-                        func(data, token_, len_, offset_, end_offset_, false);
+                        func(data, token_, len_, offset_, end_offset_, false, 0);
                         temp_offset = offset_;
                     } else {
-                        func(data, lowercase_term, len_, offset_, end_offset_, false);
+                        func(data, lowercase_term, len_, offset_, end_offset_, false, 0);
                         temp_offset = offset_;
                     }
                 }
             } else {
-                func(data, token_, len_, offset_, end_offset_, false);
+                func(data, token_, len_, offset_, end_offset_, false, 0);
                 temp_offset = offset_;
             }
         }

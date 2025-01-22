@@ -201,7 +201,7 @@ TEST_F(QueryBuilderTest, test_and) {
     LOG_INFO(oss.str());
     // apply query builder
     Vector<String> hints;
-    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, 10, hints);
+    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10, hints);
     context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(and_root);
     FakeQueryBuilder fake_query_builder;
@@ -273,7 +273,7 @@ TEST_F(QueryBuilderTest, test_or) {
     LOG_INFO(oss.str());
     // apply query builder
     Vector<String> hints;
-    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, 10, hints);
+    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10, hints);
     context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(or_root);
     FakeQueryBuilder fake_query_builder;
@@ -351,7 +351,7 @@ TEST_F(QueryBuilderTest, test_and_not) {
     LOG_INFO(oss.str());
     // apply query builder
     Vector<String> hints;
-    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, 10, hints);
+    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10, hints);
     context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
@@ -435,7 +435,7 @@ TEST_F(QueryBuilderTest, test_and_not2) {
     LOG_INFO(oss.str());
     // apply query builder
     Vector<String> hints;
-    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, 10, hints);
+    FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, 10, hints);
     context.early_term_algo_ = EarlyTermAlgo::kNaive;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;

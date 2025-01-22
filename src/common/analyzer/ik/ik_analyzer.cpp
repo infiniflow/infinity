@@ -90,7 +90,7 @@ int IKAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     while ((lexeme = context_->GetNextLexeme()) != nullptr) {
         std::wstring text = lexeme->GetLexemeText();
         String token = CharacterUtil::UTF16ToUTF8(text);
-        func(data, token.c_str(), token.size(), offset++, 0, false);
+        func(data, token.c_str(), token.size(), offset++, 0, false, 0);
         delete lexeme;
     };
     return 0;

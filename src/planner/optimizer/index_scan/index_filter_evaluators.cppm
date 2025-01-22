@@ -91,6 +91,7 @@ export struct IndexFilterEvaluatorFulltext final : IndexFilterEvaluator {
     UniquePtr<QueryNode> query_tree_;
     MinimumShouldMatchOption minimum_should_match_option_;
     u32 minimum_should_match_ = 0;
+    RankFeaturesOption rank_features_option_;
     std::atomic_flag after_optimize_ = {};
     f32 score_threshold_ = {};
     FulltextSimilarity ft_similarity_ = FulltextSimilarity::kBM25;
