@@ -43,7 +43,7 @@ void RegisterCurrentTimeFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction current_time_function(func_name,
                                   {DataType(LogicalType::kDate)},
-                                  &ScalarFunction::UnaryFunction<DateT, CurrentTimeFunction>);
+                                  &ScalarFunction::NullaryFunction<DateT, CurrentTimeFunction>);
     function_set_ptr->AddFunction(current_time_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

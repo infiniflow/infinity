@@ -30,7 +30,7 @@ namespace infinity {
 
 struct ColumnVectorCastData;
 
-export class UnaryOperator {
+export class NullaryOperator {
 public:
     template <typename ResultType, typename Operator>
     static void inline Execute(SharedPtr<ColumnVector> &result,
@@ -39,7 +39,7 @@ public:
                                bool nullable) {
         auto *result_ptr = (ResultType *)(result->data());
         SharedPtr<Bitmask> &result_null = result->nulls_ptr_;
-        ExecuteFlat<typename ResultType, typename Operator>(ResultType *__restrict result_ptr, int &result_null, int count, void *state_ptr)
+        ExecuteFlat<ResultType, Operator>(result_ptr, result_null, count, state_ptr);
         result->Finalize(count);
         return;
         String error_message = "Unexpected error.";

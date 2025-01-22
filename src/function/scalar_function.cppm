@@ -295,9 +295,13 @@ struct TernaryTryOpVarlenToVarlenWrapper {
 
 using ScalarFunctionTypePtr = void (*)(const DataBlock &, SharedPtr<ColumnVector> &);
 
+using ScalarFunctionTypePtrWithNoInput = void (*)(SharedPtr<ColumnVector> &);
+
 export class ScalarFunction final : public Function {
 public:
     explicit ScalarFunction(String name, Vector<DataType> argument_types, DataType return_type, ScalarFunctionTypePtr function);
+
+    explicit ScalarFunction(String name, DataType return_type, ScalarFunctionTypePtrWithNoInput function);
 
     void CastArgumentTypes(Vector<BaseExpression> &input_arguments);
 
@@ -315,6 +319,8 @@ public:
 
     ScalarFunctionTypePtr function_{};
 
+    ScalarFunctionTypePtrWithNoInput function_no_{};
+
 public:
 
 
@@ -327,35 +333,6 @@ public:
                                                                                        nullptr,
                                                                                        true);
     }
-
-    // // Nullary function with some failures such as overflow.
-    // template <typename OutputType, typename Operation>
-    // static inline void NullaryFunctionWithFailure(SharedPtr<ColumnVector> &output) {
-    //     NullaryOperator::Execute<OutputType, NullaryTryOpWrapper<Operation>>(output,
-    //                                                                             1,
-    //                                                                             nullptr,
-    //                                                                             true);
-    // }
-
-    // // Nullary function result is varlen without any failure.
-    // template <typename OutputType, typename Operation>
-    // static inline void NullaryFunctionToVarlen(SharedPtr<ColumnVector> &output) {
-    //     ScalarFunctionData function_data(output.get());
-    //     NullaryOperator::Execute<OutputType, NullaryOpDirectToVarlenWrapper<Operation>>(output,
-    //                                                                                         nullptr,
-    //                                                                                         &function_data,
-    //                                                                                         true);
-    // }
-
-    // // Nullary function result is varlen with some failures such as overflow.
-    // template <typename OutputType, typename Operation>
-    // static inline void NullaryFunctionToVarlenWithFailure(SharedPtr<ColumnVector> &output) {
-    //     ScalarFunctionData function_data(output.get());
-    //     NullaryOperator::Execute<InputType, OutputType, NullaryTryOpToVarlenWrapper<Operation>>(,output,
-    //                                                                                         nullptr,
-    //                                                                                         &function_data,
-    //                                                                                         true);
-    // }
 
     // Unary function
     static void NoOpFunction(const DataBlock &input, SharedPtr<ColumnVector> &output);
