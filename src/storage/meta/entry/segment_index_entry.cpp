@@ -650,17 +650,20 @@ void SegmentIndexEntry::GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> 
     std::shared_lock lock(rw_locker_);
     chunk_index_entries.clear();
     SizeT num = chunk_index_entries_.size();
+    LOG_INFO(fmt::format("GetChunkIndexEntries, segment_id: {}, num: {}, txn_id: {}", segment_id_, num, txn->TxnID()));
     for (SizeT i = 0; i < num; i++) {
         auto &chunk_index_entry = chunk_index_entries_[i];
         bool add = chunk_index_entry->CheckVisible(txn);
-        LOG_INFO(fmt::format("GetChunkIndexEntries, CheckVisible ret: {}, chunk_id: {}, deprecate ts: {}",
+        LOG_INFO(fmt::format("GetChunkIndexEntries, CheckVisible ret: {}, chunk_id: {}, deprecate ts: {}, txn_id: {}",
                              add,
                              chunk_index_entry->chunk_id_,
-                             chunk_index_entry->deprecate_ts_.load()));
+                             chunk_index_entry->deprecate_ts_.load(),
+                             txn->TxnID()));
         if (add) {
             chunk_index_entries.push_back(chunk_index_entry);
         }
     }
+    LOG_INFO(fmt::format("GetChunkIndexEntries, chunk index count: {}, txn_id: {}", chunk_index_entries.size(), txn->TxnID()));
     std::sort(std::begin(chunk_index_entries),
               std::end(chunk_index_entries),
               [](const SharedPtr<ChunkIndexEntry> &lhs, const SharedPtr<ChunkIndexEntry> &rhs) noexcept {
