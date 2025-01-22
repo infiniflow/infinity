@@ -50,6 +50,8 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
             context.minimum_should_match_ = GetMinimumShouldMatchParameter(context.minimum_should_match_option_, leaf_count);
         }
     }
+    if (!context.rank_features_option_.empty()) {
+    }
     // Create the iterator from the query tree.
     const CreateSearchParams params{table_entry_,
                                     &index_reader_,

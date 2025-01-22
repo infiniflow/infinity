@@ -111,6 +111,17 @@ void RankFeaturesDocIterator::DecodeFrom(const RowID buffer_start_doc_id) {
             it->BatchDecodeTo(buffer_start_doc_id, buffer_end_doc_id, payload_ptr_ + i * BATCH_OR_LEN);
         }
     }
+    for (u32 i = 0; i < BATCH_OR_LEN; ++i) {
+        u32 match_cnt = 0;
+        for (u32 j = 0; j < children_.size(); ++j) {
+            const auto payload = payload_ptr_[j * BATCH_OR_LEN + i];
+            if (payload == 0) {
+                continue;
+            }
+            ++match_cnt;
+        }
+        match_cnt_ptr_[i] = match_cnt;
+    }
 }
 
 } // namespace infinity
