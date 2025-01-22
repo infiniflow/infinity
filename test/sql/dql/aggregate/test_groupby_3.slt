@@ -1,0 +1,55 @@
+statement ok
+DROP TABLE IF EXISTS simple_groupby;
+
+statement ok
+CREATE TABLE simple_groupby (c1 INTEGER, c2 FLOAT, c3 VARCHAR);
+
+statement ok
+INSERT INTO simple_groupby VALUES
+(1,1.0,'abc'),
+(2,2.0,'abcdef'),
+(3,3.0,'abcdefghi'),
+(1,4.0,'abcdefghijkl'),
+(2,5.0,'abcdefghijklmno'),
+(3,6.0,'abcdefghijklmnopqr'),
+(1,1.0,'abcdefghijklmnopqrstu'),
+(2,2.0,'abcdefghijklmnopqrstuvwx'),
+(3,3.0,'abcdefghijklmnopqrstuvwxyz'),
+(1,4.0,'abc'),
+(2,5.0,'abcdef'),
+(3,6.0,'abcdefghi'),
+(1,1.0,'abcdefghijkl'),
+(2,2.0,'abcdefghijklmno'),
+(3,3.0,'abcdefghijklmnopqr'),
+(1,4.0,'abcdefghijklmnopqrstu'),
+(2,5.0,'abcdefghijklmnopqrstuvwx'),
+(3,6.0,'abcdefghijklmnopqrstuvwxyz');
+
+query TIR rowsort
+SELECT c3, SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3;
+----
+abc 2 5.000000
+abcdef 4 7.000000
+abcdefghi 6 9.000000
+abcdefghijkl 2 5.000000
+abcdefghijklmno 4 7.000000
+abcdefghijklmnopqr 6 9.000000
+abcdefghijklmnopqrstu 2 5.000000
+abcdefghijklmnopqrstuvwx 4 7.000000
+abcdefghijklmnopqrstuvwxyz 6 9.000000
+
+query TII rowsort
+SELECT c3, CHAR_LENGTH(c3), SUM(c1) FROM simple_groupby GROUP BY c3;
+----
+abc 3 2
+abcdef 6 4
+abcdefghi 9 6
+abcdefghijkl 12 2
+abcdefghijklmno 15 4
+abcdefghijklmnopqr 18 6
+abcdefghijklmnopqrstu 21 2
+abcdefghijklmnopqrstuvwx 24 4
+abcdefghijklmnopqrstuvwxyz 26 6
+
+statement ok
+DROP TABLE simple_groupby;
