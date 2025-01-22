@@ -1054,7 +1054,10 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
             }
             case SpecialType::kRowID:
             case SpecialType::kCreateTs:
-            case SpecialType::kDeleteTs: {
+            case SpecialType::kDeleteTs:
+            case SpecialType::kCurrentDate:
+            case SpecialType::kCurrentTime:
+            case SpecialType::KCurrentTimestamp: {
                 break;
             }
             case SpecialType::kFilterFullText: {
