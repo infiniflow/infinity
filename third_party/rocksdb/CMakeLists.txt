@@ -1062,9 +1062,3 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   )
 endif()
 
-option(WITH_EXAMPLES "build with examples" OFF)
-if(WITH_EXAMPLES)
-  add_subdirectory(examples)
-endif()
-
-add_subdirectory(examples)
