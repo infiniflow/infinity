@@ -72,26 +72,48 @@ public:
 
     void SimpleMergeAggregateExecute(MergeAggregateOperatorState *merge_aggregate_op_state);
 
+    void GroupByMergeAggregateExecute(MergeAggregateOperatorState *merge_aggregate_op_state);
+
     template <typename T>
-    void UpdateData(MergeAggregateOperatorState *op_state, MathOperation<T> operation, SizeT col_idx);
+    void UpdateData(MergeAggregateOperatorState *op_state,
+                    MathOperation<T> operation,
+                    SizeT col_idx,
+                    const Pair<SizeT, SizeT> &input_block_row_id,
+                    const Pair<SizeT, SizeT> &output_block_row_id);
 
     template <typename T>
     void WriteValueAtPosition(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx, T value);
 
     template <typename T>
-    void HandleSum(MergeAggregateOperatorState *op_state, SizeT col_idx);
+    void HandleSum(MergeAggregateOperatorState *op_state,
+                   SizeT col_idx,
+                   const Pair<SizeT, SizeT> &input_block_row_id,
+                   const Pair<SizeT, SizeT> &output_block_row_id);
 
     template <typename T>
-    void HandleCount(MergeAggregateOperatorState *op_state, SizeT col_idx);
+    void HandleCount(MergeAggregateOperatorState *op_state,
+                     SizeT col_idx,
+                     const Pair<SizeT, SizeT> &input_block_row_id,
+                     const Pair<SizeT, SizeT> &output_block_row_id);
 
     template <typename T>
-    void HandleMin(MergeAggregateOperatorState *op_state, SizeT col_idx);
+    void HandleMin(MergeAggregateOperatorState *op_state,
+                   SizeT col_idx,
+                   const Pair<SizeT, SizeT> &input_block_row_id,
+                   const Pair<SizeT, SizeT> &output_block_row_id);
 
     template <typename T>
-    void HandleMax(MergeAggregateOperatorState *op_state, SizeT col_idx);
+    void HandleMax(MergeAggregateOperatorState *op_state,
+                   SizeT col_idx,
+                   const Pair<SizeT, SizeT> &input_block_row_id,
+                   const Pair<SizeT, SizeT> &output_block_row_id);
 
     template <typename T>
-    void HandleAggregateFunction(const String &function_name, MergeAggregateOperatorState *op_state, SizeT col_idx);
+    void HandleAggregateFunction(const String &function_name,
+                                 MergeAggregateOperatorState *op_state,
+                                 SizeT col_idx,
+                                 const Pair<SizeT, SizeT> &input_block_row_id = {0, 0},
+                                 const Pair<SizeT, SizeT> &output_block_row_id = {0, 0});
 
     template <typename T>
     Value CreateValue(T value) {

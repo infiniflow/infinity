@@ -112,21 +112,24 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     }
 
     // 2. Use the unique key to get the row list of the same key.
-    hash_table_.Init(groupby_types);
+    HashTable &hash_table = aggregate_operator_state->hash_table_;
+    if (!hash_table.Initialized()) {
+        hash_table.Init(groupby_types);
+    }
 
     SizeT block_count = groupby_table->DataBlockCount();
     for (SizeT block_id = 0; block_id < block_count; ++block_id) {
         const SharedPtr<DataBlock> &block_ptr = groupby_table->GetDataBlockById(block_id);
-        hash_table_.Append(block_ptr->column_vectors, block_id, block_ptr->row_count());
+        hash_table.Append(block_ptr->column_vectors, block_id, block_ptr->row_count());
     }
 
     // 3. forlop each aggregates function on each group by bucket, to calculate the result according to the row list
     SharedPtr<DataTable> output_groupby_table = DataTable::Make(groupby_tabledef, TableType::kIntermediate);
-    GenerateGroupByResult(groupby_table, output_groupby_table);
+    GenerateGroupByResult(groupby_table, output_groupby_table, hash_table);
 
     // input table after group by, each block belong to one group. This is the prerequisites to execute aggregate function.
     Vector<UniquePtr<DataBlock>> grouped_input_datablocks;
-    GroupByInputTable(prev_op_state->data_block_array_, grouped_input_datablocks);
+    GroupByInputTable(prev_op_state->data_block_array_, grouped_input_datablocks, hash_table);
 
     // generate output aggregate table
     SizeT aggregates_count = aggregates_.size();
@@ -210,14 +213,16 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
     return true;
 }
 
-void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &input_datablocks, Vector<UniquePtr<DataBlock>> &output_datablocks) {
+void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &input_datablocks,
+                                          Vector<UniquePtr<DataBlock>> &output_datablocks,
+                                          HashTable &hash_table) {
     // 1. Get output table column types.
     Vector<SharedPtr<DataType>> types = input_datablocks.front()->types();
     SizeT column_count = input_datablocks.front()->column_count();
 
     // 2. Generate data blocks and append it into output table according to the group by hash table.
     // const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
-    for (const auto &item : hash_table_.hash_table_) {
+    for (const auto &item : hash_table.hash_table_) {
 
         // 2.1 Each hash bucket will be insert in to one data block
         UniquePtr<DataBlock> output_datablock = DataBlock::MakeUniquePtr();
@@ -235,8 +240,8 @@ void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &in
 
             // Forloop each column
             for (SizeT column_id = 0; column_id < column_count; ++column_id) {
-            // Loop each row of same block
-            for (const auto input_offset : vec_pair.second) {
+                // Loop each row of same block
+                for (const auto input_offset : vec_pair.second) {
 
                     output_datablock->column_vectors[column_id]->AppendWith(*input_datablocks[input_block_id]->column_vectors[column_id],
                                                                             input_offset,
@@ -258,7 +263,7 @@ void PhysicalAggregate::GroupByInputTable(const Vector<UniquePtr<DataBlock>> &in
     }
 }
 
-void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table) {
+void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_table, SharedPtr<DataTable> &output_table, HashTable &hash_table) {
 
     SizeT column_count = input_table->ColumnCount();
     Vector<SharedPtr<DataType>> types;
@@ -275,7 +280,7 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
 
     SharedPtr<DataBlock> output_datablock = nullptr;
     const Vector<SharedPtr<DataBlock>> &input_datablocks = input_table->data_blocks_;
-    for (const auto &item : hash_table_.hash_table_) {
+    for (const auto &item : hash_table.hash_table_) {
         // Each hash bucket will generate one data block.
         output_datablock = DataBlock::Make();
         output_datablock->Init(types, 1);
