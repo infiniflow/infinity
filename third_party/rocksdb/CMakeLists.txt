@@ -595,49 +595,6 @@ if(USE_COROUTINES)
   set(USE_FOLLY 1)
 endif()
 
-if(USE_FOLLY)
-  if(USE_FOLLY_LITE)
-    message(FATAL_ERROR "Please specify one of USE_FOLLY or USE_FOLLY_LITE")
-  endif()
-  if(ROCKSDB_BUILD_SHARED)
-    message(FATAL_ERROR "Cannot build RocksDB shared library with folly")
-  endif()
-  set(ROCKSDB_BUILD_SHARED OFF)
-  set(GFLAGS_SHARED FALSE)
-  find_package(folly)
-  # If cmake could not find the folly-config.cmake file, fall back
-  # to looking in third-party/folly for folly and its dependencies
-  if(NOT FOLLY_LIBRARIES)
-    exec_program(python3 ${PROJECT_SOURCE_DIR}/third-party/folly ARGS
-    build/fbcode_builder/getdeps.py show-inst-dir OUTPUT_VARIABLE
-    FOLLY_INST_PATH)
-    exec_program(ls ARGS -d ${FOLLY_INST_PATH}/../boost* OUTPUT_VARIABLE
-    BOOST_INST_PATH)
-    exec_program(ls ARGS -d ${FOLLY_INST_PATH}/../fmt* OUTPUT_VARIABLE
-    FMT_INST_PATH)
-    exec_program(ls ARGS -d ${FOLLY_INST_PATH}/../gflags* OUTPUT_VARIABLE
-    GFLAGS_INST_PATH)
-    set(Boost_DIR ${BOOST_INST_PATH}/lib/cmake/Boost-1.83.0)
-    if(EXISTS ${FMT_INST_PATH}/lib64)
-      set(fmt_DIR ${FMT_INST_PATH}/lib64/cmake/fmt)
-    else()
-      set(fmt_DIR ${FMT_INST_PATH}/lib/cmake/fmt)
-    endif()
-    set(gflags_DIR ${GFLAGS_INST_PATH}/lib/cmake/gflags)
-
-    exec_program(sed ARGS -i 's/gflags_shared//g'
-    ${FOLLY_INST_PATH}/lib/cmake/folly/folly-targets.cmake)
-
-    include(${FOLLY_INST_PATH}/lib/cmake/folly/folly-config.cmake)
-  endif()
-
-  add_compile_definitions(USE_FOLLY FOLLY_NO_CONFIG HAVE_CXX11_ATOMIC)
-  list(APPEND THIRDPARTY_LIBS Folly::folly)
-  set(FOLLY_LIBS Folly::folly)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")
-endif()
-find_package(Threads REQUIRED)
-
 # Main library source code
 
 set(SOURCES
@@ -982,37 +939,6 @@ list(APPEND SOURCES
   utilities/transactions/lock/range/range_tree/lib/util/dbt.cc
   utilities/transactions/lock/range/range_tree/lib/util/memarena.cc)
 
-message(STATUS "ROCKSDB_PLUGINS: ${ROCKSDB_PLUGINS}")
-if ( ROCKSDB_PLUGINS )
-  string(REPLACE " " ";" PLUGINS ${ROCKSDB_PLUGINS})
-  foreach (plugin ${PLUGINS})
-    add_subdirectory("plugin/${plugin}")
-    foreach (src ${${plugin}_SOURCES})
-      list(APPEND SOURCES plugin/${plugin}/${src})
-      set_source_files_properties(
-        plugin/${plugin}/${src}
-        PROPERTIES COMPILE_FLAGS "${${plugin}_COMPILE_FLAGS}")
-    endforeach()
-    foreach (test ${${plugin}_TESTS})
-      list(APPEND PLUGIN_TESTS plugin/${plugin}/${test})
-      set_source_files_properties(
-        plugin/${plugin}/${test}
-        PROPERTIES COMPILE_FLAGS "${${plugin}_COMPILE_FLAGS}")
-    endforeach()
-    foreach (path ${${plugin}_INCLUDE_PATHS})
-      include_directories(${path})
-    endforeach()
-    foreach (lib ${${plugin}_LIBS})
-      list(APPEND THIRDPARTY_LIBS ${lib})
-    endforeach()
-    foreach (link_path ${${plugin}_LINK_PATHS})
-      link_directories(AFTER ${link_path})
-    endforeach()
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${${plugin}_CMAKE_SHARED_LINKER_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${${plugin}_CMAKE_EXE_LINKER_FLAGS}")
-  endforeach()
-endif()
-
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(powerpc|ppc)64")
   list(APPEND SOURCES
     util/crc32c_ppc.c
@@ -1024,99 +950,15 @@ if(HAS_ARMV8_CRC)
     util/crc32c_arm64.cc)
 endif(HAS_ARMV8_CRC)
 
-if(WIN32)
-  list(APPEND SOURCES
-    port/win/io_win.cc
-    port/win/env_win.cc
-    port/win/env_default.cc
-    port/win/port_win.cc
-    port/win/win_logger.cc
-    port/win/win_thread.cc)
-if(WITH_XPRESS)
-  list(APPEND SOURCES
-    port/win/xpress_win.cc)
-endif()
-
-if(WITH_JEMALLOC)
-  list(APPEND SOURCES
-    port/win/win_jemalloc.cc)
-endif()
-
-else()
-  list(APPEND SOURCES
-    port/port_posix.cc
-    env/env_posix.cc
-    env/fs_posix.cc
-    env/io_posix.cc)
-endif()
-
-if(USE_FOLLY_LITE)
-  list(APPEND SOURCES
-    third-party/folly/folly/container/detail/F14Table.cpp
-    third-party/folly/folly/detail/Futex.cpp
-    third-party/folly/folly/lang/Exception.cpp
-    third-party/folly/folly/lang/SafeAssert.cpp
-    third-party/folly/folly/lang/ToAscii.cpp
-    third-party/folly/folly/ScopeGuard.cpp
-    third-party/folly/folly/synchronization/AtomicNotification.cpp
-    third-party/folly/folly/synchronization/DistributedMutex.cpp
-    third-party/folly/folly/synchronization/ParkingLot.cpp)
-  include_directories(${PROJECT_SOURCE_DIR}/third-party/folly)
-  exec_program(python3 ${PROJECT_SOURCE_DIR}/third-party/folly ARGS
-  build/fbcode_builder/getdeps.py show-source-dir boost OUTPUT_VARIABLE
-  BOOST_SOURCE_PATH)
-  exec_program(ls ARGS -d ${BOOST_SOURCE_PATH}/boost* OUTPUT_VARIABLE
-  BOOST_INCLUDE_DIR)
-  include_directories(${BOOST_INCLUDE_DIR})
-  add_definitions(-DUSE_FOLLY -DFOLLY_NO_CONFIG)
-  list(APPEND THIRDPARTY_LIBS glog)
-endif()
+list(APPEND SOURCES
+  port/port_posix.cc
+  env/env_posix.cc
+  env/fs_posix.cc
+  env/io_posix.cc)
 
 set(ROCKSDB_STATIC_LIB rocksdb${ARTIFACT_SUFFIX})
-set(ROCKSDB_SHARED_LIB rocksdb-shared${ARTIFACT_SUFFIX})
 
-
-if(WIN32)
-  set(SYSTEM_LIBS ${SYSTEM_LIBS} shlwapi.lib rpcrt4.lib)
-else()
-  set(SYSTEM_LIBS ${CMAKE_THREAD_LIBS_INIT})
-endif()
-
-set(ROCKSDB_PLUGIN_EXTERNS "")
-set(ROCKSDB_PLUGIN_BUILTINS "")
-message(STATUS "ROCKSDB PLUGINS TO BUILD ${ROCKSDB_PLUGINS}")
-foreach(PLUGIN IN LISTS PLUGINS)
-  set(PLUGIN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/plugin/${PLUGIN}/")
-  message(STATUS "PLUGIN ${PLUGIN} including rocksb plugin ${PLUGIN_ROOT}")
-  set(PLUGINMKFILE "${PLUGIN_ROOT}${PLUGIN}.mk")
-  if (NOT EXISTS ${PLUGINMKFILE})
-    message(FATAL_ERROR "PLUGIN ${PLUGIN} Missing plugin makefile: ${PLUGINMKFILE}")
-  endif()
-  file(READ ${PLUGINMKFILE} PLUGINMK)
-
-  string(REGEX MATCH "SOURCES = ([^\n]*)" FOO ${PLUGINMK})
-  set(MK_SOURCES ${CMAKE_MATCH_1})
-  separate_arguments(MK_SOURCES)
-  foreach(MK_FILE IN LISTS MK_SOURCES)
-    list(APPEND SOURCES "${PLUGIN_ROOT}${MK_FILE}")
-    message(STATUS "PLUGIN ${PLUGIN} Appending ${PLUGIN_ROOT}${MK_FILE} to SOURCES")
-  endforeach()
-
-  string(REGEX MATCH "_FUNC = ([^\n]*)" FOO ${PLUGINMK})
-  if (NOT ${CMAKE_MATCH_1} STREQUAL "")
-    string(APPEND ROCKSDB_PLUGIN_BUILTINS "{\"${PLUGIN}\", " ${CMAKE_MATCH_1} "},")
-    string(APPEND ROCKSDB_PLUGIN_EXTERNS "int " ${CMAKE_MATCH_1} "(ROCKSDB_NAMESPACE::ObjectLibrary&, const std::string&); ")
-  endif()
-
-  string(REGEX MATCH "_LIBS = ([^\n]*)" FOO ${PLUGINMK})
-  separate_arguments(CMAKE_MATCH_1)
-  foreach(MK_LIB IN LISTS CMAKE_MATCH_1)
-    list(APPEND THIRDPARTY_LIBS "${MK_LIB}")
-  endforeach()
-  message(STATUS "PLUGIN ${PLUGIN} THIRDPARTY_LIBS=${THIRDPARTY_LIBS}")
-
-  #TODO: We need to set any compile/link-time flags and add any link libraries
-endforeach()
+set(SYSTEM_LIBS ${CMAKE_THREAD_LIBS_INIT})
 
 string(TIMESTAMP TS "%Y-%m-%d %H:%M:%S" UTC)
 set(BUILD_DATE "${TS}" CACHE STRING "the time we first built rocksdb")
@@ -1147,59 +989,8 @@ target_include_directories(${ROCKSDB_STATIC_LIB} PUBLIC
 target_link_libraries(${ROCKSDB_STATIC_LIB} PRIVATE
   ${THIRDPARTY_LIBS} ${SYSTEM_LIBS})
 
-#if(ROCKSDB_BUILD_SHARED)
-#  add_library(${ROCKSDB_SHARED_LIB} SHARED ${SOURCES} ${BUILD_VERSION_CC})
-#  target_include_directories(${ROCKSDB_SHARED_LIB} PUBLIC
-#    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-#  target_link_libraries(${ROCKSDB_SHARED_LIB} PRIVATE
-#    ${THIRDPARTY_LIBS} ${SYSTEM_LIBS})
-#
-#  if(WIN32)
-#    set_target_properties(${ROCKSDB_SHARED_LIB} PROPERTIES
-#      COMPILE_DEFINITIONS "ROCKSDB_DLL;ROCKSDB_LIBRARY_EXPORTS")
-#    if(MSVC)
-#      set_target_properties(${ROCKSDB_STATIC_LIB} PROPERTIES
-#        COMPILE_FLAGS "/Fd${CMAKE_CFG_INTDIR}/${ROCKSDB_STATIC_LIB}.pdb")
-#      set_target_properties(${ROCKSDB_SHARED_LIB} PROPERTIES
-#        COMPILE_FLAGS "/Fd${CMAKE_CFG_INTDIR}/${ROCKSDB_SHARED_LIB}.pdb")
-#    endif()
-#  else()
-#    set_target_properties(${ROCKSDB_SHARED_LIB} PROPERTIES
-#                          LINKER_LANGUAGE CXX
-#                          VERSION ${rocksdb_VERSION}
-#                          SOVERSION ${rocksdb_VERSION_MAJOR}
-#                          OUTPUT_NAME "rocksdb${ARTIFACT_SUFFIX}")
-#  endif()
-#endif()
-#
-#if(ROCKSDB_BUILD_SHARED AND NOT WIN32)
-#  set(ROCKSDB_LIB ${ROCKSDB_SHARED_LIB})
-#else()
 set(ROCKSDB_LIB ${ROCKSDB_STATIC_LIB})
-#endif()
 
-option(WITH_JNI "build with JNI" OFF)
-# Tests are excluded from Release builds
-CMAKE_DEPENDENT_OPTION(WITH_TESTS "build with tests" OFF
-  "CMAKE_BUILD_TYPE STREQUAL Debug" OFF)
-option(WITH_BENCHMARK_TOOLS "build with benchmarks" OFF)
-option(WITH_CORE_TOOLS "build with ldb and sst_dump" ON)
-option(WITH_TOOLS "build with tools" ON)
-
-#if(WITH_TESTS OR WITH_BENCHMARK_TOOLS OR WITH_TOOLS OR WITH_JNI OR JNI)
-#  include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/third-party/gtest-1.8.1/fused-src)
-#endif()
-if(WITH_JNI OR JNI)
-  message(STATUS "JNI library is enabled")
-  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/java)
-else()
-  message(STATUS "JNI library is disabled")
-endif()
-
-# Installation and packaging
-if(WIN32)
-  option(ROCKSDB_INSTALL_ON_WINDOWS "Enable install target on Windows" OFF)
-endif()
 if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
@@ -1248,18 +1039,6 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
     INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   )
 
-#  if(ROCKSDB_BUILD_SHARED)
-#    install(
-#      TARGETS ${ROCKSDB_SHARED_LIB}
-#      EXPORT RocksDBTargets
-#      COMPONENT runtime
-#      ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-#      RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-#      LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-#      INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-#    )
-#  endif()
-
   install(
     EXPORT RocksDBTargets
     COMPONENT devel
@@ -1282,71 +1061,6 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
   )
 endif()
-
-option(WITH_ALL_TESTS "Build all test, rather than a small subset" ON)
-
-#if(WITH_TESTS OR WITH_BENCHMARK_TOOLS)
-#  add_subdirectory(third-party/gtest-1.8.1/fused-src/gtest)
-#  add_library(testharness STATIC
-#  test_util/mock_time_env.cc
-#  test_util/secondary_cache_test_util.cc
-#  test_util/testharness.cc)
-#  target_link_libraries(testharness gtest)
-#endif()
-#
-#if(WITH_BENCHMARK_TOOLS)
-#  add_executable(db_bench${ARTIFACT_SUFFIX}
-#    tools/simulated_hybrid_file_system.cc
-#    tools/db_bench.cc
-#    tools/db_bench_tool.cc)
-#  target_link_libraries(db_bench${ARTIFACT_SUFFIX}
-#    ${ROCKSDB_LIB} ${THIRDPARTY_LIBS})
-#
-#  add_executable(cache_bench${ARTIFACT_SUFFIX}
-#    cache/cache_bench.cc
-#    cache/cache_bench_tool.cc)
-#  target_link_libraries(cache_bench${ARTIFACT_SUFFIX}
-#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-#
-#  add_executable(memtablerep_bench${ARTIFACT_SUFFIX}
-#    memtable/memtablerep_bench.cc)
-#  target_link_libraries(memtablerep_bench${ARTIFACT_SUFFIX}
-#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-#
-#  add_executable(range_del_aggregator_bench${ARTIFACT_SUFFIX}
-#    db/range_del_aggregator_bench.cc)
-#  target_link_libraries(range_del_aggregator_bench${ARTIFACT_SUFFIX}
-#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-#
-#  add_executable(table_reader_bench${ARTIFACT_SUFFIX}
-#    table/table_reader_bench.cc)
-#  target_link_libraries(table_reader_bench${ARTIFACT_SUFFIX}
-#    ${ROCKSDB_LIB} testharness ${GFLAGS_LIB} ${FOLLY_LIBS})
-#
-#  add_executable(filter_bench${ARTIFACT_SUFFIX}
-#    util/filter_bench.cc)
-#  target_link_libraries(filter_bench${ARTIFACT_SUFFIX}
-#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-#
-#  add_executable(hash_table_bench${ARTIFACT_SUFFIX}
-#    utilities/persistent_cache/hash_table_bench.cc)
-#  target_link_libraries(hash_table_bench${ARTIFACT_SUFFIX}
-#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-#endif()
-
-#option(WITH_TRACE_TOOLS "build with trace tools" ON)
-#if(WITH_TRACE_TOOLS)
-#  add_executable(block_cache_trace_analyzer${ARTIFACT_SUFFIX}
-#    tools/block_cache_analyzer/block_cache_trace_analyzer_tool.cc)
-#  target_link_libraries(block_cache_trace_analyzer${ARTIFACT_SUFFIX}
-#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-#
-#  add_executable(trace_analyzer${ARTIFACT_SUFFIX}
-#    tools/trace_analyzer.cc)
-#  target_link_libraries(trace_analyzer${ARTIFACT_SUFFIX}
-#    ${ROCKSDB_LIB} ${GFLAGS_LIB} ${FOLLY_LIBS})
-#
-#endif()
 
 option(WITH_EXAMPLES "build with examples" OFF)
 if(WITH_EXAMPLES)
