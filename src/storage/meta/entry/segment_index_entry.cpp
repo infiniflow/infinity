@@ -662,7 +662,7 @@ void SegmentIndexEntry::GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> 
                              add,
                              chunk_index_entry->chunk_id_,
                              chunk_index_entry->deprecate_ts_.load(),
-                             txn->TxnID()));
+                             txn_id_str));
         if (add) {
             chunk_index_entries.push_back(chunk_index_entry);
         }
