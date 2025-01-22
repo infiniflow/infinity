@@ -40,6 +40,8 @@ struct DateType {
 
     int32_t value{0};
 
+    int64_t GetEpochTime() const;
+
 private:
     static bool ConvertFromString(const char *date_ptr, size_t length, DateType &date, size_t &end_length);
 
