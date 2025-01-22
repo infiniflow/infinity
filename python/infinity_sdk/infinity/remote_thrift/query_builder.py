@@ -382,6 +382,21 @@ class InfinityThriftQueryBuilder(ABC):
                     expr_type = ParsedExprType(function_expr=func_expr)
                     parsed_expr = ParsedExpr(type=expr_type)
                     select_list.append(parsed_expr)
+                case "_current_date":
+                    func_expr = FunctionExpr(function_name="currentdate", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case "_current_time":
+                    func_expr = FunctionExpr(function_name="currenttime", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
+                case "_current_timestamp":
+                    func_expr = FunctionExpr(function_name="currenttimestamp", arguments=[])
+                    expr_type = ParsedExprType(function_expr=func_expr)
+                    parsed_expr = ParsedExpr(type=expr_type)
+                    select_list.append(parsed_expr)
                 case "_score_factors":
                     func_expr = FunctionExpr(function_name="score_factors", arguments=[])
                     expr_type = ParsedExprType(function_expr=func_expr)
