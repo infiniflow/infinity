@@ -34,6 +34,9 @@ export enum class SpecialType {
     kCreateTs,
     kDeleteTs,
     kFilterFullText,
+    kCurrentDate,
+    KCurrentTime,
+    KCurrentTimestamp
 };
 
 export class SpecialFunction final : public Function {

@@ -63,6 +63,8 @@ public:
     static int64_t GetDatePart(DateTypeStd input, TimeUnit unit);
 
     static bool OuterDate2YMD(int32_t days, std::chrono::year_month_day &ymd);
+
+    static bool OuterYMD2Date(const std::chrono::year_month_day &ymd, DateTypeStd &date);
 };
 
 } // namespace infinity

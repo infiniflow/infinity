@@ -409,7 +409,7 @@ struct SQL_LTYPE {
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 %token ADMIN LEADER FOLLOWER LEARNER CONNECT STANDALONE NODES NODE REMOVE SNAPSHOT SNAPSHOTS RECOVER RESTORE
 %token PERSISTENCE OBJECT OBJECTS FILES MEMORY ALLOCATION HISTORY
-
+%token CURRENTDATE
 %token NUMBER
 
 /* nonterminal symbol */
@@ -3200,6 +3200,12 @@ function_expr : IDENTIFIER '(' ')' {
     free($1);
     func_expr->arguments_ = $4;
     func_expr->distinct_ = true;
+    $$ = func_expr;
+}
+| CURRENTDATE '(' ')' {
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "currentdate";
+    func_expr->arguments_ = nullptr;
     $$ = func_expr;
 }
 | YEAR '(' expr ')' {

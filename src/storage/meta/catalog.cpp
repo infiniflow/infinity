@@ -526,7 +526,10 @@ void Catalog::AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFuncti
         case SpecialType::kSimilarityFactors:
         case SpecialType::kScore:
         case SpecialType::kScoreFactors:
-        case SpecialType::kFilterFullText: {
+        case SpecialType::kFilterFullText:
+        case SpecialType::kCurrentDate:
+        case SpecialType::kCurrentTime:
+        case SpecialType::KCurrentTimestamp:{
             return;
         }
         case SpecialType::kCreateTs:

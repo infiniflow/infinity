@@ -98,7 +98,10 @@ SharedPtr<BaseExpression> RefencecColumnCollection::VisitReplace(const SharedPtr
             case SpecialType::kScore:
             case SpecialType::kDistanceFactors:
             case SpecialType::kSimilarityFactors:
-            case SpecialType::kScoreFactors: {
+            case SpecialType::kScoreFactors:
+            case SpecialType::kCurrentDate:
+            case SpecialType::kCurrentTime:
+            case SpecialType::KCurrentTimestamp: {
                 return expression;
             }
             default: {

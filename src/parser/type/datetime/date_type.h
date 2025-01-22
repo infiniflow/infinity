@@ -74,7 +74,7 @@ public:
 
     static bool OuterDate2YMD(DateType input, int32_t &year, int32_t &month, int32_t &day);
 
-    static bool OuterYMD2Date(DateType input, int32_t &year, int32_t &month, int32_t &day);
+    static bool OuterYMD2Date(int32_t year, int32_t month, int32_t day, DateType &date);
 };
 
 } // namespace infinity
