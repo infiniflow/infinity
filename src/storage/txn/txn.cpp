@@ -512,6 +512,8 @@ Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetCollectionByName"};
 }
 
+Status Txn::LockTable(const String &db_ame, const String &table_name) { return Status::OK(); }
+
 Status Txn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: CreateView"};
 }

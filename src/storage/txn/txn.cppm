@@ -128,7 +128,7 @@ public:
 
     Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
-    Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);
+    Status RenameTable(const String &old_table_name, const String &new_table_name);
 
     Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs);
 
@@ -143,6 +143,8 @@ public:
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
+
+    Status LockTable(const String &db_name, const String &table_name);
 
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 
@@ -262,21 +264,21 @@ private:
 
     void CheckTxn(const String &db_name);
 
-//private:
-//    // Legacy ops
-//    Status CreateDatabaseInternalLegacy(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
-//    Status DropDatabaseInternalLegacy(const String &db_name, ConflictType conflict_type);
-//    Tuple<DBEntry *, Status> GetDatabaseInternalLegacy(const String &db_name);
-//    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfoInternalLegacy(const String &db_name);
-//    Vector<DatabaseDetail> ListDatabasesInternalLegacy();
-//
-//private:
-//    // New ops
-//    Status CreateDatabaseInternal(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
-//    Status DropDatabaseInternal(const String &db_name, ConflictType conflict_type);
-//    Tuple<DBEntry *, Status> GetDatabaseInternal(const String &db_name);
-//    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfoInternal(const String &db_name);
-//    Vector<DatabaseDetail> ListDatabasesInternal();
+    // private:
+    //     // Legacy ops
+    //     Status CreateDatabaseInternalLegacy(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
+    //     Status DropDatabaseInternalLegacy(const String &db_name, ConflictType conflict_type);
+    //     Tuple<DBEntry *, Status> GetDatabaseInternalLegacy(const String &db_name);
+    //     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfoInternalLegacy(const String &db_name);
+    //     Vector<DatabaseDetail> ListDatabasesInternalLegacy();
+    //
+    // private:
+    //     // New ops
+    //     Status CreateDatabaseInternal(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
+    //     Status DropDatabaseInternal(const String &db_name, ConflictType conflict_type);
+    //     Tuple<DBEntry *, Status> GetDatabaseInternal(const String &db_name);
+    //     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfoInternal(const String &db_name);
+    //     Vector<DatabaseDetail> ListDatabasesInternal();
 
 private:
     // Reference to external class
