@@ -35,6 +35,9 @@ export {
     constexpr std::string_view COLUMN_NAME_DELETE = "__delete";
     constexpr std::string_view COLUMN_NAME_SCORE = "__score";
     constexpr std::string_view COLUMN_NAME_DISTANCE = "__distance";
+    constexpr std::string_view COLUMN_NAME_CURRENTDATE = "__current_date";
+    constexpr std::string_view COLUMN_NAME_CURRENTTIME = "__current_time";
+    constexpr std::string_view COLUMN_NAME_CURRENTTIMESTAMP = "__current_timestamp";
 
     // type related constants
     constexpr i64 MAX_VARCHAR_SIZE = 65536;

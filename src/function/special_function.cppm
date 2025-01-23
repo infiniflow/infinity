@@ -35,7 +35,7 @@ export enum class SpecialType {
     kDeleteTs,
     kFilterFullText,
     kCurrentDate,
-    KCurrentTime,
+    kCurrentTime,
     KCurrentTimestamp
 };
 

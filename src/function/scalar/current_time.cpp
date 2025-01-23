@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module;
+#include <chrono>
 module current_time;
 import stl;
 import catalog;
@@ -26,7 +27,7 @@ import data_type;
 import column_vector;
 
 namespace infinity {
-
+using namespace std::chrono;
 struct CurrentTimeFunction {
     template <typename TA>
     static inline void Run(TA &result) {

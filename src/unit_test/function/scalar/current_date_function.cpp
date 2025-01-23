@@ -74,7 +74,6 @@ TEST_P(CurrentDateFunctionsTest, current_date_func) {
 
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
         result->Initialize();
-        std::cout << result->capacity() << std::endl;
         func.function_no_(result);
         Value v = result->GetValue(0);
         EXPECT_EQ(v.type_.type(), LogicalType::kDate);

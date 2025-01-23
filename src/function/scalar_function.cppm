@@ -74,19 +74,6 @@ struct TernaryOpDirectWrapper {
     }
 };
 
-// template <typename Operator>
-// struct NullaryTryOpWrapper {
-//     template <typename TargetValueType>
-//     inline static void Execute(TargetValueType &result, Bitmask *nulls_ptr, void *, void *) {
-//         if (Operator::template Run<TargetValueType>(result)) {
-//             return;
-//         }
-
-//         nulls_ptr->SetFalse(idx);
-//         result = NullValue<TargetValueType>();
-//     }
-// };
-
 template <typename Operator>
 struct UnaryTryOpWrapper {
     template <typename SourceValueType, typename TargetValueType>
@@ -128,15 +115,6 @@ struct TernaryTryOpWrapper {
     }
 };
 
-// template <typename Operator>
-// struct NullaryOpDirectToVarlenWrapper {
-//     template <typename TargetValueType>
-//     inline static void Execute(TargetValueType &result, Bitmask *, SizeT, void *, void *state_ptr) {
-//         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
-//         return Operator::template Run<TargetValueType>(result, function_data_ptr->column_vector_ptr_);
-//     }
-// };
-
 template <typename Operator>
 struct UnaryOpDirectToVarlenWrapper {
     template <typename SourceValueType, typename TargetValueType>
@@ -167,20 +145,6 @@ struct TernaryOpDirectToVarlenWrapper {
                                                                                     function_data_ptr->column_vector_ptr_);
     }
 };
-
-// template <typename Operator>
-// struct NullaryTryOpToVarlenWrapper {
-//     template <typename TargetValueType>
-//     inline static void Execute(TargetValueType &result, Bitmask *nulls_ptr, SizeT idx, void *, void *state_ptr) {
-//         auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
-//         if (Operator::template Run<TargetValueType>(result, function_data_ptr->column_vector_ptr_)) {
-//             return;
-//         }
-
-//         nulls_ptr->SetFalse(idx);
-//         result = NullValue<TargetValueType>();
-//     }
-// };
 
 template <typename Operator>
 struct UnaryTryOpToVarlenWrapper {

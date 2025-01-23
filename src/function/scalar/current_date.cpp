@@ -34,12 +34,24 @@ struct CurrentDateFunction {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
         return;
-        // auto now = system_clock::now();
-        // zoned_time local_time(current_zone(), now);
-        // year_month_day ymd = floor<std::chrono::days>(local_time.get_local_time());
     }
 
 };
+template <>
+inline void CurrentDateFunction::Run(DateT &result) {
+        auto now = system_clock::now();
+        auto sys_days = std::chrono::floor<std::chrono::days>(now);
+        std::chrono::year_month_day ymd = std::chrono::year_month_day(sys_days);
+        DateT::OuterYMD2Date(ymd, result);
+}
+
+// template <>
+// inline void CurrentDateFunction::Run(VarchatT &left, DateT &result) {
+//         auto now = system_clock::now();
+//         auto sys_days = std::chrono::floor<std::chrono::days>(now);
+//         std::chrono::year_month_day ymd = std::chrono::year_month_day(sys_days);
+//         DateT::OuterYMD2Date(ymd, result);
+// }
 
 void RegisterCurrentDateFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "currentdate";
@@ -47,7 +59,7 @@ void RegisterCurrentDateFunction(const UniquePtr<Catalog> &catalog_ptr) {
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction current_date_function(func_name,
-                                  {DataType(LogicalType::kDate)},
+                                  DataType(LogicalType::kDate),
                                   &ScalarFunction::NullaryFunction<DateT, CurrentDateFunction>);
     function_set_ptr->AddFunction(current_date_function);
 

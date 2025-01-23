@@ -3205,7 +3205,13 @@ function_expr : IDENTIFIER '(' ')' {
 | CURRENTDATE '(' ')' {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "currentdate";
-    func_expr->arguments_ = nullptr;
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
+    $$ = func_expr;
+}
+| CURRENTDATE {
+    infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
+    func_expr->func_name_ = "currentdate";
+    func_expr->arguments_ = new std::vector<infinity::ParsedExpr*>();
     $$ = func_expr;
 }
 | YEAR '(' expr ')' {

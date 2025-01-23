@@ -34,6 +34,10 @@ ScalarFunction::ScalarFunction(String name, Vector<DataType> argument_types, Dat
     : Function(std::move(name), FunctionType::kScalar), parameter_types_(std::move(argument_types)), return_type_(std::move(return_type)),
       function_(std::move(function)) {}
 
+ScalarFunction::ScalarFunction(String name, DataType return_type, ScalarFunctionTypePtrWithNoInput function)
+    : Function(std::move(name), FunctionType::kScalar), return_type_(std::move(return_type)),
+      function_no_(std::move(function)) {}
+
 void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) {
     // Check and add a cast function to cast the input arguments expression type to target type
     auto arguments_count = input_arguments.size();
@@ -62,7 +66,7 @@ String ScalarFunction::ToString() const {
     ss << name_;
     auto parameter_count = parameter_types_.size();
     if (parameter_count == 0) {
-        ss << "()";
+        ss << "()->" << return_type_.ToString();;
 
     } else {
         ss << "(";

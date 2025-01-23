@@ -13,7 +13,6 @@
 // limitations under the License.
 
 module;
-
 #include <sstream>
 
 module scalar_function_set;
@@ -30,9 +29,13 @@ import third_party;
 
 namespace infinity {
 
-ScalarFunctionSet::~ScalarFunctionSet() { functions_.clear(); }
+ScalarFunctionSet::~ScalarFunctionSet() { 
+    functions_.clear(); 
+}
 
-void ScalarFunctionSet::AddFunction(const ScalarFunction &func) { functions_.emplace_back(func); }
+void ScalarFunctionSet::AddFunction(const ScalarFunction &func) { 
+    functions_.emplace_back(func); 
+}
 
 ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> &input_arguments) {
 
@@ -81,6 +84,10 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
     }
 
     return functions_[candidates_index[0]];
+}
+
+ScalarFunction ScalarFunctionSet::GetMostMatchFunctionWithNoInput() {
+    return functions_[0];
 }
 
 i64 ScalarFunctionSet::MatchFunctionCost(const ScalarFunction &func, const Vector<SharedPtr<BaseExpression>> &arguments) {
