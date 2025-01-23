@@ -69,6 +69,7 @@ TEST_P(CurrentDateFunctionsTest, current_date_func) {
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kDate);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunctionWithNoInput();
+
         EXPECT_STREQ("currentdate()->Date", func.ToString().c_str());
 
 

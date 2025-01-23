@@ -15,6 +15,7 @@
 module;
 
 #include <string>
+#include <iostream>
 
 module expression_binder;
 
@@ -95,6 +96,8 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
     // Call implemented BuildExpression
 
     SharedPtr<BaseExpression> result = BuildExpression(expr, bind_context_ptr, depth, root);
+    std::cout << expr.GetName() << std::endl;
+    
     if (result.get() == nullptr) {
         if (result.get() == nullptr) {
             Status status = Status::SyntaxError(fmt::format("Fail to bind the expression: {}", expr.GetName()));

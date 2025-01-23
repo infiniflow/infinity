@@ -13,7 +13,7 @@
 // limitations under the License.
 
 module;
-
+#include <iostream>
 module project_binder;
 
 import stl;
@@ -58,6 +58,12 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
     String expr_name = expr.GetName();
 
     // Covert avg function expr to (sum / count) function expr
+    if (expr.GetName().compare("currentdate") == 0) {
+        if (expr.type_ == ParsedExprType::kFunction) {
+            std::cout << "YES" << std::endl;
+        }
+    }
+
     if (expr.type_ == ParsedExprType::kFunction) {
         auto &function_expression = (FunctionExpr &)expr;
         auto special_function = TryBuildSpecialFuncExpr(function_expression, bind_context_ptr, depth);
