@@ -28,6 +28,7 @@ import data_block;
 import value;
 import data_type;
 import type_info;
+import array_info;
 import logical_type;
 import in_expr;
 import constant_expr;
@@ -45,6 +46,7 @@ import logger;
 import query_options;
 import search_options;
 import defer_op;
+import infinity_thrift_service;
 
 namespace infinity {
 
@@ -170,6 +172,22 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
         }
         case LiteralType::kInterval: {
             constant_expr->date_value_ = strdup(str_value.c_str());
+            break;
+        }
+        case LiteralType::kCurlyBracketsArray: {
+            for (SizeT i = 0; i < curly_brackets_array.size(); ++i) {
+                UniquePtr<ParsedExpr> element_expr{curly_brackets_array[i]->GetParsedExpr(status)};
+                if (!status.ok()) {
+                    return nullptr;
+                }
+                const auto element_constant_expr = dynamic_cast<ConstantExpr *>(element_expr.get());
+                if (!element_constant_expr) {
+                    status = Status::InvalidConstantType();
+                    return nullptr;
+                }
+                constant_expr->curly_brackets_array_.emplace_back(element_constant_expr);
+                element_expr.release();
+            }
             break;
         }
         default: {
@@ -693,29 +711,40 @@ WrapQueryResult WrapQuery(Infinity &instance, const String &query_text) {
 
 namespace {
 
+DataType GetDataTypeFromWrapDataType(const WrapDataType &warp_data_type) {
+    SharedPtr<TypeInfo> type_info_ptr = nullptr;
+    switch (warp_data_type.logical_type) {
+        case LogicalType::kEmbedding:
+        case LogicalType::kMultiVector:
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray: {
+            auto &embedding_type = warp_data_type.embedding_type;
+            type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
+            break;
+        }
+        case LogicalType::kSparse: {
+            auto &sparse_type = warp_data_type.sparse_type;
+            type_info_ptr = SparseInfo::Make(sparse_type.element_type, sparse_type.index_type, sparse_type.dimension, SparseStoreType::kSort);
+            break;
+        }
+        case LogicalType::kArray: {
+            auto &array_type = warp_data_type.array_type;
+            auto element_data_type = GetDataTypeFromWrapDataType(*array_type);
+            type_info_ptr = ArrayInfo::Make(std::move(element_data_type));
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+    DataType data_type(warp_data_type.logical_type, type_info_ptr);
+    return data_type;
+}
+
 Optional<WrapQueryResult> UnwrapColumnDefs(Vector<WrapColumnDef> &column_defs, Vector<ColumnDef *> &column_defs_ptr) {
     for (SizeT i = 0; i < column_defs.size(); ++i) {
         auto &wrap_column_def = column_defs[i];
-        SharedPtr<TypeInfo> type_info_ptr = nullptr;
-        switch (wrap_column_def.column_type.logical_type) {
-            case LogicalType::kEmbedding:
-            case LogicalType::kMultiVector:
-            case LogicalType::kTensor:
-            case LogicalType::kTensorArray: {
-                auto &embedding_type = wrap_column_def.column_type.embedding_type;
-                type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
-                break;
-            }
-            case LogicalType::kSparse: {
-                auto &sparse_type = wrap_column_def.column_type.sparse_type;
-                type_info_ptr = SparseInfo::Make(sparse_type.element_type, sparse_type.index_type, sparse_type.dimension, SparseStoreType::kSort);
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-        auto column_type = MakeShared<DataType>(wrap_column_def.column_type.logical_type, type_info_ptr);
+        auto column_type = MakeShared<DataType>(GetDataTypeFromWrapDataType(wrap_column_def.column_type));
         Status status;
         SharedPtr<ParsedExpr> default_expr(wrap_column_def.constant_expr.GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
@@ -1213,6 +1242,22 @@ void HandleTimeRelatedTypes(ColumnField &output_column_field, SizeT row_count, c
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
 }
 
+extern template void InfinityThriftService::HandleArrayTypeRecursively<ArrayT>(String &output_str, const DataType &data_type, const ArrayT &data_value, const SharedPtr<ColumnVector> &column_vector);
+
+void HandleArrayType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+    const auto &column_data_type = *column_vector->data_type();
+    if (column_data_type.type() != LogicalType::kArray) {
+        UnrecoverableError(fmt::format("{}: Unexpected data type: {}, expect Array!", __func__, column_vector->data_type()->ToString()));
+    }
+    auto *array_data_ptr = reinterpret_cast<const ArrayT *>(column_vector->data());
+    String dst;
+    for (SizeT index = 0; index < row_count; ++index) {
+        InfinityThriftService::HandleArrayTypeRecursively(dst, column_data_type, array_data_ptr[index], column_vector);
+    }
+    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_type = column_vector->data_type()->type();
+}
+
 void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     switch (column_vector->data_type()->type()) {
         case LogicalType::kBoolean: {
@@ -1267,6 +1312,10 @@ void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, c
             HandleTimeRelatedTypes(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kArray: {
+            HandleArrayType(output_column_field, row_count, column_vector);
+            break;
+        }
         default: {
             throw UnrecoverableException("Unsupported column type");
         }
@@ -1283,8 +1332,8 @@ void ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, 
     }
 }
 
-void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataType> &data_type) {
-    switch (data_type->type()) {
+void DataTypeToWrapDataType(WrapDataType &proto_data_type, const DataType &data_type) {
+    switch (data_type.type()) {
         case LogicalType::kBoolean:
         case LogicalType::kTinyInt:
         case LogicalType::kSmallInt:
@@ -1299,37 +1348,45 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
         case LogicalType::kDateTime:
         case LogicalType::kInterval:
         case LogicalType::kTimestamp: {
-            proto_data_type.logical_type = data_type->type();
+            proto_data_type.logical_type = data_type.type();
             break;
         }
         case LogicalType::kVarchar: {
-            proto_data_type.logical_type = data_type->type();
+            proto_data_type.logical_type = data_type.type();
             break;
         }
         case LogicalType::kMultiVector:
         case LogicalType::kTensor:
         case LogicalType::kTensorArray:
         case LogicalType::kEmbedding: {
-            proto_data_type.logical_type = data_type->type();
+            proto_data_type.logical_type = data_type.type();
             WrapEmbeddingType &embedding_type = proto_data_type.embedding_type;
 
-            auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type.type_info().get());
             embedding_type.dimension = embedding_info->Dimension();
             embedding_type.element_type = embedding_info->Type();
             break;
         }
         case LogicalType::kSparse: {
-            proto_data_type.logical_type = data_type->type();
+            proto_data_type.logical_type = data_type.type();
             WrapSparseType &sparse_type = proto_data_type.sparse_type;
 
-            auto sparse_info = static_cast<SparseInfo *>(data_type->type_info().get());
+            auto sparse_info = static_cast<SparseInfo *>(data_type.type_info().get());
             sparse_type.dimension = sparse_info->Dimension();
             sparse_type.element_type = sparse_info->DataType();
             sparse_type.index_type = sparse_info->IndexType();
             break;
         }
+        case LogicalType::kArray: {
+            proto_data_type.logical_type = data_type.type();
+            proto_data_type.array_type = MakeShared<WrapDataType>();
+            const auto array_info = static_cast<const ArrayInfo *>(data_type.type_info().get());
+            const auto &element_data_type = array_info->ElemType();
+            DataTypeToWrapDataType(*proto_data_type.array_type, element_data_type);
+            break;
+        }
         default: {
-            String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
+            String error_message = fmt::format("Invalid logical data type: {}", data_type.ToString());
             UnrecoverableError(error_message);
         }
     }
@@ -1345,7 +1402,7 @@ void HandleColumnDef(WrapQueryResult &wrap_query_result, SizeT column_count, Sha
         proto_column_def.column_name = column_def->name();
 
         WrapDataType &proto_data_type = proto_column_def.column_type;
-        DataTypeToWrapDataType(proto_data_type, column_def->type());
+        DataTypeToWrapDataType(proto_data_type, *column_def->type());
         proto_column_def.comment = column_def->comment();
 
         wrap_query_result.column_defs.emplace_back(proto_column_def);

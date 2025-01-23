@@ -160,6 +160,10 @@ public:
 
     void Compact(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::CompactRequest &request) final;
 
+    template <typename T>
+    static void
+    HandleArrayTypeRecursively(String &output_str, const DataType &data_type, const T &data_value, const SharedPtr<ColumnVector> &column_vector);
+
 private:
     Tuple<Infinity *, Status> GetInfinityBySessionID(i64 session_id);
 
@@ -231,10 +235,6 @@ private:
     static void HandleBoolType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
     static void HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
-
-    template <typename T>
-    static void
-    HandleArrayTypeRecursively(String &output_str, const DataType &data_type, const T &data_value, const SharedPtr<ColumnVector> &column_vector);
 
     static void HandleArrayType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
