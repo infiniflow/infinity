@@ -654,6 +654,29 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             order_by_expr = nullptr;
         }
     }
+    Vector<ParsedExpr *> *group_by_list = nullptr;
+    DeferFn defer_fn10([&]() {
+        if (group_by_list != nullptr) {
+            for (auto &expr_ptr : *group_by_list) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete group_by_list;
+            group_by_list = nullptr;
+        }
+    });
+    if (!request.group_by_list.empty()) {
+        group_by_list = new Vector<ParsedExpr *>();
+        group_by_list->reserve(request.group_by_list.size());
+        for (auto &expr : request.group_by_list) {
+            auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
+            group_by_list->emplace_back(parsed_expr);
+        }
+    }
 
     // auto end2 = std::chrono::steady_clock::now();
     // phase_2_duration_ += end2 - start2;
@@ -669,7 +692,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
                                                 output_columns,
                                                 highlight_columns,
                                                 order_by_list,
-                                                nullptr,
+                                                group_by_list,
                                                 request.total_hits_count);
     output_columns = nullptr;
     highlight_columns = nullptr;
@@ -678,6 +701,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     limit = nullptr;
     offset = nullptr;
     order_by_list = nullptr;
+    group_by_list = nullptr;
     // auto end3 = std::chrono::steady_clock::now();
     //
     // phase_3_duration_ += end3 - start3;
