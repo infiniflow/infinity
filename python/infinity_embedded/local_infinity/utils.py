@@ -32,6 +32,11 @@ from infinity_embedded.embedded_infinity_ext import WrapEmbeddingType, WrapColum
 
 
 def traverse_conditions(cons, fn=None):
+    if isinstance(cons, exp.Alias):
+        expr = traverse_conditions(cons.args['this'])
+        expr.alias_name = cons.alias
+        return expr
+
     if isinstance(cons, exp.Binary):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()

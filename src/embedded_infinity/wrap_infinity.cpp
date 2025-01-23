@@ -508,34 +508,50 @@ ParsedExpr *WrapInExpr::GetParsedExpr(Status &status) {
 }
 
 ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
+    ParsedExpr *result = nullptr;
     status.code_ = ErrorCode::kOk;
     switch (type) {
         case ParsedExprType::kConstant:
-            return constant_expr.GetParsedExpr(status);
+            result = constant_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kColumn:
-            return column_expr.GetParsedExpr(status);
+            result = column_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kFunction:
-            return function_expr.GetParsedExpr(status);
+            result = function_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kBetween:
-            return between_expr.GetParsedExpr(status);
+            result = between_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kKnn:
-            return knn_expr.GetParsedExpr(status);
+            result = knn_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kMatch:
-            return match_expr.GetParsedExpr(status);
+            result = match_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kMatchSparse:
-            return match_sparse_expr.GetParsedExpr(status);
+            result = match_sparse_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kMatchTensor:
-            return match_tensor_expr.GetParsedExpr(status);
+            result = match_tensor_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kFusion:
-            return fusion_expr.GetParsedExpr(status);
+            result = fusion_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kSearch:
-            return search_expr.GetParsedExpr(status);
+            result = search_expr.GetParsedExpr(status);
+            break;
         case ParsedExprType::kIn:
-            return in_expr.GetParsedExpr(status);
+            result = in_expr.GetParsedExpr(status);
+            break;
         default:
             status = Status::InvalidParsedExprType();
+            break;
     }
-    return nullptr;
+    if (result) {
+        result->alias_ = alias_name;
+    }
+    return result;
 }
 
 OrderByExpr *WrapOrderByExpr::GetOrderByExpr(Status &status) {

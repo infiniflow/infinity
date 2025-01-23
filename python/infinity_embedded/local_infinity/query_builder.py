@@ -421,6 +421,18 @@ class InfinityLocalQueryBuilder(ABC):
         self._offset = offset_expr
         return self
 
+    def group_by(self, columns: List[str] | str):
+        group_by_list = []
+        if isinstance(columns, list):
+            for column in columns:
+                parsed_expr = parse_expr(maybe_parse(column))
+                group_by_list.append(parsed_expr)
+        else:
+            parsed_expr = parse_expr(maybe_parse(columns))
+            group_by_list.append(parsed_expr)
+        self._group_by = group_by_list
+        return self
+
     def output(self, columns: Optional[list]) -> InfinityLocalQueryBuilder:
         self._columns = columns
         select_list: List[WrapParsedExpr] = []

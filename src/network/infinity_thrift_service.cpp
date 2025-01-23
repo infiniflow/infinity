@@ -2408,7 +2408,9 @@ ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const 
     } else {
         status = Status::InvalidParsedExprType();
     }
-    result->alias_ = expr.alias_name;
+    if (result) {
+        result->alias_ = expr.alias_name;
+    }
     return result;
 }
 
