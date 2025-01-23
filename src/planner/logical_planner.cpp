@@ -1245,7 +1245,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
-            auto [db_entry, status] = txn->GetDatabase(use_command_info->db_name());
+            Status status = txn->GetDatabase(use_command_info->db_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
                     MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);

@@ -239,11 +239,11 @@ Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     return Status::OK();
 }
 
-Tuple<DBEntry *, Status> Txn::GetDatabase(const String &db_name) {
+Status Txn::GetDatabase(const String &db_name) {
     this->CheckTxnStatus();
     TxnTimeStamp begin_ts = this->BeginTS();
-
-    return catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
+    auto [db_entry, status] = catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
+    return status;
 }
 
 Tuple<SharedPtr<DatabaseInfo>, Status> Txn::GetDatabaseInfo(const String &db_name) {

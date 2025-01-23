@@ -119,7 +119,6 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
     auto db_name2 = std::make_shared<std::string>("db2");
     auto db_name3 = std::make_shared<std::string>("db3");
 
-    std::shared_ptr<std::string> db_entry_dir1;
     {
         InfinityContext::instance().InitPhase1(config_path);
         InfinityContext::instance().InitPhase2();
@@ -134,10 +133,8 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
             txn->CreateDatabase(db_name2, ConflictType::kError, MakeShared<String>());
             txn->DropDatabase(*db_name2, ConflictType::kError);
 
-            auto [db_entry, status] = txn->GetDatabase(*db_name1);
-            EXPECT_TRUE(status.ok() && db_entry != nullptr);
-            db_entry_dir1 = db_entry->db_entry_dir();
-
+            Status status = txn->GetDatabase(*db_name1);
+            EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
@@ -159,17 +156,15 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
             {
-                auto [db_entry, status] = txn->GetDatabase(*db_name1);
-                ASSERT_TRUE(status.ok() && db_entry != nullptr);
-                EXPECT_EQ(*db_entry->db_name_ptr(), *db_name1);
-                EXPECT_EQ(*db_entry->db_entry_dir(), *db_entry_dir1);
+                Status status = txn->GetDatabase(*db_name1);
+                ASSERT_TRUE(status.ok());
             }
             {
-                auto [db_entry, status] = txn->GetDatabase(*db_name2);
+                Status status = txn->GetDatabase(*db_name2);
                 EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
             }
             {
-                auto [db_entry, status] = txn->GetDatabase(*db_name3);
+                Status status = txn->GetDatabase(*db_name3);
                 EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
             }
             txn_mgr->CommitTxn(txn);
@@ -909,7 +904,6 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
 }
 
 TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
-    std::shared_ptr<std::string> db_entry_dir;
     auto db_name = std::make_shared<std::string>("db1");
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -930,9 +924,8 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
 
             txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
 
-            auto [db_entry, status] = txn->GetDatabase(*db_name);
+            Status status = txn->GetDatabase(*db_name);
             EXPECT_TRUE(status.ok());
-            db_entry_dir = db_entry->db_entry_dir();
 
             txn_mgr->CommitTxn(txn);
         }

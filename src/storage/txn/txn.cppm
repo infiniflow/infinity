@@ -117,7 +117,7 @@ public:
 
     Status DropDatabase(const String &db_name, ConflictType conflict_type);
 
-    Tuple<DBEntry *, Status> GetDatabase(const String &db_name);
+    Status GetDatabase(const String &db_name);
 
     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name);
 
@@ -261,6 +261,22 @@ private:
     void CheckTxnStatus();
 
     void CheckTxn(const String &db_name);
+
+//private:
+//    // Legacy ops
+//    Status CreateDatabaseInternalLegacy(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
+//    Status DropDatabaseInternalLegacy(const String &db_name, ConflictType conflict_type);
+//    Tuple<DBEntry *, Status> GetDatabaseInternalLegacy(const String &db_name);
+//    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfoInternalLegacy(const String &db_name);
+//    Vector<DatabaseDetail> ListDatabasesInternalLegacy();
+//
+//private:
+//    // New ops
+//    Status CreateDatabaseInternal(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
+//    Status DropDatabaseInternal(const String &db_name, ConflictType conflict_type);
+//    Tuple<DBEntry *, Status> GetDatabaseInternal(const String &db_name);
+//    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfoInternal(const String &db_name);
+//    Vector<DatabaseDetail> ListDatabasesInternal();
 
 private:
     // Reference to external class

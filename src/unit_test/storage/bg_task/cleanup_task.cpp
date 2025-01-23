@@ -91,8 +91,8 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
     WaitCleanup(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
-        auto [db_entry, status] = txn->GetDatabase(*db_name);
-        EXPECT_EQ(db_entry, nullptr);
+        Status status = txn->GetDatabase(*db_name);
+        EXPECT_FALSE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
 }
@@ -135,8 +135,8 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
-        auto [db_entry, status] = txn->GetDatabase(*db_name);
-        EXPECT_EQ(db_entry, nullptr);
+        Status status = txn->GetDatabase(*db_name);
+        EXPECT_FALSE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
 }
