@@ -40,6 +40,8 @@ def setup_class(request, local_infinity, http):
         globals()['InfinityException'] = func
         func = getattr(module, 'SparseVector')
         globals()['SparseVector'] = func
+        func = getattr(module, 'Array')
+        globals()['Array'] = func
         uri = common_values.TEST_LOCAL_PATH
         request.cls.infinity_obj = infinity_embedded.connect(uri)
     elif http:
