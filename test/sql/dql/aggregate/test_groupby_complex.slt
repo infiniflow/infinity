@@ -29,6 +29,13 @@ SELECT c1, c2, SUM(c3) FROM simple_groupby GROUP BY c1, c2;
 2 2 10.000000
 2 3 10.000000
 
+query IIR rowsort
+SELECT c1, c2, SUM(c3) FROM simple_groupby WHERE c1 > 1 GROUP BY c1, c2;
+----
+2 1 6.000000
+2 2 10.000000
+2 3 10.000000
+
 query IRI rowsort
 SELECT c1, c3, SUM(c2) FROM simple_groupby GROUP BY c1, c3;
 ----
@@ -65,12 +72,29 @@ SELECT c3, COUNT(c3), SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3;
 7.000000 1 1 1
 8.000000 1 2 2
 
-query IIR rowsort
-SELECT c1, c2, SUM(c3) FROM simple_groupby WHERE c1 > 1 GROUP BY c1, c2;
+query RII
+SELECT c3, SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3 ORDER BY c3 DESC;
 ----
-2 1 6.000000
-2 2 10.000000
-2 3 10.000000
+8.000000 2 2
+7.000000 1 1
+6.000000 2 3
+5.000000 1 2
+4.000000 4 4
+3.000000 2 5
+2.000000 4 3
+1.000000 2 4
+
+query RII
+SELECT c3, SUM(c1) AS sum1, SUM(c2) AS sum2 FROM simple_groupby GROUP BY c3 ORDER BY sum1, sum2;
+----
+7.000000 1 1
+5.000000 1 2
+8.000000 2 2
+6.000000 2 3
+1.000000 2 4
+3.000000 2 5
+2.000000 4 3
+4.000000 4 4
 
 statement ok
 DELETE FROM simple_groupby WHERE c1 <= 1;
