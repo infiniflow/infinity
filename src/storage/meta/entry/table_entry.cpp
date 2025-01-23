@@ -976,16 +976,29 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     Vector<RowID> base_rowids;
                     RowID base_rowid = chunk_index_entries[0]->base_rowid_;
                     u32 total_row_count = 0;
+
+                    for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
+                        auto &chunk_index_entry = chunk_index_entries[i];
+                        LOG_TRACE(fmt::format("Merge index, chunk_id: {}, base_name: {}, row_id: {}, row_count: {}",
+                                              chunk_index_entry->chunk_id_,
+                                              chunk_index_entry->base_name_,
+                                              chunk_index_entry->base_rowid_.ToUint64(),
+                                              chunk_index_entry->row_count_));
+                    }
+
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
                         msg += " " + chunk_index_entry->base_name_;
+
                         if (chunk_index_entry->base_rowid_ != chunk_index_entries[0]->base_rowid_ + total_row_count) {
                             String error_msg = fmt::format("{}... chunk_index_entry {} base_rowid expects to be {:016x}",
                                                            msg,
                                                            chunk_index_entry->base_name_,
                                                            (chunk_index_entries[0]->base_rowid_ + total_row_count).ToUint64());
 
-//                            merging text_index ft_0000000000000000_8000 ft_000000000000e000... chunk_index_entry ft_000000000000e000 base_rowid expects to be 0000000000008000@src/storage/meta/entry/table_entry.cpp:955
+                            //                            merging text_index ft_0000000000000000_8000 ft_000000000000e000... chunk_index_entry
+                            //                            ft_000000000000e000 base_rowid expects to be
+                            //                            0000000000008000@src/storage/meta/entry/table_entry.cpp:955
 
                             UnrecoverableError(error_msg);
                         }
