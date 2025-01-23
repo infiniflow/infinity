@@ -529,6 +529,9 @@ def get_data_type_from_column_big_info(column_big_info: list) -> WrapDataType:
             proto_column_type.array_type = get_data_type_from_column_big_info(column_big_info[1:])
             return proto_column_type
         case _:
+            if len(column_big_info) > 1:
+                raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                        f"Unknown datatype: {column_big_info}, too many arguments")
             proto_column_type = WrapDataType()
             match column_big_info_first_str:
                 case "int8":
