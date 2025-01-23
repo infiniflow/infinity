@@ -446,6 +446,43 @@ class TestInfinity:
         )
 
         res, extra_result = (
+            table_obj.output(["c1+c2", "sum(c3)"]).group_by(["c1+c2"]).to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "(c1 + c2)": [2, 3, 4, 5],
+                "sum(c3)": [8.0, 14.0, 14.0, 10.0],
+            }
+        ).astype({"(c1 + c2)": dtype("int32"), "sum(c3)": dtype("float64")})
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res, extra_result = (
+            table_obj.output(["abs(c1-c2)", "c1+c2", "sum(c3)"])
+            .group_by(["abs(c1-c2)", "c1+c2"])
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "abs((c1 - c2))": [0, 0, 1, 1, 2],
+                "(c1 + c2)": [2, 4, 3, 5, 4],
+                "sum(c3)": [8.0, 10.0, 14.0, 10.0, 4.0],
+            }
+        ).astype(
+            {
+                "abs((c1 - c2))": dtype("int32"),
+                "(c1 + c2)": dtype("int32"),
+                "sum(c3)": dtype("float64"),
+            }
+        )
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res, extra_result = (
             table_obj.output(["c1", "c2", "sum(c3)"])
             .filter("c1 > 1")
             .group_by(["c1", "c2"])
