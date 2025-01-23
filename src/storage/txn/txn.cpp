@@ -295,7 +295,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     return Status::OK();
 }
 
-Status Txn::RenameTable(TableEntry *old_table_entry, const String &new_table_name) {
+Status Txn::RenameTable(const String &old_table_name, const String &new_table_name) {
     UnrecoverableError("Not implemented yet");
     return Status::OK();
 }
