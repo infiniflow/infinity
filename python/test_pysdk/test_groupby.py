@@ -59,7 +59,7 @@ def setup_class(request, local_infinity, http):
 class TestInfinity:
 
     # test/sql/dql/aggregate/test_groupby_aggtype.slt
-    def test_group_by_aggtype(self, suffix):
+    def test_groupby_aggtype(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
 
         table_name = "test_simple_groupby" + suffix
@@ -139,7 +139,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     # test/sql/dql/aggregate/test_groupby_datatype.slt
-    def test_group_by_datatype(self, suffix):
+    def test_groupby_datatype(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
 
         table_name = "test_simple_groupby" + suffix
@@ -400,3 +400,201 @@ class TestInfinity:
             res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
             gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
         )
+
+    # test/sql/dql/aggregate/test_groupby_complex.slt
+    def test_groupby_complex(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
+
+        table_name = "test_simple_groupby" + suffix
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            table_name,
+            {
+                "c1": {"type": "int"},
+                "c2": {"type": "int"},
+                "c3": {"type": "float"},
+            },
+        )
+        table_obj.insert(
+            [
+                {"c1": 1, "c2": 1, "c3": 1.0},
+                {"c1": 2, "c2": 2, "c3": 2.0},
+                {"c1": 1, "c2": 3, "c3": 3.0},
+                {"c1": 2, "c2": 1, "c3": 4.0},
+                {"c1": 1, "c2": 2, "c3": 5.0},
+                {"c1": 2, "c2": 3, "c3": 6.0},
+                {"c1": 1, "c2": 1, "c3": 7.0},
+                {"c1": 2, "c2": 2, "c3": 8.0},
+                {"c1": 1, "c2": 3, "c3": 1.0},
+                {"c1": 2, "c2": 1, "c3": 2.0},
+                {"c1": 1, "c2": 2, "c3": 3.0},
+                {"c1": 2, "c2": 3, "c3": 4.0},
+            ]
+        )
+
+        res, extra_result = (
+            table_obj.output(["c1", "c2", "sum(c3)"]).group_by(["c1", "c2"]).to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c1": [1, 1, 1, 2, 2, 2],
+                "c2": [1, 2, 3, 1, 2, 3],
+                "sum(c3)": [8.0, 8.0, 4.0, 6.0, 10.0, 10.0],
+            }
+        ).astype(
+            {"c1": dtype("int32"), "c2": dtype("int32"), "sum(c3)": dtype("float64")}
+        )
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res, extra_result = (
+            table_obj.output(["c1", "c2", "sum(c3)"])
+            .filter("c1 > 1")
+            .group_by(["c1", "c2"])
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c1": [2, 2, 2],
+                "c2": [1, 2, 3],
+                "sum(c3)": [6.0, 10.0, 10.0],
+            }
+        ).astype(
+            {"c1": dtype("int32"), "c2": dtype("int32"), "sum(c3)": dtype("float64")}
+        )
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res, extra_result = (
+            table_obj.output(["c1", "c3", "sum(c2)"]).group_by(["c1", "c3"]).to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c1": [1, 1, 1, 1, 2, 2, 2, 2],
+                "c3": [1.0, 3.0, 5.0, 7.0, 2.0, 4.0, 6.0, 8.0],
+                "sum(c2)": [4, 5, 2, 1, 3, 4, 3, 2],
+            }
+        ).astype(
+            {"c1": dtype("int32"), "c3": dtype("float32"), "sum(c2)": dtype("int64")}
+        )
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res, extra_result = (
+            table_obj.output(["c3", "sum(c1)", "sum(c2)"]).group_by("c3").to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c3": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                "sum(c1)": [2, 4, 2, 4, 1, 2, 1, 2],
+                "sum(c2)": [4, 3, 5, 4, 2, 3, 1, 2],
+            }
+        ).astype(
+            {
+                "c3": dtype("float32"),
+                "sum(c1)": dtype("int64"),
+                "sum(c2)": dtype("int64"),
+            }
+        )
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res, extra_result = (
+            table_obj.output(["c3", "count(c3)", "sum(c1)", "sum(c2)"])
+            .group_by("c3")
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c3": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                "count(c3)": [2, 2, 2, 2, 1, 1, 1, 1],
+                "sum(c1)": [2, 4, 2, 4, 1, 2, 1, 2],
+                "sum(c2)": [4, 3, 5, 4, 2, 3, 1, 2],
+            }
+        ).astype(
+            {
+                "c3": dtype("float32"),
+                "count(c3)": dtype("int64"),
+                "sum(c1)": dtype("int64"),
+                "sum(c2)": dtype("int64"),
+            }
+        )
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res, extra_result = (
+            table_obj.output(["c3", "sum(c1)", "sum(c2)"])
+            .group_by("c3")
+            .sort([["c3", SortType.Desc]])
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c3": [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0],
+                "sum(c1)": [2, 1, 2, 1, 4, 2, 4, 2],
+                "sum(c2)": [2, 1, 3, 2, 4, 5, 3, 4],
+            }
+        ).astype(
+            {
+                "c3": dtype("float32"),
+                "sum(c1)": dtype("int64"),
+                "sum(c2)": dtype("int64"),
+            }
+        )
+        pd.testing.assert_frame_equal(res, gt)
+
+        res, extra_result = (
+            table_obj.output(["c3", "sum(c1) as sum1", "sum(c2) as sum2"])
+            .group_by("c3")
+            .sort([["sum1", SortType.Asc], ["sum2", SortType.Asc]])
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c3": [7.0, 5.0, 8.0, 6.0, 1.0, 3.0, 2.0, 4.0],
+                "sum1": [1, 1, 2, 2, 2, 2, 4, 4],
+                "sum2": [1, 2, 2, 3, 4, 5, 3, 4],
+            }
+        ).astype(
+            {
+                "c3": dtype("float32"),
+                "sum1": dtype("int64"),
+                "sum2": dtype("int64"),
+            }
+        )
+        pd.testing.assert_frame_equal(res, gt)
+
+        table_obj.delete("c1 <= 1")
+
+        res, extra_result = (
+            table_obj.output(["c1", "c2", "sum(c3)"])
+            .group_by(["c1", "c2"])
+            .sort([["c1", SortType.Asc], ["c2", SortType.Asc]])
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c1": [2, 2, 2],
+                "c2": [1, 2, 3],
+                "sum(c3)": [6.0, 10.0, 10.0],
+            }
+        ).astype(
+            {"c1": dtype("int32"), "c2": dtype("int32"), "sum(c3)": dtype("float64")}
+        )
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res = db_obj.drop_table(table_name, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK

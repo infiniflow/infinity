@@ -2390,31 +2390,26 @@ InExpr *InfinityThriftService::GetInExprFromProto(Status &status, const infinity
 }
 
 ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const infinity_thrift_rpc::ParsedExpr &expr) {
+    ParsedExpr *result = nullptr;
     if (expr.type.__isset.column_expr == true) {
-        auto parsed_expr = GetColumnExprFromProto(*expr.type.column_expr);
-        return parsed_expr;
+        result = GetColumnExprFromProto(*expr.type.column_expr);
     } else if (expr.type.__isset.constant_expr == true) {
-        auto parsed_expr = GetConstantFromProto(status, *expr.type.constant_expr);
-        return parsed_expr;
+        result = GetConstantFromProto(status, *expr.type.constant_expr);
     } else if (expr.type.__isset.function_expr == true) {
-        auto parsed_expr = GetFunctionExprFromProto(status, *expr.type.function_expr);
-        return parsed_expr;
+        result = GetFunctionExprFromProto(status, *expr.type.function_expr);
     } else if (expr.type.__isset.knn_expr == true) {
-        auto parsed_expr = GetKnnExprFromProto(status, *expr.type.knn_expr);
-        return parsed_expr;
+        result = GetKnnExprFromProto(status, *expr.type.knn_expr);
     } else if (expr.type.__isset.match_expr == true) {
-        auto parsed_expr = GetMatchExprFromProto(status, *expr.type.match_expr);
-        return parsed_expr;
+        result = GetMatchExprFromProto(status, *expr.type.match_expr);
     } else if (expr.type.__isset.fusion_expr == true) {
-        auto parsed_expr = GetFusionExprFromProto(*expr.type.fusion_expr);
-        return parsed_expr;
+        result = GetFusionExprFromProto(*expr.type.fusion_expr);
     } else if (expr.type.__isset.in_expr == true) {
-        auto parsed_expr = GetInExprFromProto(status, *expr.type.in_expr);
-        return parsed_expr;
+        result = GetInExprFromProto(status, *expr.type.in_expr);
     } else {
         status = Status::InvalidParsedExprType();
     }
-    return nullptr;
+    result->alias_ = expr.alias_name;
+    return result;
 }
 
 OrderByExpr *InfinityThriftService::GetOrderByExprFromProto(Status &status, const infinity_thrift_rpc::OrderByExpr &expr) {
