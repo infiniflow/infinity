@@ -1776,6 +1776,7 @@ Searches for data in a specified table. The search can range from a simple vecto
   - `"filter"`: `string`
   - `"fusion"`: `object`
   - `"sort"` : `object[]`
+  - `"group_by"`: `string[]`
   - `"limit"` : `string`
   - `"offset"` : `string`
   - `"option"` : `object`
@@ -2012,6 +2013,9 @@ curl --request GET \
 
 - `"sort"` : `object[]`
   Defines how to sort the results.
+
+- `"group_by"`: `string[]`
+  Indicates the expression to group by.
 
 - `"limit"` : `string`
   Indicates the limit row count.
