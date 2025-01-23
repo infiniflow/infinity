@@ -926,32 +926,37 @@ class table_http_result:
                 for col in col_types:
                     df_dict[col] = ()
 
+        line_i = 0
         for res in self.output_res:
-            for k in res:
-                # print(res[k])
-                if k not in df_dict:
-                    df_dict[k] = ()
-                tup = df_dict[k]
-                if isinstance(res[k], (int, float)):
-                    new_tup = tup + (res[k],)
-                elif is_list(res[k]):
-                    new_tup = tup + (ast.literal_eval(res[k]),)
-                elif is_date(res[k]):
-                    new_tup = tup + (res[k],)
-                elif is_time(res[k]):
-                    new_tup = tup + (res[k],)
-                elif is_datetime(res[k]):
-                    new_tup = tup + (res[k],)
-                elif is_sparse(res[k]):  # sparse vector
-                    sparse_vec = str2sparse(res[k])
+            for col in res:
+                col_name = next(iter(col))
+                v = col[col_name]
+                if col_name not in df_dict:
+                    df_dict[col_name] = ()
+                tup = df_dict[col_name]
+                if len(tup) == line_i + 1:
+                    continue
+                if isinstance(v, (int, float)):
+                    new_tup = tup + (v,)
+                elif is_list(v):
+                    new_tup = tup + (ast.literal_eval(v),)
+                elif is_date(v):
+                    new_tup = tup + (v,)
+                elif is_time(v):
+                    new_tup = tup + (v,)
+                elif is_datetime(v):
+                    new_tup = tup + (v,)
+                elif is_sparse(v):  # sparse vector
+                    sparse_vec = str2sparse(v)
                     new_tup = tup + (sparse_vec,)
                 else:
-                    if res[k].lower() == 'true':
-                        res[k] = True
-                    elif res[k].lower() == 'false':
-                        res[k] = False
-                    new_tup = tup + (res[k],)
-                df_dict[k] = new_tup
+                    if v.lower() == 'true':
+                        v = True
+                    elif v.lower() == 'false':
+                        v = False
+                    new_tup = tup + (v,)
+                df_dict[col_name] = new_tup
+            line_i += 1
         # print(self.output_res)
         # print(df_dict)
         extra_result = None

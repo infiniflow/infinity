@@ -270,6 +270,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_result_row;
                     for (SizeT col = 0; col < column_cnt; ++col) {
+                        nlohmann::json json_result_cell;
                         Value value = data_block->GetValue(col, row);
                         const String &column_name = result.result_table_->GetColumnNameById(col);
                         switch (value.type().type()) {
@@ -277,22 +278,23 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                             case LogicalType::kSmallInt:
                             case LogicalType::kInteger:
                             case LogicalType::kBigInt: {
-                                json_result_row[column_name] = value.ToInteger();
+                                json_result_cell[column_name] = value.ToInteger();
                                 break;
                             }
                             case LogicalType::kFloat: {
-                                json_result_row[column_name] = value.ToFloat();
+                                json_result_cell[column_name] = value.ToFloat();
                                 break;
                             }
                             case LogicalType::kDouble: {
-                                json_result_row[column_name] = value.ToDouble();
+                                json_result_cell[column_name] = value.ToDouble();
                                 break;
                             }
                             default: {
-                                json_result_row[column_name] = value.ToString();
+                                json_result_cell[column_name] = value.ToString();
                                 break;
                             }
                         }
+                        json_result_row.push_back(json_result_cell);
                     }
                     response["output"].push_back(json_result_row);
                 }
