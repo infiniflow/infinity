@@ -26,6 +26,7 @@ Time,
 DateTime,
 Timestamp,
 Interval,
+Array,
 Invalid
 }
 
@@ -82,11 +83,16 @@ struct SparseType {
 3:  ElementType index_type,
 }
 
+struct ArrayType {
+1:  DataType & element_data_type,
+}
+
 union PhysicalType {
 1:  NumberType number_type,
 2:  VarcharType varchar_type,
 3:  EmbeddingType embedding_type,
 4:  SparseType sparse_type,
+5:  ArrayType array_type,
 }
 
 struct DataType {
@@ -120,6 +126,7 @@ Time,
 Inteval,
 DateTime,
 Timestamp,
+CurlyBracketsArray,
 }
 
 union ParsedExprType {
@@ -184,6 +191,7 @@ struct ConstantExpr {
 10: optional list<list<list<i64>>> i64_tensor_array_value,
 11: optional list<list<list<double>>> f64_tensor_array_value,
 12: optional list<i64> i64_array_idx,
+13: optional list<ConstantExpr> curly_brackets_array,
 }
 
 struct KnnExpr {
@@ -313,6 +321,7 @@ ColumnTime,
 ColumnDateTime,
 ColumnTimestamp,
 ColumnInterval,
+ColumnArray,
 ColumnInvalid,
 }
 

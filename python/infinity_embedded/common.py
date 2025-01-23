@@ -14,7 +14,7 @@
 
 from pathlib import Path
 from typing import Union
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 
 
@@ -60,9 +60,26 @@ class SparseVector:
         return str(self)
 
 
+@dataclass
+class Array:
+    elements: list = field(default_factory=list)
+
+    def append(self, element):
+        self.elements.append(element)
+
+    def __init__(self, *args):
+        self.elements = list(args)
+
+    def __str__(self):
+        return f"Array({', '.join(str(e) for e in self.elements)})"
+
+    def __repr__(self):
+        return str(self)
+
+
 URI = Union[NetworkAddress, Path]
 VEC = Union[list, np.ndarray]
-INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector, dict]
+INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector, dict, Array]
 
 LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 

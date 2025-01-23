@@ -104,6 +104,7 @@ export using infinity_thrift_rpc::VarcharType;
 export using infinity_thrift_rpc::PhysicalType;
 export using infinity_thrift_rpc::EmbeddingType;
 export using infinity_thrift_rpc::SparseType;
+export using infinity_thrift_rpc::ArrayType;
 export using infinity_thrift_rpc::InfinityServiceIfFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessorFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessor;
