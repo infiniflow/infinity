@@ -149,7 +149,7 @@ Status TableMeta::ApplyTableSnapshot(std::function<SharedPtr<TableEntry>(Transac
 
     auto [entry, status] = table_entry_list_.ApplySnapshot(std::move(restore_entry), txn_id, begin_ts);
     if (!status.ok()) {
-        UnrecoverableError(status.message());
+        RecoverableError(status);
     }
     return Status::OK();
 }
