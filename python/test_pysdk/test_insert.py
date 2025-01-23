@@ -661,6 +661,8 @@ class TestInfinity:
         method: create table with array column
         expected: ok
         """
+        if suffix == '_http':
+            pytest.skip("HTTP not support array type")
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_insert_array" + suffix, ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_array" + suffix, {"c1": {"type": "array,array,array,int"}},
@@ -688,6 +690,8 @@ class TestInfinity:
         method: create table with array column
         expected: ok
         """
+        if suffix == '_http':
+            pytest.skip("HTTP not support array type")
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_insert_array_varchar" + suffix, ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_array_varchar" + suffix,
