@@ -67,6 +67,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
+        Vector<ParsedExpr *> *group_by_columns{nullptr};
         bool total_hits_count_flag{};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
@@ -146,6 +147,18 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
 
                 order_by_list = ParseSort(list, http_status, response);
                 if (order_by_list == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "group_by")) {
+                if (group_by_columns != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one group by field.";
+                    return;
+                }
+                auto &group_by_list = elem.value();
+
+                group_by_columns = ParseOutput(group_by_list, http_status, response);
+                if (group_by_columns == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "filter")) {
@@ -240,12 +253,13 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                                                         output_columns,
                                                         highlight_columns,
                                                         order_by_list,
-                                                        nullptr,
+                                                        group_by_columns,
                                                         total_hits_count_flag);
 
         output_columns = nullptr;
         highlight_columns = nullptr;
         order_by_list = nullptr;
+        group_by_columns = nullptr;
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {

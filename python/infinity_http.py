@@ -376,7 +376,7 @@ class database_http:
                 fields.append(tmp)
         except:
             raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")
-        print(fields)
+        # print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
         h = self.net.set_up_header(["accept", "content-type"])
@@ -712,6 +712,7 @@ class table_http_result:
         self._match_sparse = []
         self._search_exprs = []
         self._sort = []
+        self._group_by = []
         self._limit = None
         self._offset = None
         self._option = None
@@ -730,6 +731,8 @@ class table_http_result:
             tmp["highlight"] = self._highlight
         if len(self._sort):
             tmp["sort"] = self._sort
+        if len(self._group_by):
+            tmp["group_by"] = self._group_by
         if self._limit is not None:
             tmp["limit"] = str(self._limit)
         if self._offset is not None:
@@ -774,6 +777,10 @@ class table_http_result:
             tmp["output"] = self._output
         if len(self._highlight):
             tmp["highlight"] = self._highlight
+        if len(self._sort):
+            tmp["sort"] = self._sort
+        if len(self._group_by):
+            tmp["group_by"] = self._group_by
         if self._limit is not None:
             tmp["limit"] = self._limit
         if self._offset is not None:
@@ -826,6 +833,10 @@ class table_http_result:
 
     def offset(self, offset):
         self._offset = offset
+        return self
+    
+    def group_by(self, group_by_list):
+        self._group_by = group_by_list
         return self
 
     def option(self, option: {}):
@@ -960,6 +971,7 @@ class table_http_result:
             k1 = k1.replace("+", " ")
             k1 = k1.replace("-", " ")
             cols = k1.split(" ")
+            cols = [col for col in cols if col != ""]
             # print(cols)
 
             function_name = ""
@@ -974,6 +986,9 @@ class table_http_result:
                 elif is_float(col.strip()):
                     df_type[k] = dtype('float64')
                     df_type[k] = function_return_type(function_name, df_type[k])
+                elif col == "/":
+                    df_type[k] = dtype('float64')
+                    break
                 else:
                     function_name = col.strip().lower()
                     if (function_name in functions):

@@ -82,11 +82,7 @@ class TestInfinity:
         )
 
         # test agg sum
-        res, extra_result = (
-            table_obj.output(["c1", "sum(c2)"]).group_by("c1")
-            # .sort([["c1", SortType.Asc]])
-            .to_df()
-        )
+        res, extra_result = table_obj.output(["c1", "sum(c2)"]).group_by("c1").to_df()
         gt = pd.DataFrame({"c1": (1, 2), "sum(c2)": (9.0, 6.0)}).astype(
             {"c1": dtype("int32"), "sum(c2)": dtype("float64")}
         )
