@@ -281,6 +281,11 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         RecoverableError(status);
     }
 
+    auto [table_info, info_status] = txn->GetTableInfo(schema_name, table_name);
+    if (!info_status.ok()) {
+        RecoverableError(info_status);
+    }
+
     if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
         RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
     }
@@ -403,7 +408,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 
     // Create logical insert node.
     auto logical_insert = MakeShared<LogicalInsert>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                    table_entry,
+                                                    table_info,
                                                     bind_context_ptr->GenerateTableIndex(),
                                                     std::move(value_list_array));
 

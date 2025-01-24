@@ -91,7 +91,11 @@ struct ExpressionIndexScanInfo {
         const TxnTimeStamp begin_ts = txn->BeginTS();
         auto [table_entry, table_status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
         if (!table_status.ok()) {
-            UnrecoverableError(table_status.message());
+            LOG_ERROR(fmt::format("InitColumnIndexEntries: GetTableByName db: {}, table: {}, failed: {}",
+                                  *table_info->db_name_,
+                                  *table_info->table_name_,
+                                  table_status.message()));
+            RecoverableError(table_status);
         }
         for (auto map_guard = table_entry->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
@@ -239,8 +243,10 @@ class IndexScanFilterExpressionPushDownMethod {
     ExpressionIndexScanInfo tree_info_;
 
 public:
-    IndexScanFilterExpressionPushDownMethod(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr)
-        : query_context_(query_context), base_table_ref_ptr_(base_table_ref_ptr) {
+    explicit IndexScanFilterExpressionPushDownMethod(QueryContext *query_context, const BaseTableRef *base_table_ref_ptr)
+        : query_context_(query_context), base_table_ref_ptr_(base_table_ref_ptr) {}
+
+    void Init() {
         const auto and_function_set_ptr = Catalog::GetFunctionSetByName(query_context_->storage()->catalog(), "AND");
         and_scalar_function_set_ptr_ = static_cast<ScalarFunctionSet *>(and_function_set_ptr.get());
         // prepare secondary index info
@@ -726,6 +732,7 @@ IndexScanFilterExpressionPushDownResult FilterExpressionPushDown::PushDownToInde
                                                                                       const BaseTableRef *base_table_ref_ptr,
                                                                                       const SharedPtr<BaseExpression> &expression) {
     IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
+    filter_expression_push_down_method.Init();
     return filter_expression_push_down_method.SolveForIndexScan(expression);
 }
 
@@ -733,6 +740,7 @@ void FilterExpressionPushDown::BuildFilterFulltextExpression(QueryContext *query
                                                              const BaseTableRef *base_table_ref_ptr,
                                                              const Vector<SharedPtr<BaseExpression>> &expressions) {
     IndexScanFilterExpressionPushDownMethod filter_expression_push_down_method(query_context, base_table_ref_ptr);
+    filter_expression_push_down_method.Init();
     for (const auto &expr : expressions) {
         filter_expression_push_down_method.BuildIndexFilterEvaluatorForLeftoverFilterFulltextExpression(expr);
     }
