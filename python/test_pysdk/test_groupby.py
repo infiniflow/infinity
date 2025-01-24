@@ -541,6 +541,54 @@ class TestInfinity:
         )
 
         res, extra_result = (
+            table_obj.output(["c3", "sum(c1)", "sum(c2)"])
+            .group_by("c3")
+            .having("sum(c1) >= 2")
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c3": [1.0, 2.0, 3.0, 4.0, 6.0, 8.0],
+                "sum(c1)": [2, 4, 2, 4, 2, 2],
+                "sum(c2)": [4, 3, 5, 4, 3, 2],
+            }
+        ).astype(
+            {
+                "c3": dtype("float32"),
+                "sum(c1)": dtype("int64"),
+                "sum(c2)": dtype("int64"),
+            }
+        )
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res, extra_result = (
+            table_obj.output(["c3", "sum(c1)", "sum(c2)"])
+            .group_by("c3")
+            .having("sum(c1) >= 2 and c3 > 3")
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {
+                "c3": [4.0, 6.0, 8.0],
+                "sum(c1)": [4, 2, 2],
+                "sum(c2)": [4, 3, 2],
+            }
+        ).astype(
+            {
+                "c3": dtype("float32"),
+                "sum(c1)": dtype("int64"),
+                "sum(c2)": dtype("int64"),
+            }
+        )
+        pd.testing.assert_frame_equal(
+            res.sort_values(by=res.columns.tolist()).reset_index(drop=True),
+            gt.sort_values(by=gt.columns.tolist()).reset_index(drop=True),
+        )
+
+        res, extra_result = (
             table_obj.output(["c3", "count(c3)", "sum(c1)", "sum(c2)"])
             .group_by("c3")
             .to_df()
