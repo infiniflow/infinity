@@ -1876,6 +1876,36 @@ table_obj.output(["c1", "c2"]).sort([["c2", SortType.Asc], ["c1", SortType.Desc]
 
 ---
 
+### group_by
+
+```python
+table_object.group_by(group_by_columns)
+```
+
+Creates a group-by expression using `group_by_columns`.
+
+#### Parameters
+
+##### group_by_columns: `list[str] | str`, *Required*
+
+A list of strings specifying the expression to group by. Each string in the list represents a column name or an expression.
+
+#### Returns
+
+- Success: An `infinity.local_infinity.table.LocalTable` object in embedded mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value indicating a specific error condition.
+  - `error_msg`: `str` A message providing additional details about the error.
+
+#### Examples
+
+```python
+table_obj.output(["c1", "sum(c2)"]).group_by(["c1"]).to_df()
+table_obj.output(["c1", "avg(c1)", "count(c2)", "min(c3)", "max(c4)"]).group_by(["c1", "c1+c2"]).to_df()
+```
+
+---
+
 ### limit
 
 ```python

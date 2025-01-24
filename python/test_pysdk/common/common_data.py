@@ -38,7 +38,8 @@ types = [
 ]
 
 functions = [
-    "sqrt", "round", "ceil", "floor", "filter_text", "filter_fulltext", "or", "and", "not"
+    "sqrt", "round", "ceil", "floor", "filter_text", "filter_fulltext", "or", "and", "not", "char_length",
+    "sum", "min", "max", "count", "avg"
 ]
 
 bool_functions = [
@@ -57,6 +58,19 @@ def function_return_type(function_name, param_type) :
         return dtype('bool')
     elif function_name == "trunc":
         return dtype('str_')
+    elif function_name == "char_length":
+        return dtype('int32')
+    elif function_name == "sum":
+        if(param_type == dtype('int8') or param_type == dtype('int16') or param_type == dtype('int32') or param_type == dtype('int64')):
+            return dtype('int64')
+        else:
+            return dtype('float64')
+    elif function_name == "min" or function_name == "max":
+        return param_type
+    elif function_name == "count":
+        return dtype('int64')
+    elif function_name == "avg":
+        return dtype('float64')
     else:
         return param_type
 

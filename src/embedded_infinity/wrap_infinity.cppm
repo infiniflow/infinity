@@ -281,6 +281,7 @@ export struct WrapParsedExpr {
     WrapFusionExpr fusion_expr;
     WrapSearchExpr search_expr;
     WrapInExpr in_expr;
+    String alias_name;
 
     ParsedExpr *GetParsedExpr(Status &status);
 };

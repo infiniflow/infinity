@@ -338,6 +338,17 @@ class InfinityThriftQueryBuilder(ABC):
         offset_expr = ParsedExpr(type=expr_type)
         self._offset = offset_expr
         return self
+    
+    def group_by(self, columns: List[str] | str) -> InfinityThriftQueryBuilder:
+        group_by_list: List[ParsedExpr] = []
+        if isinstance(columns, list):
+            for column in columns:
+                column = column.lower()
+                group_by_list.append(parse_expr(maybe_parse(column)))
+        else:
+            group_by_list.append(parse_expr(maybe_parse(columns)))
+        self._groupby = group_by_list
+        return self
 
     def output(self, columns: Optional[list]) -> InfinityThriftQueryBuilder:
         self._columns = columns

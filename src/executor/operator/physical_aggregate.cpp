@@ -100,7 +100,7 @@ bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *oper
 
         groupby_table->data_blocks_.emplace_back(DataBlock::MakeUniquePtr());
         DataBlock *output_data_block = groupby_table->data_blocks_.back().get();
-        output_data_block->Init(groupby_types, 1);
+        output_data_block->Init(groupby_types);
 
         ExpressionEvaluator groupby_executor;
         groupby_executor.Init(input_data_block);

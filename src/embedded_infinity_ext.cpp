@@ -229,7 +229,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("match_tensor_expr", &WrapParsedExpr::match_tensor_expr)
         .def_rw("fusion_expr", &WrapParsedExpr::fusion_expr)
         .def_rw("search_expr", &WrapParsedExpr::search_expr)
-        .def_rw("in_expr", &WrapParsedExpr::in_expr);
+        .def_rw("in_expr", &WrapParsedExpr::in_expr)
+        .def_rw("alias_name", &WrapParsedExpr::alias_name);
 
     // Bind WrapOrderByExpr
     nb::class_<WrapOrderByExpr>(m, "WrapOrderByExpr")

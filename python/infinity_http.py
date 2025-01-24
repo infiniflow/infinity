@@ -376,7 +376,7 @@ class database_http:
                 fields.append(tmp)
         except:
             raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")
-        print(fields)
+        # print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
         h = self.net.set_up_header(["accept", "content-type"])
@@ -712,6 +712,7 @@ class table_http_result:
         self._match_sparse = []
         self._search_exprs = []
         self._sort = []
+        self._group_by = []
         self._limit = None
         self._offset = None
         self._option = None
@@ -730,6 +731,8 @@ class table_http_result:
             tmp["highlight"] = self._highlight
         if len(self._sort):
             tmp["sort"] = self._sort
+        if len(self._group_by):
+            tmp["group_by"] = self._group_by
         if self._limit is not None:
             tmp["limit"] = str(self._limit)
         if self._offset is not None:
@@ -774,6 +777,10 @@ class table_http_result:
             tmp["output"] = self._output
         if len(self._highlight):
             tmp["highlight"] = self._highlight
+        if len(self._sort):
+            tmp["sort"] = self._sort
+        if len(self._group_by):
+            tmp["group_by"] = self._group_by
         if self._limit is not None:
             tmp["limit"] = self._limit
         if self._offset is not None:
@@ -826,6 +833,10 @@ class table_http_result:
 
     def offset(self, offset):
         self._offset = offset
+        return self
+    
+    def group_by(self, group_by_list):
+        self._group_by = group_by_list
         return self
 
     def option(self, option: {}):
@@ -915,32 +926,37 @@ class table_http_result:
                 for col in col_types:
                     df_dict[col] = ()
 
+        line_i = 0
         for res in self.output_res:
-            for k in res:
-                # print(res[k])
-                if k not in df_dict:
-                    df_dict[k] = ()
-                tup = df_dict[k]
-                if isinstance(res[k], (int, float)):
-                    new_tup = tup + (res[k],)
-                elif is_list(res[k]):
-                    new_tup = tup + (ast.literal_eval(res[k]),)
-                elif is_date(res[k]):
-                    new_tup = tup + (res[k],)
-                elif is_time(res[k]):
-                    new_tup = tup + (res[k],)
-                elif is_datetime(res[k]):
-                    new_tup = tup + (res[k],)
-                elif is_sparse(res[k]):  # sparse vector
-                    sparse_vec = str2sparse(res[k])
+            for col in res:
+                col_name = next(iter(col))
+                v = col[col_name]
+                if col_name not in df_dict:
+                    df_dict[col_name] = ()
+                tup = df_dict[col_name]
+                if len(tup) == line_i + 1:
+                    continue
+                if isinstance(v, (int, float)):
+                    new_tup = tup + (v,)
+                elif is_list(v):
+                    new_tup = tup + (ast.literal_eval(v),)
+                elif is_date(v):
+                    new_tup = tup + (v,)
+                elif is_time(v):
+                    new_tup = tup + (v,)
+                elif is_datetime(v):
+                    new_tup = tup + (v,)
+                elif is_sparse(v):  # sparse vector
+                    sparse_vec = str2sparse(v)
                     new_tup = tup + (sparse_vec,)
                 else:
-                    if res[k].lower() == 'true':
-                        res[k] = True
-                    elif res[k].lower() == 'false':
-                        res[k] = False
-                    new_tup = tup + (res[k],)
-                df_dict[k] = new_tup
+                    if v.lower() == 'true':
+                        v = True
+                    elif v.lower() == 'false':
+                        v = False
+                    new_tup = tup + (v,)
+                df_dict[col_name] = new_tup
+            line_i += 1
         # print(self.output_res)
         # print(df_dict)
         extra_result = None
@@ -960,6 +976,7 @@ class table_http_result:
             k1 = k1.replace("+", " ")
             k1 = k1.replace("-", " ")
             cols = k1.split(" ")
+            cols = [col for col in cols if col != ""]
             # print(cols)
 
             function_name = ""
@@ -974,6 +991,9 @@ class table_http_result:
                 elif is_float(col.strip()):
                     df_type[k] = dtype('float64')
                     df_type[k] = function_return_type(function_name, df_type[k])
+                elif col == "/":
+                    df_type[k] = dtype('float64')
+                    break
                 else:
                     function_name = col.strip().lower()
                     if (function_name in functions):

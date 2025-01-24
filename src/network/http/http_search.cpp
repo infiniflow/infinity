@@ -67,6 +67,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
+        Vector<ParsedExpr *> *group_by_columns{nullptr};
         bool total_hits_count_flag{};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
@@ -146,6 +147,18 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
 
                 order_by_list = ParseSort(list, http_status, response);
                 if (order_by_list == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "group_by")) {
+                if (group_by_columns != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one group by field.";
+                    return;
+                }
+                auto &group_by_list = elem.value();
+
+                group_by_columns = ParseOutput(group_by_list, http_status, response);
+                if (group_by_columns == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "filter")) {
@@ -240,12 +253,13 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                                                         output_columns,
                                                         highlight_columns,
                                                         order_by_list,
-                                                        nullptr,
+                                                        group_by_columns,
                                                         total_hits_count_flag);
 
         output_columns = nullptr;
         highlight_columns = nullptr;
         order_by_list = nullptr;
+        group_by_columns = nullptr;
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
@@ -256,6 +270,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 for (int row = 0; row < row_count; ++row) {
                     nlohmann::json json_result_row;
                     for (SizeT col = 0; col < column_cnt; ++col) {
+                        nlohmann::json json_result_cell;
                         Value value = data_block->GetValue(col, row);
                         const String &column_name = result.result_table_->GetColumnNameById(col);
                         switch (value.type().type()) {
@@ -263,22 +278,23 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                             case LogicalType::kSmallInt:
                             case LogicalType::kInteger:
                             case LogicalType::kBigInt: {
-                                json_result_row[column_name] = value.ToInteger();
+                                json_result_cell[column_name] = value.ToInteger();
                                 break;
                             }
                             case LogicalType::kFloat: {
-                                json_result_row[column_name] = value.ToFloat();
+                                json_result_cell[column_name] = value.ToFloat();
                                 break;
                             }
                             case LogicalType::kDouble: {
-                                json_result_row[column_name] = value.ToDouble();
+                                json_result_cell[column_name] = value.ToDouble();
                                 break;
                             }
                             default: {
-                                json_result_row[column_name] = value.ToString();
+                                json_result_cell[column_name] = value.ToString();
                                 break;
                             }
                         }
+                        json_result_row.push_back(json_result_cell);
                     }
                     response["output"].push_back(json_result_row);
                 }

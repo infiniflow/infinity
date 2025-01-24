@@ -181,6 +181,11 @@ def generic_match_to_string(generic_match_expr: ttypes.GenericMatchExpr) -> str:
 
 
 def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
+    if isinstance(cons, exp.Alias):
+        expr = traverse_conditions(cons.args['this'])
+        expr.alias_name = cons.alias
+        return expr
+
     if isinstance(cons, exp.Binary):
         parsed_expr = ttypes.ParsedExpr()
         function_expr = ttypes.FunctionExpr()
