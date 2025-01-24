@@ -57,6 +57,7 @@ import logical_type;
 import embedding_info;
 import sparse_info;
 import decimal_info;
+import array_info;
 import status;
 import constant_expr;
 import command_statement;
@@ -65,6 +66,98 @@ import physical_import;
 namespace {
 
 using namespace infinity;
+
+Pair<SharedPtr<DataType>, infinity::Status> ParseColumnType(const Span<const std::string> tokens, const nlohmann::json &field_element) {
+    SharedPtr<DataType> column_type;
+    if (tokens.empty()) {
+        return {nullptr, infinity::Status::ParserError("Empty column type")};
+    } else if (tokens[0] == "vector" || tokens[0] == "multivector" || tokens[0] == "tensor" || tokens[0] == "tensorarray") {
+        if (tokens.size() != 3) {
+            return {nullptr, infinity::Status::ParserError("vector / multivector / tensor / tensorarray type syntax error")};
+        }
+        const SizeT dimension = std::stoull(tokens[1]);
+        const auto &etype = tokens[2];
+        EmbeddingDataType e_data_type;
+        if (etype == "int" || etype == "integer" || etype == "int32") {
+            e_data_type = EmbeddingDataType::kElemInt32;
+        } else if (etype == "uint8") {
+            e_data_type = EmbeddingDataType::kElemUInt8;
+        } else if (etype == "int8" || etype == "tinyint") {
+            e_data_type = EmbeddingDataType::kElemInt8;
+        } else if (etype == "float" || etype == "float32") {
+            e_data_type = EmbeddingDataType::kElemFloat;
+        } else if (etype == "double" || etype == "float64") {
+            e_data_type = EmbeddingDataType::kElemDouble;
+        } else if (etype == "float16") {
+            e_data_type = EmbeddingDataType::kElemFloat16;
+        } else if (etype == "bfloat16") {
+            e_data_type = EmbeddingDataType::kElemBFloat16;
+        } else if (etype == "bit") {
+            e_data_type = EmbeddingDataType::kElemBit;
+        } else {
+            return {nullptr, infinity::Status::InvalidEmbeddingDataType(etype)};
+        }
+        auto type_info = EmbeddingInfo::Make(e_data_type, dimension);
+        auto logical_type_v = LogicalType::kInvalid;
+        if (tokens[0] == "vector") {
+            logical_type_v = LogicalType::kEmbedding;
+        } else if (tokens[0] == "multivector") {
+            logical_type_v = LogicalType::kMultiVector;
+        } else if (tokens[0] == "tensor") {
+            logical_type_v = LogicalType::kTensor;
+        } else if (tokens[0] == "tensorarray") {
+            logical_type_v = LogicalType::kTensorArray;
+        }
+        column_type = std::make_shared<DataType>(logical_type_v, std::move(type_info));
+    } else if (tokens[0] == "sparse") {
+        if (tokens.size() != 4) {
+            return {nullptr, infinity::Status::ParserError("sparse type syntax error")};
+        }
+        const SizeT dimension = std::stoull(tokens[1]);
+        const auto &dtype = tokens[2];
+        const auto &itype = tokens[3];
+        EmbeddingDataType d_data_type;
+        EmbeddingDataType i_data_type;
+        if (dtype == "integer" || dtype == "int" || dtype == "int32") {
+            d_data_type = EmbeddingDataType::kElemInt32;
+        } else if (dtype == "float" || dtype == "float32") {
+            d_data_type = EmbeddingDataType::kElemFloat;
+        } else if (dtype == "double" || dtype == "float64") {
+            d_data_type = EmbeddingDataType::kElemDouble;
+        } else {
+            return {nullptr, infinity::Status::InvalidEmbeddingDataType(dtype)};
+        }
+
+        if (itype == "tinyint" || itype == "int8") {
+            i_data_type = EmbeddingDataType::kElemInt8;
+        } else if (itype == "smallint" || itype == "int16") {
+            i_data_type = EmbeddingDataType::kElemInt16;
+        } else if (itype == "integer" || itype == "int" || itype == "int32") {
+            i_data_type = EmbeddingDataType::kElemInt32;
+        } else if (itype == "bigint" || itype == "int64") {
+            i_data_type = EmbeddingDataType::kElemInt64;
+        } else {
+            return {nullptr, infinity::Status::InvalidEmbeddingDataType(itype)};
+        }
+        auto type_info = SparseInfo::Make(d_data_type, i_data_type, dimension, SparseStoreType::kSort);
+        column_type = std::make_shared<DataType>(LogicalType::kSparse, std::move(type_info));
+    } else if (tokens[0] == "decimal") {
+        auto type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
+        column_type = std::make_shared<DataType>(LogicalType::kDecimal, std::move(type_info));
+    } else if (tokens[0] == "array") {
+        auto [element_type, stat] = ParseColumnType(tokens.subspan<1>(), field_element);
+        if (!stat.ok()) {
+            return {nullptr, std::move(stat)};
+        }
+        auto type_info = ArrayInfo::Make(std::move(*element_type));
+        column_type = std::make_shared<DataType>(LogicalType::kArray, std::move(type_info));
+    } else if (tokens.size() == 1) {
+        column_type = DataType::StringDeserialize(tokens[0]);
+    } else {
+        return {nullptr, infinity::Status::ParserError(fmt::format("{} isn't supported.", tokens[0]))};
+    }
+    return std::make_pair(std::move(column_type), infinity::Status::OK());
+}
 
 infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef *> &column_definitions) {
     SizeT column_count = fields.size();
@@ -86,89 +179,12 @@ infinity::Status ParseColumnDefs(const nlohmann::json &fields, Vector<ColumnDef 
         tokens = SplitStrByComma(value_type);
 
         SharedPtr<DataType> column_type{nullptr};
-        SharedPtr<TypeInfo> type_info{nullptr};
         try {
-            if (tokens[0] == "vector" || tokens[0] == "multivector" || tokens[0] == "tensor" || tokens[0] == "tensorarray") {
-                if (tokens.size() != 3) {
-                    return infinity::Status::ParserError("vector / multivector / tensor / tensorarray type syntax error");
-                }
-                SizeT dimension = std::stoull(tokens[1]);
-                String etype = tokens[2];
-                EmbeddingDataType e_data_type;
-                if (etype == "int" || etype == "integer" || etype == "int32") {
-                    e_data_type = EmbeddingDataType::kElemInt32;
-                } else if (etype == "uint8") {
-                    e_data_type = EmbeddingDataType::kElemUInt8;
-                } else if (etype == "int8" || etype == "tinyint") {
-                    e_data_type = EmbeddingDataType::kElemInt8;
-                } else if (etype == "float" || etype == "float32") {
-                    e_data_type = EmbeddingDataType::kElemFloat;
-                } else if (etype == "double" || etype == "float64") {
-                    e_data_type = EmbeddingDataType::kElemDouble;
-                } else if (etype == "float16") {
-                    e_data_type = EmbeddingDataType::kElemFloat16;
-                } else if (etype == "bfloat16") {
-                    e_data_type = EmbeddingDataType::kElemBFloat16;
-                } else if (etype == "bit") {
-                    e_data_type = EmbeddingDataType::kElemBit;
-                } else {
-                    return infinity::Status::InvalidEmbeddingDataType(etype);
-                }
-                type_info = EmbeddingInfo::Make(e_data_type, dimension);
-                LogicalType logical_type_v = LogicalType::kInvalid;
-                if (tokens[0] == "vector") {
-                    logical_type_v = LogicalType::kEmbedding;
-                } else if (tokens[0] == "multivector") {
-                    logical_type_v = LogicalType::kMultiVector;
-                } else if (tokens[0] == "tensor") {
-                    logical_type_v = LogicalType::kTensor;
-                } else if (tokens[0] == "tensorarray") {
-                    logical_type_v = LogicalType::kTensorArray;
-                }
-                column_type = std::make_shared<DataType>(logical_type_v, type_info);
-            } else if (tokens[0] == "sparse") {
-                if (tokens.size() != 4) {
-                    return infinity::Status::ParserError("sparse type syntax error");
-                }
-                SizeT dimension = std::stoull(tokens[1]);
-                String dtype = tokens[2];
-                String itype = tokens[3];
-                EmbeddingDataType d_data_type;
-                EmbeddingDataType i_data_type;
-                if (dtype == "integer" || dtype == "int" || dtype == "int32") {
-                    d_data_type = EmbeddingDataType::kElemInt32;
-                } else if (dtype == "float" || dtype == "float32") {
-                    d_data_type = EmbeddingDataType::kElemFloat;
-                } else if (dtype == "double" || dtype == "float64") {
-                    d_data_type = EmbeddingDataType::kElemDouble;
-                } else {
-                    return infinity::Status::InvalidEmbeddingDataType(dtype);
-                }
-
-                if (itype == "tinyint" || itype == "int8") {
-                    i_data_type = EmbeddingDataType::kElemInt8;
-                } else if (itype == "smallint" || itype == "int16") {
-                    i_data_type = EmbeddingDataType::kElemInt16;
-                } else if (itype == "integer" || itype == "int" || itype == "int32") {
-                    i_data_type = EmbeddingDataType::kElemInt32;
-                } else if (itype == "bigint" || itype == "int64") {
-                    i_data_type = EmbeddingDataType::kElemInt64;
-                } else {
-                    return infinity::Status::InvalidEmbeddingDataType(itype);
-                }
-                type_info = SparseInfo::Make(d_data_type, i_data_type, dimension, SparseStoreType::kSort);
-                column_type = std::make_shared<DataType>(LogicalType::kSparse, type_info);
-            } else if (tokens[0] == "decimal") {
-                type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
-                column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
-            } else if (tokens[0] == "array") {
-                type_info = nullptr;
-                return infinity::Status::ParserError("Array isn't implemented here.");
-            } else if (tokens.size() == 1) {
-                column_type = DataType::StringDeserialize(tokens[0]);
-            } else {
-                return infinity::Status::ParserError(fmt::format("{} isn't supported.", tokens[0]));
+            auto [result_type, err_status] = ParseColumnType(tokens, field_element);
+            if (!err_status.ok()) {
+                return std::move(err_status);
             }
+            column_type = std::move(result_type);
         } catch (std::exception &e) {
             return infinity::Status::ParserError("type syntax error");
         }
@@ -1168,6 +1184,24 @@ public:
                             break;
                         }
                         case nlohmann::json::value_t::object: {
+                            // check array type
+                            if (value.size() == 1 && value.begin().key() == "array") {
+                                SharedPtr<ConstantExpr> array_expr;
+                                try {
+                                    auto array_result = BuildConstantExprFromJson(value);
+                                    if (!array_result) {
+                                        throw std::runtime_error("Empty return value!");
+                                    }
+                                    array_expr = std::move(array_result);
+                                } catch (std::exception &e) {
+                                    json_response["error_code"] = ErrorCode::kSyntaxError;
+                                    json_response["error_message"] = fmt::format("Error when parsing array value: {}", e.what());
+                                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                                }
+                                auto const_expr = std::make_unique<ConstantExpr>(std::move(*array_expr));
+                                insert_one_row->values_.emplace_back(std::move(const_expr));
+                                break;
+                            }
                             std::unique_ptr<ConstantExpr> const_sparse_expr = {};
                             if (value.size() == 0) {
                                 json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
