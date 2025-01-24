@@ -729,6 +729,8 @@ def get_data_type_from_column_big_info(column_big_info: list) -> ttypes.DataType
             return sparse_type
             # return get_sparse_info(column_info, column_defs, column_name, index)
         case "array":
+            if len(column_big_info) < 2:
+                raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"No element type for array!")
             array_type = ttypes.DataType()
             array_type.logic_type = ttypes.LogicType.Array
             array_type.physical_type = ttypes.PhysicalType()

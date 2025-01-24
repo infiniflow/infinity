@@ -529,6 +529,8 @@ def get_data_type_from_column_big_info(column_big_info: list) -> WrapDataType:
             return sparse_type
             # return get_sparse_info(column_info, column_defs, column_name, index)
         case "array":
+            if len(column_big_info) < 2:
+                raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"No element type for array!")
             proto_column_type = WrapDataType()
             proto_column_type.logical_type = LogicalType.kArray
             proto_column_type.array_type = get_data_type_from_column_big_info(column_big_info[1:])

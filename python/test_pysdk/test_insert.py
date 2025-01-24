@@ -665,6 +665,8 @@ class TestInfinity:
             pytest.skip("HTTP not support array type")
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_insert_array" + suffix, ConflictType.Ignore)
+        with pytest.raises(InfinityException):
+            db_obj.create_table("test_insert_array" + suffix, {"c1": {"type": "array,array"}}, ConflictType.Error)
         table_obj = db_obj.create_table("test_insert_array" + suffix, {"c1": {"type": "array,array,array,int"}},
                                         ConflictType.Error)
         assert table_obj
