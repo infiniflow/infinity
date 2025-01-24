@@ -133,7 +133,7 @@ bool PhysicalCompactFinish::ApplyDeletes(QueryContext *query_context, const Comp
             row_ids.push_back(new_row_id);
         }
     }
-    txn->Delete(table_entry, row_ids, false);
+    txn->Delete(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_, row_ids, false);
     return true;
 }
 

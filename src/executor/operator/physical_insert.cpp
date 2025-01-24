@@ -35,6 +35,7 @@ import default_values;
 import status;
 import infinity_exception;
 import logger;
+import meta_info;
 
 import wal_manager;
 import infinity_context;
@@ -43,7 +44,7 @@ import column_def;
 
 namespace infinity {
 
-void PhysicalInsert::Init(QueryContext* query_context) {}
+void PhysicalInsert::Init(QueryContext *query_context) {}
 
 bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -59,7 +60,7 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
 
     SizeT row_count = value_list_.size();
     SizeT column_count = value_list_[0].size();
-    SizeT table_collection_column_count = table_entry_->ColumnCount();
+    SizeT table_collection_column_count = table_info_->column_count_;
     if (column_count != table_collection_column_count) {
         String error_message =
             fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count);
@@ -95,7 +96,7 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     output_block->Finalize();
 
     auto *txn = query_context->GetTxn();
-    txn->Append(table_entry_, output_block);
+    txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_block);
 
     UniquePtr<String> result_msg = MakeUnique<String>(fmt::format("INSERTED {} Rows", output_block->row_count()));
     if (operator_state == nullptr) {

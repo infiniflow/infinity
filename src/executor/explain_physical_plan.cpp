@@ -635,13 +635,13 @@ void ExplainPhysicalPlan::Explain(const PhysicalInsert *insert_node, SharedPtr<V
 
     // Schema name
     {
-        String schema_name_str = String(intent_size, ' ') + " - database name: " + *insert_node->table_entry()->GetDBName();
+        String schema_name_str = String(intent_size, ' ') + " - database name: " + *insert_node->table_info()->db_name_;
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = String(intent_size, ' ') + " - table name: " + *insert_node->table_entry()->GetTableName();
+        String table_name_str = String(intent_size, ' ') + " - table name: " + *insert_node->table_info()->table_name_;
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 

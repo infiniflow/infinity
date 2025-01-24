@@ -55,18 +55,10 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
 
     OperatorState *prev_op_state = operator_state->prev_op_state_;
 
-    Txn* txn = query_context->GetTxn();
-    auto [table_entry, get_table_status] = txn->GetTableByName(*table_info_->db_name_, *table_info_->table_name_);
-    if (!get_table_status.ok()) {
-        operator_state->status_ = get_table_status;
-        RecoverableError(get_table_status);
-    }
-
+    Vector<RowID> row_ids;
     SizeT data_block_count = prev_op_state->data_block_array_.size();
     for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
         DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
-        auto txn = query_context->GetTxn();
-        Vector<RowID> row_ids;
         for (SizeT i = 0; i < input_data_block_ptr->column_count(); i++) {
             SharedPtr<ColumnVector> column_vector = input_data_block_ptr->column_vectors[i];
             if (column_vector->data_type()->type() == LogicalType::kRowID) {
@@ -75,15 +67,21 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
                 break;
             }
         }
-        if (!row_ids.empty()) {
-            LOG_TRACE(fmt::format("Found to delete: row_count {}", row_ids.size()));
-            txn->Delete(table_entry, row_ids); // TODO: segment id in `row_ids` is fixed.
-            DeleteOperatorState *delete_operator_state = static_cast<DeleteOperatorState *>(operator_state);
-            ++delete_operator_state->count_;
-            delete_operator_state->sum_ += row_ids.size();
-        } else {
-            LOG_TRACE("DELETE: No row_id, skip");
+    }
+    if (!row_ids.empty()) {
+        LOG_TRACE(fmt::format("Found to delete: row_count {}", row_ids.size()));
+        Txn* txn = query_context->GetTxn();
+        Status status = txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids); // TODO: segment id in `row_ids` is fixed.
+        if (!status.ok()) {
+            operator_state->status_ = status;
+            RecoverableError(status);
+            return false;
         }
+        DeleteOperatorState *delete_operator_state = static_cast<DeleteOperatorState *>(operator_state);
+        ++delete_operator_state->count_;
+        delete_operator_state->sum_ += row_ids.size();
+    } else {
+        LOG_TRACE("DELETE: No row_id, skip");
     }
     prev_op_state->data_block_array_.clear();
     if (prev_op_state->Complete()) {

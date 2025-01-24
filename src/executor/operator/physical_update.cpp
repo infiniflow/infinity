@@ -112,8 +112,8 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
             }
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_column_vectors);
-            txn->Append(table_entry, output_data_block);
-            txn->Delete(table_entry, row_ids);
+            txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_data_block);
+            txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids);
 
             UpdateOperatorState *update_operator_state = static_cast<UpdateOperatorState *>(operator_state);
             ++update_operator_state->count_;

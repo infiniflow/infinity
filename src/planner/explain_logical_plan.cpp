@@ -650,14 +650,14 @@ Status ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<V
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetDBName());
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *(insert_node->table_info()->db_name_));
 
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = fmt::format("{} - table name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetTableName());
+        String table_name_str = fmt::format("{} - table name: {}", String(intent_size, ' '), *(insert_node->table_info()->table_name_));
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 

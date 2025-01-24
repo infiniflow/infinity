@@ -107,9 +107,11 @@ Txn::~Txn() {
 }
 
 // DML
-Status Txn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry) {
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
+Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
 
     this->CheckTxn(db_name);
 
@@ -126,9 +128,11 @@ Status Txn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entr
     return Status::OK();
 }
 
-Status Txn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block) {
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
+Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
 
     this->CheckTxn(db_name);
     TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
@@ -141,9 +145,11 @@ Status Txn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_bl
     return append_status;
 }
 
-Status Txn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict) {
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
+Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
 
     this->CheckTxn(db_name);
 
@@ -415,7 +421,7 @@ Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_
 // TODO: use table ref instead of table entry
 Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
     auto [table_entry, table_status] = this->GetTableByName(*table_ref->table_info_->db_name_, *table_ref->table_info_->table_name_);
-    if(!table_status.ok()) {
+    if (!table_status.ok()) {
         return table_status;
     }
 

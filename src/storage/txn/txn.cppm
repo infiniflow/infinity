@@ -193,11 +193,11 @@ public:
     Status GetViews(const String &db_name, Vector<ViewDetail> &output_view_array);
 
     // DML
-    Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
+    Status Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry);
 
-    Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
+    Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
-    Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
+    Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict = true);
 
     Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 

@@ -517,7 +517,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<Logical
 
     SharedPtr<LogicalInsert> logical_insert_ptr = dynamic_pointer_cast<LogicalInsert>(logical_operator);
     return MakeUnique<PhysicalInsert>(logical_operator->node_id(),
-                                      logical_insert_ptr->table_entry(),
+                                      logical_insert_ptr->table_info(),
                                       logical_insert_ptr->table_index(),
                                       logical_insert_ptr->value_list(),
                                       logical_operator->load_metas());

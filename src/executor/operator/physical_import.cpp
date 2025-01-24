@@ -2228,7 +2228,7 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<
 
 void PhysicalImport::SaveSegmentData(TableEntry *table_entry, Txn *txn, SharedPtr<SegmentEntry> segment_entry) {
     segment_entry->FlushNewData();
-    txn->Import(table_entry, std::move(segment_entry));
+    txn->Import(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(segment_entry));
 }
 
 } // namespace infinity
