@@ -31,7 +31,7 @@ import infinity_context;
 
 namespace infinity {
 
-void PhysicalRenameTable::Init() {}
+void PhysicalRenameTable::Init(QueryContext* query_context) {}
 
 bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
     RecoverableError(Status::NotSupport("Rename table is not supported."));
@@ -39,7 +39,7 @@ bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *op
     return true;
 }
 
-void PhysicalAddColumns::Init() {}
+void PhysicalAddColumns::Init(QueryContext* query_context) {}
 
 bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -72,7 +72,7 @@ bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *ope
     return true;
 }
 
-void PhysicalDropColumns::Init() {}
+void PhysicalDropColumns::Init(QueryContext* query_context) {}
 
 bool PhysicalDropColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

@@ -43,7 +43,7 @@ import column_def;
 
 namespace infinity {
 
-void PhysicalInsert::Init() {}
+void PhysicalInsert::Init(QueryContext* query_context) {}
 
 bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

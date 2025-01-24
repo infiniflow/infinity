@@ -414,13 +414,17 @@ Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_
 
 // TODO: use table ref instead of table entry
 Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
-    auto *table_entry = table_ref->table_entry_ptr_;
+    auto [table_entry, table_status] = this->GetTableByName(*table_ref->table_info_->db_name_, *table_ref->table_info_->table_name_);
+    if(!table_status.ok()) {
+        return table_status;
+    }
+
     const auto &db_name = *table_entry->GetDBName();
     const auto &table_name = *table_entry->GetTableName();
 
-    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
-    if (!status.ok()) {
-        return status;
+    auto [table_index_entry, index_status] = this->GetIndexByName(db_name, table_name, index_name);
+    if (!index_status.ok()) {
+        return index_status;
     }
 
     return table_index_entry->CreateIndexDo(table_ref, create_index_idxes, this);
@@ -483,12 +487,34 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
     return index_status;
 }
 
+SharedPtr<IndexReader> Txn::GetFullTextIndexReader(const String &db_name, const String &table_name) {
+    this->CheckTxn(db_name);
+
+    TxnTimeStamp begin_ts = this->BeginTS();
+    auto [table_entry, status] = catalog_->GetTableByName(db_name, table_name, txn_context_ptr_->txn_id_, begin_ts);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    return table_entry->GetFullTextIndexReader(this);
+}
+
 Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const String &table_name) {
     this->CheckTxn(db_name);
 
     TxnTimeStamp begin_ts = this->BeginTS();
 
     return catalog_->GetTableByName(db_name, table_name, txn_context_ptr_->txn_id_, begin_ts);
+}
+
+SharedPtr<BlockIndex> Txn::GetBlockIndexFromTable(const String &db_name, const String &table_name) {
+    this->CheckTxn(db_name);
+    TxnTimeStamp begin_ts = this->BeginTS();
+    auto [table_entry, status] = catalog_->GetTableByName(db_name, table_name, txn_context_ptr_->txn_id_, begin_ts);
+    if (!status.ok()) {
+        return nullptr;
+    }
+    return table_entry->GetBlockIndex(this);
 }
 
 Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String &db_name, const String &table_name) {

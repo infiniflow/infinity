@@ -119,6 +119,8 @@ public:
     ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
+    SharedPtr<TableInfo> GetTableInfo(Txn* txn);
+
     Tuple<TableIndexEntry *, Status>
     CreateIndex(const SharedPtr<IndexBase> &index_base, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
@@ -291,7 +293,7 @@ public:
 
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return columns_; }
 
-    IndexReader GetFullTextIndexReader(Txn *txn);
+    SharedPtr<IndexReader> GetFullTextIndexReader(Txn *txn);
 
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
         return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);

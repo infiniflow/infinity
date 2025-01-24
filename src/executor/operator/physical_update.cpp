@@ -40,10 +40,11 @@ import value;
 import wal_manager;
 import infinity_context;
 import status;
+import txn;
 
 namespace infinity {
 
-void PhysicalUpdate::Init() {}
+void PhysicalUpdate::Init(QueryContext* query_context) {}
 
 bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -55,6 +56,13 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
         operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
         operator_state->SetComplete();
         return true;
+    }
+
+    Txn* txn = query_context->GetTxn();
+    auto [table_entry, get_table_status] = txn->GetTableByName(*table_info_->db_name_, *table_info_->table_name_);
+    if (!get_table_status.ok()) {
+        operator_state->status_ = get_table_status;
+        RecoverableError(get_table_status);
     }
 
     OperatorState *prev_op_state = operator_state->prev_op_state_;
@@ -104,8 +112,8 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
             }
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_column_vectors);
-            txn->Append(table_entry_ptr_, output_data_block);
-            txn->Delete(table_entry_ptr_, row_ids);
+            txn->Append(table_entry, output_data_block);
+            txn->Delete(table_entry, row_ids);
 
             UpdateOperatorState *update_operator_state = static_cast<UpdateOperatorState *>(operator_state);
             ++update_operator_state->count_;

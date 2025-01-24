@@ -34,6 +34,7 @@ import column_def;
 import value;
 import snapshot_info;
 import txn_context;
+import block_index;
 
 namespace infinity {
 
@@ -64,6 +65,7 @@ class BaseTableRef;
 enum class CompactStatementType;
 struct SegmentIndexEntry;
 struct AddDeltaEntryTask;
+struct IndexReader;
 
 export class Txn : public EnableSharedFromThis<Txn> {
 public:
@@ -140,6 +142,8 @@ public:
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
+    SharedPtr<BlockIndex> GetBlockIndexFromTable(const String &db_name, const String &table_name);
+
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
@@ -175,6 +179,8 @@ public:
     Status CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
+
+    SharedPtr<IndexReader> GetFullTextIndexReader(const String &db_name, const String &table_name);
 
     // View Ops
     // Fixme: view definition should be given

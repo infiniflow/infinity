@@ -50,12 +50,12 @@ SharedPtr<Binding> Binding::MakeBinding(BindingType binding_type,
 SharedPtr<Binding> Binding::MakeBinding(BindingType binding_type,
                                         const String &binding_alias,
                                         u64 table_index,
-                                        TableEntry *table_ptr,
+                                        SharedPtr<TableInfo> table_info,
                                         SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                         SharedPtr<Vector<String>> column_names,
                                         SharedPtr<BlockIndex> block_index) {
     auto binding = MakeBinding(binding_type, binding_alias, table_index, std::move(column_types), std::move(column_names));
-    binding->table_collection_entry_ptr_ = table_ptr;
+    binding->table_info_ = table_info;
     binding->block_index_ = std::move(block_index);
     //    binding->logical_node_ptr_ = std::move(logical_node_ptr);
     //    binding->logical_node_id_ = logical_node_id;

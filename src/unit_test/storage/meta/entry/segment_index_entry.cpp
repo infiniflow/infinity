@@ -133,7 +133,7 @@ TEST_P(SegmentIndexEntryTest, create_ivf_index_test) {
 
         auto [index_entry, index_status] = txn1->CreateIndexDef(table_entry, index_base, ConflictType::kInvalid);
         EXPECT_EQ(index_status.ok(), true);
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn1);
+        auto table_ref = BaseTableRef::FakeTableRef(txn1, db_name, table_name);
         auto [_, status3] = txn1->CreateIndexPrepare(index_entry, table_ref.get(), true, true);
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());
@@ -199,7 +199,7 @@ TEST_P(SegmentIndexEntryTest, opt_hnsw_index_test) {
 
         auto [index_entry, index_status] = txn1->CreateIndexDef(table_entry, index_base, ConflictType::kInvalid);
         EXPECT_EQ(index_status.ok(), true);
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn1);
+        auto table_ref = BaseTableRef::FakeTableRef(txn1, db_name, table_name);
         auto [_, status3] = txn1->CreateIndexPrepare(index_entry, table_ref.get(), true, true);
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());
@@ -279,7 +279,7 @@ TEST_P(SegmentIndexEntryTest, opt_bmp_index_test) {
 
         auto [index_entry, index_status] = txn1->CreateIndexDef(table_entry, index_base, ConflictType::kInvalid);
         EXPECT_EQ(index_status.ok(), true);
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn1);
+        auto table_ref = BaseTableRef::FakeTableRef(txn1, db_name, table_name);
         auto [_, status3] = txn1->CreateIndexPrepare(index_entry, table_ref.get(), true, true);
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());
@@ -371,7 +371,7 @@ TEST_P(SegmentIndexEntryTest, flush_bmp_test) {
 
         auto [index_entry, index_status] = txn1->CreateIndexDef(table_entry, index_base, ConflictType::kInvalid);
         EXPECT_EQ(index_status.ok(), true);
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn1);
+        auto table_ref = BaseTableRef::FakeTableRef(txn1, db_name, table_name);
         auto [_, status3] = txn1->CreateIndexPrepare(index_entry, table_ref.get(), true, true);
         txn1->CreateIndexFinish(table_entry, index_entry);
         EXPECT_TRUE(status3.ok());

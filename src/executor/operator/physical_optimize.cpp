@@ -37,7 +37,7 @@ import infinity_context;
 
 namespace infinity {
 
-void PhysicalOptimize::Init() {}
+void PhysicalOptimize::Init(QueryContext* query_context) {}
 
 bool PhysicalOptimize::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

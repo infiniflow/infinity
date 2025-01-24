@@ -32,7 +32,7 @@ import infinity_context;
 
 namespace infinity {
 
-void PhysicalFlush::Init() {}
+void PhysicalFlush::Init(QueryContext* query_context) {}
 
 bool PhysicalFlush::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

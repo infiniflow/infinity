@@ -826,6 +826,11 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
 
+                auto [table_info, status] = txn_idx->GetTableInfo(*db_name, *table_name);
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+
                 IndexFullText fullIdxBase(std::make_shared<String>(idx_name),
                                           MakeShared<String>("test comment"),
                                           idx_file_name,
@@ -839,9 +844,9 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                     auto [table_entry, status3] = txn_idx->GetTableByName(*db_name, *table_name);
                     EXPECT_TRUE(status3.ok());
 
-                    auto [tInfo, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
+                    auto [table_info, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
                     EXPECT_TRUE(status4.ok());
-                    auto col_cnt = (*tInfo).column_count_;
+                    auto col_cnt = (*table_info).column_count_;
 
                     String alias = "tb1";
                     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
@@ -858,7 +863,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
-                    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+                    auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
                     auto [segment_index_entries, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
@@ -1004,9 +1009,9 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                     auto [table_entry, status3] = txn_idx->GetTableByName(*db_name, *table_name);
                     EXPECT_TRUE(status3.ok());
 
-                    auto [tInfo, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
+                    auto [table_info, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
                     EXPECT_TRUE(status4.ok());
-                    auto col_cnt = (*tInfo).column_count_;
+                    auto col_cnt = (*table_info).column_count_;
 
                     String alias = "tb1";
                     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
@@ -1023,7 +1028,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
-                    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+                    auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
                     auto [segment_index_entries, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
@@ -1157,9 +1162,9 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                     auto [table_entry, status3] = txn_idx->GetTableByName(*db_name, *table_name);
                     EXPECT_TRUE(status3.ok());
 
-                    auto [tInfo, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
+                    auto [table_info, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
                     EXPECT_TRUE(status4.ok());
-                    auto col_cnt = (*tInfo).column_count_;
+                    auto col_cnt = (*table_info).column_count_;
 
                     String alias = "tb1";
                     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
@@ -1176,7 +1181,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
-                    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+                    auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
                     auto [_, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());

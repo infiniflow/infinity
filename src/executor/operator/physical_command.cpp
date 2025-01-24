@@ -53,7 +53,7 @@ import snapshot;
 
 namespace infinity {
 
-void PhysicalCommand::Init() {}
+void PhysicalCommand::Init(QueryContext* query_context) {}
 
 bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operator_state) {
     DeferFn defer_fn([&]() { operator_state->SetComplete(); });

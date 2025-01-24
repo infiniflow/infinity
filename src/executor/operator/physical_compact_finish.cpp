@@ -63,7 +63,10 @@ bool PhysicalCompactFinish::Execute(QueryContext *query_context, OperatorState *
 
 void PhysicalCompactFinish::SaveSegmentData(QueryContext *query_context, const CompactStateData *compact_state_data) {
     auto *txn = query_context->GetTxn();
-    auto *table_entry = base_table_ref_->table_entry_ptr_;
+    auto [table_entry, status] = txn->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
+    if(!status.ok()) {
+        RecoverableError(status);
+    }
 
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data;
 
@@ -109,7 +112,10 @@ void PhysicalCompactFinish::SaveSegmentData(QueryContext *query_context, const C
 
 bool PhysicalCompactFinish::ApplyDeletes(QueryContext *query_context, const CompactStateData *compact_state_data) {
     auto *txn = query_context->GetTxn();
-    auto *table_entry = base_table_ref_->table_entry_ptr_;
+    auto [table_entry, status] = txn->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
+    if(!status.ok()) {
+        RecoverableError(status);
+    }
 
     for (const auto &compact_segment_data : compact_state_data->segment_data_list_) {
         for (auto *old_segment : compact_segment_data.old_segments_) {

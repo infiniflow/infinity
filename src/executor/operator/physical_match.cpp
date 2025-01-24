@@ -238,7 +238,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
     using TimeDurationType = std::chrono::duration<float, std::milli>;
     const auto execute_start_time = std::chrono::high_resolution_clock::now();
     // 1. build QueryNode tree
-    QueryBuilder query_builder(base_table_ref_.get());
+    QueryBuilder query_builder(base_table_ref_->table_info_);
     query_builder.Init(index_reader_);
     const auto finish_init_query_builder_time = std::chrono::high_resolution_clock::now();
     LOG_DEBUG(fmt::format("PhysicalMatch 1: Init QueryBuilder time: {} ms",
@@ -327,7 +327,7 @@ bool PhysicalMatch::ExecuteInner(QueryContext *query_context, OperatorState *ope
 PhysicalMatch::PhysicalMatch(const u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
                              SharedPtr<MatchExpression> match_expr,
-                             IndexReader index_reader,
+                             SharedPtr<IndexReader> index_reader,
                              UniquePtr<QueryNode> &&query_tree,
                              const float begin_threshold,
                              const EarlyTermAlgo early_term_algo,
@@ -350,14 +350,13 @@ PhysicalMatch::PhysicalMatch(const u64 id,
 
 PhysicalMatch::~PhysicalMatch() = default;
 
-void PhysicalMatch::Init() {}
+void PhysicalMatch::Init(QueryContext *query_context) {}
 
 bool PhysicalMatch::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto start_time = std::chrono::high_resolution_clock::now();
     assert(common_query_filter_);
     {
-        Txn *txn = query_context->GetTxn();
-        bool try_result = common_query_filter_->TryFinishBuild(txn);
+        bool try_result = common_query_filter_->TryFinishBuild();
         auto finish_filter_time = std::chrono::high_resolution_clock::now();
         std::chrono::duration<float, std::milli> filter_duration = finish_filter_time - start_time;
         LOG_DEBUG(fmt::format("PhysicalMatch Prepare: Filter time: {} ms", filter_duration.count()));
@@ -403,14 +402,14 @@ String PhysicalMatch::ToString(i64 &space) const {
     } else {
         arrow_str = "PhysicalMatch ";
     }
-    String res = fmt::format("{} Table: {}, {}", arrow_str, *(base_table_ref_->table_entry_ptr_->GetTableName()), match_expr_->ToString());
+    String res = fmt::format("{} Table: {}, {}", arrow_str, *(base_table_ref_->table_info_->table_name_), match_expr_->ToString());
     return res;
 }
 
 void PhysicalMatch::AddCache(QueryContext *query_context, ResultCacheManager *cache_mgr, const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
     Txn *txn = query_context->GetTxn();
-    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
-    TxnTimeStamp query_ts = std::min(txn->BeginTS(), table_entry->max_commit_ts());
+    TableInfo *table_info = base_table_ref_->table_info_.get();
+    TxnTimeStamp query_ts = std::min(txn->BeginTS(), table_info->max_commit_ts_);
     Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
     for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
         data_blocks[i] = output_data_blocks[i]->Clone();

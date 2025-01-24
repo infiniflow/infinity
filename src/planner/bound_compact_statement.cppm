@@ -66,8 +66,8 @@ public:
                     }
                     ++idx;
                 }
-                auto base_table_ref1 = MakeShared<BaseTableRef>(base_table_ref_->table_entry_ptr_, base_table_ref_->block_index_, index_index1);
-                auto base_table_ref2 = MakeShared<BaseTableRef>(base_table_ref_->table_entry_ptr_, base_table_ref_->block_index_, index_index2);
+                auto base_table_ref1 = MakeShared<BaseTableRef>(base_table_ref_->table_info_, base_table_ref_->block_index_, index_index1);
+                auto base_table_ref2 = MakeShared<BaseTableRef>(base_table_ref_->table_info_, base_table_ref_->block_index_, index_index2);
                 auto compact_index_node1 = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref1);
                 auto compact_index_node2 = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref2);
                 auto compact_finish = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);

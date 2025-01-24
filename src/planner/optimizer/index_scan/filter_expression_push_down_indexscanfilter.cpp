@@ -43,7 +43,7 @@ import table_index_entry;
 import catalog;
 import value;
 import table_index_meta;
-import table_entry;
+import meta_info;
 import txn;
 import roaring_bitmap;
 import query_node;
@@ -55,6 +55,7 @@ import doc_iterator;
 import search_driver;
 import status;
 import parse_fulltext_options;
+import table_entry;
 
 namespace infinity {
 
@@ -85,9 +86,13 @@ struct ExpressionIndexScanInfo {
     // for index scan
     HashMap<ColumnID, TableIndexEntry *> candidate_column_index_map_;
 
-    inline void InitColumnIndexEntries(TableEntry *table_entry, Txn *txn) {
+    inline void InitColumnIndexEntries(TableInfo *table_info, Txn *txn) {
         const TransactionID txn_id = txn->TxnID();
         const TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [table_entry, table_status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
+        if (!table_status.ok()) {
+            UnrecoverableError(table_status.message());
+        }
         for (auto map_guard = table_entry->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
@@ -229,7 +234,7 @@ class IndexScanFilterExpressionPushDownMethod {
     // for index
     QueryContext *query_context_;
     const BaseTableRef *base_table_ref_ptr_;
-    TableEntry *table_entry_ptr_ = nullptr;
+    TableInfo *table_info_ = nullptr;
     ScalarFunctionSet *and_scalar_function_set_ptr_ = nullptr;
     ExpressionIndexScanInfo tree_info_;
 
@@ -240,8 +245,8 @@ public:
         and_scalar_function_set_ptr_ = static_cast<ScalarFunctionSet *>(and_function_set_ptr.get());
         // prepare secondary index info
         if (base_table_ref_ptr_) {
-            table_entry_ptr_ = base_table_ref_ptr_->table_entry_ptr_;
-            tree_info_.InitColumnIndexEntries(table_entry_ptr_, query_context_->GetTxn());
+            table_info_ = base_table_ref_ptr_->table_info_.get();
+            tree_info_.InitColumnIndexEntries(table_info_, query_context_->GetTxn());
         }
     }
 
@@ -455,7 +460,8 @@ private:
             }
             case Enum::kFilterFulltextExpr: {
                 auto *filter_fulltext_expr = static_cast<const FilterFulltextExpression *>(index_filter_tree_node.src_ptr->get());
-                auto index_reader = table_entry_ptr_->GetFullTextIndexReader(query_context_->GetTxn());
+                auto index_reader = query_context_->GetTxn()->GetFullTextIndexReader(*table_info_->db_name_, *table_info_->table_name_);
+
                 EarlyTermAlgo early_term_algo = EarlyTermAlgo::kAuto;
                 UniquePtr<QueryNode> query_tree;
                 MinimumShouldMatchOption minimum_should_match_option;
@@ -587,7 +593,7 @@ private:
                         }
                     }
 
-                    Map<String, String> column2analyzer = index_reader.GetColumn2Analyzer(index_names);
+                    Map<String, String> column2analyzer = index_reader->GetColumn2Analyzer(index_names);
                     SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     query_tree = search_driver.ParseSingleWithFields(filter_fulltext_expr->fields_, filter_fulltext_expr->matching_text_);
                     if (!query_tree) {
@@ -595,7 +601,7 @@ private:
                     }
                 }
                 return MakeUnique<IndexFilterEvaluatorFulltext>(filter_fulltext_expr,
-                                                                table_entry_ptr_,
+                                                                table_info_,
                                                                 early_term_algo,
                                                                 std::move(index_reader),
                                                                 std::move(query_tree),

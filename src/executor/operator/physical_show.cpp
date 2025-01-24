@@ -90,7 +90,7 @@ import command_statement;
 
 namespace infinity {
 
-void PhysicalShow::Init() {
+void PhysicalShow::Init(QueryContext* query_context) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 

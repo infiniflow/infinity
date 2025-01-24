@@ -818,8 +818,7 @@ void InitCompactFinishFragmentContext(PhysicalCompactFinish *compact_finish_oper
         UnrecoverableError(error_message);
     }
     auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
-    TableEntry *table_entry = compact_finish_operator->base_table_ref_->table_entry_ptr_;
-    serial_materialize_fragment_ctx->compact_state_data_ = MakeShared<CompactStateData>(table_entry);
+    serial_materialize_fragment_ctx->compact_state_data_ = MakeShared<CompactStateData>(compact_finish_operator->base_table_ref_->table_info_);
 }
 
 void FragmentContext::MakeSourceState(i64 parallel_count) {

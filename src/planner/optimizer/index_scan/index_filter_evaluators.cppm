@@ -24,7 +24,7 @@ import filter_expression_push_down;
 import filter_expression_push_down_helper;
 import filter_fulltext_expression;
 import base_expression;
-import table_entry;
+import meta_info;
 import query_node;
 import column_index_reader;
 import txn;
@@ -85,9 +85,9 @@ protected:
 // maybe combined from multiple filter_fulltext exprs
 export struct IndexFilterEvaluatorFulltext final : IndexFilterEvaluator {
     Vector<const FilterFulltextExpression *> src_filter_fulltext_expressions_;
-    const TableEntry *table_entry_ = nullptr;
+    const TableInfo *table_info_ = nullptr;
     EarlyTermAlgo early_term_algo_ = EarlyTermAlgo::kNaive;
-    IndexReader index_reader_;
+    SharedPtr<IndexReader> index_reader_;
     UniquePtr<QueryNode> query_tree_;
     MinimumShouldMatchOption minimum_should_match_option_;
     u32 minimum_should_match_ = 0;
@@ -99,16 +99,16 @@ export struct IndexFilterEvaluatorFulltext final : IndexFilterEvaluator {
     Vector<String> index_names_;
 
     IndexFilterEvaluatorFulltext(const FilterFulltextExpression *src_filter_fulltext_expression,
-                                 const TableEntry *table_entry,
+                                 const TableInfo *table_info,
                                  const EarlyTermAlgo early_term_algo,
-                                 IndexReader &&index_reader,
+                                 SharedPtr<IndexReader> index_reader,
                                  UniquePtr<QueryNode> &&query_tree,
                                  MinimumShouldMatchOption &&minimum_should_match_option,
                                  const f32 score_threshold,
                                  const FulltextSimilarity ft_similarity,
                                  const BM25Params &bm25_params,
                                  Vector<String> &&index_names)
-        : IndexFilterEvaluator(Type::kFulltextIndex), src_filter_fulltext_expressions_({src_filter_fulltext_expression}), table_entry_(table_entry),
+        : IndexFilterEvaluator(Type::kFulltextIndex), src_filter_fulltext_expressions_({src_filter_fulltext_expression}), table_info_(table_info),
           early_term_algo_(early_term_algo), index_reader_(std::move(index_reader)), query_tree_(std::move(query_tree)),
           minimum_should_match_option_(std::move(minimum_should_match_option)), score_threshold_(std::max(score_threshold, 0.0f)),
           ft_similarity_(ft_similarity), bm25_params_(bm25_params), index_names_(std::move(index_names)) {}

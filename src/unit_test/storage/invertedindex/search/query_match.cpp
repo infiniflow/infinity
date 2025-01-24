@@ -218,9 +218,9 @@ void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name
             auto [table_entry, status3] = txn_idx->GetTableByName(db_name, table_name);
             EXPECT_TRUE(status3.ok());
 
-            auto [t_info, status4] = txn_idx->GetTableInfo(db_name, table_name);
+            auto [table_info, status4] = txn_idx->GetTableInfo(db_name, table_name);
             EXPECT_TRUE(status4.ok());
-            auto col_cnt = (*t_info).column_count_;
+            auto col_cnt = (*table_info).column_count_;
 
             String alias = "tb1";
             SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
@@ -237,7 +237,7 @@ void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name
             SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
             u64 table_idx = 0;
-            auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+            auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
             auto [_, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
             EXPECT_TRUE(status5.ok());
@@ -317,10 +317,10 @@ void QueryMatchTest::QueryMatch(const String &db_name,
     auto [table_index_entry, status_index] = txn->GetIndexByName(db_name, table_name, index_name);
     EXPECT_TRUE(status_index.ok());
 
-    auto fake_table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+    auto fake_table_ref = BaseTableRef::FakeTableRef(txn, db_name, table_name);
 
-    QueryBuilder query_builder(fake_table_ref.get());
-    IndexReader index_reader = fake_table_ref->table_entry_ptr_->GetFullTextIndexReader(txn);
+    QueryBuilder query_builder(fake_table_ref->table_info_);
+    SharedPtr<IndexReader> index_reader = table_entry->GetFullTextIndexReader(txn);
     query_builder.Init(index_reader);
     Vector<String> index_hints;
     const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer(index_hints);

@@ -22,7 +22,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_entry;
+import meta_info;
 import load_meta;
 import infinity_exception;
 import internal_types;
@@ -33,12 +33,12 @@ namespace infinity {
 
 export class PhysicalDelete final : public PhysicalOperator {
 public:
-    explicit PhysicalDelete(u64 id, UniquePtr<PhysicalOperator> left, TableEntry *table_entry_ptr, SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kDelete, std::move(left), nullptr, id, load_metas), table_entry_ptr_(table_entry_ptr) {}
+    explicit PhysicalDelete(u64 id, UniquePtr<PhysicalOperator> left, SharedPtr<TableInfo> table_info, SharedPtr<Vector<LoadMeta>> load_metas)
+        : PhysicalOperator(PhysicalOperatorType::kDelete, std::move(left), nullptr, id, load_metas), table_info_(std::move(table_info)) {}
 
     ~PhysicalDelete() override = default;
 
-    void Init() override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
@@ -52,7 +52,7 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    TableEntry *table_entry_ptr_{};
+    SharedPtr<TableInfo> table_info_{};
 
 private:
     SharedPtr<Vector<String>> output_names_{};

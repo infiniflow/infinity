@@ -52,7 +52,7 @@ String ToString(SinkType sink_type) {
     }
 }
 
-void PhysicalSink::Init() {}
+void PhysicalSink::Init(QueryContext* query_context) {}
 
 bool PhysicalSink::Execute(QueryContext *, OperatorState *) { return true; }
 

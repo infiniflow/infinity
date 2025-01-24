@@ -134,7 +134,7 @@ auto GetKnnExprForCalculation(const KnnExpression &src_knn_expr, const Embedding
     return result;
 }
 
-void PhysicalKnnScan::Init() {
+void PhysicalKnnScan::Init(QueryContext* query_context) {
     KnnExpression *knn_expr = knn_expression_.get();
     const auto *column_expr = static_cast<const ColumnExpression *>(knn_expr->arguments()[0].get());
     const auto column_data_type = column_expr->Type();
@@ -344,7 +344,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataType(QueryContext *query_contex
     }
 }
 
-TableEntry *PhysicalKnnScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+//TableInfo *PhysicalKnnScan::table_info() const { return base_table_ref_->table_info_.get(); }
 
 String PhysicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
 
@@ -367,7 +367,12 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     block_column_entries_ = MakeUnique<Vector<BlockColumnEntry *>>();
     index_entries_ = MakeUnique<Vector<SegmentIndexEntry *>>();
 
-    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+    auto *table_info = base_table_ref_->table_info_.get();
+    auto [table_entry, status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
     Map<u32, SharedPtr<SegmentIndexEntry>> index_entry_map;
 
     if (knn_expression_->ignore_index_) {
@@ -492,7 +497,7 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
     Txn *txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    if (!common_query_filter_->TryFinishBuild(txn)) {
+    if (!common_query_filter_->TryFinishBuild()) {
         // not ready, abort and wait for next time
         return;
     }

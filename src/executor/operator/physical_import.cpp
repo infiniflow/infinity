@@ -72,7 +72,7 @@ import infinity_context;
 
 namespace infinity {
 
-void PhysicalImport::Init() {}
+void PhysicalImport::Init(QueryContext* query_context) {}
 
 /**
  * @brief copy statement execute function

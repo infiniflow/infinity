@@ -35,10 +35,11 @@ import third_party;
 import wal_manager;
 import infinity_context;
 import status;
+import txn;
 
 namespace infinity {
 
-void PhysicalDelete::Init() {}
+void PhysicalDelete::Init(QueryContext* query_context) {}
 
 bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -53,6 +54,13 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
     }
 
     OperatorState *prev_op_state = operator_state->prev_op_state_;
+
+    Txn* txn = query_context->GetTxn();
+    auto [table_entry, get_table_status] = txn->GetTableByName(*table_info_->db_name_, *table_info_->table_name_);
+    if (!get_table_status.ok()) {
+        operator_state->status_ = get_table_status;
+        RecoverableError(get_table_status);
+    }
 
     SizeT data_block_count = prev_op_state->data_block_array_.size();
     for (SizeT block_idx = 0; block_idx < data_block_count; ++block_idx) {
@@ -69,7 +77,7 @@ bool PhysicalDelete::Execute(QueryContext *query_context, OperatorState *operato
         }
         if (!row_ids.empty()) {
             LOG_TRACE(fmt::format("Found to delete: row_count {}", row_ids.size()));
-            txn->Delete(table_entry_ptr_, row_ids); // TODO: segment id in `row_ids` is fixed.
+            txn->Delete(table_entry, row_ids); // TODO: segment id in `row_ids` is fixed.
             DeleteOperatorState *delete_operator_state = static_cast<DeleteOperatorState *>(operator_state);
             ++delete_operator_state->count_;
             delete_operator_state->sum_ += row_ids.size();

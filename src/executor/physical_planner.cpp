@@ -362,7 +362,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
     //        query_context_ptr_->set_max_node_id(logical_operator->node_id());
     //    }
     // Initialize the physical plan node
-    result->Init();
+    result->Init(query_context_ptr_);
 
     return result;
 }
@@ -381,8 +381,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateTable(const SharedPtr<Lo
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<LogicalNode> &logical_operator) const {
     auto logical_create_index = static_pointer_cast<LogicalCreateIndex>(logical_operator);
-    SharedPtr<String> schema_name = logical_create_index->base_table_ref()->schema_name();
-    SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_name();
+    SharedPtr<String> schema_name = logical_create_index->base_table_ref()->table_info_->db_name_;
+    SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_info_->table_name_;
     const auto &index_def_ptr = logical_create_index->index_definition();
     if (index_def_ptr->index_type_ != IndexType::kHnsw) {
         // TODO: support other index types build in parallel.
@@ -537,7 +537,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<Logical
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
     auto physical_delete = MakeUnique<PhysicalDelete>(logical_operator->node_id(),
                                                       std::move(input_physical_operator),
-                                                      logical_delete->table_entry_ptr_,
+                                                      logical_delete->table_info_,
                                                       logical_operator->load_metas());
     return physical_delete;
 }
@@ -556,7 +556,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<Logical
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
     auto physical_update = MakeUnique<PhysicalUpdate>(logical_operator->node_id(),
                                                       std::move(input_physical_operator),
-                                                      logical_update->table_entry_ptr_,
+                                                      logical_update->table_info_,
                                                       logical_update->update_columns_,
                                                       logical_update->all_columns_in_table_,
                                                       logical_update->final_result_columns_,

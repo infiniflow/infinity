@@ -75,7 +75,7 @@ public:
         : PhysicalAlter(table_entry, AlterStatementType::kRenameTable, std::move(output_names), std::move(output_types), id, load_metas),
           new_table_name_(std::move(new_table_name)) {}
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -94,7 +94,7 @@ public:
         : PhysicalAlter(table_entry, AlterStatementType::kAddColumns, std::move(output_names), std::move(output_types), id, load_metas),
           column_defs_(column_defs) {}
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -113,7 +113,7 @@ public:
         : PhysicalAlter(table_entry, AlterStatementType::kDropColumns, std::move(output_names), std::move(output_types), id, load_metas),
           column_names_(column_names) {}
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 

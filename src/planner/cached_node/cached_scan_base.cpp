@@ -27,11 +27,11 @@ CachedScanBase::CachedScanBase(LogicalNodeType type,
                                const BaseTableRef *base_table_ref,
                                TxnTimeStamp query_ts,
                                SharedPtr<Vector<String>> output_names)
-    : CachedNodeBase(type, output_names), schema_name_(base_table_ref->schema_name()), table_name_(base_table_ref->table_name()),
+    : CachedNodeBase(type, output_names), schema_name_(base_table_ref->db_name()), table_name_(base_table_ref->table_name()),
       column_ids_(base_table_ref->column_ids_), query_ts_(query_ts) {}
 
 CachedScanBase::CachedScanBase(LogicalNodeType type, const PhysicalScanBase *physical_scan_base, TxnTimeStamp query_ts)
-    : CachedNodeBase(type, physical_scan_base->GetOutputNames()), schema_name_(physical_scan_base->base_table_ref_->schema_name()),
+    : CachedNodeBase(type, physical_scan_base->GetOutputNames()), schema_name_(physical_scan_base->base_table_ref_->db_name()),
       table_name_(physical_scan_base->base_table_ref_->table_name()), column_ids_(physical_scan_base->base_table_ref_->column_ids_),
       query_ts_(query_ts) {}
 

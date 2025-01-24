@@ -24,15 +24,15 @@ import column_binding;
 
 import internal_types;
 import data_type;
-
-import table_entry;
+import meta_info;
 
 namespace infinity {
 
 export class LogicalDelete final : public LogicalNode {
 
 public:
-    LogicalDelete(u64 node_id, TableEntry *table_entry_ptr) : LogicalNode(node_id, LogicalNodeType::kDelete), table_entry_ptr_(table_entry_ptr) {}
+    LogicalDelete(u64 node_id, SharedPtr<TableInfo> table_info)
+        : LogicalNode(node_id, LogicalNodeType::kDelete), table_info_(std::move(table_info)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -44,7 +44,7 @@ public:
 
     inline String name() final { return "LogicalDelete"; }
 
-    TableEntry *table_entry_ptr_{};
+    SharedPtr<TableInfo> table_info_{};
 };
 
 } // namespace infinity

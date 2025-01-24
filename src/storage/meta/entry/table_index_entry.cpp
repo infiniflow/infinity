@@ -379,7 +379,7 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *seg
 
 Tuple<Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
-    TableEntry *table_entry = table_ref->table_entry_ptr_;
+    TableEntry *table_entry = table_index_meta()->GetTableEntry();
     TxnStore *txn_store = txn->txn_store();
     TxnTableStore *txn_table_store = txn_store->GetTxnTableStore(table_entry);
 

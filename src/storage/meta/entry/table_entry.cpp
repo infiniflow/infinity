@@ -252,6 +252,23 @@ SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
     return table_entry;
 }
 
+SharedPtr<TableInfo> TableEntry::GetTableInfo(Txn* txn) {
+    SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
+    table_info->db_name_ = this->GetDBName();
+    table_info->table_name_ = this->table_name_;
+    table_info->table_full_dir_ = MakeShared<String>(Path(InfinityContext::instance().config()->DataDir()) / *this->TableEntryDir());
+    table_info->column_count_ = this->ColumnCount();
+    table_info->row_count_ = this->row_count();
+    table_info->table_comment_ = this->GetTableComment();
+    table_info->table_entry_type_ = this->EntryType();
+    table_info->max_commit_ts_ = this->max_commit_ts();
+    table_info->column_defs_ = this->column_defs();
+
+    SharedPtr<BlockIndex> segment_index = this->GetBlockIndex(txn);
+    table_info->segment_count_ = segment_index->SegmentCount();
+    return table_info;
+}
+
 Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBase> &index_base,
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
@@ -1509,7 +1526,7 @@ Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
     return res;
 }
 
-IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
+SharedPtr<IndexReader> TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
 
 void TableEntry::InvalidateFullTextIndexCache() {
     LOG_DEBUG(fmt::format("Invalidate fulltext index cache: table_name: {}", *table_name_));

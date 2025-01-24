@@ -49,7 +49,7 @@ import txn;
 
 namespace infinity {
 
-void PhysicalExport::Init() {}
+void PhysicalExport::Init(QueryContext* query_context) {}
 
 bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operator_state) {
     ExportOperatorState *export_op_state = static_cast<ExportOperatorState *>(operator_state);

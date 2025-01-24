@@ -26,7 +26,7 @@ import base_expression;
 import default_values;
 import filter_expression_push_down;
 import data_type;
-import table_entry;
+import meta_info;
 import table_index_entry;
 import fast_rough_filter;
 
@@ -47,7 +47,7 @@ public:
 
     [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    [[nodiscard]] TableEntry *table_collection_ptr() const;
+    [[nodiscard]] TableInfo *table_info() const;
 
     [[nodiscard]] String TableAlias() const;
 

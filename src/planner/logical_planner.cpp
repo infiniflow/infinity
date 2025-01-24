@@ -748,14 +748,20 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
-    TableEntry *table_entry = base_table_ref->table_entry_ptr_;
+
+    auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
     {
-        TableEntry::TableStatus status;
-        if (!table_entry->SetCreatingIndex(status, txn)) {
-            RecoverableError(Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(status))));
+        TableEntry::TableStatus table_status;
+        if (!table_entry->SetCreatingIndex(table_status, txn)) {
+            RecoverableError(
+                Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(table_status))));
         }
     }
-    auto status = table_entry->AddWriteTxnNum(txn);
+    status = table_entry->AddWriteTxnNum(txn);
     if (!status.ok()) {
         RecoverableError(status);
     }
