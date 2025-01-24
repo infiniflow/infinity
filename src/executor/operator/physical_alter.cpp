@@ -53,18 +53,13 @@ bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *ope
         return true;
     }
 
-    LOG_INFO(fmt::format("Locking table {} for add columns", *table_entry_->GetTableName()));
-    table_entry_->SetLocked();
-    LOG_INFO(fmt::format("Table {} is locked", *table_entry_->GetTableName()));
-
+    Txn *txn = query_context->GetTxn();
+    txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
     DeferFn defer_fn([&]() {
-        LOG_INFO(fmt::format("Table {} unlocked.", *table_entry_->GetTableName()));
-        table_entry_->SetUnlock();
+        txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_);
     });
 
-    Txn *txn = query_context->GetTxn();
-
-    auto status = txn->AddColumns(table_entry_, column_defs_);
+    auto status = txn->AddColumns(*table_info_->db_name_, *table_info_->table_name_, column_defs_);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -86,17 +81,13 @@ bool PhysicalDropColumns::Execute(QueryContext *query_context, OperatorState *op
         return true;
     }
 
-    LOG_INFO(fmt::format("Locking table {} for add columns", *table_entry_->GetTableName()));
-    table_entry_->SetLocked();
-    LOG_INFO(fmt::format("Table {} is locked", *table_entry_->GetTableName()));
-
+    Txn *txn = query_context->GetTxn();
+    txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
     DeferFn defer_fn([&]() {
-        LOG_INFO(fmt::format("Table {} unlocked.", *table_entry_->GetTableName()));
-        table_entry_->SetUnlock();
+        txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_);
     });
 
-    Txn *txn = query_context->GetTxn();
-    auto status = txn->DropColumns(table_entry_, column_names_);
+    auto status = txn->DropColumns(*table_info_->db_name_, *table_info_->table_name_, column_names_);
     if (!status.ok()) {
         RecoverableError(status);
     }

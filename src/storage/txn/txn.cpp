@@ -306,13 +306,18 @@ Status Txn::RenameTable(const String &old_table_name, const String &new_table_na
     return Status::OK();
 }
 
-Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs) {
-    TxnTimeStamp begin_ts = this->BeginTS();
+Status Txn::AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs) {
+    auto [table_entry, table_status] = GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return table_status;
+    }
 
-    auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_context_ptr_->txn_id_, begin_ts);
+    TxnTimeStamp begin_ts = this->BeginTS();
+    auto [db_entry, db_status] = catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
     if (!db_status.ok()) {
         return db_status;
     }
+
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     new_table_entry->InitCompactionAlg(begin_ts);
     TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
@@ -329,13 +334,18 @@ Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef
     return Status::OK();
 }
 
-Status Txn::DropColumns(TableEntry *table_entry, const Vector<String> &column_names) {
-    TxnTimeStamp begin_ts = this->BeginTS();
+Status Txn::DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names) {
+    auto [table_entry, table_status] = GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return table_status;
+    }
 
-    auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_context_ptr_->txn_id_, begin_ts);
+    TxnTimeStamp begin_ts = this->BeginTS();
+    auto [db_entry, db_status] = catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
     if (!db_status.ok()) {
         return db_status;
     }
+
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     new_table_entry->InitCompactionAlg(begin_ts);
     TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
@@ -544,7 +554,25 @@ Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetCollectionByName"};
 }
 
-Status Txn::LockTable(const String &db_ame, const String &table_name) { return Status::OK(); }
+Status Txn::LockTable(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    status = table_entry->SetLocked();
+    LOG_INFO(fmt::format("Table {}.{} is locked", db_name, table_name));
+    return status;
+}
+
+Status Txn::UnLockTable(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    status = table_entry->SetUnlock();
+    LOG_INFO(fmt::format("Table {}.{} is unlocked", db_name, table_name));
+    return status;
+}
 
 Status Txn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: CreateView"};

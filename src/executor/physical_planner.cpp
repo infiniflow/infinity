@@ -598,7 +598,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
     switch (logical_alter->type_) {
         case AlterStatementType::kRenameTable: {
             auto *logical_rename_table = static_cast<LogicalRenameTable *>(logical_alter);
-            return MakeUnique<PhysicalRenameTable>(logical_rename_table->table_entry_,
+            return MakeUnique<PhysicalRenameTable>(logical_rename_table->table_info_,
                                                    std::move(logical_rename_table->new_table_name_),
                                                    logical_operator->GetOutputNames(),
                                                    logical_operator->GetOutputTypes(),
@@ -607,7 +607,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
         }
         case AlterStatementType::kAddColumns: {
             auto *logical_add_columns = static_cast<LogicalAddColumns *>(logical_alter);
-            return MakeUnique<PhysicalAddColumns>(logical_add_columns->table_entry_,
+            return MakeUnique<PhysicalAddColumns>(logical_add_columns->table_info_,
                                                   logical_add_columns->column_defs_,
                                                   logical_operator->GetOutputNames(),
                                                   logical_operator->GetOutputTypes(),
@@ -616,7 +616,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
         }
         case AlterStatementType::kDropColumns: {
             auto *logical_drop_columns = static_cast<LogicalDropColumns *>(logical_alter);
-            return MakeUnique<PhysicalDropColumns>(logical_drop_columns->table_entry_,
+            return MakeUnique<PhysicalDropColumns>(logical_drop_columns->table_info_,
                                                    logical_drop_columns->column_names_,
                                                    logical_operator->GetOutputNames(),
                                                    logical_operator->GetOutputTypes(),

@@ -132,9 +132,9 @@ public:
 
     Status RenameTable(const String &old_table_name, const String &new_table_name);
 
-    Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs);
+    Status AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs);
 
-    Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
+    Status DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names);
 
     Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
@@ -149,6 +149,7 @@ public:
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
     Status LockTable(const String &db_name, const String &table_name);
+    Status UnLockTable(const String &db_name, const String &table_name);
 
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 

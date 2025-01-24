@@ -119,7 +119,7 @@ public:
     ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
-    SharedPtr<TableInfo> GetTableInfo(Txn* txn);
+    SharedPtr<TableInfo> GetTableInfo(Txn *txn);
 
     Tuple<TableIndexEntry *, Status>
     CreateIndex(const SharedPtr<IndexBase> &index_base, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
@@ -374,9 +374,9 @@ public:
 
     void DecWriteTxnNum();
 
-    void SetLocked();
+    Status SetLocked();
 
-    void SetUnlock();
+    Status SetUnlock();
 
     enum struct TableStatus : u8 {
         kNone = 0,

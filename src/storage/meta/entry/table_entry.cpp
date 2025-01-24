@@ -252,7 +252,7 @@ SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
     return table_entry;
 }
 
-SharedPtr<TableInfo> TableEntry::GetTableInfo(Txn* txn) {
+SharedPtr<TableInfo> TableEntry::GetTableInfo(Txn *txn) {
     SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
     table_info->db_name_ = this->GetDBName();
     table_info->table_name_ = this->table_name_;
@@ -1614,11 +1614,12 @@ void TableEntry::DecWriteTxnNum() {
     }
 }
 
-void TableEntry::SetLocked() {
+Status TableEntry::SetLocked() {
     std::unique_lock lock(mtx_);
     if (locked_) {
-        LOG_WARN(fmt::format("Table {} has already been locked", *GetTableName()));
-        return;
+        String error_message = fmt::format("Table {} has already been locked", *GetTableName());
+        LOG_WARN(error_message);
+        return Status::AlreadyLocked(error_message);
     }
     if (write_txn_num_ > 0) {
         wait_lock_ = true;
@@ -1626,15 +1627,18 @@ void TableEntry::SetLocked() {
         wait_lock_ = false;
     }
     locked_ = true;
+    return Status::OK();
 }
 
-void TableEntry::SetUnlock() {
+Status TableEntry::SetUnlock() {
     std::lock_guard lock(mtx_);
     if (!locked_) {
-        LOG_WARN(fmt::format("Table {} is not locked", *GetTableName()));
-        return;
+        String error_message = fmt::format("Table {} is not locked", *GetTableName());
+        LOG_WARN(error_message);
+        return Status::NotLocked(error_message);
     }
     locked_ = false;
+    return Status::OK();
 }
 
 bool TableEntry::SetCompact(TableStatus &status, Txn *txn) {

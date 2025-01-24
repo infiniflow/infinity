@@ -1196,16 +1196,21 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
         statement->schema_name_ = query_context_ptr_->schema_name();
     }
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
+    auto [table_entry, entry_status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    if (!entry_status.ok()) {
+        RecoverableError(entry_status);
+    }
+
+    auto [table_info, info_status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
+    if (!info_status.ok()) {
+        RecoverableError(info_status);
     }
 
     switch (statement->type_) {
         case AlterStatementType::kRenameTable: {
             auto *rename_table_statement = static_cast<RenameTableStatement *>(statement);
             this->logical_plan_ = MakeShared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                 table_entry,
+                                                                 table_info,
                                                                  std::move(rename_table_statement->new_table_name_));
             break;
         }
@@ -1229,7 +1234,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                     RecoverableError(Status::DuplicateColumnName(column_def->name()));
                 }
             }
-            this->logical_plan_ = MakeShared<LogicalAddColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_entry, std::move(column_defs));
+            this->logical_plan_ = MakeShared<LogicalAddColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_info, std::move(column_defs));
             break;
         }
         case AlterStatementType::kDropColumns: {
@@ -1241,7 +1246,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                     RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
                 }
             }
-            this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_entry, std::move(column_names));
+            this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_info, std::move(column_names));
             break;
         }
         default: {
