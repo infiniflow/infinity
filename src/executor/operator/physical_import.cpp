@@ -936,6 +936,30 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_obj
                 }
             }
         }
+        case nlohmann::json::value_t::object: {
+            if (json_object.size() == 1 && json_object.begin().key() == "array") {
+                const auto &array_obj = json_object.begin().value();
+                if (array_obj.type() != nlohmann::json::value_t::array) {
+                    const auto error_info = fmt::format("Unrecognized json object type in array: {}, expect array!", array_obj.type_name());
+                    RecoverableError(Status::ImportFileFormatError(error_info));
+                    return nullptr;
+                }
+                auto res = MakeShared<ConstantExpr>(LiteralType::kCurlyBracketsArray);
+                for (const auto &elem : array_obj) {
+                    auto elem_expr = BuildConstantExprFromJson(elem);
+                    if (!elem_expr) {
+                        RecoverableError(Status::ImportFileFormatError("Failed to build expr for element of array!"));
+                        return nullptr;
+                    }
+                    res->curly_brackets_array_.push_back(std::move(elem_expr));
+                }
+                return res;
+            } else {
+                const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
+                RecoverableError(Status::ImportFileFormatError(error_info));
+                return nullptr;
+            }
+        }
         default: {
             const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
             RecoverableError(Status::ImportFileFormatError(error_info));
