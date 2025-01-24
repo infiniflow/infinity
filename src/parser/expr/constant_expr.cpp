@@ -26,6 +26,24 @@
 
 namespace infinity {
 
+ConstantExpr::ConstantExpr(ConstantExpr &&constant_expr) noexcept : ParsedExpr(ParsedExprType::kConstant) {
+    literal_type_ = constant_expr.literal_type_;
+    bool_value_ = constant_expr.bool_value_;
+    integer_value_ = constant_expr.integer_value_;
+    double_value_ = constant_expr.double_value_;
+    str_value_ = constant_expr.str_value_;
+    constant_expr.str_value_ = nullptr;
+    interval_type_ = constant_expr.interval_type_;
+    date_value_ = constant_expr.date_value_;
+    constant_expr.date_value_ = nullptr;
+    long_array_ = std::move(constant_expr.long_array_);
+    double_array_ = std::move(constant_expr.double_array_);
+    sub_array_array_ = std::move(constant_expr.sub_array_array_);
+    long_sparse_array_ = std::move(constant_expr.long_sparse_array_);
+    double_sparse_array_ = std::move(constant_expr.double_sparse_array_);
+    curly_brackets_array_ = std::move(constant_expr.curly_brackets_array_);
+}
+
 ConstantExpr::~ConstantExpr() {
     switch (literal_type_) {
         case LiteralType::kString: {
