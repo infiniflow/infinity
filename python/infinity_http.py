@@ -713,6 +713,7 @@ class table_http_result:
         self._search_exprs = []
         self._sort = []
         self._group_by = []
+        self._having = []
         self._limit = None
         self._offset = None
         self._option = None
@@ -733,6 +734,8 @@ class table_http_result:
             tmp["sort"] = self._sort
         if len(self._group_by):
             tmp["group_by"] = self._group_by
+        if len(self._having):
+            tmp["having"] = self._having
         if self._limit is not None:
             tmp["limit"] = str(self._limit)
         if self._offset is not None:
@@ -781,6 +784,8 @@ class table_http_result:
             tmp["sort"] = self._sort
         if len(self._group_by):
             tmp["group_by"] = self._group_by
+        if len(self._having):
+            tmp["having"] = self._having
         if self._limit is not None:
             tmp["limit"] = self._limit
         if self._offset is not None:
@@ -837,6 +842,10 @@ class table_http_result:
     
     def group_by(self, group_by_list):
         self._group_by = group_by_list
+        return self
+    
+    def having(self, having_expr):
+        self._having = having_expr
         return self
 
     def option(self, option: {}):

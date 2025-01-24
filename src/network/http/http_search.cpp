@@ -68,6 +68,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
         Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
         Vector<ParsedExpr *> *group_by_columns{nullptr};
+        UniquePtr<ParsedExpr> having{};
         bool total_hits_count_flag{};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
@@ -159,6 +160,16 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
 
                 group_by_columns = ParseOutput(group_by_list, http_status, response);
                 if (group_by_columns == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "having")) {
+                if (having != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one having field.";
+                    return;
+                }
+                having = ParseFilter(elem.value(), http_status, response);
+                if (having == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "filter")) {
@@ -254,6 +265,7 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                                                         highlight_columns,
                                                         order_by_list,
                                                         group_by_columns,
+                                                        having.release(),
                                                         total_hits_count_flag);
 
         output_columns = nullptr;
@@ -338,6 +350,8 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *highlight_columns{nullptr};
         Vector<OrderByExpr *> *order_by_list{nullptr};
+        Vector<ParsedExpr *> *group_by_columns{nullptr};
+        UniquePtr<ParsedExpr> having{nullptr};
         DeferFn defer_fn([&]() {
             if (output_columns != nullptr) {
                 for (auto &expr : *output_columns) {
@@ -416,6 +430,28 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
 
                 order_by_list = ParseSort(list, http_status, response);
                 if (order_by_list == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "group_by")) {
+                if (group_by_columns != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one group by field.";
+                    return;
+                }
+                auto &group_by_list = elem.value();
+
+                group_by_columns = ParseOutput(group_by_list, http_status, response);
+                if (group_by_columns == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "having")) {
+                if (having != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one having field.";
+                    return;
+                }
+                having = ParseFilter(elem.value(), http_status, response);
+                if (having == nullptr) {
                     return;
                 }
             } else if (IsEqual(key, "filter")) {
@@ -497,11 +533,13 @@ void HTTPSearch::Explain(Infinity *infinity_ptr,
                                                          output_columns,
                                                          highlight_columns,
                                                          order_by_list,
-                                                         nullptr);
+                                                         group_by_columns,
+                                                         having.release());
 
         output_columns = nullptr;
         highlight_columns = nullptr;
         order_by_list = nullptr;
+        group_by_columns = nullptr;
         if (result.IsOk()) {
             SizeT block_rows = result.result_table_->DataBlockCount();
             for (SizeT block_id = 0; block_id < block_rows; ++block_id) {

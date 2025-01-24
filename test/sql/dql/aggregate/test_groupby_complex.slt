@@ -77,6 +77,23 @@ SELECT c3, SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3;
 7.000000 1 1
 8.000000 2 2
 
+query RII rowsort
+SELECT c3, SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3 HAVING SUM(c1) >= 2;
+----
+1.000000 2 4
+2.000000 4 3
+3.000000 2 5
+4.000000 4 4
+6.000000 2 3
+8.000000 2 2
+
+query RII rowsort
+SELECT c3, SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3 HAVING SUM(c1) >= 2 and c3 > 3;
+----
+4.000000 4 4
+6.000000 2 3
+8.000000 2 2
+
 query RIII rowsort
 SELECT c3, COUNT(c3), SUM(c1), SUM(c2) FROM simple_groupby GROUP BY c3;
 ----

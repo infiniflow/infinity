@@ -1448,6 +1448,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
                            Vector<WrapParsedExpr> highlight_list,
                            Vector<WrapOrderByExpr> order_by_list,
                            Vector<WrapParsedExpr> group_by_list,
+                           WrapParsedExpr *having_expr,
                            bool total_hits_count_flag,
                            WrapSearchExpr *wrap_search_expr,
                            WrapParsedExpr *filter_expr,
@@ -1586,6 +1587,21 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
+    ParsedExpr *having = nullptr;
+    DeferFn defer_fn9([&]() {
+        if (having != nullptr) {
+            delete having;
+            having = nullptr;
+        }
+    });
+    if (having_expr != nullptr) {
+        Status status;
+        having = having_expr->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+
     Vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
         if (order_by_exprs != nullptr) {
@@ -1622,6 +1638,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
                                         highlight,
                                         order_by_exprs,
                                         group_by_exprs,
+                                        having,
                                         total_hits_count_flag);
     search_expr = nullptr;
     filter = nullptr;
@@ -1631,6 +1648,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
     highlight = nullptr;
     order_by_exprs = nullptr;
     group_by_exprs = nullptr;
+    having = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }
@@ -1649,6 +1667,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
                             Vector<WrapParsedExpr> highlight_list,
                             Vector<WrapOrderByExpr> order_by_list,
                             Vector<WrapParsedExpr> group_by_list,
+                            WrapParsedExpr *having_expr,
                             WrapSearchExpr *wrap_search_expr,
                             WrapParsedExpr *filter_expr,
                             WrapParsedExpr *limit_expr,
@@ -1786,6 +1805,21 @@ WrapQueryResult WrapExplain(Infinity &instance,
         }
     }
 
+    ParsedExpr *having = nullptr;
+    DeferFn defer_fn13([&]() {
+        if (having != nullptr) {
+            delete having;
+            having = nullptr;
+        }
+    });
+    if (having_expr != nullptr) {
+        Status status;
+        having = having_expr->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+
     Vector<OrderByExpr *> *order_by_exprs = nullptr;
     DeferFn defer_fn6([&]() {
         if (order_by_exprs != nullptr) {
@@ -1822,7 +1856,8 @@ WrapQueryResult WrapExplain(Infinity &instance,
                                          output_columns,
                                          highlight,
                                          order_by_exprs,
-                                         group_by_exprs);
+                                         group_by_exprs,
+                                         having);
     search_expr = nullptr;
     filter = nullptr;
     limit = nullptr;
@@ -1831,6 +1866,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
     highlight = nullptr;
     order_by_exprs = nullptr;
     group_by_exprs = nullptr;
+    having = nullptr;
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }
