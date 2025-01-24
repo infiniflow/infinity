@@ -303,7 +303,7 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(table_entry, segment_entry);
+            txn->Import(*db_name, *table_name, segment_entry);
 
             txn_mgr->CommitTxn(txn);
         }
@@ -387,7 +387,7 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            status = txn->Append(table_entry, data_block);
+            status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -475,7 +475,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            status = txn->Append(table_entry, data_block);
+            status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -488,7 +488,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
 
             Vector<infinity::RowID> del_row_ids{};
             del_row_ids.push_back(del_row);
-            status = txn->Delete(table_entry, del_row_ids, true);
+            status = txn->Delete(*db_name, *table_name, del_row_ids, true);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -542,7 +542,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            status = txn->Append(table_entry, data_block);
+            status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
             EXPECT_EQ(table_entry->row_count(), 1ul);
@@ -570,7 +570,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            status = txn->Append(table_entry, data_block);
+            status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
             EXPECT_EQ(table_entry->row_count(), 2ul);
@@ -622,7 +622,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto [table_entry, status] = txn_record3->GetTableByName(*db_name, *table_name);
             ASSERT_TRUE(status.ok());
 
-            status = txn_record3->Append(table_entry, data_block);
+            status = txn_record3->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn_record3);
@@ -808,7 +808,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(table_entry, segment_entry);
+            txn->Import(*db_name, *table_name, segment_entry);
 
             txn_mgr->CommitTxn(txn);
         }
@@ -978,7 +978,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(table_entry, segment_entry);
+            txn->Import(*db_name, *table_name, segment_entry);
 
             txn_mgr->CommitTxn(txn);
         }
@@ -1131,7 +1131,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(table_entry, segment_entry);
+            txn->Import(*db_name, *table_name, segment_entry);
 
             txn_mgr->CommitTxn(txn);
         }

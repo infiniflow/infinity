@@ -384,7 +384,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
             EXPECT_EQ(input_block->Finalized(), true);
             auto [table_entry, status] = txn5->GetTableByName("default_db", "tbl4");
             EXPECT_TRUE(status.ok());
-            txn5->Append(table_entry, input_block);
+            txn5->Append("default_db", "tbl4", input_block);
             txn_mgr->CommitTxn(txn5);
         }
         {

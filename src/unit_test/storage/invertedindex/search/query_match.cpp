@@ -293,7 +293,7 @@ void QueryMatchTest::InsertData(const String &db_name, const String &table_name)
         }
     }
     segment_entry->FlushNewData();
-    txn->Import(table_entry, segment_entry);
+    txn->Import(db_name, table_name, segment_entry);
 
     last_commit_ts_ = txn_mgr->CommitTxn(txn);
 }

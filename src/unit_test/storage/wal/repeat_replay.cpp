@@ -98,7 +98,7 @@ TEST_P(RepeatReplayTest, append) {
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Append(table_entry, data_block);
+        status = txn->Append(*db_name, *table_name, data_block);
         ASSERT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     };

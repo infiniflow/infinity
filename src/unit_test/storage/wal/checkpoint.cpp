@@ -402,7 +402,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto append_status = txn->Append(table_entry, data_block);
+            auto append_status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(append_status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -482,7 +482,7 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
             }
             input_block->Finalize();
 
-            auto append_status = txn->Append(table_entry, input_block);
+            auto append_status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(append_status.ok());
             txn_mgr->CommitTxn(txn);
         };
