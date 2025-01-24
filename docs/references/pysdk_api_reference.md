@@ -1909,10 +1909,10 @@ table_obj.output(["c1", "avg(c1)", "count(c2)", "min(c3)", "max(c4)"]).group_by(
 ### having
 
 ```python
-table_object.having(having_expr)
+table_object.having(expr)
 ```
 
-Creates a having expression using `having_expr`.
+Creates a filtering condition expression for the group-by result.
 
 #### Parameters
 
