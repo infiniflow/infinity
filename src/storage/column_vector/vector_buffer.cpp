@@ -292,6 +292,7 @@ void VectorBuffer::CopyCompactBits(u8 *dst_ptr_u8, const u8 *src_ptr_u8, SizeT d
 SizeT VectorBuffer::TotalSize(const DataType *data_type) const {
     SizeT size = 0;
     switch (data_type->type()) {
+        case LogicalType::kArray:
         case LogicalType::kVarchar:
         case LogicalType::kSparse:
         case LogicalType::kMultiVector:
@@ -309,6 +310,7 @@ SizeT VectorBuffer::TotalSize(const DataType *data_type) const {
 
 void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
     switch (data_type->type()) {
+        case LogicalType::kArray:
         case LogicalType::kVarchar:
         case LogicalType::kSparse:
         case LogicalType::kMultiVector:
@@ -330,6 +332,7 @@ void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
 
 void VectorBuffer::ReadAdv(const char *&ptr, const DataType *data_type) {
     switch (data_type->type()) {
+        case LogicalType::kArray:
         case LogicalType::kVarchar:
         case LogicalType::kSparse:
         case LogicalType::kMultiVector:

@@ -44,7 +44,8 @@ struct LogicType {
         DateTime = 19,
         Timestamp = 20,
         Interval = 21,
-        Invalid = 22
+        Array = 22,
+        Invalid = 23
     };
 };
 
@@ -124,7 +125,8 @@ struct LiteralType {
         Time = 14,
         Inteval = 15,
         DateTime = 16,
-        Timestamp = 17
+        Timestamp = 17,
+        CurlyBracketsArray = 18
     };
 };
 
@@ -177,7 +179,8 @@ struct ColumnType {
         ColumnDateTime = 18,
         ColumnTimestamp = 19,
         ColumnInterval = 20,
-        ColumnInvalid = 21
+        ColumnArray = 21,
+        ColumnInvalid = 22
     };
 };
 
@@ -220,6 +223,8 @@ class VarcharType;
 class EmbeddingType;
 
 class SparseType;
+
+class ArrayType;
 
 class PhysicalType;
 
@@ -658,12 +663,50 @@ void swap(SparseType &a, SparseType &b);
 
 std::ostream &operator<<(std::ostream &out, const SparseType &obj);
 
+typedef struct _ArrayType__isset {
+    _ArrayType__isset() : element_data_type(false) {}
+    bool element_data_type : 1;
+} _ArrayType__isset;
+
+class ArrayType : public virtual ::apache::thrift::TBase {
+public:
+    ArrayType(const ArrayType &) noexcept;
+    ArrayType &operator=(const ArrayType &) noexcept;
+    ArrayType() noexcept : element_data_type() {}
+
+    virtual ~ArrayType() noexcept;
+    ::std::shared_ptr<DataType> element_data_type;
+
+    _ArrayType__isset __isset;
+
+    void __set_element_data_type(::std::shared_ptr<DataType> val);
+
+    bool operator==(const ArrayType &rhs) const {
+        if (!(element_data_type == rhs.element_data_type))
+            return false;
+        return true;
+    }
+    bool operator!=(const ArrayType &rhs) const { return !(*this == rhs); }
+
+    bool operator<(const ArrayType &) const;
+
+    uint32_t read(::apache::thrift::protocol::TProtocol *iprot) override;
+    uint32_t write(::apache::thrift::protocol::TProtocol *oprot) const override;
+
+    virtual void printTo(std::ostream &out) const;
+};
+
+void swap(ArrayType &a, ArrayType &b);
+
+std::ostream &operator<<(std::ostream &out, const ArrayType &obj);
+
 typedef struct _PhysicalType__isset {
-    _PhysicalType__isset() : number_type(false), varchar_type(false), embedding_type(false), sparse_type(false) {}
+    _PhysicalType__isset() : number_type(false), varchar_type(false), embedding_type(false), sparse_type(false), array_type(false) {}
     bool number_type : 1;
     bool varchar_type : 1;
     bool embedding_type : 1;
     bool sparse_type : 1;
+    bool array_type : 1;
 } _PhysicalType__isset;
 
 class PhysicalType : public virtual ::apache::thrift::TBase {
@@ -677,6 +720,7 @@ public:
     VarcharType varchar_type;
     EmbeddingType embedding_type;
     SparseType sparse_type;
+    ArrayType array_type;
 
     _PhysicalType__isset __isset;
 
@@ -687,6 +731,8 @@ public:
     void __set_embedding_type(const EmbeddingType &val);
 
     void __set_sparse_type(const SparseType &val);
+
+    void __set_array_type(const ArrayType &val);
 
     bool operator==(const PhysicalType &rhs) const {
         if (__isset.number_type != rhs.__isset.number_type)
@@ -704,6 +750,10 @@ public:
         if (__isset.sparse_type != rhs.__isset.sparse_type)
             return false;
         else if (__isset.sparse_type && !(sparse_type == rhs.sparse_type))
+            return false;
+        if (__isset.array_type != rhs.__isset.array_type)
+            return false;
+        else if (__isset.array_type && !(array_type == rhs.array_type))
             return false;
         return true;
     }
@@ -1137,7 +1187,7 @@ typedef struct _ConstantExpr__isset {
     _ConstantExpr__isset()
         : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false),
           f64_array_value(false), i64_tensor_value(false), f64_tensor_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false),
-          i64_array_idx(false) {}
+          i64_array_idx(false), curly_brackets_array(false) {}
     bool literal_type : 1;
     bool bool_value : 1;
     bool i64_value : 1;
@@ -1150,6 +1200,7 @@ typedef struct _ConstantExpr__isset {
     bool i64_tensor_array_value : 1;
     bool f64_tensor_array_value : 1;
     bool i64_array_idx : 1;
+    bool curly_brackets_array : 1;
 } _ConstantExpr__isset;
 
 class ConstantExpr : public virtual ::apache::thrift::TBase {
@@ -1175,6 +1226,7 @@ public:
     std::vector<std::vector<std::vector<int64_t>>> i64_tensor_array_value;
     std::vector<std::vector<std::vector<double>>> f64_tensor_array_value;
     std::vector<int64_t> i64_array_idx;
+    std::vector<ConstantExpr> curly_brackets_array;
 
     _ConstantExpr__isset __isset;
 
@@ -1201,6 +1253,8 @@ public:
     void __set_f64_tensor_array_value(const std::vector<std::vector<std::vector<double>>> &val);
 
     void __set_i64_array_idx(const std::vector<int64_t> &val);
+
+    void __set_curly_brackets_array(const std::vector<ConstantExpr> &val);
 
     bool operator==(const ConstantExpr &rhs) const {
         if (!(literal_type == rhs.literal_type))
@@ -1248,6 +1302,10 @@ public:
         if (__isset.i64_array_idx != rhs.__isset.i64_array_idx)
             return false;
         else if (__isset.i64_array_idx && !(i64_array_idx == rhs.i64_array_idx))
+            return false;
+        if (__isset.curly_brackets_array != rhs.__isset.curly_brackets_array)
+            return false;
+        else if (__isset.curly_brackets_array && !(curly_brackets_array == rhs.curly_brackets_array))
             return false;
         return true;
     }

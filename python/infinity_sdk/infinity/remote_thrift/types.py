@@ -70,8 +70,18 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
             return object
         case ttypes.LogicType.Timestamp:
             return object
+        case ttypes.LogicType.Array:
+            return object
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
+
+
+def bf16_bytes_to_float32_list(column_vector):
+    tmp_u16 = np.frombuffer(column_vector, dtype='<i2')
+    result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+    result_arr[1::2] = tmp_u16
+    view_float32 = result_arr.view('<f4')
+    return list(view_float32)
 
 
 def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttypes.DataType, column_vectors) -> \
@@ -89,11 +99,7 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
         case ttypes.ColumnType.ColumnFloat16:
             return list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
         case ttypes.ColumnType.ColumnBFloat16:
-            tmp_u16 = np.frombuffer(column_vector, dtype='<i2')
-            result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
-            result_arr[1::2] = tmp_u16
-            view_float32 = result_arr.view('<f4')
-            return list(view_float32)
+            return bf16_bytes_to_float32_list(column_vector)
         case ttypes.ColumnType.ColumnVarchar:
             return list(parse_bytes(column_vector))
         case ttypes.ColumnType.ColumnBool:
@@ -131,11 +137,7 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
                 all_list = list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBFloat16:
-                tmp_u16 = np.frombuffer(column_vector, dtype='<i2')
-                result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
-                result_arr[1::2] = tmp_u16
-                view_float32 = result_arr.view('<f4')
-                all_list = list(view_float32)
+                all_list = bf16_bytes_to_float32_list(column_vector)
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBit:
                 all_list = list(struct.unpack('<{}B'.format(len(column_vector)), column_vector))
@@ -171,6 +173,8 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             return parse_datetime_bytes(column_vector)
         case ttypes.ColumnType.ColumnInterval:
             return parse_interval_bytes(column_vector)
+        case ttypes.ColumnType.ColumnArray:
+            return parse_array_bytes(column_data_type, column_vector)
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 
@@ -202,7 +206,7 @@ def parse_datetime_bytes(column_vector):
     for i in range(0, len(parsed_list), 2):
         if i + 1 < len(parsed_list):
             datetime_list.append(
-                (epoch + timedelta(days=parsed_list[i], seconds=parsed_list[i + 1])).strftime('%Y-%m-%d %H:%M:%S'));
+                (epoch + timedelta(days=parsed_list[i], seconds=parsed_list[i + 1])).strftime('%Y-%m-%d %H:%M:%S'))
     return datetime_list
 
 
@@ -214,45 +218,171 @@ def parse_interval_bytes(column_vector):
     return interval_list
 
 
+def parse_array_bytes(column_data_type: ttypes.DataType, bytes_data):
+    results = []
+    offset = 0
+    while offset < len(bytes_data):
+        array_data, offset = parse_single_array_bytes(column_data_type, bytes_data, offset)
+        results.append(array_data)
+    return results
+
+
+def parse_single_array_bytes(column_data_type: ttypes.DataType, bytes_data, offset):
+    assert column_data_type.logic_type == ttypes.LogicType.Array
+    element_data_type: ttypes.DataType = column_data_type.physical_type.array_type.element_data_type
+    array_element_cnt = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+    offset += 4
+    tmp_column_type = None
+    single_pod_element_size = 0
+    parse_single_element_func = None
+    # TODO: RowID is always converted to BigInt, check src/function/builtin_functions.cpp
+    match element_data_type.logic_type:
+        case ttypes.LogicType.Boolean:
+            tmp_column_type = ttypes.ColumnType.ColumnBool
+            single_pod_element_size = 1
+        case ttypes.LogicType.TinyInt:
+            tmp_column_type = ttypes.ColumnType.ColumnInt8
+            single_pod_element_size = 1
+        case ttypes.LogicType.SmallInt:
+            tmp_column_type = ttypes.ColumnType.ColumnInt16
+            single_pod_element_size = 2
+        case ttypes.LogicType.Integer:
+            tmp_column_type = ttypes.ColumnType.ColumnInt32
+            single_pod_element_size = 4
+        case ttypes.LogicType.BigInt:
+            tmp_column_type = ttypes.ColumnType.ColumnInt64
+            single_pod_element_size = 8
+        case ttypes.LogicType.Float:
+            tmp_column_type = ttypes.ColumnType.ColumnFloat32
+            single_pod_element_size = 4
+        case ttypes.LogicType.Double:
+            tmp_column_type = ttypes.ColumnType.ColumnFloat64
+            single_pod_element_size = 8
+        case ttypes.LogicType.Float16:
+            tmp_column_type = ttypes.ColumnType.ColumnFloat16
+            single_pod_element_size = 2
+        case ttypes.LogicType.BFloat16:
+            tmp_column_type = ttypes.ColumnType.ColumnBFloat16
+            single_pod_element_size = 2
+        case ttypes.LogicType.Embedding:
+            tmp_column_type = ttypes.ColumnType.ColumnEmbedding
+            embedding_dimension = column_data_type.physical_type.embedding_type.dimension
+            match column_data_type.physical_type.embedding_type.element_type:
+                case ttypes.ElementType.ElementBit:
+                    single_pod_element_size = embedding_dimension // 8
+                case ttypes.ElementType.ElementUInt8:
+                    single_pod_element_size = embedding_dimension
+                case ttypes.ElementType.ElementInt8:
+                    single_pod_element_size = embedding_dimension
+                case ttypes.ElementType.ElementInt16:
+                    single_pod_element_size = embedding_dimension * 2
+                case ttypes.ElementType.ElementInt32:
+                    single_pod_element_size = embedding_dimension * 4
+                case ttypes.ElementType.ElementInt64:
+                    single_pod_element_size = embedding_dimension * 8
+                case ttypes.ElementType.ElementFloat32:
+                    single_pod_element_size = embedding_dimension * 4
+                case ttypes.ElementType.ElementFloat64:
+                    single_pod_element_size = embedding_dimension * 8
+                case ttypes.ElementType.ElementFloat16:
+                    single_pod_element_size = embedding_dimension * 2
+                case ttypes.ElementType.ElementBFloat16:
+                    single_pod_element_size = embedding_dimension * 2
+                case _:
+                    raise NotImplementedError(f"Unsupported type {element_data_type}")
+        case ttypes.LogicType.Date:
+            tmp_column_type = ttypes.ColumnType.ColumnDate
+            single_pod_element_size = 4
+        case ttypes.LogicType.Time:
+            tmp_column_type = ttypes.ColumnType.ColumnTime
+            single_pod_element_size = 4
+        case ttypes.LogicType.DateTime:
+            tmp_column_type = ttypes.ColumnType.ColumnDateTime
+            single_pod_element_size = 8
+        case ttypes.LogicType.Timestamp:
+            tmp_column_type = ttypes.ColumnType.ColumnTimestamp
+            single_pod_element_size = 8
+        case ttypes.LogicType.Interval:
+            tmp_column_type = ttypes.ColumnType.ColumnInterval
+            single_pod_element_size = 4
+        case ttypes.LogicType.Varchar:
+            parse_single_element_func = parse_single_str_bytes
+        case ttypes.LogicType.MultiVector:
+            parse_single_element_func = parse_single_tensor_bytes
+        case ttypes.LogicType.Tensor:
+            parse_single_element_func = parse_single_tensor_bytes
+        case ttypes.LogicType.TensorArray:
+            parse_single_element_func = parse_single_tensorarray_bytes
+        case ttypes.LogicType.Sparse:
+            parse_single_element_func = parse_single_sparse_bytes
+        case ttypes.LogicType.Array:
+            parse_single_element_func = parse_single_array_bytes
+        case _:
+            raise NotImplementedError(f"Unexpected type {element_data_type}")
+    if parse_single_element_func is not None:
+        array_data = []
+        for _ in range(array_element_cnt):
+            element_data, offset = parse_single_element_func(element_data_type, bytes_data, offset)
+            array_data.append(element_data)
+        return array_data, offset
+    assert tmp_column_type is not None
+    bytes_len = array_element_cnt * single_pod_element_size
+    array_data = column_vector_to_list(tmp_column_type, element_data_type, [bytes_data[offset:offset + bytes_len]])
+    offset += bytes_len
+    return array_data, offset
+
+
 def parse_bytes(bytes_data):
     results = []
     offset = 0
     while offset < len(bytes_data):
-        length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
-        offset += 4
-        string_data = bytes_data[offset:offset + length].decode('utf-8')
+        string_data, offset = parse_single_str_bytes(None, bytes_data, offset)
         results.append(string_data)
-        offset += length
     return results
+
+
+def parse_single_str_bytes(_, bytes_data, offset):
+    length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+    offset += 4
+    string_data = bytes_data[offset:offset + length].decode('utf-8')
+    offset += length
+    return string_data, offset
 
 
 def parse_tensor_bytes(column_data_type: ttypes.DataType, bytes_data):
     results = []
     offset = 0
     while offset < len(bytes_data):
-        length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
-        offset += 4
-        tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
+        tensor_data, offset = parse_single_tensor_bytes(column_data_type, bytes_data, offset)
         results.append(tensor_data)
-        offset += length
     return results
+
+
+def parse_single_tensor_bytes(column_data_type: ttypes.DataType, bytes_data, offset):
+    length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+    offset += 4
+    tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
+    offset += length
+    return tensor_data, offset
 
 
 def parse_tensorarray_bytes(column_data_type: ttypes.DataType, bytes_data):
     results = []
     offset = 0
     while offset < len(bytes_data):
-        tensor_n = struct.unpack('I', bytes_data[offset:offset + 4])[0]
-        offset += 4
-        tensorarray_data = []
-        for _ in range(tensor_n):
-            length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
-            offset += 4
-            tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
-            offset += length
-            tensorarray_data.append(tensor_data)
+        tensorarray_data, offset = parse_single_tensorarray_bytes(column_data_type, bytes_data, offset)
         results.append(tensorarray_data)
     return results
+
+
+def parse_single_tensorarray_bytes(column_data_type: ttypes.DataType, bytes_data, offset):
+    tensorarray_data = []
+    tensor_n = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+    offset += 4
+    for _ in range(tensor_n):
+        tensor_data, offset = parse_single_tensor_bytes(column_data_type, bytes_data, offset)
+        tensorarray_data.append(tensor_data)
+    return tensorarray_data, offset
 
 
 def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[Any]]:
@@ -295,11 +425,7 @@ def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[
         all_list = list(struct.unpack('<{}e'.format(len(binary_data) // 2), binary_data))
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBFloat16:
-        tmp_u16 = np.frombuffer(binary_data, dtype='<i2')
-        result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
-        result_arr[1::2] = tmp_u16
-        view_float32 = result_arr.view('<f4')
-        all_list = list(view_float32)
+        all_list = bf16_bytes_to_float32_list(binary_data)
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     else:
         raise NotImplementedError(
@@ -307,72 +433,71 @@ def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[
 
 
 def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
-    dimension = column_data_type.physical_type.sparse_type.dimension
-    element_type = column_data_type.physical_type.sparse_type.element_type
-    index_type = column_data_type.physical_type.sparse_type.index_type
     res = []
     offset = 0
     # print(len(column_vector))
     while offset < len(column_vector):
-        nnz = struct.unpack('I', column_vector[offset:offset + 4])[0]
-        offset += 4
-        # print(nnz)
-        indices = []
-        values = []
-        match index_type:
-            case ttypes.ElementType.ElementInt8:
-                indices = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
-                offset += nnz
-            case ttypes.ElementType.ElementInt16:
-                indices = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
-                offset += nnz * 2
-            case ttypes.ElementType.ElementInt32:
-                indices = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
-                offset += nnz * 4
-            case ttypes.ElementType.ElementInt64:
-                indices = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
-                offset += nnz * 8
-            case _:
-                raise NotImplementedError(f"Unsupported type {index_type}")
-        match element_type:
-            case ttypes.ElementType.ElementUInt8:
-                values = struct.unpack('<{}B'.format(nnz), column_vector[offset:offset + nnz])
-                offset += nnz
-            case ttypes.ElementType.ElementInt8:
-                values = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
-                offset += nnz
-            case ttypes.ElementType.ElementInt16:
-                values = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
-                offset += nnz * 2
-            case ttypes.ElementType.ElementInt32:
-                values = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
-                offset += nnz * 4
-            case ttypes.ElementType.ElementInt64:
-                values = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
-                offset += nnz * 8
-            case ttypes.ElementType.ElementFloat32:
-                values = struct.unpack('<{}f'.format(nnz), column_vector[offset:offset + nnz * 4])
-                offset += nnz * 4
-            case ttypes.ElementType.ElementFloat64:
-                values = struct.unpack('<{}d'.format(nnz), column_vector[offset:offset + nnz * 8])
-                offset += nnz * 8
-            case ttypes.ElementType.ElementFloat16:
-                values = struct.unpack('<{}e'.format(nnz), column_vector[offset:offset + nnz * 2])
-                offset += nnz * 2
-            case ttypes.ElementType.ElementBFloat16:
-                tmp_u16 = np.frombuffer(column_vector[offset:offset + nnz * 2], dtype='<i2')
-                result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
-                result_arr[1::2] = tmp_u16
-                view_float32 = result_arr.view('<f4')
-                values = list(view_float32)
-                offset += nnz * 2
-            case ttypes.ElementType.ElementBit:
-                raise NotImplementedError(f"Unsupported type {element_type}")
-            case _:
-                raise NotImplementedError(f"Unsupported type {element_type}")
-        # print("indices: {}, values: {}".format(indices, values))
-        res.append(SparseVector(list(indices), values).to_dict())
+        sparse_vector, offset = parse_single_sparse_bytes(column_data_type, column_vector, offset)
+        res.append(sparse_vector)
     return res
+
+
+def parse_single_sparse_bytes(column_data_type: ttypes.DataType, column_vector, offset):
+    dimension = column_data_type.physical_type.sparse_type.dimension
+    element_type = column_data_type.physical_type.sparse_type.element_type
+    index_type = column_data_type.physical_type.sparse_type.index_type
+    nnz = struct.unpack('I', column_vector[offset:offset + 4])[0]
+    offset += 4
+    # print(nnz)
+    match index_type:
+        case ttypes.ElementType.ElementInt8:
+            indices = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
+            offset += nnz
+        case ttypes.ElementType.ElementInt16:
+            indices = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
+            offset += nnz * 2
+        case ttypes.ElementType.ElementInt32:
+            indices = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
+            offset += nnz * 4
+        case ttypes.ElementType.ElementInt64:
+            indices = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
+            offset += nnz * 8
+        case _:
+            raise NotImplementedError(f"Unsupported type {index_type}")
+    match element_type:
+        case ttypes.ElementType.ElementUInt8:
+            values = struct.unpack('<{}B'.format(nnz), column_vector[offset:offset + nnz])
+            offset += nnz
+        case ttypes.ElementType.ElementInt8:
+            values = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
+            offset += nnz
+        case ttypes.ElementType.ElementInt16:
+            values = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
+            offset += nnz * 2
+        case ttypes.ElementType.ElementInt32:
+            values = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
+            offset += nnz * 4
+        case ttypes.ElementType.ElementInt64:
+            values = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
+            offset += nnz * 8
+        case ttypes.ElementType.ElementFloat32:
+            values = struct.unpack('<{}f'.format(nnz), column_vector[offset:offset + nnz * 4])
+            offset += nnz * 4
+        case ttypes.ElementType.ElementFloat64:
+            values = struct.unpack('<{}d'.format(nnz), column_vector[offset:offset + nnz * 8])
+            offset += nnz * 8
+        case ttypes.ElementType.ElementFloat16:
+            values = struct.unpack('<{}e'.format(nnz), column_vector[offset:offset + nnz * 2])
+            offset += nnz * 2
+        case ttypes.ElementType.ElementBFloat16:
+            values = bf16_bytes_to_float32_list(column_vector[offset:offset + nnz * 2])
+            offset += nnz * 2
+        case ttypes.ElementType.ElementBit:
+            raise NotImplementedError(f"Unsupported type {element_type}")
+        case _:
+            raise NotImplementedError(f"Unsupported type {element_type}")
+    # print("indices: {}, values: {}".format(indices, values))
+    return SparseVector(list(indices), list(values)).to_dict(), offset
 
 
 def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> ttypes.DataType:

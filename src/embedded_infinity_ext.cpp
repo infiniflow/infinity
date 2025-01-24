@@ -73,7 +73,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def(nb::init<>())
         .def_rw("logical_type", &WrapDataType::logical_type)
         .def_rw("embedding_type", &WrapDataType::embedding_type)
-        .def_rw("sparse_type", &WrapDataType::sparse_type);
+        .def_rw("sparse_type", &WrapDataType::sparse_type)
+        .def_rw("array_type", &WrapDataType::array_type);
 
     nb::class_<WrapConstantExpr>(m, "WrapConstantExpr")
         .def(nb::init<>())
@@ -88,7 +89,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("f64_tensor_value", &WrapConstantExpr::f64_tensor_value)
         .def_rw("i64_tensor_array_value", &WrapConstantExpr::i64_tensor_array_value)
         .def_rw("f64_tensor_array_value", &WrapConstantExpr::f64_tensor_array_value)
-        .def_rw("i64_array_idx", &WrapConstantExpr::i64_array_idx);
+        .def_rw("i64_array_idx", &WrapConstantExpr::i64_array_idx)
+        .def_rw("curly_brackets_array", &WrapConstantExpr::curly_brackets_array);
 
     nb::class_<WrapColumnDef>(m, "WrapColumnDef")
         .def(nb::init<>())
@@ -227,7 +229,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("match_tensor_expr", &WrapParsedExpr::match_tensor_expr)
         .def_rw("fusion_expr", &WrapParsedExpr::fusion_expr)
         .def_rw("search_expr", &WrapParsedExpr::search_expr)
-        .def_rw("in_expr", &WrapParsedExpr::in_expr);
+        .def_rw("in_expr", &WrapParsedExpr::in_expr)
+        .def_rw("alias_name", &WrapParsedExpr::alias_name);
 
     // Bind WrapOrderByExpr
     nb::class_<WrapOrderByExpr>(m, "WrapOrderByExpr")
@@ -709,6 +712,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kInterval", LiteralType::kInterval)
         .value("kLongSparseArray", LiteralType::kLongSparseArray)
         .value("kDoubleSparseArray", LiteralType::kDoubleSparseArray)
+        .value("kCurlyBracketsArray", LiteralType::kCurlyBracketsArray)
         .export_values();
 
     // embedding_info
