@@ -87,7 +87,7 @@ TEST_F(InfinityTableTest, test1) {
 
             QueryResult explain_ast =
                 infinity
-                    ->Explain(db_name, table_name, ExplainType::kAst, nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
+                    ->Explain(db_name, table_name, ExplainType::kAst, nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr);
             EXPECT_TRUE(explain_ast.IsOk());
             //            fmt::print("AST: {}\n", explain_ast.ToString());
         }
@@ -108,6 +108,7 @@ TEST_F(InfinityTableTest, test1) {
                                                           output_columns,
                                                           nullptr,
                                                           nullptr,
+                                                          nullptr,
                                                           nullptr);
             EXPECT_TRUE(explain_unopt.IsOk());
             //            fmt::print("Unoptimized logical plan: {}\n", explain_unopt.ToString());
@@ -121,7 +122,7 @@ TEST_F(InfinityTableTest, test1) {
 
             QueryResult explain_optimized_logical =
                 infinity
-                    ->Explain(db_name, table_name, ExplainType::kOpt, nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr);
+                    ->Explain(db_name, table_name, ExplainType::kOpt, nullptr, nullptr, nullptr, nullptr, output_columns, nullptr, nullptr, nullptr, nullptr);
 
             EXPECT_TRUE(explain_optimized_logical.IsOk());
             //            fmt::print("Optimized logical plan: {}\n", explain_opt.ToString());
@@ -141,6 +142,7 @@ TEST_F(InfinityTableTest, test1) {
                                                         nullptr,
                                                         nullptr,
                                                         output_columns,
+                                                        nullptr,
                                                         nullptr,
                                                         nullptr,
                                                         nullptr);
@@ -164,6 +166,7 @@ TEST_F(InfinityTableTest, test1) {
                                                              output_columns,
                                                              nullptr,
                                                              nullptr,
+                                                             nullptr,
                                                              nullptr);
             EXPECT_TRUE(explain_fragment.IsOk());
             //            fmt::print("Fragment: {}\n", explain_fragment.ToString());
@@ -183,6 +186,7 @@ TEST_F(InfinityTableTest, test1) {
                                                              nullptr,
                                                              nullptr,
                                                              output_columns,
+                                                             nullptr,
                                                              nullptr,
                                                              nullptr,
                                                              nullptr);
