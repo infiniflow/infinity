@@ -67,12 +67,13 @@ class ExplainQuery(Query):
             search: Optional[WrapSearchExpr],
             filter: Optional[WrapParsedExpr],
             group_by: Optional[List[WrapParsedExpr]],
+            having: Optional[WrapParsedExpr],
             limit: Optional[WrapParsedExpr],
             offset: Optional[WrapParsedExpr],
             sort: Optional[List[WrapOrderByExpr]],
             explain_type: Optional[BaseExplainType],
     ):
-        super().__init__(columns, highlight, search, filter, group_by, limit, offset, sort, None)
+        super().__init__(columns, highlight, search, filter, group_by, having, limit, offset, sort, None)
         self.explain_type = explain_type
 
 
@@ -741,6 +742,7 @@ class InfinityLocalQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             group_by=self._group_by,
+            having=self._having,
             limit=self._limit,
             offset=self._offset,
             explain_type=explain_type,

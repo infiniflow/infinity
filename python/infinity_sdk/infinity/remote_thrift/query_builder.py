@@ -71,12 +71,13 @@ class ExplainQuery(Query):
             search: Optional[SearchExpr],
             filter: Optional[ParsedExpr],
             groupby: Optional[List[ParsedExpr]],
+            having: Optional[ParsedExpr],
             limit: Optional[ParsedExpr],
             offset: Optional[ParsedExpr],
             sort: Optional[List[OrderByExpr]],
             explain_type: Optional[ExplainType],
     ):
-        super().__init__(columns, highlight, search, filter, groupby, limit, offset, sort, False)
+        super().__init__(columns, highlight, search, filter, groupby, having, limit, offset, sort, False)
         self.explain_type = explain_type
 
 
@@ -579,6 +580,7 @@ class InfinityThriftQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             groupby=self._groupby,
+            having=self._having,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,

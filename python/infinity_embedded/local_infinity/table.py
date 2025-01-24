@@ -503,6 +503,7 @@ class LocalTable():
                                  highlight_list=highlight,
                                  order_by_list=order_by_list,
                                  group_by_list=group_by_list,
+                                 having_expr=query.having,
                                  search_expr=query.search,
                                  where_expr=query.filter,
                                  limit_expr=query.limit,
