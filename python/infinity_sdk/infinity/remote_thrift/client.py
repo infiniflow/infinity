@@ -264,7 +264,7 @@ class ThriftInfinityClient:
 
     @retry_wrapper
     def select(self, db_name: str, table_name: str, select_list, highlight_list, search_expr,
-               where_expr, group_by_list, limit_expr, offset_expr, order_by_list, total_hits_count):
+               where_expr, group_by_list, having_expr, limit_expr, offset_expr, order_by_list, total_hits_count):
         return self.client.Select(SelectRequest(session_id=self.session_id,
                                                 db_name=db_name,
                                                 table_name=table_name,
@@ -273,6 +273,7 @@ class ThriftInfinityClient:
                                                 search_expr=search_expr,
                                                 where_expr=where_expr,
                                                 group_by_list=group_by_list,
+                                                having_expr=having_expr,
                                                 limit_expr=limit_expr,
                                                 offset_expr=offset_expr,
                                                 order_by_list=order_by_list,

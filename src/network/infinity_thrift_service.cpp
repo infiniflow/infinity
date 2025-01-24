@@ -655,6 +655,8 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             order_by_expr = nullptr;
         }
     }
+
+    // group by
     Vector<ParsedExpr *> *group_by_list = nullptr;
     DeferFn defer_fn10([&]() {
         if (group_by_list != nullptr) {
@@ -679,6 +681,22 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         }
     }
 
+    // having
+    ParsedExpr *having = nullptr;
+    DeferFn defer_fn12([&]() {
+        if (having != nullptr) {
+            delete having;
+            having = nullptr;
+        }
+    });
+    if (request.__isset.having_expr == true) {
+        having = GetParsedExprFromProto(parsed_expr_status, request.having_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
+
     // auto end2 = std::chrono::steady_clock::now();
     // phase_2_duration_ += end2 - start2;
     //
@@ -694,6 +712,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
                                                 highlight_columns,
                                                 order_by_list,
                                                 group_by_list,
+                                                having,
                                                 request.total_hits_count);
     output_columns = nullptr;
     highlight_columns = nullptr;
@@ -703,6 +722,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     offset = nullptr;
     order_by_list = nullptr;
     group_by_list = nullptr;
+    having = nullptr;
     // auto end3 = std::chrono::steady_clock::now();
     //
     // phase_3_duration_ += end3 - start3;
@@ -954,6 +974,47 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         }
     }
 
+    // group by
+    Vector<ParsedExpr *> *group_by_list = nullptr;
+    DeferFn defer_fn10([&]() {
+        if (group_by_list != nullptr) {
+            for (auto &expr_ptr : *group_by_list) {
+                delete expr_ptr;
+                expr_ptr = nullptr;
+            }
+            delete group_by_list;
+            group_by_list = nullptr;
+        }
+    });
+    if (!request.group_by_list.empty()) {
+        group_by_list = new Vector<ParsedExpr *>();
+        group_by_list->reserve(request.group_by_list.size());
+        for (auto &expr : request.group_by_list) {
+            auto parsed_expr = GetParsedExprFromProto(parsed_expr_status, expr);
+            if (!parsed_expr_status.ok()) {
+                ProcessStatus(response, parsed_expr_status);
+                return;
+            }
+            group_by_list->emplace_back(parsed_expr);
+        }
+    }
+
+    // having
+    ParsedExpr *having = nullptr;
+    DeferFn defer_fn12([&]() {
+        if (having != nullptr) {
+            delete having;
+            having = nullptr;
+        }
+    });
+    if (request.__isset.having_expr == true) {
+        having = GetParsedExprFromProto(parsed_expr_status, request.having_expr);
+        if (!parsed_expr_status.ok()) {
+            ProcessStatus(response, parsed_expr_status);
+            return;
+        }
+    }
+
     // Explain type
     auto explain_type = GetExplainTypeFromProto(request.explain_type);
     const QueryResult result = infinity->Explain(request.db_name,
@@ -966,7 +1027,8 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
                                                  output_columns,
                                                  highlight_columns,
                                                  order_by_list,
-                                                 nullptr);
+                                                 group_by_list,
+                                                 having);
     output_columns = nullptr;
     highlight_columns = nullptr;
     search_expr = nullptr;
@@ -974,6 +1036,8 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     limit = nullptr;
     offset = nullptr;
     order_by_list = nullptr;
+    group_by_list = nullptr;
+    having = nullptr;
 
     if (result.IsOk()) {
         auto &columns = response.column_fields;

@@ -404,6 +404,10 @@ class RemoteTable():
         self.query_builder.group_by(group_by_expr_list)
         return self
 
+    def having(self, having_expr: Optional[str]):
+        self.query_builder.having(having_expr)
+        return self
+
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
         for order_by_expr in order_by_expr_list:
             if len(order_by_expr) != 2:
@@ -507,6 +511,7 @@ class RemoteTable():
                                 search_expr=query.search,
                                 where_expr=query.filter,
                                 group_by_list=query.groupby,
+                                having_expr=query.having,
                                 limit_expr=query.limit,
                                 offset_expr=query.offset,
                                 order_by_list=query.sort,
