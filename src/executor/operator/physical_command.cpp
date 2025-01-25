@@ -381,11 +381,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
             [[maybe_unused]] auto *lock_table_command = static_cast<LockCmd *>(command_info_.get());
             auto *txn = query_context->GetTxn();
-            auto [table_entry, status] = txn->GetTableByName(lock_table_command->db_name(), lock_table_command->table_name());
+            Status status = txn->LockTable(lock_table_command->db_name(), lock_table_command->table_name());
             if (!status.ok()) {
                 RecoverableError(status);
             }
-            table_entry->SetLocked();
             break;
         }
         case CommandType::kUnlockTable: {
@@ -402,11 +401,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
             [[maybe_unused]] auto *unlock_table_command = static_cast<UnlockCmd *>(command_info_.get());
             auto *txn = query_context->GetTxn();
-            auto [table_entry, status] = txn->GetTableByName(unlock_table_command->db_name(), unlock_table_command->table_name());
+            Status status = txn->UnLockTable(unlock_table_command->db_name(), unlock_table_command->table_name());
             if (!status.ok()) {
                 RecoverableError(status);
             }
-            table_entry->SetUnlock();
             break;
         }
         case CommandType::kCleanup: {
