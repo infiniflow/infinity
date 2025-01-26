@@ -55,7 +55,7 @@ public:
 
     virtual void Init(QueryContext* query_context) = 0;
 
-    virtual SizeT TaskletCount() = 0;
+    virtual SizeT TaskletCount();
 
     inline PhysicalOperator *left() const { return left_.get(); }
 

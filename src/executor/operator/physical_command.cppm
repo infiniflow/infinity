@@ -48,8 +48,6 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SizeT TaskletCount() override;
-
     inline SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override { return output_types_; }
