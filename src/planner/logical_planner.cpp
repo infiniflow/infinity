@@ -272,11 +272,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     }
     // Check schema and table in the catalog
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, status] = txn->GetTableByName(schema_name, table_name);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-    status = table_entry->AddWriteTxnNum(txn);
+    Status status = txn->AddWriteTxnNum(schema_name, table_name);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -286,7 +282,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         RecoverableError(info_status);
     }
 
-    if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
+    if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {
         RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
     }
 
@@ -328,14 +324,14 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             // use column names
             assert(insert_row.columns_.size() == src_value_list.size());
             const auto column_count = src_value_list.size();
-            SizeT table_column_count = table_entry->ColumnCount();
+            SizeT table_column_count = table_info->column_count_;
             // Create value list with table column size and null value
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count);
             Vector<bool> has_value(table_column_count, false);
             for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
                 const auto &column_name = insert_row.columns_[column_idx];
-                const SharedPtr<ColumnDef> &column_def = table_entry->GetColumnDefByName(column_name);
-                SizeT table_column_idx = table_entry->GetColumnIdxByID(column_def->id());
+                const ColumnDef* column_def = table_info->GetColumnDefByName(column_name);
+                SizeT table_column_idx = table_info->GetColumnIdxByID(column_def->id());
                 const SharedPtr<DataType> &table_column_type = column_def->column_type_;
                 auto &src_value = src_value_list[column_idx];
                 auto &dst_value = rewrite_value_list[table_column_idx];
@@ -357,7 +353,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                 if (has_value[column_idx]) {
                     continue;
                 }
-                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
+                const ColumnDef* column_def = table_info->GetColumnDefByIdx(column_idx);
                 if (!column_def->has_default_value()) {
                     RecoverableError(Status::SyntaxError(fmt::format("INSERT: No default value found for column {}.", column_def->ToString())));
                 }
@@ -378,11 +374,11 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             dst_value_list = std::move(rewrite_value_list);
         } else {
             // append default values
-            const auto table_column_count = table_entry->ColumnCount();
+            SizeT table_column_count = table_info->column_count_;
             dst_value_list = std::move(src_value_list);
             dst_value_list.reserve(table_column_count);
             for (SizeT column_idx = dst_value_list.size(); column_idx < table_column_count; ++column_idx) {
-                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
+                const ColumnDef* column_def = table_info->GetColumnDefByIdx(column_idx);
                 if (column_def->has_default_value()) {
                     auto value_expr =
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
@@ -394,7 +390,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             assert(dst_value_list.size() == table_column_count);
             for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
                 auto &dst_value = dst_value_list[column_idx];
-                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByIdx(column_idx)->column_type_;
+                const SharedPtr<DataType> &table_column_type = table_info->GetColumnDefByIdx(column_idx)->column_type_;
                 DataType value_type = dst_value->Type();
                 if (*table_column_type != value_type && LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
                     // need cast
