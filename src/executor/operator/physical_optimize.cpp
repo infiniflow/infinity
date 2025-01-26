@@ -83,7 +83,6 @@ void PhysicalOptimize::OptIndex(QueryContext *query_context, OperatorState *oper
         RecoverableError(status);
         return;
     }
-    txn->OptIndex(table_index_entry, std::move(opt_params_));
     LOG_INFO(fmt::format("OptimizeIndex {}.{}::{} end", db_name_, table_name_, index_name_));
 }
 
