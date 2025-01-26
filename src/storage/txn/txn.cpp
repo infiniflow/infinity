@@ -178,7 +178,7 @@ Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vecto
 Status Txn::OptimizeIndexes(const String &db_name, const String &table_name) {
     auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
     if (!table_status.ok()) {
-        return status;
+        return table_status;
     }
     table_entry->OptimizeIndex(this);
     return Status::OK();
@@ -191,6 +191,7 @@ Txn::OptimizeIndexByName(const String &db_name, const String &table_name, const 
         return status;
     }
     this->OptIndex(table_index_entry, std::move(init_params));
+    return Status::OK();
 }
 
 
