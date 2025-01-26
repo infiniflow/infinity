@@ -1194,7 +1194,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             if (query_context->persistence_manager() == nullptr) {
                 index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
             } else {
-                Vector<String> paths = table_index_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                Vector<String> paths = table_index_entry->GetFilePath(txn);
                 SizeT index_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -1311,7 +1311,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
             if (query_context->persistence_manager() == nullptr) {
                 index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
             } else {
-                Vector<String> paths = segment_index_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                Vector<String> paths = segment_index_entry->GetFilePath(txn);
                 SizeT index_segment_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -2039,7 +2039,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             if (query_context->persistence_manager() == nullptr) {
                 segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             } else {
-                Vector<String> paths = segment_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                Vector<String> paths = segment_entry->GetFilePath(txn);
                 SizeT segment_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -2260,9 +2260,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
 void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts = txn->BeginTS();
-
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [block_info_array, status] = txn->GetBlocksInfo(db_name_, *object_name_, *segment_id_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2280,14 +2278,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
-    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
-    if (!segment_entry) {
-        Status status = Status::SegmentNotExist(*segment_id_);
-        RecoverableError(status);
-        return;
-    }
-    auto block_entry_iter = BlockEntryIter(segment_entry.get());
-    for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+    for (const auto &block_info : block_info_array) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -2295,19 +2286,18 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
         SizeT column_id = 0;
         {
-            Value value = Value::MakeBigInt(block_entry->block_id());
+            Value value = Value::MakeBigInt(block_info->block_id_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
-
         ++column_id;
         {
             String block_size_str;
             if (query_context->persistence_manager() == nullptr) {
-                String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
+                String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
                 block_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
             } else {
-                Vector<String> paths = block_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                Vector<String> &paths = block_info->files_;
                 SizeT block_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -2325,7 +2315,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            Value value = Value::MakeBigInt(block_entry->row_count());
+            Value value = Value::MakeBigInt(block_info->row_count_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }

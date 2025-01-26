@@ -71,6 +71,7 @@ export struct BlockInfo {
     i64 column_count_{};
     TxnTimeStamp checkpoint_ts_{};
     SizeT storage_size_{};
+    Vector<String> files_{};
 };
 
 export struct TableDetail {

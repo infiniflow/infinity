@@ -561,6 +561,15 @@ SharedPtr<BlockEntry> SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
     return block_entries_[block_id];
 }
 
+Vector<SharedPtr<BlockInfo>> SegmentEntry::GetBlocksInfo(Txn* txn) const {
+    Vector<SharedPtr<BlockInfo>> blocks_info;
+    std::shared_lock lock(rw_locker_);
+    for (const auto &block_entry : block_entries_) {
+        blocks_info.emplace_back(block_entry->GetBlockInfo(txn));
+    }
+    return blocks_info;
+}
+
 SegmentStatus SegmentEntry::GetSaveStatus(TxnTimeStamp ts) const {
     switch (status_) {
         case SegmentStatus::kUnsealed:
@@ -689,12 +698,12 @@ void SegmentEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> SegmentEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+Vector<String> SegmentEntry::GetFilePath(Txn* txn) const {
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     Vector<String> res;
     res.reserve(block_entries_.size());
     for (const auto &block_entry : block_entries_) {
-        Vector<String> files = block_entry->GetFilePath(txn_id, begin_ts);
+        Vector<String> files = block_entry->GetFilePath(txn);
         res.insert(res.end(), files.begin(), files.end());
     }
     return res;

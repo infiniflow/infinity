@@ -46,6 +46,7 @@ import column_index_reader;
 import value;
 import infinity_exception;
 import snapshot_info;
+import txn;
 
 namespace infinity {
 
@@ -53,7 +54,6 @@ class IndexBase;
 struct DBEntry;
 struct TableIndexEntry;
 class TableMeta;
-class Txn;
 struct Catalog;
 class AddTableEntryOp;
 class SegmentIndexEntry;
@@ -367,7 +367,7 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+    Vector<String> GetFilePath(Txn* txn) const final;
 
 public:
     Status AddWriteTxnNum(Txn *txn);

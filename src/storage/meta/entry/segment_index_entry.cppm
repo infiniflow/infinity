@@ -101,7 +101,7 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) final;
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+    Vector<String> GetFilePath(Txn* txn) const final;
 
     void PickCleanup(CleanupScanner *scanner) final;
 
