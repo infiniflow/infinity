@@ -42,6 +42,8 @@ import block_index;
 
 namespace infinity {
 
+SizeT PhysicalOperator::TaskletCount() { return 1; }
+
 String PhysicalOperator::GetName() const { return PhysicalOperatorToString(operator_type_); }
 
 void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *operator_state, HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) {

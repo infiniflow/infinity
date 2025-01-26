@@ -52,12 +52,6 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return left_->GetOutputTypes(); }
 
-    SizeT TaskletCount() override {
-        String error_message = "Not implement: TaskletCount not Implement";
-        UnrecoverableError(error_message);
-        return 0;
-    }
-
     [[nodiscard]] inline const SharedPtr<BaseExpression> &limit_expr() const { return limit_expr_; }
 
     [[nodiscard]] inline const SharedPtr<BaseExpression> &offset_expr() const { return offset_expr_; }
