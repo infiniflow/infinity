@@ -175,6 +175,25 @@ Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vecto
     return compact_status;
 }
 
+Status Txn::OptimizeIndexes(const String &db_name, const String &table_name) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return status;
+    }
+    table_entry->OptimizeIndex(this);
+    return Status::OK();
+}
+
+Status
+Txn::OptimizeIndexByName(const String &db_name, const String &table_name, const String &index_name, Vector<UniquePtr<InitParameter>> init_params) {
+    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
+    if (!status.ok()) {
+        return status;
+    }
+    this->OptIndex(table_index_entry, std::move(init_params));
+}
+
+
 Status Txn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
     TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
     TxnTableStore *txn_table_store = this->GetTxnTableStore(table_entry);
