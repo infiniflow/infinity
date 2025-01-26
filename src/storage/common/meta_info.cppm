@@ -62,6 +62,17 @@ export struct TableIndexInfo {
     SharedPtr<String> index_column_names_{};
 };
 
+export struct BlockInfo {
+    BlockID block_id_;
+    SharedPtr<String> block_dir_{};
+    i64 row_count_{};
+    i64 row_capacity_{};
+    i64 checkpoint_row_count_{};
+    i64 column_count_{};
+    TxnTimeStamp checkpoint_ts_{};
+    SizeT storage_size_{};
+};
+
 export struct TableDetail {
     SharedPtr<String> db_name_{};
     SharedPtr<String> table_name_{};

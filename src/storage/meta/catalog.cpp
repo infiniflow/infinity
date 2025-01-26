@@ -347,6 +347,36 @@ Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name,
     return db_entry->GetTableInfo(table_name, txn);
 }
 
+Tuple<SharedPtr<BlockInfo>, Status>
+Catalog::GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, Txn *txn) {
+    auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    auto segment_entry = table_entry->GetSegmentByID(segment_id, txn->BeginTS());
+    if (!segment_entry) {
+        return {nullptr, Status::SegmentNotExist(segment_id)};
+    }
+
+    auto block_entry = segment_entry->GetBlockEntryByID(block_id);
+    if (!block_entry) {
+        return {nullptr, Status::BlockNotExist(block_id)};
+    }
+
+    SharedPtr<BlockInfo> block_info = MakeShared<BlockInfo>();
+    block_info->block_id_ = block_entry->block_id();
+    block_info->block_dir_ = block_entry->block_dir();
+    block_info->row_count_ = block_entry->row_count();
+    block_info->row_capacity_ = block_entry->row_capacity();
+    block_info->checkpoint_row_count_ = block_entry->checkpoint_row_count();
+    block_info->column_count_ = block_entry->columns().size();
+    block_info->checkpoint_ts_ = block_entry->checkpoint_ts();
+    block_info->storage_size_ = block_entry->GetStorageSize();
+
+    return {nullptr, Status::OK()};
+}
+
 Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {
     TableMeta *table_meta = table_entry->GetTableMeta();
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));

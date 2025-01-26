@@ -146,6 +146,8 @@ public:
 
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
 
+    Tuple<SharedPtr<BlockInfo>, Status> GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id);
+
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
     // Lock table related

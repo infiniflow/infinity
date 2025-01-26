@@ -90,7 +90,7 @@ import command_statement;
 
 namespace infinity {
 
-void PhysicalShow::Init(QueryContext* query_context) {
+void PhysicalShow::Init(QueryContext *query_context) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
@@ -2346,9 +2346,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
 void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts = txn->BeginTS();
-
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [block_info, status] = txn->GetBlockInfo(db_name_, *object_name_, *segment_id_, *block_id_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2360,20 +2358,6 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
 
-    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
-    if (!segment_entry) {
-        Status status = Status::SegmentNotExist(*segment_id_);
-        RecoverableError(status);
-        return;
-    }
-
-    auto block_entry = segment_entry->GetBlockEntryByID(*block_id_);
-    if (!block_entry) {
-        Status status = Status::BlockNotExist(*block_id_);
-        RecoverableError(status);
-        return;
-    }
-
     {
         SizeT column_id = 0;
         {
@@ -2384,7 +2368,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(block_entry->block_id()));
+            Value value = Value::MakeVarchar(std::to_string(block_info->block_id_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2400,7 +2384,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
+            String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
             Value value = Value::MakeVarchar(full_block_dir);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2417,7 +2401,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT block_storage_size = block_entry->GetStorageSize();
+            SizeT block_storage_size = block_info->storage_size_;
             String block_storage_size_str = Utility::FormatByteSize(block_storage_size);
             Value value = Value::MakeVarchar(block_storage_size_str);
             ValueExpression value_expr(value);
@@ -2435,7 +2419,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT row_capacity = block_entry->row_capacity();
+            SizeT row_capacity = block_info->row_capacity_;
             Value value = Value::MakeVarchar(std::to_string(row_capacity));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2452,7 +2436,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT row_count = block_entry->row_count();
+            SizeT row_count = block_info->row_count_;
             Value value = Value::MakeVarchar(std::to_string(row_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2469,7 +2453,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT checkpoint_row_count = block_entry->checkpoint_row_count();
+            SizeT checkpoint_row_count = block_info->checkpoint_row_count_;
             Value value = Value::MakeVarchar(std::to_string(checkpoint_row_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2486,7 +2470,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT column_count = block_entry->columns().size();
+            SizeT column_count = block_info->column_count_;
             Value value = Value::MakeVarchar(std::to_string(column_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2503,7 +2487,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT checkpoint_ts = block_entry->checkpoint_ts();
+            SizeT checkpoint_ts = block_info->checkpoint_ts_;
             Value value = Value::MakeVarchar(std::to_string(checkpoint_ts));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -5914,7 +5898,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
         {
             // txn id
             String txn_text;
-            if(txn_context->text_.get() != nullptr) {
+            if (txn_context->text_.get() != nullptr) {
                 txn_text = *txn_context->text_;
             }
             Value value = Value::MakeVarchar(txn_text);
@@ -5946,7 +5930,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
         {
             // txn type
             String transaction_type_str = "read";
-            if(txn_context->is_write_transaction_) {
+            if (txn_context->is_write_transaction_) {
                 transaction_type_str = "write";
             }
             Value value = Value::MakeVarchar(transaction_type_str);
