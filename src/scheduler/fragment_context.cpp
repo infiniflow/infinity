@@ -1100,10 +1100,10 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             break;
         }
         case PhysicalOperatorType::kLimit: {
-            if (fragment_type_ != FragmentType::kParallelStream) {
-                String error_message = fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type()));
-                UnrecoverableError(error_message);
-            }
+            // if (fragment_type_ != FragmentType::kParallelStream) {
+            //     String error_message = fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type()));
+            //     UnrecoverableError(error_message);
+            // }
 
             if ((i64)tasks_.size() != parallel_count) {
                 String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
