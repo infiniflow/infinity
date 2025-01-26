@@ -47,12 +47,6 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SizeT TaskletCount() override {
-        String error_message = "Not implement: TaskletCount not Implement";
-        UnrecoverableError(error_message);
-        return 0;
-    }
-
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }

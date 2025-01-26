@@ -54,12 +54,6 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    SizeT TaskletCount() override {
-        String error_message = "Not implement: TaskletCount not Implement";
-        UnrecoverableError(error_message);
-        return 0;
-    }
-
     inline const Vector<SharedPtr<BaseExpression>> &conditions() const { return conditions_; }
 
 private:

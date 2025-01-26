@@ -55,12 +55,6 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    SizeT TaskletCount() override {
-        String error_message = "Not implement: TaskletCount not Implement";
-        UnrecoverableError(error_message);
-        return 0;
-    }
-
     template <typename T>
     T GetInputData(MergeAggregateOperatorState *op_state, SizeT block_index, SizeT col_idx, SizeT row_idx);
 
