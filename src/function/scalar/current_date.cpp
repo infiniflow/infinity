@@ -40,13 +40,8 @@ struct CurrentDateFunction {
 
 template <>
 inline void CurrentDateFunction::Run(VarcharT &left, DateT &result) {
-        // auto zone = std::chrono::locate_zone(left);
         auto now = system_clock::now();
         auto sys_days = std::chrono::floor<std::chrono::days>(now);
-        // std::chrono::zoned_time zt{zone, now};
-        // auto tp = zt.get_local_time();
-        // auto sys_days = std::chrono::floor<std::chrono::days>(tp);
-        // std::chrono::year_month_day ymd = std::chrono::year_month_day(sys_days);
         result.value = sys_days.time_since_epoch().count();
 }
 

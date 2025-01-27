@@ -37,17 +37,13 @@ struct CurrentTimeFunction {
 
 };
 
-// template <>
-// inline void CurrentTimeFunction::Run(VarcharT &left, DateT &result) {
-//         auto zone = locate_zone(left);
-//         auto now = system_clock::now();
-//         // auto sys_days = std::chrono::floor<std::chrono::days>(now);
-//         std::chrono::zoned_time zt{zone, now};
-//         auto tp = zt.get_local_time();
-//         auto sys_days = std::chrono::floor<std::chrono::days>(tp);
-//         std::chrono::year_month_day ymd = std::chrono::year_month_day(sys_days);
-//         DateT::OuterYMD2Date(ymd, result);
-// }
+template <>
+inline void CurrentTimeFunction::Run(VarcharT &left, TimeT &result) {
+        auto now = system_clock::now();
+        auto sys_days = std::chrono::floor<std::chrono::days>(now);
+        auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
+        result.value = static_cast<i32>(sys_secs.time_since_epoch().count() - sys_days.time_since_epoch().count());
+}
 
 void RegisterCurrentTimeFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "currenttime";
@@ -56,7 +52,7 @@ void RegisterCurrentTimeFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction current_time_function(func_name,
                                   {DataType(LogicalType::kVarchar)},
-                                  {DataType(LogicalType::kTime)},
+                                  DataType(LogicalType::kTime),
                                   &ScalarFunction::UnaryFunction<VarcharT, TimeT, CurrentTimeFunction>);
     function_set_ptr->AddFunction(current_time_function);
 

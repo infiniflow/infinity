@@ -69,19 +69,16 @@ TEST_P(CurrentTimeFunctionsTest, current_time_func) {
         Vector<SharedPtr<BaseExpression>> inputs;
 
         DataType data_type1(LogicalType::kVarchar);
-        // DataType data_type2(LogicalType::kBigInt);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kTime);
         SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
 
         inputs.emplace_back(col1_expr_ptr);
-        // inputs.emplace_back(col2_expr_ptr);
 
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
         EXPECT_STREQ("currenttime(Varchar)->Time", func.ToString().c_str());
 
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(MakeShared<DataType>(data_type1));
-        // column_types.emplace_back(MakeShared<DataType>(data_type2));
 
         SizeT row_count = DEFAULT_VECTOR_SIZE;
 
@@ -95,11 +92,7 @@ TEST_P(CurrentTimeFunctionsTest, current_time_func) {
 
         for (SizeT i = 0; i < row_count; ++i) {
             Value v1 = data_block.GetValue(0, i);
-            // Value v2 = data_block.GetValue(1, i);
             EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
-            // EXPECT_EQ(v2.type_.type(), LogicalType::kBigInt);
-            // EXPECT_FLOAT_EQ(v1.value_.float32, static_cast<f32>(i));
-            // EXPECT_EQ(v2.value_.big_int, static_cast<i64>(i));
         }
 
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
