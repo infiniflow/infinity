@@ -29,6 +29,7 @@ import column_vector;
 namespace infinity {
 using namespace std::chrono;
 struct CurrentDateFunction {
+    const char* defaultTZ = "Asia/Shanghai";
     template <typename TA, typename TB>
     static inline void Run(TA &left, TB &result) {
         Status status = Status::NotSupport("Not implemented");
@@ -43,7 +44,7 @@ struct CurrentDateFunction {
             return;
         }
         if (setenv("TZ", newTZ, 1) != 0) {
-            const char* newTZ = "Asia/Shanghai";
+            const char* newTZ = CurrentDateFunction().defaultTZ;
             setenv("TZ", newTZ, 1);
         }
         tzset();
@@ -51,11 +52,10 @@ struct CurrentDateFunction {
     }
     static inline void TimeZoneResetHelper() {
         const char* tzValue = std::getenv("TZ");
-        if (tzValue == "Asia/Shanghai") {
+        if (tzValue == CurrentDateFunction().defaultTZ) {
             return;
         }
-        const char* newTZ = "Asia/Shanghai";
-        setenv("TZ", newTZ, 1);
+        setenv("TZ", CurrentDateFunction().defaultTZ, 1);
         tzset();
         return;
     }
