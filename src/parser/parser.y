@@ -397,7 +397,7 @@ struct SQL_LTYPE {
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
 %token DATABASE TABLE COLLECTION TABLES INTO VALUES VIEW INDEX VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK SYSTEM
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
-%token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN UNNEST
+%token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER HIGHLIGHT CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME FLOAT16 BFLOAT16 UNSIGNED
 %token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP
 %token ARRAY TUPLE EMBEDDING VECTOR MULTIVECTOR TENSOR SPARSE TENSORARRAY BIT TEXT
@@ -465,7 +465,7 @@ struct SQL_LTYPE {
 %type <const_expr_t>            empty_array_expr common_sparse_array_expr
 %type <int_sparse_ele_t>        int_sparse_ele
 %type <float_sparse_ele_t>      float_sparse_ele
-%type <expr_array_t>            expr_array group_by_clause sub_search_array highlight_clause unnest_clause
+%type <expr_array_t>            expr_array group_by_clause sub_search_array highlight_clause
 %type <insert_row_list_t>       insert_row_list
 %type <update_expr_t>           update_expr;
 %type <update_expr_array_t>     update_expr_array;
@@ -1552,17 +1552,16 @@ select_clause_without_modifier_paren: '(' select_clause_without_modifier ')' {
 };
 
 select_clause_without_modifier:
-SELECT distinct expr_array highlight_clause from_clause unnest_clause search_clause where_clause group_by_clause having_clause {
+SELECT distinct expr_array highlight_clause from_clause search_clause where_clause group_by_clause having_clause {
     $$ = new infinity::SelectStatement();
     $$->select_distinct_ = $2;
     $$->select_list_ = $3;
     $$->highlight_list_ = $4;
     $$->table_ref_ = $5;
-    $$->unnest_expr_list_ = $6;
-    $$->search_expr_ = $7;
-    $$->where_expr_ = $8;
-    $$->group_by_list_ = $9;
-    $$->having_expr_ = $10;
+    $$->search_expr_ = $6;
+    $$->where_expr_ = $7;
+    $$->group_by_list_ = $8;
+    $$->having_expr_ = $9;
 
     if($$->group_by_list_ == nullptr && $$->having_expr_ != nullptr) {
         yyerror(&yyloc, scanner, result, "HAVING clause should follow after GROUP BY clause");
@@ -1619,13 +1618,6 @@ distinct : DISTINCT {
 }
 | {
     $$ = false;
-}
-
-unnest_clause: UNNEST expr_array {
-    $$ = $2;
-}
-| {
-    $$ = nullptr;
 }
 
 highlight_clause: HIGHLIGHT expr_array {
