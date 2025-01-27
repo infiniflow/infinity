@@ -35,14 +35,28 @@ struct CurrentDateFunction {
         RecoverableError(status);
         return;
     }
-
+    static inline void TimeZoneConvertHelper(VarcharT &left) {
+        const char* tzValue = std::getenv("TZ");
+        const std::string str = left.ToString();
+        const char* newTZ = str.c_str();
+        if ( tzValue == newTZ) {
+            return;
+        }
+        if (setenv("TZ", newTZ, 1) != 0) {
+            const char* newTZ = "Asia/Shanghai";
+            setenv("TZ", newTZ, 1);
+        }
+        tzset();
+        return;
+    }
 };
 
 template <>
 inline void CurrentDateFunction::Run(VarcharT &left, DateT &result) {
-        auto now = system_clock::now();
-        auto sys_days = std::chrono::floor<std::chrono::days>(now);
-        result.value = sys_days.time_since_epoch().count();
+    TimeZoneConvertHelper(left);
+    auto now = system_clock::now();
+    auto sys_days = std::chrono::floor<std::chrono::days>(now);
+    result.value = sys_days.time_since_epoch().count();
 }
 
 void RegisterCurrentDateFunction(const UniquePtr<Catalog> &catalog_ptr) {

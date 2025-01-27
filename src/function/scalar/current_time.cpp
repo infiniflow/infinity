@@ -34,11 +34,26 @@ struct CurrentTimeFunction {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
+    static inline void TimeZoneConvertHelper(VarcharT &left) {
+        const char* tzValue = std::getenv("TZ");
+        const std::string str = left.ToString();
+        const char* newTZ = str.c_str();
+        if ( tzValue == newTZ) {
+            return;
+        }
+        if (setenv("TZ", newTZ, 1) != 0) {
+            const char* newTZ = "Asia/Shanghai";
+            setenv("TZ", newTZ, 1);
+        }
+        tzset();
+        return;
+    }
 
 };
 
 template <>
 inline void CurrentTimeFunction::Run(VarcharT &left, TimeT &result) {
+        TimeZoneConvertHelper(left);
         auto now = system_clock::now();
         auto sys_days = std::chrono::floor<std::chrono::days>(now);
         auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
