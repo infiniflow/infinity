@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module;
+#include <chrono>
 module current_timestamp;
 import stl;
 import catalog;
@@ -36,17 +37,15 @@ struct CurrentTimestampFunction {
 
 };
 
-// template <>
-// inline void CurrentDateFunction::Run(VarcharT &left, DateT &result) {
-//         auto zone = locate_zone(left);
-//         auto now = system_clock::now();
-//         // auto sys_days = std::chrono::floor<std::chrono::days>(now);
-//         std::chrono::zoned_time zt{zone, now};
-//         auto tp = zt.get_local_time();
-//         auto sys_days = std::chrono::floor<std::chrono::days>(tp);
-//         std::chrono::year_month_day ymd = std::chrono::year_month_day(sys_days);
-//         DateT::OuterYMD2Date(ymd, result);
-// }
+template <>
+inline void CurrentTimestampFunction::Run(VarcharT &left, TimestampT &result) {
+        auto now = system_clock::now();
+        auto sys_days = std::chrono::floor<std::chrono::days>(now);
+        auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
+        result.time.value = static_cast<i32>(sys_secs.time_since_epoch().count() - sys_days.time_since_epoch().count());
+        result.date.value = static_cast<i32>(sys_days.time_since_epoch().count());
+        // result(static_cast<i32>(sys_days.time_since_epoch().count(), static_cast<i32>(sys_secs.time_since_epoch().count() - sys_days.time_since_epoch().count())));
+}
 
 void RegisterCurrentTimestampFunction(const UniquePtr<Catalog> &catalog_ptr) {
     String func_name = "currenttimestamp";
@@ -55,7 +54,7 @@ void RegisterCurrentTimestampFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction current_timestamp_function(func_name,
                                   {DataType(LogicalType::kVarchar)},
-                                  DataType(LogicalType::kDate),
+                                  DataType(LogicalType::kTimestamp),
                                   &ScalarFunction::UnaryFunction<VarcharT, TimestampT, CurrentTimestampFunction>);
     function_set_ptr->AddFunction(current_timestamp_function);
 
