@@ -49,6 +49,16 @@ struct CurrentDateFunction {
         tzset();
         return;
     }
+    static inline void TimeZoneResetHelper() {
+        const char* tzValue = std::getenv("TZ");
+        if (tzValue == "Asia/Shanghai") {
+            return;
+        }
+        const char* newTZ = "Asia/Shanghai";
+        setenv("TZ", newTZ, 1);
+        tzset();
+        return;
+    }
 };
 
 template <>
@@ -57,6 +67,7 @@ inline void CurrentDateFunction::Run(VarcharT &left, DateT &result) {
     auto now = system_clock::now();
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
     result.value = sys_days.time_since_epoch().count();
+    TimeZoneResetHelper();
 }
 
 void RegisterCurrentDateFunction(const UniquePtr<Catalog> &catalog_ptr) {

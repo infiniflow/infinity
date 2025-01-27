@@ -48,6 +48,17 @@ struct CurrentTimestampFunction {
         tzset();
         return;
     }
+
+    static inline void TimeZoneResetHelper() {
+        const char* tzValue = std::getenv("TZ");
+        if (tzValue == "Asia/Shanghai") {
+            return;
+        }
+        const char* newTZ = "Asia/Shanghai";
+        setenv("TZ", newTZ, 1);
+        tzset();
+        return;
+    }
 };
 
 template <>
@@ -58,6 +69,7 @@ inline void CurrentTimestampFunction::Run(VarcharT &left, TimestampT &result) {
         auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
         result.time.value = static_cast<i32>(sys_secs.time_since_epoch().count() - sys_days.time_since_epoch().count());
         result.date.value = static_cast<i32>(sys_days.time_since_epoch().count());
+        TimeZoneResetHelper();
 }
 
 void RegisterCurrentTimestampFunction(const UniquePtr<Catalog> &catalog_ptr) {
