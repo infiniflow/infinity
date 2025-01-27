@@ -47,6 +47,8 @@ public:
     u64 GetColumnIdByName(const String &column_name) const;
     const ColumnDef *GetColumnDefByID(ColumnID column_id) const;
     const ColumnDef *GetColumnDefByIdx(SizeT idx) const;
+//    const ColumnDef *GetColumnDefByName(const String &column_name) const;
+//    SizeT GetColumnIdxByID(ColumnID column_id) const;
 };
 
 export struct TableIndexInfo {

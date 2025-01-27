@@ -194,7 +194,6 @@ Txn::OptimizeIndexByName(const String &db_name, const String &table_name, const 
     return Status::OK();
 }
 
-
 Status Txn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
     TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
     TxnTableStore *txn_table_store = this->GetTxnTableStore(table_entry);
@@ -592,6 +591,14 @@ Status Txn::UnLockTable(const String &db_name, const String &table_name) {
     status = table_entry->SetUnlock();
     LOG_INFO(fmt::format("Table {}.{} is unlocked", db_name, table_name));
     return status;
+}
+
+Status Txn::AddWriteTxnNum(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    return table_entry->AddWriteTxnNum(this);
 }
 
 Status Txn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {

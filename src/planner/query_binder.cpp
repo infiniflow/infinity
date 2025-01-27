@@ -1013,13 +1013,8 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     }
 
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+    Status status = txn->AddWriteTxnNum(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
     if(!status.ok()) {
-        RecoverableError(status);
-    }
-
-    status = table_entry->AddWriteTxnNum(txn);
-    if (!status.ok()) {
         RecoverableError(status);
     }
 
@@ -1049,12 +1044,8 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     }
 
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+    Status status = txn->AddWriteTxnNum(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
     if(!status.ok()) {
-        RecoverableError(status);
-    }
-    status = table_entry->AddWriteTxnNum(txn);
-    if (!status.ok()) {
         RecoverableError(status);
     }
 

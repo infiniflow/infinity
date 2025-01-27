@@ -272,11 +272,13 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     }
     // Check schema and table in the catalog
     Txn *txn = query_context_ptr_->GetTxn();
+
     auto [table_entry, status] = txn->GetTableByName(schema_name, table_name);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    status = table_entry->AddWriteTxnNum(txn);
+
+    status = txn->AddWriteTxnNum(schema_name, table_name);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -286,7 +288,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         RecoverableError(info_status);
     }
 
-    if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
+    if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {
         RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
     }
 
@@ -328,7 +330,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             // use column names
             assert(insert_row.columns_.size() == src_value_list.size());
             const auto column_count = src_value_list.size();
-            SizeT table_column_count = table_entry->ColumnCount();
+            SizeT table_column_count = table_info->column_count_;
             // Create value list with table column size and null value
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count);
             Vector<bool> has_value(table_column_count, false);
@@ -378,7 +380,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             dst_value_list = std::move(rewrite_value_list);
         } else {
             // append default values
-            const auto table_column_count = table_entry->ColumnCount();
+            SizeT table_column_count = table_info->column_count_;
             dst_value_list = std::move(src_value_list);
             dst_value_list.reserve(table_column_count);
             for (SizeT column_idx = dst_value_list.size(); column_idx < table_column_count; ++column_idx) {

@@ -148,8 +148,10 @@ public:
 
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
+    // Lock table related
     Status LockTable(const String &db_name, const String &table_name);
     Status UnLockTable(const String &db_name, const String &table_name);
+    Status AddWriteTxnNum(const String &db_name, const String &table_name);
 
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 
