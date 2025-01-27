@@ -51,6 +51,8 @@ class ConstantExpr : public ParsedExpr {
 public:
     explicit ConstantExpr(LiteralType literal_type) : ParsedExpr(ParsedExprType::kConstant), literal_type_(literal_type) {}
 
+    ConstantExpr(ConstantExpr &&constant_expr) noexcept;
+
     ~ConstantExpr() override;
 
     [[nodiscard]] std::string ToString() const override;

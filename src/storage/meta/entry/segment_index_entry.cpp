@@ -658,11 +658,15 @@ void SegmentIndexEntry::GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> 
     for (SizeT i = 0; i < num; i++) {
         auto &chunk_index_entry = chunk_index_entries_[i];
         bool add = chunk_index_entry->CheckVisible(txn);
-        LOG_INFO(fmt::format("GetChunkIndexEntries, CheckVisible ret: {}, chunk_id: {}, deprecate ts: {}, txn_id: {}",
-                             add,
-                             chunk_index_entry->chunk_id_,
-                             chunk_index_entry->deprecate_ts_.load(),
-                             txn_id_str));
+        LOG_INFO(fmt::format(
+            "GetChunkIndexEntries, CheckVisible ret: {}, chunk_id: {}, deprecate ts: {}, txn_id: {}, commit_ts: {}, base_rowid: {}, row_count: {}",
+            add,
+            chunk_index_entry->chunk_id_,
+            chunk_index_entry->deprecate_ts_.load(),
+            chunk_index_entry->txn_id_,
+            chunk_index_entry->commit_ts_.load(),
+            chunk_index_entry->base_rowid_.ToString(),
+            chunk_index_entry->row_count_));
         if (add) {
             chunk_index_entries.push_back(chunk_index_entry);
         }

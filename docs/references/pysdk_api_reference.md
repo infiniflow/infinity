@@ -465,6 +465,10 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
       - `"double"`/`"float64"`
       - `"float16"`
       - `"bfloat16"`
+  - Array: e.g., `"array,varchar"`, `"array,array,varchar"`
+    - `array`: The column is an array column.
+    - followed by the element type of the array. Can be recursive.
+    - for example, `"array,varchar"` is a one-dimensional array of strings, and `"array,array,varchar"` is a two-dimensional array of strings.
 - **Default value** (`"default"`)  
   The default value for unspecified cells in that column.  
 
@@ -1412,6 +1416,17 @@ table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 
 # Creat a table with only one tensor array column:
 table_object = db_object.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
 table_object.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
+```
+
+##### Insert arrays
+
+```python
+from infinity.common import Array
+# Creat a table with only one varchar array array column:
+table_object = db_object.create_table("varchar_array_array_table",
+                                      {"varchar_array_array_column": {"type": "array,array,varchar"}})
+# Insert one row into the table:
+table_object.insert([{"varchar_array_array_column": Array(Array("hello", "world"), Array("!"), Array())}])
 ```
 
 ---

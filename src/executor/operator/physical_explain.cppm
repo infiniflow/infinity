@@ -55,12 +55,6 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    SizeT TaskletCount() override {
-        String error_message = "Not implement: TaskletCount not Implement";
-        UnrecoverableError(error_message);
-        return 0;
-    }
-
     inline ExplainType explain_type() const { return explain_type_; }
 
     static void AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<SharedPtr<String>> &array2);

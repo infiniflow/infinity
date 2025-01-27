@@ -47,12 +47,6 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    SizeT TaskletCount() override {
-        String error_message = "Not implement: TaskletCount not Implement";
-        UnrecoverableError(error_message);
-        return 0;
-    }
-
     inline FlushType flush_type() const { return flush_type_; }
 
 private:
