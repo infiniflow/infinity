@@ -60,6 +60,7 @@ public:
     const Vector<SharedPtr<BaseExpression>> &final_result_columns_;
 
 private:
+
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };

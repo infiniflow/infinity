@@ -35,6 +35,7 @@ import wal_entry;
 import column_def;
 import constant_expr;
 import snapshot_info;
+import meta_info;
 
 namespace infinity {
 
@@ -222,6 +223,8 @@ public:
 
     SharedPtr<BlockEntry> GetBlockEntryByID(BlockID block_id) const;
 
+    Vector<SharedPtr<BlockInfo>> GetBlocksInfo(Txn* txn) const;
+
     BlocksGuard GetBlocksGuard() const { return BlocksGuard{block_entries_, std::shared_lock(rw_locker_)}; }
 
     SizeT GetStorageSize() const;
@@ -291,7 +294,7 @@ public:
 
     void PickCleanup(CleanupScanner *scanner) override;
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const override;
+    Vector<String> GetFilePath(Txn* txn) const override;
 
     void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
 

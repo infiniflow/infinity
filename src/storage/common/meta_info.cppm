@@ -47,8 +47,8 @@ public:
     u64 GetColumnIdByName(const String &column_name) const;
     const ColumnDef *GetColumnDefByID(ColumnID column_id) const;
     const ColumnDef *GetColumnDefByIdx(SizeT idx) const;
-//    const ColumnDef *GetColumnDefByName(const String &column_name) const;
-//    SizeT GetColumnIdxByID(ColumnID column_id) const;
+    const ColumnDef *GetColumnDefByName(const String &column_name) const;
+    SizeT GetColumnIdxByID(ColumnID column_id) const;
 };
 
 export struct TableIndexInfo {
@@ -60,6 +60,18 @@ export struct TableIndexInfo {
     SharedPtr<String> index_other_params_{};
     SharedPtr<String> index_column_ids_{};
     SharedPtr<String> index_column_names_{};
+};
+
+export struct BlockInfo {
+    BlockID block_id_;
+    SharedPtr<String> block_dir_{};
+    i64 row_count_{};
+    i64 row_capacity_{};
+    i64 checkpoint_row_count_{};
+    i64 column_count_{};
+    TxnTimeStamp checkpoint_ts_{};
+    SizeT storage_size_{};
+    Vector<String> files_{};
 };
 
 export struct TableDetail {

@@ -165,7 +165,7 @@ BlockEntry::ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *b
     block_entry->row_capacity_ = block_snapshot_info->row_capacity_;
     block_entry->block_dir_ = MakeShared<String>(block_snapshot_info->block_dir_);
 
-    for(const auto& block_column_snapshot: block_snapshot_info->column_block_snapshots_) {
+    for (const auto &block_column_snapshot : block_snapshot_info->column_block_snapshots_) {
         auto column_entry = BlockColumnEntry::ApplyBlockColumnSnapshot(block_entry.get(), block_column_snapshot.get(), txn_id, begin_ts);
         block_entry->columns_.emplace_back(std::move(column_entry));
     }
@@ -194,6 +194,24 @@ SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
     block_snapshot_info->fast_rough_filter_ = json_res.dump();
 
     return block_snapshot_info;
+}
+
+SharedPtr<BlockInfo> BlockEntry::GetBlockInfo(Txn* txn) const {
+    SharedPtr<BlockInfo> block_info = MakeShared<BlockInfo>();
+    block_info->block_id_ = this->block_id();
+    block_info->block_dir_ = this->block_dir();
+    block_info->row_count_ = this->row_count();
+    block_info->row_capacity_ = this->row_capacity();
+    block_info->checkpoint_row_count_ = this->checkpoint_row_count();
+    block_info->column_count_ = this->columns_.size();
+    block_info->checkpoint_ts_ = this->checkpoint_ts();
+    block_info->storage_size_ = this->GetStorageSize();
+    block_info->files_.reserve(columns_.size());
+    for (const auto &block_column_entry : columns_) {
+        Vector<String> files = block_column_entry->GetFilePath(txn);
+        block_info->files_.insert(block_info->files_.end(), block_info->files_.begin(), files.end());
+    }
+    return block_info;
 }
 
 // Used to replay DeltaOp to update a BlockEntry
@@ -618,12 +636,12 @@ void BlockEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> BlockEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+Vector<String> BlockEntry::GetFilePath(Txn* txn) const {
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     Vector<String> res;
     res.reserve(columns_.size());
     for (const auto &block_column_entry : columns_) {
-        Vector<String> files = block_column_entry->GetFilePath(txn_id, begin_ts);
+        Vector<String> files = block_column_entry->GetFilePath(txn);
         res.insert(res.end(), files.begin(), files.end());
     }
     return res;

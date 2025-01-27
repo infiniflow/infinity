@@ -85,7 +85,7 @@ bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operato
 }
 
 SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state) {
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_entry_->column_defs();
+    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info_->column_defs_;
 
     Vector<ColumnID> select_columns;
     // export all columns or export specific column index
@@ -253,7 +253,7 @@ label_return:
 
 SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state) {
 
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_entry_->column_defs();
+    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info_->column_defs_;
 
     Vector<ColumnID> select_columns;
     // export all columns or export specific column index
@@ -403,7 +403,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     }
 
     u64 exported_column_idx = column_idx_array_[0];
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_entry_->column_defs();
+    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info_->column_defs_;
     DataType *data_type = column_defs[exported_column_idx]->type().get();
     if (data_type->type() != LogicalType::kEmbedding) {
         String error_message = fmt::format("Only embedding column can be exported as FVECS file, but it is {}", data_type->ToString());
@@ -504,7 +504,7 @@ SharedPtr<arrow::DataType> GetArrowType(const DataType &column_data_type);
 SharedPtr<arrow::Array> BuildArrowArray(const ColumnDef *column_def, const ColumnVector &column_vector, const Vector<u32> &block_rows_for_output);
 
 SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperatorState *export_op_state) {
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_entry_->column_defs();
+    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info_->column_defs_;
     Vector<ColumnID> select_columns;
     // export all columns or export specific column index
     if (column_idx_array_.empty()) {

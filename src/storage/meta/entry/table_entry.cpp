@@ -1515,12 +1515,12 @@ void TableEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
-    Vector<TableIndexEntry *> table_index_entries = TableIndexes(txn_id, begin_ts);
+Vector<String> TableEntry::GetFilePath(Txn* txn) const {
+    Vector<TableIndexEntry *> table_index_entries = TableIndexes(txn->TxnID(), txn->BeginTS());
     Vector<String> res;
     res.reserve(table_index_entries.size());
     for (const auto &table_index_entry : table_index_entries) {
-        Vector<String> index_files = table_index_entry->GetFilePath(txn_id, begin_ts);
+        Vector<String> index_files = table_index_entry->GetFilePath(txn);
         res.insert(res.end(), index_files.begin(), index_files.end());
     }
 
@@ -1528,7 +1528,7 @@ Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
     res.reserve(res.size() + segment_map_.size());
     for (const auto &segment_pair : segment_map_) {
         const SegmentEntry *segment_entry = segment_pair.second.get();
-        Vector<String> segment_files = segment_entry->GetFilePath(txn_id, begin_ts);
+        Vector<String> segment_files = segment_entry->GetFilePath(txn);
         res.insert(res.end(), segment_files.begin(), segment_files.end());
     }
     return res;

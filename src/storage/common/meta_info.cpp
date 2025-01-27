@@ -53,24 +53,24 @@ const ColumnDef *TableInfo::GetColumnDefByIdx(SizeT idx) const {
     return column_defs_[idx].get();
 }
 
-//const ColumnDef *TableInfo::GetColumnDefByName(const String &column_name) const {
-//    auto iter = std::find_if(column_defs_.begin(), column_defs_.end(), [column_name](const SharedPtr<ColumnDef> &column_def) {
-//        return column_def->name() == column_name;
-//    });
-//    if (iter == column_defs_.end()) {
-//        return nullptr;
-//    }
-//    return iter->get();
-//}
-//
-//SizeT TableInfo::GetColumnIdxByID(ColumnID column_id) const {
-//    auto iter = std::find_if(column_defs_.begin(), column_defs_.end(), [column_id](const SharedPtr<ColumnDef> &column_def) {
-//        return static_cast<ColumnID>(column_def->id()) == column_id;
-//    });
-//    if (iter == column_defs_.end()) {
-//        return -1;
-//    }
-//    return std::distance(column_defs_.begin(), iter);
-//}
+const ColumnDef *TableInfo::GetColumnDefByName(const String &column_name) const {
+    auto iter = std::find_if(column_defs_.begin(), column_defs_.end(), [column_name](const SharedPtr<ColumnDef> &column_def) {
+        return column_def->name() == column_name;
+    });
+    if (iter == column_defs_.end()) {
+        return nullptr;
+    }
+    return iter->get();
+}
+
+SizeT TableInfo::GetColumnIdxByID(ColumnID column_id) const {
+    auto iter = std::find_if(column_defs_.begin(), column_defs_.end(), [column_id](const SharedPtr<ColumnDef> &column_def) {
+        return static_cast<ColumnID>(column_def->id()) == column_id;
+    });
+    if (iter == column_defs_.end()) {
+        return -1;
+    }
+    return std::distance(column_defs_.begin(), iter);
+}
 
 } // namespace infinity

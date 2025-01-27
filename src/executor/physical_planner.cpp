@@ -578,7 +578,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildImport(const SharedPtr<Logical
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExport(const SharedPtr<LogicalNode> &logical_operator) const {
     LogicalExport *logical_export = (LogicalExport *)(logical_operator.get());
     return MakeUnique<PhysicalExport>(logical_export->node_id(),
-                                      logical_export->table_entry(),
+                                      logical_export->table_info(),
                                       logical_export->schema_name(),
                                       logical_export->table_name(),
                                       logical_export->file_path(),
