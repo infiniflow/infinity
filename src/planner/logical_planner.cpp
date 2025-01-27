@@ -337,6 +337,9 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
                 const auto &column_name = insert_row.columns_[column_idx];
                 const SharedPtr<ColumnDef> &column_def = table_entry->GetColumnDefByName(column_name);
+                if (column_def.get() == nullptr) {
+                    RecoverableError(Status::SyntaxError(fmt::format("INSERT: Column {} not found in table {}.", column_name, table_name)));
+                }
                 SizeT table_column_idx = table_entry->GetColumnIdxByID(column_def->id());
                 const SharedPtr<DataType> &table_column_type = column_def->column_type_;
                 auto &src_value = src_value_list[column_idx];

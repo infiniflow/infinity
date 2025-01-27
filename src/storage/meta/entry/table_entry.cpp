@@ -1129,9 +1129,8 @@ const ColumnDef *TableEntry::GetColumnDefByID(ColumnID column_id) const {
 }
 
 SharedPtr<ColumnDef> TableEntry::GetColumnDefByName(const String &column_name) const {
-    ColumnID column_id = GetColumnIdByName(column_name);
-    auto iter = std::find_if(columns_.begin(), columns_.end(), [column_id](const SharedPtr<ColumnDef> &column_def) {
-        return static_cast<ColumnID>(column_def->id()) == column_id;
+    auto iter = std::find_if(columns_.begin(), columns_.end(), [column_name](const SharedPtr<ColumnDef> &column_def) {
+        return column_def->name() == column_name;
     });
     if (iter == columns_.end()) {
         return nullptr;
