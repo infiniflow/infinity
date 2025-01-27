@@ -110,6 +110,11 @@ public:
     //    HashMap<String, SharedPtr<BaseExpression>> group_by_name_;
     HashMap<String, i64> group_index_by_name_;
 
+    u64 unnest_table_index_{0};
+    String unnest_table_name_{};
+    Vector<SharedPtr<BaseExpression>> unnest_exprs_;
+    HashMap<String, i64> unnest_index_by_name_;
+
     // Bound aggregate function expr
     u64 aggregate_table_index_{0};
     String aggregate_table_name_{};

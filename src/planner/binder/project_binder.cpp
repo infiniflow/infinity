@@ -23,12 +23,17 @@ import bind_context;
 import function;
 import function_set;
 import column_expression;
+import unnest_expression;
 import third_party;
 import function_expr;
 import parsed_expr;
 import column_expr;
 import infinity_exception;
 import logger;
+import status;
+import logical_type;
+import array_info;
+import data_type;
 
 namespace {
 
@@ -60,6 +65,9 @@ SharedPtr<BaseExpression> ProjectBinder::BuildExpression(const ParsedExpr &expr,
     // Covert avg function expr to (sum / count) function expr
     if (expr.type_ == ParsedExprType::kFunction) {
         auto &function_expression = (FunctionExpr &)expr;
+        if (IsUnnestedFunction(function_expression.func_name_)) {
+            return BindUnnest(function_expression, bind_context_ptr, depth, root);
+        }
         auto special_function = TryBuildSpecialFuncExpr(function_expression, bind_context_ptr, depth);
         if (special_function.has_value()) {
             return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
@@ -175,5 +183,54 @@ SharedPtr<BaseExpression> ProjectBinder::BuildColExpr(const ColumnExpr &expr, Bi
     }
     return bound_column_expr;
 }
+
+SharedPtr<BaseExpression> ProjectBinder::BindUnnest(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) { 
+    if (depth > 0) {
+        RecoverableError(Status::SyntaxError("UNNEST() for correlated expression is not supported."));
+        return nullptr;
+    }
+
+    if (expr.arguments_->size() != 1) {
+        RecoverableError(Status::SyntaxError("UNNEST() requires a single argument."));
+        return nullptr;
+    }
+    if (expr.distinct_) {
+        RecoverableError(Status::SyntaxError("DISTINCT is not applicable to UNNEST()."));
+    }
+
+    SharedPtr<BaseExpression> child_expr = ExpressionBinder::BuildExpression(*(*expr.arguments_)[0], bind_context_ptr, depth, root);
+    DataType return_type(LogicalType::kInvalid);
+    switch (child_expr->Type().type()) {
+        case LogicalType::kArray: {
+            auto *array_info = static_cast<ArrayInfo *>(child_expr->Type().type_info().get());
+            return_type = DataType(array_info->ElemType().type());
+            break;
+        }
+        default: {
+            RecoverableError(Status::SyntaxError("UNNEST() requires an array argument."));
+            return nullptr;
+        }
+    }
+
+    SharedPtr<BaseExpression> unnest_expr = MakeShared<UnnestExpression>(child_expr);
+
+    u64 table_index = bind_context_ptr->GenerateTableIndex();
+    String table_name = fmt::format("unnest{:d}", table_index);
+    bind_context_ptr->unnest_table_index_ = table_index;
+    bind_context_ptr->unnest_table_name_ = table_name;
+
+    String expr_name = expr.GetName();
+
+    bind_context_ptr->unnest_index_by_name_[expr_name] = bind_context_ptr->unnest_exprs_.size();
+    bind_context_ptr->unnest_exprs_.emplace_back(unnest_expr);
+
+    auto col_expr = ColumnExpression::Make(return_type, table_name, table_index, expr_name, 0, depth);
+
+    bound_select_statement_->unnest_expressions_.push_back(col_expr);
+
+    return col_expr;
+ }
+
+bool ProjectBinder::IsUnnestedFunction(const String &function_name) { return function_name == String("unnest"); }
 
 } // namespace infinity
