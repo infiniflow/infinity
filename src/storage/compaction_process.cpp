@@ -153,7 +153,9 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
                     LOG_TRACE(fmt::format("To compact segment: {}", segment_ptr->ToString()));
                 }
 
-                compaction_tasks.emplace_back(MakeUnique<AutoCompactStatement>(table_entry, std::move(compact_segments)), txn);
+                compaction_tasks.emplace_back(
+                    MakeUnique<AutoCompactStatement>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(compact_segments)),
+                    txn);
             }
         }
     }

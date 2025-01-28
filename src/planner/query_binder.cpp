@@ -1132,14 +1132,15 @@ UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement
     SharedPtr<BaseTableRef> base_table_ref = nullptr;
     if (statement.compact_type_ == CompactStatementType::kManual) {
         const auto &compact_statement = static_cast<const ManualCompactStatement &>(statement);
-        base_table_ref = GetTableRef(compact_statement.schema_name_, compact_statement.table_name_);
+        base_table_ref = GetTableRef(compact_statement.db_name_, compact_statement.table_name_);
     } else {
         const auto &compact_statement = static_cast<const AutoCompactStatement &>(statement);
         auto block_index = MakeShared<BlockIndex>();
-        for (auto *compactible_segment : compact_statement.compactible_segments_) {
-            block_index->Insert(compactible_segment, txn);
+        for (auto *segment_entry : compact_statement.segments_to_compact_) {
+            block_index->Insert(segment_entry, txn);
         }
-        base_table_ref = MakeShared<BaseTableRef>(compact_statement.table_entry_->GetTableInfo(txn), std::move(block_index));
+        auto [table_info, status] = txn->GetTableInfo(statement.db_name_, statement.table_name_);
+        base_table_ref = MakeShared<BaseTableRef>(table_info, std::move(block_index));
     }
 
     auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
