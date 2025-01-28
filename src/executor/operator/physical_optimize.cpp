@@ -65,7 +65,7 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
     // Get tables from catalog
     LOG_INFO(fmt::format("OptimizeIndex {}.{} begin", db_name_, table_name_));
     auto txn = query_context->GetTxn();
-    Status status = txn->OptimizeIndexes(db_name_, table_name_);
+    Status status = txn->OptimizeTableIndexes(db_name_, table_name_);
     if (!status.ok()) {
         operator_state->status_ = status;
         RecoverableError(status);

@@ -175,7 +175,20 @@ Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vecto
     return compact_status;
 }
 
-Status Txn::OptimizeIndexes(const String &db_name, const String &table_name) {
+void Txn::OptimizeIndexes() {
+    TransactionID txn_id = this->TxnID();
+    TxnTimeStamp begin_ts = this->BeginTS();
+
+    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
+    for (auto *db_entry : db_entries) {
+        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
+        for (auto *table_entry : table_entries) {
+            table_entry->OptimizeIndex(this);
+        }
+    }
+}
+
+Status Txn::OptimizeTableIndexes(const String &db_name, const String &table_name) {
     auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
     if (!table_status.ok()) {
         return table_status;
