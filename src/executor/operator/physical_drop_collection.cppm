@@ -43,7 +43,7 @@ public:
 
     ~PhysicalDropCollection() override = default;
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 

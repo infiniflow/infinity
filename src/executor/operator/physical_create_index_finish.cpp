@@ -43,7 +43,7 @@ PhysicalCreateIndexFinish::PhysicalCreateIndexFinish(u64 id,
     : PhysicalOperator(PhysicalOperatorType::kCreateIndexFinish, std::move(left), nullptr, id, load_metas), db_name_(db_name),
       table_name_(table_name), index_base_(index_base), output_names_(output_names), output_types_(output_types) {}
 
-void PhysicalCreateIndexFinish::Init() {}
+void PhysicalCreateIndexFinish::Init(QueryContext* query_context) {}
 
 bool PhysicalCreateIndexFinish::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

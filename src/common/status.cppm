@@ -140,6 +140,8 @@ export enum class ErrorCode : long {
     kUnknown = 3091,
     kInvalidQueryOption = 3092,
     kFailToStartTxn = 3093,
+    kAlreadyLocked = 3094,
+    kNotLocked = 3095,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -317,6 +319,8 @@ public:
     static Status Unknown(const String &name);
     static Status InvalidQueryOption(const String &detail);
     static Status FailToStartTxn(const String &detail);
+    static Status AlreadyLocked(const String &detail);
+    static Status NotLocked(const String &detail);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");

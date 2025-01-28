@@ -54,9 +54,10 @@ class EarlyTerminateIterator;
 enum class EarlyTermAlgo;
 enum class FulltextSimilarity;
 struct BM25Params;
+struct TableInfo;
 
 struct CreateSearchParams {
-    const TableEntry *table_entry;
+    const TableInfo *table_info;
     const IndexReader *index_reader;
     EarlyTermAlgo early_term_algo;
     FulltextSimilarity ft_similarity;

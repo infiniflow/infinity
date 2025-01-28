@@ -31,6 +31,7 @@ import base_expression;
 import default_values;
 import internal_types;
 import data_type;
+import meta_info;
 
 namespace infinity {
 
@@ -69,7 +70,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalTableScan::GetOutputTypes() const 
     return result_types;
 }
 
-TableEntry *LogicalTableScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+TableInfo *LogicalTableScan::table_info() const { return base_table_ref_->table_info_.get(); }
 
 String LogicalTableScan::TableAlias() const { return base_table_ref_->alias_; }
 
@@ -82,7 +83,7 @@ String LogicalTableScan::ToString(i64 &space) const {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "TableScan: " << *base_table_ref_->table_entry_ptr_->GetTableName() << ", on: ";
+    ss << String(space, ' ') << arrow_str << "TableScan: " << *base_table_ref_->table_info_->table_name_ << ", on: ";
     SizeT column_count = base_table_ref_->column_names_->size();
     for (SizeT i = 0; i < column_count - 1; ++i) {
         ss << base_table_ref_->column_names_->at(i) << " ";

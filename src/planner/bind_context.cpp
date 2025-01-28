@@ -32,6 +32,7 @@ import logger;
 import knn_expr;
 import match_sparse_expr;
 import global_resource_usage;
+import meta_info;
 
 namespace infinity {
 
@@ -171,14 +172,14 @@ void BindContext::AddViewBinding(const String &name,
 
 void BindContext::AddTableBinding(const String &table_alias,
                                   u64 table_index,
-                                  TableEntry *table_collection_entry_ptr,
+                                  SharedPtr<TableInfo> table_info,
                                   SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                                   SharedPtr<Vector<String>> column_names,
                                   SharedPtr<BlockIndex> block_index) {
     auto binding = Binding::MakeBinding(BindingType::kTable,
                                         table_alias,
                                         table_index,
-                                        table_collection_entry_ptr,
+                                        table_info,
                                         std::move(column_types),
                                         std::move(column_names),
                                         std::move(block_index));

@@ -26,7 +26,7 @@ import load_meta;
 import internal_types;
 import operator_state;
 import query_context;
-import table_entry;
+import meta_info;
 
 namespace infinity {
 
@@ -60,7 +60,7 @@ public:
 
     [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
 
-    [[nodiscard]] inline TableEntry *table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+    [[nodiscard]] inline TableInfo *table_info() const { return base_table_ref_->table_info_.get(); }
 
 protected:
     void SetOutput(const Vector<char *> &raw_result_dists_list,

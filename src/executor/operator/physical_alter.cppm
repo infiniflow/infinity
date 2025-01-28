@@ -27,7 +27,7 @@ import infinity_exception;
 import internal_types;
 import data_type;
 import logger;
-import table_entry;
+import meta_info;
 import alter_statement;
 import column_def;
 import constant_expr;
@@ -36,13 +36,13 @@ namespace infinity {
 
 export class PhysicalAlter : public PhysicalOperator {
 public:
-    explicit PhysicalAlter(TableEntry *table_entry,
+    explicit PhysicalAlter(const SharedPtr<TableInfo>& table_info,
                            AlterStatementType type,
                            SharedPtr<Vector<String>> output_names,
                            SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                            u64 id,
                            SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id, load_metas), table_entry_(table_entry),
+        : PhysicalOperator(PhysicalOperatorType::kAlter, nullptr, nullptr, id, load_metas), table_info_(table_info),
           output_names_(std::move(output_names)), output_types_(std::move(output_types)) {}
 
     ~PhysicalAlter() override = default;
@@ -53,23 +53,23 @@ public:
 
 protected:
     AlterStatementType type_;
-    TableEntry *table_entry_{};
+    SharedPtr<TableInfo> table_info_{};
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 };
 
 export class PhysicalRenameTable final : public PhysicalAlter {
 public:
-    PhysicalRenameTable(TableEntry *table_entry,
+    PhysicalRenameTable(const SharedPtr<TableInfo>& table_info,
                         String &&new_table_name,
                         SharedPtr<Vector<String>> output_names,
                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                         u64 id,
                         SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalAlter(table_entry, AlterStatementType::kRenameTable, std::move(output_names), std::move(output_types), id, load_metas),
+        : PhysicalAlter(table_info, AlterStatementType::kRenameTable, std::move(output_names), std::move(output_types), id, load_metas),
           new_table_name_(std::move(new_table_name)) {}
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -79,16 +79,16 @@ private:
 
 export class PhysicalAddColumns final : public PhysicalAlter {
 public:
-    PhysicalAddColumns(TableEntry *table_entry,
+    PhysicalAddColumns(const SharedPtr<TableInfo>& table_info,
                        const Vector<SharedPtr<ColumnDef>> &column_defs,
                        SharedPtr<Vector<String>> output_names,
                        SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                        u64 id,
                        SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalAlter(table_entry, AlterStatementType::kAddColumns, std::move(output_names), std::move(output_types), id, load_metas),
+        : PhysicalAlter(table_info, AlterStatementType::kAddColumns, std::move(output_names), std::move(output_types), id, load_metas),
           column_defs_(column_defs) {}
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -98,16 +98,16 @@ private:
 
 export class PhysicalDropColumns final : public PhysicalAlter {
 public:
-    PhysicalDropColumns(TableEntry *table_entry,
+    PhysicalDropColumns(const SharedPtr<TableInfo>& table_info,
                         const Vector<String> &column_names,
                         SharedPtr<Vector<String>> output_names,
                         SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                         u64 id,
                         SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalAlter(table_entry, AlterStatementType::kDropColumns, std::move(output_names), std::move(output_types), id, load_metas),
+        : PhysicalAlter(table_info, AlterStatementType::kDropColumns, std::move(output_names), std::move(output_types), id, load_metas),
           column_names_(column_names) {}
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 

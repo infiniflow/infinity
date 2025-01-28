@@ -53,7 +53,7 @@ public:
 #endif
     }
 
-    virtual void Init() = 0;
+    virtual void Init(QueryContext* query_context) = 0;
 
     virtual SizeT TaskletCount();
 

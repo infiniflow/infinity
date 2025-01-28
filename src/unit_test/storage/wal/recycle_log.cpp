@@ -133,7 +133,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
         TxnManager *txn_mgr = storage->txn_manager();
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
-            auto [db, status] = txn->GetDatabase("db1");
+            Status status = txn->GetDatabase("db1");
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -241,7 +241,7 @@ TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
         TxnManager *txn_mgr = storage->txn_manager();
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
-            auto [db, status] = txn->GetDatabase("db1");
+            Status status = txn->GetDatabase("db1");
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }

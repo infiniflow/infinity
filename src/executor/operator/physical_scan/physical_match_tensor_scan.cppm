@@ -29,6 +29,7 @@ import physical_filter_scan_base;
 import global_block_id;
 import logical_match_tensor_scan;
 import internal_types;
+import meta_info;
 
 namespace infinity {
 struct LoadMeta;
@@ -48,7 +49,7 @@ public:
                                      const SharedPtr<MatchTensorScanIndexOptions> &index_options,
                                      SharedPtr<Vector<LoadMeta>> load_metas);
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -68,7 +69,7 @@ public:
 
     [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
 
-    [[nodiscard]] inline TableEntry *table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+//    [[nodiscard]] inline TableInfo *table_info() const { return base_table_ref_->table_info_.get(); }
 
     [[nodiscard]] inline const SharedPtr<MatchTensorExpression> &match_tensor_expr() const { return src_match_tensor_expr_; }
 

@@ -21,7 +21,7 @@ import query_context;
 import operator_state;
 import physical_operator_type;
 import base_table_ref;
-import table_entry;
+import meta_info;
 import block_column_entry;
 import segment_index_entry;
 import load_meta;
@@ -56,7 +56,7 @@ public:
 
     ~PhysicalKnnScan() override = default;
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *output_state) final;
 
@@ -64,7 +64,7 @@ public:
 
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
-    [[nodiscard]] TableEntry *table_collection_ptr() const;
+//    [[nodiscard]] TableInfo *table_info() const;
 
     [[nodiscard]] String TableAlias() const;
 

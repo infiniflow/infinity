@@ -21,7 +21,7 @@ module physical_merge_parallel_aggregate;
 
 namespace infinity {
 
-void PhysicalMergeParallelAggregate::Init() {}
+void PhysicalMergeParallelAggregate::Init(QueryContext* query_context) {}
 
 bool PhysicalMergeParallelAggregate::Execute(QueryContext *, OperatorState *) { return true; }
 

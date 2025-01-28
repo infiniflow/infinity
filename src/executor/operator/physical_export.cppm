@@ -27,7 +27,7 @@ import infinity_exception;
 import internal_types;
 import statement_common;
 import data_type;
-import table_entry;
+import meta_info;
 import block_index;
 import logger;
 import third_party;
@@ -40,7 +40,7 @@ namespace infinity {
 export class PhysicalExport : public PhysicalOperator {
 public:
     explicit PhysicalExport(u64 id,
-                            TableEntry *table_entry,
+                            const SharedPtr<TableInfo>& table_info,
                             String schema_name,
                             String table_name,
                             String file_path,
@@ -53,14 +53,14 @@ public:
                             Vector<u64> column_idx_array,
                             SharedPtr<BlockIndex> block_index,
                             SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id, load_metas), table_entry_(table_entry), file_type_(type),
+        : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id, load_metas), table_info_(table_info), file_type_(type),
           file_path_(std::move(file_path)), table_name_(std::move(table_name)), schema_name_(std::move(schema_name)), header_(header),
           delimiter_(delimiter), offset_(offset), limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)),
           block_index_(std::move(block_index)) {}
 
     ~PhysicalExport() override = default;
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
@@ -92,7 +92,7 @@ private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
-    TableEntry *table_entry_{};
+    SharedPtr<TableInfo> table_info_{};
     CopyFileType file_type_{CopyFileType::kInvalid};
     String file_path_{};
     String table_name_{};

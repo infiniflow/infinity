@@ -82,9 +82,14 @@ private:
     const SizeT max_segment_size_;
 };
 
-void PhysicalCompact::Init() {
+void PhysicalCompact::Init(QueryContext *query_context) {
+    auto [table_entry, status] =
+        query_context->GetTxn()->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
     if (compact_type_ == CompactStatementType::kManual) {
-        TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
         LOG_DEBUG(fmt::format("Manual compact {} start", *table_entry->GetTableName()));
         if (!table_entry->CompactPrepare()) {
             LOG_WARN(fmt::format("Table {} is not compactable.", *table_entry->GetTableName()));
@@ -99,7 +104,6 @@ void PhysicalCompact::Init() {
             compactible_segments_group_.push_back(compactible_segments);
         }
     } else {
-        TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
         LOG_DEBUG(fmt::format("Auto compact {} start", *table_entry->GetTableName()));
         Vector<SegmentEntry *> compactible_segments;
         const auto &block_index = *base_table_ref_->block_index_;
@@ -155,7 +159,11 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     TxnTimeStamp scan_ts = txn_mgr->GetNewTimeStamp();
     compact_state_data->SetScanTS(scan_ts);
 
-    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+    auto [table_entry, status] = txn->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
+    if(!status.ok()) {
+        RecoverableError(status);
+    }
+
     BlockIndex *block_index = base_table_ref_->block_index_.get();
 
     SizeT column_count = table_entry->ColumnCount();

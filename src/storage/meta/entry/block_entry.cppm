@@ -37,11 +37,12 @@ import column_def;
 import txn_store;
 import cleanup_scanner;
 import snapshot_info;
+import meta_info;
+import txn;
 
 namespace infinity {
 
 class BufferManager;
-class Txn;
 struct SegmentEntry;
 struct TableEntry;
 class DataBlock;
@@ -105,7 +106,7 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+    Vector<String> GetFilePath(Txn* txn) const final;
 
     void Flush(TxnTimeStamp checkpoint_ts);
 
@@ -199,6 +200,8 @@ public:
     void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 
     SharedPtr<BlockSnapshotInfo> GetSnapshotInfo() const;
+
+    SharedPtr<BlockInfo> GetBlockInfo(Txn* txn) const;
 
 public:
     // Setter, Used in import, segment append block, and block append block in compact

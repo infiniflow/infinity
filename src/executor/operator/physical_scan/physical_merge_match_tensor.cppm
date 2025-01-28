@@ -20,7 +20,7 @@ import stl;
 import query_context;
 import operator_state;
 import physical_operator;
-import table_entry;
+import meta_info;
 import match_tensor_expression;
 import base_table_ref;
 import data_type;
@@ -46,7 +46,7 @@ public:
                              SharedPtr<Vector<LoadMeta>> load_metas,
                              bool cache_result);
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -62,7 +62,7 @@ public:
 
     [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
 
-    [[nodiscard]] inline TableEntry *table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+    [[nodiscard]] inline TableInfo *table_info() const { return base_table_ref_->table_info_.get(); }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 

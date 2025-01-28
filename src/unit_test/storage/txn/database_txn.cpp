@@ -52,9 +52,8 @@ TEST_P(DBTxnTest, test1) {
     Status status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
 
     // Txn1: Get db1, OK
-    auto [db_entry1, status1] = new_txn->GetDatabase("db1");
+    Status status1 = new_txn->GetDatabase("db1");
     EXPECT_TRUE(status1.ok());
-    EXPECT_NE(db_entry1, nullptr);
 
     // Txn1: Commit OK
     txn_mgr->CommitTxn(new_txn);
@@ -63,7 +62,7 @@ TEST_P(DBTxnTest, test1) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"), TransactionType::kNormal);
 
     // Txn2: Get db1, OK
-    auto [db_entry2, status2] = new_txn->GetDatabase("db1");
+    Status status2 = new_txn->GetDatabase("db1");
     EXPECT_TRUE(status2.ok());
 
     // Txn2: Drop db1, OK
@@ -77,9 +76,8 @@ TEST_P(DBTxnTest, test1) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn3: Get db1, NOT OK
-    auto [db_entry3, status3] = new_txn->GetDatabase("db1");
+    Status status3 = new_txn->GetDatabase("db1");
     EXPECT_TRUE(!status3.ok());
-    EXPECT_EQ(db_entry3, nullptr);
 
     // Txn3: Drop db1, NOT OK
     status3 = new_txn->DropDatabase("db1", ConflictType::kError);
@@ -107,9 +105,8 @@ TEST_P(DBTxnTest, test20) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop db1"), TransactionType::kNormal);
 
     // Txn2: Get db1, OK
-    auto [db_entry1, status1] = new_txn->GetDatabase("db1");
+    Status status1 = new_txn->GetDatabase("db1");
     EXPECT_TRUE(status1.ok());
-    EXPECT_NE(db_entry1, nullptr);
 
     // Txn2: Drop db1, OK
     status = new_txn->DropDatabase("db1", ConflictType::kError);
@@ -120,9 +117,8 @@ TEST_P(DBTxnTest, test20) {
     EXPECT_TRUE(status.ok());
 
     // Txn2: Get db1, OK
-    auto [db_entry2, status2] = new_txn->GetDatabase("db1");
+    Status status2 = new_txn->GetDatabase("db1");
     EXPECT_TRUE(status2.ok());
-    EXPECT_NE(db_entry2, nullptr);
 
     // Txn2: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -131,9 +127,8 @@ TEST_P(DBTxnTest, test20) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
-    auto [db_entry3, status3] = new_txn->GetDatabase("db1");
+    Status status3 = new_txn->GetDatabase("db1");
     EXPECT_TRUE(status3.ok());
-    EXPECT_NE(db_entry3, nullptr);
 
     // Txn3: Create db1, NOT OK
     status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -164,9 +159,8 @@ TEST_P(DBTxnTest, test2) {
     EXPECT_TRUE(status.ok());
 
     // Txn1: Get db1, NOT OK
-    auto [db_entry1, status1] = new_txn->GetDatabase("db1");
+    Status status1 = new_txn->GetDatabase("db1");
     EXPECT_FALSE(status1.ok());
-    EXPECT_EQ(db_entry1, nullptr);
 
     // Txn1: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -175,7 +169,7 @@ TEST_P(DBTxnTest, test2) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
 
     // Txn2: Get db1, OK
-    auto [db_entry2, status2] = new_txn->GetDatabase("db1");
+    Status status2 = new_txn->GetDatabase("db1");
     EXPECT_FALSE(status2.ok());
 
     // Txn2: Create db1, OK
@@ -183,7 +177,7 @@ TEST_P(DBTxnTest, test2) {
     EXPECT_TRUE(status.ok());
 
     // Txn2: Get db1, OK
-    auto [db_entry3, status3] = new_txn->GetDatabase("db1");
+    Status status3 = new_txn->GetDatabase("db1");
     EXPECT_TRUE(status3.ok());
 
     // Txn2: Commit, OK
@@ -193,9 +187,8 @@ TEST_P(DBTxnTest, test2) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
-    auto [db_entry4, status4] = new_txn->GetDatabase("db1");
+    Status status4 = new_txn->GetDatabase("db1");
     EXPECT_TRUE(status4.ok());
-    EXPECT_NE(db_entry4, nullptr);
 
     // Txn3: Create db1, NOT OK
     status = new_txn->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
@@ -280,9 +273,8 @@ TEST_P(DBTxnTest, test5) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn2: Get db1, NOT OK
-    auto [db_entry, status1] = new_txn->GetDatabase("db1");
+    Status status1 = new_txn->GetDatabase("db1");
     EXPECT_TRUE(!status1.ok());
-    EXPECT_EQ(db_entry, nullptr);
 
     // Txn2: Commit, OK
     txn_mgr->CommitTxn(new_txn);
@@ -325,9 +317,8 @@ TEST_P(DBTxnTest, test6) {
     Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
-    auto [db_entry, status1] = new_txn3->GetDatabase("db1");
+    Status status1 = new_txn3->GetDatabase("db1");
     EXPECT_TRUE(status1.ok());
-    EXPECT_NE(db_entry, nullptr);
 
     // Txn3: Commit, OK
     txn_mgr->CommitTxn(new_txn3);
@@ -374,9 +365,8 @@ TEST_P(DBTxnTest, test7) {
     Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
-    auto [db_entry, status1] = new_txn3->GetDatabase("db1");
+    Status status1 = new_txn3->GetDatabase("db1");
     EXPECT_TRUE(status1.ok());
-    EXPECT_NE(db_entry, nullptr);
 
     // Txn3: Commit, OK
     txn_mgr->CommitTxn(new_txn3);

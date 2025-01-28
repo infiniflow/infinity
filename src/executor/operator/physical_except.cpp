@@ -21,7 +21,7 @@ module physical_except;
 
 namespace infinity {
 
-void PhysicalExcept::Init() {}
+void PhysicalExcept::Init(QueryContext* query_context) {}
 
 bool PhysicalExcept::Execute(QueryContext *, OperatorState *) { return true; }
 

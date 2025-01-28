@@ -93,7 +93,7 @@ Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 paralle
     return result;
 }
 
-void PhysicalIndexScan::Init() {
+void PhysicalIndexScan::Init(QueryContext* query_context) {
     // check add_row_id_
     if (!add_row_id_) {
         String error_message = "ExecuteInternal(): add_row_id_ should be true.";

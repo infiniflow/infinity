@@ -49,7 +49,7 @@ PhysicalCreateIndexDo::PhysicalCreateIndexDo(u64 id,
     : PhysicalOperator(PhysicalOperatorType::kCreateIndexDo, std::move(left), nullptr, id, load_metas), base_table_ref_(base_table_ref),
       index_name_(index_name), output_names_(output_names), output_types_(output_types) {}
 
-void PhysicalCreateIndexDo::Init() {}
+void PhysicalCreateIndexDo::Init(QueryContext* query_context) {}
 
 // FIXME: fetch and add a block one time
 bool PhysicalCreateIndexDo::Execute(QueryContext *query_context, OperatorState *operator_state) {

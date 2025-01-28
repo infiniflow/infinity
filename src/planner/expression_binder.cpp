@@ -83,7 +83,7 @@ import fusion_expr;
 import data_type;
 import expression_type;
 import catalog;
-import table_entry;
+import meta_info;
 import column_vector;
 
 namespace infinity {
@@ -458,9 +458,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
                 ColumnExpr *col_expr = (ColumnExpr *)(*expr.arguments_)[0];
                 if (col_expr->star_) {
                     String &table_name = bind_context_ptr->table_names_[0];
-                    TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+                    TableInfo *table_info = bind_context_ptr->binding_by_name_[table_name]->table_info_.get();
                     col_expr->names_.clear();
-                    col_expr->names_.emplace_back(table_entry->GetColumnDefByID(0)->name_);
+                    col_expr->names_.emplace_back(table_info->GetColumnDefByID(0)->name_);
                 }
             }
         }
@@ -1065,7 +1065,7 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         String &table_name = bind_context_ptr->table_names_[0];
         String column_name = special_function_ptr->name();
 
-        TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+        TableInfo *table_info = bind_context_ptr->binding_by_name_[table_name]->table_info_.get();
         switch (special_function_ptr->special_type()) {
             case SpecialType::kCreateTs: {
                 return ColumnExpression::Make(special_function_ptr->data_type(),
@@ -1090,7 +1090,7 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
                                               table_name,
                                               bind_context_ptr->table_name2table_index_[table_name],
                                               column_name,
-                                              table_entry->ColumnCount() + special_function_ptr->extra_idx(),
+                                              table_info->column_count_ + special_function_ptr->extra_idx(),
                                               depth,
                                               special_function_ptr->special_type());
             }

@@ -81,7 +81,7 @@ PhysicalMatchSparseScan::PhysicalMatchSparseScan(u64 id,
                              load_metas),
       match_sparse_expr_(std::move(match_sparse_expression)) {}
 
-void PhysicalMatchSparseScan::Init() { search_column_id_ = match_sparse_expr_->column_expr_->binding().column_idx; }
+void PhysicalMatchSparseScan::Init(QueryContext* query_context) { search_column_id_ = match_sparse_expr_->column_expr_->binding().column_idx; }
 
 SharedPtr<Vector<String>> PhysicalMatchSparseScan::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
@@ -121,7 +121,13 @@ SizeT PhysicalMatchSparseScan::TaskletCount() {
 
 SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
     Txn *txn = query_context->GetTxn();
-    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+
+    auto *table_info = base_table_ref_->table_info_.get();
+    auto [table_entry, status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
     BlockIndex *block_index = base_table_ref_->block_index_.get();
     SizeT ret = block_index->BlockCount();
 
@@ -384,7 +390,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                                             MatchSparseScanOperatorState *match_sparse_scan_state) {
     Txn *txn = query_context->GetTxn();
     const TxnTimeStamp begin_ts = txn->BeginTS();
-    if (!common_query_filter_->TryFinishBuild(txn)) {
+    if (!common_query_filter_->TryFinishBuild()) {
         // not ready, abort and wait for next time
         return;
     }

@@ -45,7 +45,7 @@ import column_def;
 
 namespace infinity {
 
-void PhysicalAggregate::Init() {}
+void PhysicalAggregate::Init(QueryContext* query_context) {}
 
 bool PhysicalAggregate::Execute(QueryContext *query_context, OperatorState *operator_state) {
     OperatorState *prev_op_state = operator_state->prev_op_state_;

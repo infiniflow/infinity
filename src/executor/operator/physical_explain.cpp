@@ -46,7 +46,7 @@ void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<
     }
 }
 
-void PhysicalExplain::Init() {
+void PhysicalExplain::Init(QueryContext* query_context) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     output_names_ = MakeShared<Vector<String>>();

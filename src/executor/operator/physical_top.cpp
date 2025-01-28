@@ -315,7 +315,7 @@ PhysicalTop::GenerateSortFunction(OrderType compare_order, SharedPtr<BaseExpress
     }
 }
 
-void PhysicalTop::Init() {
+void PhysicalTop::Init(QueryContext* query_context) {
     // Initialize sort parameters
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {

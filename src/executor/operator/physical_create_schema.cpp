@@ -30,7 +30,7 @@ import status;
 
 namespace infinity {
 
-void PhysicalCreateSchema::Init() {}
+void PhysicalCreateSchema::Init(QueryContext* query_context) {}
 
 bool PhysicalCreateSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

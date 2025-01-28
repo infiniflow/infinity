@@ -29,6 +29,7 @@ import infinity_context;
 import infinity_exception;
 import table_entry;
 import segment_index_entry;
+import meta_info;
 
 namespace infinity {
 
@@ -63,9 +64,16 @@ bool PhysicalCompactIndexDo::Execute(QueryContext *query_context, OperatorState 
 
     Txn *txn = query_context->GetTxn();
     auto &create_index_idxes = (*compact_index_do_operator_state->create_index_shared_data_)[create_index_idx]->create_index_idxes_;
-    TableEntry *table_entry = new_table_ref->table_entry_ptr_;
+    TableInfo *table_info = new_table_ref->table_info_.get();
+
+    TableEntry *table_entry{nullptr};
+    Status status;
+    std::tie(table_entry, status) = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
     Map<SegmentID, SegmentIndexEntry *> segment_index_entries = compact_state_data->GetSegmentIndexEntries(index_name);
-    auto status = txn->CreateIndexDo(table_entry, segment_index_entries, index_name, create_index_idxes);
+    status = txn->CreateIndexDo(table_entry, segment_index_entries, index_name, create_index_idxes);
 
     ++create_index_idx;
     compact_index_do_operator_state->create_index_idx_ = create_index_idx;

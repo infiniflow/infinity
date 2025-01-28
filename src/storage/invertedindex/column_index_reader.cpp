@@ -159,20 +159,20 @@ void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mut
     last_known_update_ts_ = std::max(last_known_update_ts_, ts);
 }
 
-IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
+SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(Txn *txn) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     TransactionID txn_id = txn->TxnID();
-    IndexReader result;
+    SharedPtr<IndexReader> index_reader = MakeShared<IndexReader>();
     std::scoped_lock lock(mutex_);
     assert(cache_ts_ <= first_known_update_ts_);
     assert(first_known_update_ts_ == MAX_TIMESTAMP || first_known_update_ts_ <= last_known_update_ts_);
     if (first_known_update_ts_ != 0 && begin_ts >= cache_ts_ && begin_ts < first_known_update_ts_) [[likely]] {
         // no need to build, use cache
-        result.column_index_readers_ = cache_column_readers_;
+        index_reader->column_index_readers_ = cache_column_readers_;
         // result.column2analyzer_ = column2analyzer_;
     } else {
         FlatHashMap<u64, TxnTimeStamp, detail::Hash<u64>> cache_column_ts;
-        result.column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>>();
+        index_reader->column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>>();
         // result.column2analyzer_ = MakeShared<Map<String, String>>();
         for (auto map_guard = table_entry_ptr_->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
@@ -190,10 +190,10 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
 
             String column_name = index_base->column_name();
             auto column_id = table_entry_ptr_->GetColumnIdByName(column_name);
-            if (result.column_index_readers_->find(column_id) == result.column_index_readers_->end()) {
-                (*result.column_index_readers_)[column_id] = MakeShared<Map<String, SharedPtr<ColumnIndexReader>>>();
+            if (index_reader->column_index_readers_->find(column_id) == index_reader->column_index_readers_->end()) {
+                (*index_reader->column_index_readers_)[column_id] = MakeShared<Map<String, SharedPtr<ColumnIndexReader>>>();
             }
-            auto column_index_map = (*result.column_index_readers_)[column_id];
+            auto column_index_map = (*index_reader->column_index_readers_)[column_id];
 
             assert(table_index_entry->GetFulltexSegmentUpdateTs() <= last_known_update_ts_);
             if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
@@ -225,11 +225,11 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn) {
             first_known_update_ts_ = MAX_TIMESTAMP;
             last_known_update_ts_ = 0;
             cache_column_ts_ = std::move(cache_column_ts);
-            cache_column_readers_ = result.column_index_readers_;
+            cache_column_readers_ = index_reader->column_index_readers_;
             // column2analyzer_ = result.column2analyzer_;
         }
     }
-    return result;
+    return index_reader;
 }
 
 void TableIndexReaderCache::Invalidate() {

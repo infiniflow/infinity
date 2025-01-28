@@ -377,7 +377,7 @@ void DBEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> DBEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+Vector<String> DBEntry::GetFilePath(Txn* txn) const {
     String error_message = "Unimplemented";
     UnrecoverableError(error_message);
     return Vector<String>();

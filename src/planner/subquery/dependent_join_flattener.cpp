@@ -334,7 +334,7 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
 
     //    Catalog *catalog = query_context_->storage()->catalog();
 
-    SharedPtr<BaseTableRef> base_table_ref = MakeShared<BaseTableRef>(table_binding_ptr->table_collection_entry_ptr_,
+    SharedPtr<BaseTableRef> base_table_ref = MakeShared<BaseTableRef>(table_binding_ptr->table_info_,
                                                                       column_ids,
                                                                       table_binding_ptr->block_index_,
                                                                       table_binding_ptr->table_name_,

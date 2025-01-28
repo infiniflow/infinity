@@ -32,6 +32,7 @@ import value;
 import column_vector;
 import cached_match_scan;
 import result_cache_manager;
+import meta_info;
 
 namespace infinity {
 
@@ -69,7 +70,7 @@ PhysicalMergeMatchTensor::PhysicalMergeMatchTensor(const u64 id,
       base_table_ref_(std::move(base_table_ref)), match_tensor_expr_(std::move(match_tensor_expr)), filter_expression_(std::move(filter_expression)),
       topn_(topn), index_options_(index_options) {}
 
-void PhysicalMergeMatchTensor::Init() { left()->Init(); }
+void PhysicalMergeMatchTensor::Init(QueryContext* query_context) { left()->Init(query_context); }
 
 SizeT PhysicalMergeMatchTensor::TaskletCount() {
     String error_message = "Not Expected: TaskletCount of PhysicalMergeMatchTensor?";
@@ -193,8 +194,8 @@ void PhysicalMergeMatchTensor::AddCache(QueryContext *query_context,
                                         ResultCacheManager *cache_mgr,
                                         const Vector<UniquePtr<DataBlock>> &output_data_blocks) const {
     Txn *txn = query_context->GetTxn();
-    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
-    TxnTimeStamp query_ts = std::min(txn->BeginTS(), table_entry->max_commit_ts());
+    auto *table_info = base_table_ref_->table_info_.get();
+    TxnTimeStamp query_ts = std::min(txn->BeginTS(), table_info->max_commit_ts_);
     Vector<UniquePtr<DataBlock>> data_blocks(output_data_blocks.size());
     for (SizeT i = 0; i < output_data_blocks.size(); ++i) {
         data_blocks[i] = output_data_blocks[i]->Clone();

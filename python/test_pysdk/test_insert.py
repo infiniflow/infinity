@@ -980,7 +980,7 @@ class TestInfinity:
             print(insert_res)
 
         assert e.type == InfinityException
-        assert e.value.args[0] == ErrorCode.COLUMN_NOT_EXIST
+        assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
 
         res = db_obj.drop_table(
             "test_insert_no_match_column"+suffix, ConflictType.Error)

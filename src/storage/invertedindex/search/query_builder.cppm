@@ -19,7 +19,7 @@ export module query_builder;
 import stl;
 import doc_iterator;
 import column_index_reader;
-import table_entry;
+import meta_info;
 import internal_types;
 import default_values;
 import base_table_ref;
@@ -54,19 +54,18 @@ export struct FullTextQueryContext {
 
 export class QueryBuilder {
 public:
-    explicit QueryBuilder(BaseTableRef *base_table_ref) : base_table_ref_(base_table_ref), table_entry_(base_table_ref->table_entry_ptr_) {};
+    explicit QueryBuilder(SharedPtr<TableInfo> table_info) : table_info_(std::move(table_info)) {};
 
-    void Init(IndexReader index_reader);
+    void Init(SharedPtr<IndexReader> index_reader);
 
     ~QueryBuilder();
 
-    Map<String, String> GetColumn2Analyzer(const Vector<String> &hints) const { return index_reader_.GetColumn2Analyzer(hints); }
+    Map<String, String> GetColumn2Analyzer(const Vector<String> &hints) const { return index_reader_->GetColumn2Analyzer(hints); }
 
     UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
 private:
-    BaseTableRef *base_table_ref_{nullptr};
-    TableEntry *table_entry_{nullptr};
-    IndexReader index_reader_;
+    SharedPtr<TableInfo> table_info_{nullptr};
+    SharedPtr<IndexReader> index_reader_{};
 };
 } // namespace infinity

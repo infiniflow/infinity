@@ -384,7 +384,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
             EXPECT_EQ(input_block->Finalized(), true);
             auto [table_entry, status] = txn5->GetTableByName("default_db", "tbl4");
             EXPECT_TRUE(status.ok());
-            txn5->Append(table_entry, input_block);
+            txn5->Append("default_db", "tbl4", input_block);
             txn_mgr->CommitTxn(txn5);
         }
         {
@@ -851,7 +851,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+                auto table_ref = BaseTableRef::FakeTableRef(txn, db_name, table_name);
                 auto result = txn->CreateIndexDef(table_entry, index_base_ivf, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
@@ -959,7 +959,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+                auto table_ref = BaseTableRef::FakeTableRef(txn, db_name, table_name);
                 auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);

@@ -34,7 +34,7 @@ import infinity_context;
 
 namespace infinity {
 
-void PhysicalDropSchema::Init() {}
+void PhysicalDropSchema::Init(QueryContext* query_context) {}
 
 bool PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

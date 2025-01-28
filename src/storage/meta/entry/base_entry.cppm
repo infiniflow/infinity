@@ -21,14 +21,12 @@ export module base_entry;
 
 import stl;
 import default_values;
-import txn;
-import txn_manager;
 import infinity_exception;
 import third_party;
-import txn_state;
 import logger;
 import cleanup_scanner;
 import global_resource_usage;
+import txn;
 
 namespace infinity {
 
@@ -106,7 +104,7 @@ export struct BaseEntry {
 
     virtual void PickCleanup(CleanupScanner *scanner) {};
 
-    virtual Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const = 0;
+    virtual Vector<String> GetFilePath(Txn* txn) const = 0;
 
 public:
     // Reserved

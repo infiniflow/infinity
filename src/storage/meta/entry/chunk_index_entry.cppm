@@ -130,7 +130,7 @@ public:
 
     virtual void PickCleanup(CleanupScanner *scanner) override {}
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const override;
+    Vector<String> GetFilePath(Txn* txn) const override;
 
     void SaveIndexFile();
 

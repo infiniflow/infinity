@@ -20,7 +20,7 @@ import column_binding;
 import logical_node;
 
 import base_table_ref;
-import table_entry;
+import meta_info;
 import internal_types;
 import data_type;
 import fast_rough_filter;
@@ -39,7 +39,7 @@ public:
 
     [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    [[nodiscard]] TableEntry *table_collection_ptr() const;
+    [[nodiscard]] TableInfo *table_info() const;
 
     [[nodiscard]] String TableAlias() const;
 

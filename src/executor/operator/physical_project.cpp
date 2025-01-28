@@ -34,7 +34,7 @@ module physical_project;
 
 namespace infinity {
 
-void PhysicalProject::Init() {
+void PhysicalProject::Init(QueryContext* query_context) {
     //    executor.Init(expressions_);
     //
     //    Vector<SharedPtr<ColumnDef>> columns;

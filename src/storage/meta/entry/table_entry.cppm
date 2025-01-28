@@ -46,6 +46,7 @@ import column_index_reader;
 import value;
 import infinity_exception;
 import snapshot_info;
+import txn;
 
 namespace infinity {
 
@@ -53,7 +54,6 @@ class IndexBase;
 struct DBEntry;
 struct TableIndexEntry;
 class TableMeta;
-class Txn;
 struct Catalog;
 class AddTableEntryOp;
 class SegmentIndexEntry;
@@ -119,6 +119,8 @@ public:
     ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
 
 public:
+    SharedPtr<TableInfo> GetTableInfo(Txn *txn);
+
     Tuple<TableIndexEntry *, Status>
     CreateIndex(const SharedPtr<IndexBase> &index_base, ConflictType conflict_type, TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
@@ -291,7 +293,7 @@ public:
 
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return columns_; }
 
-    IndexReader GetFullTextIndexReader(Txn *txn);
+    SharedPtr<IndexReader> GetFullTextIndexReader(Txn *txn);
 
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
         return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
@@ -365,16 +367,16 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+    Vector<String> GetFilePath(Txn* txn) const final;
 
 public:
     Status AddWriteTxnNum(Txn *txn);
 
     void DecWriteTxnNum();
 
-    void SetLocked();
+    Status SetLocked();
 
-    void SetUnlock();
+    Status SetUnlock();
 
     enum struct TableStatus : u8 {
         kNone = 0,

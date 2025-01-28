@@ -119,7 +119,6 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
     auto db_name2 = std::make_shared<std::string>("db2");
     auto db_name3 = std::make_shared<std::string>("db3");
 
-    std::shared_ptr<std::string> db_entry_dir1;
     {
         InfinityContext::instance().InitPhase1(config_path);
         InfinityContext::instance().InitPhase2();
@@ -134,10 +133,8 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
             txn->CreateDatabase(db_name2, ConflictType::kError, MakeShared<String>());
             txn->DropDatabase(*db_name2, ConflictType::kError);
 
-            auto [db_entry, status] = txn->GetDatabase(*db_name1);
-            EXPECT_TRUE(status.ok() && db_entry != nullptr);
-            db_entry_dir1 = db_entry->db_entry_dir();
-
+            Status status = txn->GetDatabase(*db_name1);
+            EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
         {
@@ -159,17 +156,15 @@ TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
             {
-                auto [db_entry, status] = txn->GetDatabase(*db_name1);
-                ASSERT_TRUE(status.ok() && db_entry != nullptr);
-                EXPECT_EQ(*db_entry->db_name_ptr(), *db_name1);
-                EXPECT_EQ(*db_entry->db_entry_dir(), *db_entry_dir1);
+                Status status = txn->GetDatabase(*db_name1);
+                ASSERT_TRUE(status.ok());
             }
             {
-                auto [db_entry, status] = txn->GetDatabase(*db_name2);
+                Status status = txn->GetDatabase(*db_name2);
                 EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
             }
             {
-                auto [db_entry, status] = txn->GetDatabase(*db_name3);
+                Status status = txn->GetDatabase(*db_name3);
                 EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
             }
             txn_mgr->CommitTxn(txn);
@@ -308,7 +303,7 @@ TEST_P(CatalogDeltaReplayTest, replay_import) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(table_entry, segment_entry);
+            txn->Import(*db_name, *table_name, segment_entry);
 
             txn_mgr->CommitTxn(txn);
         }
@@ -392,7 +387,7 @@ TEST_P(CatalogDeltaReplayTest, replay_append) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            status = txn->Append(table_entry, data_block);
+            status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -480,7 +475,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            status = txn->Append(table_entry, data_block);
+            status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -493,7 +488,7 @@ TEST_P(CatalogDeltaReplayTest, replay_delete) {
 
             Vector<infinity::RowID> del_row_ids{};
             del_row_ids.push_back(del_row);
-            status = txn->Delete(table_entry, del_row_ids, true);
+            status = txn->Delete(*db_name, *table_name, del_row_ids, true);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -547,7 +542,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            status = txn->Append(table_entry, data_block);
+            status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
             EXPECT_EQ(table_entry->row_count(), 1ul);
@@ -575,7 +570,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            status = txn->Append(table_entry, data_block);
+            status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
             EXPECT_EQ(table_entry->row_count(), 2ul);
@@ -627,7 +622,7 @@ TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             auto [table_entry, status] = txn_record3->GetTableByName(*db_name, *table_name);
             ASSERT_TRUE(status.ok());
 
-            status = txn_record3->Append(table_entry, data_block);
+            status = txn_record3->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(status.ok());
 
             txn_mgr->CommitTxn(txn_record3);
@@ -813,7 +808,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(table_entry, segment_entry);
+            txn->Import(*db_name, *table_name, segment_entry);
 
             txn_mgr->CommitTxn(txn);
         }
@@ -831,6 +826,11 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                 auto [table_entry, status1] = txn_idx->GetTableByName(*db_name, *table_name);
                 EXPECT_TRUE(status1.ok());
 
+                auto [table_info, status] = txn_idx->GetTableInfo(*db_name, *table_name);
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+
                 IndexFullText fullIdxBase(std::make_shared<String>(idx_name),
                                           MakeShared<String>("test comment"),
                                           idx_file_name,
@@ -844,9 +844,9 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                     auto [table_entry, status3] = txn_idx->GetTableByName(*db_name, *table_name);
                     EXPECT_TRUE(status3.ok());
 
-                    auto [tInfo, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
+                    auto [table_info, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
                     EXPECT_TRUE(status4.ok());
-                    auto col_cnt = (*tInfo).column_count_;
+                    auto col_cnt = (*table_info).column_count_;
 
                     String alias = "tb1";
                     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
@@ -863,7 +863,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
                     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
-                    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+                    auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
                     auto [segment_index_entries, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
@@ -909,7 +909,6 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
 }
 
 TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
-    std::shared_ptr<std::string> db_entry_dir;
     auto db_name = std::make_shared<std::string>("db1");
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -930,9 +929,8 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
 
             txn->CreateDatabase(db_name, ConflictType::kError, MakeShared<String>());
 
-            auto [db_entry, status] = txn->GetDatabase(*db_name);
+            Status status = txn->GetDatabase(*db_name);
             EXPECT_TRUE(status.ok());
-            db_entry_dir = db_entry->db_entry_dir();
 
             txn_mgr->CommitTxn(txn);
         }
@@ -980,7 +978,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(table_entry, segment_entry);
+            txn->Import(*db_name, *table_name, segment_entry);
 
             txn_mgr->CommitTxn(txn);
         }
@@ -1011,9 +1009,9 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                     auto [table_entry, status3] = txn_idx->GetTableByName(*db_name, *table_name);
                     EXPECT_TRUE(status3.ok());
 
-                    auto [tInfo, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
+                    auto [table_info, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
                     EXPECT_TRUE(status4.ok());
-                    auto col_cnt = (*tInfo).column_count_;
+                    auto col_cnt = (*table_info).column_count_;
 
                     String alias = "tb1";
                     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
@@ -1030,7 +1028,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
-                    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+                    auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
                     auto [segment_index_entries, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());
@@ -1133,7 +1131,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
             }
 
             segment_entry->FlushNewData();
-            txn->Import(table_entry, segment_entry);
+            txn->Import(*db_name, *table_name, segment_entry);
 
             txn_mgr->CommitTxn(txn);
         }
@@ -1164,9 +1162,9 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                     auto [table_entry, status3] = txn_idx->GetTableByName(*db_name, *table_name);
                     EXPECT_TRUE(status3.ok());
 
-                    auto [tInfo, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
+                    auto [table_info, status4] = txn_idx->GetTableInfo(*db_name, *table_name);
                     EXPECT_TRUE(status4.ok());
-                    auto col_cnt = (*tInfo).column_count_;
+                    auto col_cnt = (*table_info).column_count_;
 
                     String alias = "tb1";
                     SharedPtr<Vector<SharedPtr<DataType>>> types_ptr = MakeShared<Vector<SharedPtr<DataType>>>();
@@ -1183,7 +1181,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
                     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn_idx);
 
                     u64 table_idx = 0;
-                    auto table_ref = MakeShared<BaseTableRef>(table_entry, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
+                    auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_idx, names_ptr, types_ptr);
 
                     auto [_, status5] = txn_idx->CreateIndexPrepare(table_idx_entry, table_ref.get(), true, true);
                     EXPECT_TRUE(status5.ok());

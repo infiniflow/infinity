@@ -119,7 +119,7 @@ public:
 
     void UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts);
 
-    IndexReader GetIndexReader(Txn *txn);
+    SharedPtr<IndexReader> GetIndexReader(Txn *txn);
 
     // User shall call this function only once when all transactions using `GetIndexReader()` have finished.
     void Invalidate();

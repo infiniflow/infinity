@@ -32,7 +32,7 @@ module physical_cross_product;
 
 namespace infinity {
 
-void PhysicalCrossProduct::Init() {}
+void PhysicalCrossProduct::Init(QueryContext* query_context) {}
 
 bool PhysicalCrossProduct::Execute(QueryContext *, OperatorState *) {
 #if 0

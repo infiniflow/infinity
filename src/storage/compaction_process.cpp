@@ -153,7 +153,9 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
                     LOG_TRACE(fmt::format("To compact segment: {}", segment_ptr->ToString()));
                 }
 
-                compaction_tasks.emplace_back(MakeUnique<AutoCompactStatement>(table_entry, std::move(compact_segments)), txn);
+                compaction_tasks.emplace_back(
+                    MakeUnique<AutoCompactStatement>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(compact_segments)),
+                    txn);
             }
         }
     }
@@ -162,22 +164,13 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
 }
 
 void CompactionProcessor::ScanAndOptimize() {
-    Txn *opt_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanAndOptimize"), TransactionType::kNormal);
-    LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", opt_txn->BeginTS()));
-    TransactionID txn_id = opt_txn->TxnID();
-    TxnTimeStamp begin_ts = opt_txn->BeginTS();
-
-    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
-    for (auto *db_entry : db_entries) {
-        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
-        for (auto *table_entry : table_entries) {
-            table_entry->OptimizeIndex(opt_txn);
-        }
-    }
+    Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanAndOptimize"), TransactionType::kNormal);
+    LOG_INFO(fmt::format("ScanAndOptimize opt begin ts: {}", txn->BeginTS()));
+    txn->OptimizeIndexes();
     try {
-        txn_mgr_->CommitTxn(opt_txn);
+        txn_mgr_->CommitTxn(txn);
     } catch (const RecoverableException &e) {
-        txn_mgr_->RollBackTxn(opt_txn);
+        txn_mgr_->RollBackTxn(txn);
     }
 }
 

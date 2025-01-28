@@ -79,7 +79,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalMatchScanBase::GetOutputTypes() co
     return result_types;
 }
 
-TableEntry *LogicalMatchScanBase::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+TableInfo *LogicalMatchScanBase::table_info() const { return base_table_ref_->table_info_.get(); }
 
 String LogicalMatchScanBase::TableAlias() const { return base_table_ref_->alias_; }
 
@@ -101,9 +101,9 @@ String LogicalMatchScanBase::ToString(i64 &space) const {
     table_name += " - table name: ";
     table_name += this->TableAlias();
     table_name += "(";
-    table_name += *base_table_ref_->table_entry_ptr_->GetDBName();
+    table_name += *base_table_ref_->table_info_->db_name_;
     table_name += ".";
-    table_name += *base_table_ref_->table_entry_ptr_->GetTableName();
+    table_name += *base_table_ref_->table_info_->table_name_;
     table_name += ")";
     ss << table_name << std::endl;
 

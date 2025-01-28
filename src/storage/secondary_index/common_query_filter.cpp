@@ -115,8 +115,8 @@ void MergeFalseIntoBitmask(const VectorBuffer *input_bool_column_buffer,
     });
 }
 
-CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, TxnTimeStamp begin_ts)
-    : begin_ts_(begin_ts), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
+CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, Txn* txn_ptr)
+    : txn_ptr_(txn_ptr), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
     const auto &segment_index = base_table_ref_->block_index_->segment_block_index_;
     if (segment_index.empty()) {
         finish_build_.test_and_set(std::memory_order_release);
@@ -127,15 +127,21 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
         }
         total_task_num_ = tasks_.size();
     }
-    always_true_ = original_filter_ == nullptr && !base_table_ref_->table_entry_ptr_->CheckAnyDelete(begin_ts_);
+
+    auto [table_entry, status] = txn_ptr->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
+    if(!status.ok()) {
+        RecoverableError(status);
+    }
+
+    always_true_ = original_filter_ == nullptr && !table_entry->CheckAnyDelete(txn_ptr_->BeginTS());
     if (always_true_) {
         finish_build_.test_and_set(std::memory_order_release);
     }
 }
 
-void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
-    auto *buffer_mgr = txn->buffer_mgr();
-    TxnTimeStamp begin_ts = txn->BeginTS();
+void CommonQueryFilter::BuildFilter(u32 task_id) {
+    auto *buffer_mgr = txn_ptr_->buffer_mgr();
+    TxnTimeStamp begin_ts = txn_ptr_->BeginTS();
     const auto &segment_index = base_table_ref_->block_index_->segment_block_index_;
     const SegmentID segment_id = tasks_[task_id];
     const SegmentEntry *segment_entry = segment_index.at(segment_id).segment_entry_;
@@ -144,7 +150,7 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
         return;
     }
     const SizeT segment_row_count = segment_index.at(segment_id).segment_offset_;
-    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, txn);
+    Bitmask result_elem = index_filter_evaluator_->Evaluate(segment_id, segment_row_count, txn_ptr_);
     if (result_elem.CountTrue() == 0) {
         // empty result
         return;

@@ -37,7 +37,7 @@ import infinity_context;
 
 namespace infinity {
 
-void PhysicalOptimize::Init() {}
+void PhysicalOptimize::Init(QueryContext *query_context) {}
 
 bool PhysicalOptimize::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -65,27 +65,25 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
     // Get tables from catalog
     LOG_INFO(fmt::format("OptimizeIndex {}.{} begin", db_name_, table_name_));
     auto txn = query_context->GetTxn();
-    auto [table_entry, table_status] = txn->GetTableByName(db_name_, table_name_);
-
-    if (!table_status.ok()) {
-        operator_state->status_ = table_status;
-        RecoverableError(table_status);
-        return;
-    }
-
-    table_entry->OptimizeIndex(txn);
-    LOG_INFO(fmt::format("OptimizeIndex {}.{} end", db_name_, table_name_));
-}
-
-void PhysicalOptimize::OptIndex(QueryContext *query_context, OperatorState *operator_state) {
-    auto txn = query_context->GetTxn();
-    auto [table_index_entry, status] = txn->GetIndexByName(db_name_, table_name_, index_name_);
+    Status status = txn->OptimizeTableIndexes(db_name_, table_name_);
     if (!status.ok()) {
         operator_state->status_ = status;
         RecoverableError(status);
         return;
     }
-    txn->OptIndex(table_index_entry, std::move(opt_params_));
+    LOG_INFO(fmt::format("OptimizeIndex {}.{} end", db_name_, table_name_));
+}
+
+void PhysicalOptimize::OptIndex(QueryContext *query_context, OperatorState *operator_state) {
+    LOG_INFO(fmt::format("OptimizeIndex {}.{}::{} begin", db_name_, table_name_, index_name_));
+    auto txn = query_context->GetTxn();
+    Status status = txn->OptimizeIndexByName(db_name_, table_name_, index_name_, std::move(opt_params_));
+    if (!status.ok()) {
+        operator_state->status_ = status;
+        RecoverableError(status);
+        return;
+    }
+    LOG_INFO(fmt::format("OptimizeIndex {}.{}::{} end", db_name_, table_name_, index_name_));
 }
 
 } // namespace infinity

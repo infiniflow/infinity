@@ -21,7 +21,7 @@ module physical_hash;
 
 namespace infinity {
 
-void PhysicalHash::Init() {}
+void PhysicalHash::Init(QueryContext* query_context) {}
 
 bool PhysicalHash::Execute(QueryContext *, OperatorState *) { return true; }
 

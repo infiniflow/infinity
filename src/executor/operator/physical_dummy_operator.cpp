@@ -21,7 +21,7 @@ module physical_dummy_operator;
 
 namespace infinity {
 
-void PhysicalDummyOperator::Init() {}
+void PhysicalDummyOperator::Init(QueryContext* query_context) {}
 
 bool PhysicalDummyOperator::Execute(QueryContext *, OperatorState *) { return true; }
 

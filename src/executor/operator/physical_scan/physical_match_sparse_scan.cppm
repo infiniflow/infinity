@@ -45,7 +45,7 @@ public:
                             const SharedPtr<CommonQueryFilter> &common_query_filter,
                             SharedPtr<Vector<LoadMeta>> load_metas);
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 

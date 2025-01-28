@@ -21,7 +21,7 @@ module physical_intersect;
 
 namespace infinity {
 
-void PhysicalIntersect::Init() {}
+void PhysicalIntersect::Init(QueryContext* query_context) {}
 
 bool PhysicalIntersect::Execute(QueryContext *, OperatorState *) { return true; }
 

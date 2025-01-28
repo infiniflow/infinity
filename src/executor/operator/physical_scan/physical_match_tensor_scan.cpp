@@ -105,7 +105,7 @@ PhysicalMatchTensorScan::PhysicalMatchTensorScan(const u64 id,
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
 
-void PhysicalMatchTensorScan::Init() {}
+void PhysicalMatchTensorScan::Init(QueryContext *query_context) {}
 
 SharedPtr<Vector<String>> PhysicalMatchTensorScan::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
@@ -139,7 +139,7 @@ ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
 
 void PhysicalMatchTensorScan::CheckColumn() {
     search_column_id_ = src_match_tensor_expr_->column_expr_->binding().column_idx;
-    const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByIdx(search_column_id_);
+    const ColumnDef *column_def = base_table_ref_->table_info_->GetColumnDefByIdx(search_column_id_);
     const auto &column_type_ptr = column_def->type();
     if (const auto l_type = column_type_ptr->type(); l_type != LogicalType::kTensor and l_type != LogicalType::kTensorArray) {
         String error_message = fmt::format("Column {} is not a tensor or tensorarray column", column_def->name());
@@ -169,14 +169,20 @@ void PhysicalMatchTensorScan::CheckColumn() {
 
 void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
     Txn *txn = query_context->GetTxn();
+
+    auto *table_info = base_table_ref_->table_info_.get();
+    auto [table_entry, status] = txn->GetTableByName(*table_info->db_name_, *table_info->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
     const TransactionID txn_id = txn->TxnID();
     const TxnTimeStamp begin_ts = txn->BeginTS();
     const auto search_column_id = SearchColumnID();
 
-    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     Map<u32, SharedPtr<SegmentIndexEntry>> index_entry_map;
 
-    // if not ignoreing index
+    // if not ignoring index
     if (!src_match_tensor_expr_->ignore_index_) {
         auto map_guard = table_entry->IndexMetaMap();
         // if index is specified
@@ -291,7 +297,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
     Txn *txn = query_context->GetTxn();
     const TxnTimeStamp begin_ts = txn->BeginTS();
     BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
-    if (!common_query_filter_->TryFinishBuild(txn)) {
+    if (!common_query_filter_->TryFinishBuild()) {
         // not ready, abort and wait for next time
         return;
     }

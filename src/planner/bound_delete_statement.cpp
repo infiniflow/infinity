@@ -49,7 +49,7 @@ SharedPtr<LogicalNode> BoundDeleteStatement::BuildPlan(QueryContext *query_conte
     SharedPtr<LogicalNode> table_scan_node = BuildFrom(table_ref_ptr_, query_context, bind_context);
 
     auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
-    SharedPtr<LogicalNode> delete_node = MakeShared<LogicalDelete>(bind_context->GetNewLogicalNodeId(), base_table_ref->table_entry_ptr_);
+    SharedPtr<LogicalNode> delete_node = MakeShared<LogicalDelete>(bind_context->GetNewLogicalNodeId(), base_table_ref->table_info_);
 
     if (!where_conditions_.empty()) {
         SharedPtr<LogicalNode> filter_node = BuildFilter(table_scan_node, where_conditions_, query_context, bind_context);

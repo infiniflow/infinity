@@ -567,7 +567,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
         EXPECT_EQ(table_status.ok(), true);
         {
-            auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+            auto table_ref = BaseTableRef::FakeTableRef(txn, db_name, table_name);
             auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
             auto *table_index_entry = std::get<0>(result);
             auto status = std::get<1>(result);
@@ -600,7 +600,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto append_status = txn->Append(table_entry, data_block);
+            auto append_status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(append_status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -726,7 +726,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto append_status = txn->Append(table_entry, data_block);
+            auto append_status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(append_status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -821,7 +821,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto append_status = txn->Append(table_entry, data_block);
+            auto append_status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(append_status.ok());
 
             txn_mgr->CommitTxn(txn);

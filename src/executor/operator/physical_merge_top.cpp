@@ -56,8 +56,8 @@ struct VectorBlockRawIndex {
     explicit operator bool() const { return left_row_cnt_ > 0; }
 };
 
-void PhysicalMergeTop::Init() {
-    left()->Init();
+void PhysicalMergeTop::Init(QueryContext* query_context) {
+    left()->Init(query_context);
     // Initialize sort parameters
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {

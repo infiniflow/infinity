@@ -16,6 +16,8 @@ module;
 
 module base_entry;
 
+import txn_manager;
+
 namespace infinity {
 
 BaseEntry::BaseEntry(const BaseEntry &other) : deleted_(other.deleted_), entry_type_(other.entry_type_), encode_(other.encode_) {

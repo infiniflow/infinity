@@ -33,10 +33,10 @@ import index_file_worker;
 import column_def;
 import snapshot_info;
 import block_entry;
+import txn;
 
 namespace infinity {
 
-class Txn;
 class TxnManager;
 class TableIndexMeta;
 class BufferManager;
@@ -177,7 +177,7 @@ private:
 public:
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+    Vector<String> GetFilePath(Txn* txn) const final;
 
     void PickCleanup(CleanupScanner *scanner) override;
 

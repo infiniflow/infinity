@@ -344,9 +344,8 @@ TEST_P(TableTxnTest, test7) {
     Txn *new_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
     // Txn3: Get db1, NOT OK
-    auto [db_entry2, s2] = new_txn2->GetDatabase("db1");
+    Status s2 = new_txn2->GetDatabase("db1");
     EXPECT_TRUE(!s2.ok());
-    EXPECT_EQ(db_entry2, nullptr);
 
     // Txn3: Get tbl1, NOT OK
     auto [table_entry3, s3] = new_txn2->GetTableByName("db1", "tbl1");
@@ -384,9 +383,8 @@ TEST_P(TableTxnTest, test8) {
     Txn *new_txn3 = txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kRead);
 
     // Txn3: Get db1, OK
-    auto [db_entry, s2] = new_txn3->GetDatabase("db1");
+    Status s2 = new_txn3->GetDatabase("db1");
     EXPECT_TRUE(s2.ok());
-    EXPECT_NE(db_entry, nullptr);
 
     // Txn3: Get tbl1, NOT OK
     auto [table_entry3, s3] = new_txn3->GetTableByName("db1", "tbl1");

@@ -99,7 +99,7 @@ public:
 
     ~PhysicalLimit() final = default;
 
-    void Init() final;
+    void Init(QueryContext* query_context) final;
 
     static bool Execute(QueryContext *query_context,
                         const Vector<UniquePtr<DataBlock>> &input_blocks,

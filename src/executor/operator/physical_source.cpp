@@ -51,7 +51,7 @@ String ToString(SourceType source_type) {
     }
 }
 
-void PhysicalSource::Init() {}
+void PhysicalSource::Init(QueryContext* query_context) {}
 
 bool PhysicalSource::Execute(QueryContext *, OperatorState *) { return true; }
 

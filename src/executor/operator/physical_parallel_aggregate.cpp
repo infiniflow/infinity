@@ -21,7 +21,7 @@ module physical_parallel_aggregate;
 
 namespace infinity {
 
-void PhysicalParallelAggregate::Init() {}
+void PhysicalParallelAggregate::Init(QueryContext* query_context) {}
 
 bool PhysicalParallelAggregate::Execute(QueryContext *, OperatorState *) { return true; }
 

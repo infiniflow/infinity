@@ -33,7 +33,7 @@ import infinity_context;
 
 namespace infinity {
 
-void PhysicalDropTable::Init() {}
+void PhysicalDropTable::Init(QueryContext* query_context) {}
 
 bool PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

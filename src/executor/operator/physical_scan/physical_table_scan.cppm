@@ -25,7 +25,7 @@ import physical_operator_type;
 import global_block_id;
 import table_function;
 import base_table_ref;
-import table_entry;
+import meta_info;
 import block_index;
 import load_meta;
 import internal_types;
@@ -47,7 +47,7 @@ public:
 
     ~PhysicalTableScan() override = default;
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
@@ -58,8 +58,6 @@ public:
     String table_alias() const;
 
     u64 TableIndex() const;
-
-    TableEntry *TableEntry() const;
 
     SizeT BlockEntryCount() const;
 

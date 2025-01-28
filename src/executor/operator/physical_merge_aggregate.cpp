@@ -38,7 +38,7 @@ namespace infinity {
 template <typename T>
 using MathOperation = std::function<T(T, T)>;
 
-void PhysicalMergeAggregate::Init() {}
+void PhysicalMergeAggregate::Init(QueryContext* query_context) {}
 
 bool PhysicalMergeAggregate::Execute(QueryContext *query_context, OperatorState *operator_state) {
 

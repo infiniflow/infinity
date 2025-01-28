@@ -23,7 +23,7 @@ import logical_node;
 import data_type;
 import internal_types;
 import statement_common;
-import table_entry;
+import meta_info;
 import block_index;
 
 namespace infinity {
@@ -31,7 +31,7 @@ namespace infinity {
 export class LogicalExport : public LogicalNode {
 public:
     explicit LogicalExport(u64 node_id,
-                           TableEntry *table_entry,
+                           const SharedPtr<TableInfo> &table_info,
                            String schema_name,
                            String table_name,
                            String file_path,
@@ -43,7 +43,7 @@ public:
                            SizeT row_limit,
                            Vector<u64> column_idx_array,
                            SharedPtr<BlockIndex> block_index)
-        : LogicalNode(node_id, LogicalNodeType::kExport), table_entry_(table_entry), schema_name_(std::move(schema_name)),
+        : LogicalNode(node_id, LogicalNodeType::kExport), table_info_(table_info), schema_name_(std::move(schema_name)),
           table_name_(std::move(table_name)), file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type),
           offset_(offset), limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)),
           block_index_(std::move(block_index)) {}
@@ -58,9 +58,9 @@ public:
 
     inline String name() final { return "LogicalExport"; }
 
-    inline const TableEntry *table_entry() const { return table_entry_; }
+    const SharedPtr<TableInfo>& table_info() const { return table_info_; }
 
-    inline TableEntry *table_entry() { return table_entry_; }
+    SharedPtr<TableInfo> table_info() { return table_info_; }
 
     [[nodiscard]] CopyFileType FileType() const { return file_type_; }
 
@@ -85,7 +85,7 @@ public:
     [[nodiscard]] SharedPtr<BlockIndex> block_index() const { return block_index_; }
 
 private:
-    TableEntry *table_entry_{};
+    SharedPtr<TableInfo> table_info_{};
 
     String schema_name_{"default_db"};
     String table_name_{};
