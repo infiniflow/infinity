@@ -630,7 +630,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildUnnest(SharedPtr<LogicalNode> 
                                                          QueryContext *query_context,
                                                          const SharedPtr<BindContext> &bind_context) {
     // SharedPtr<LogicalUnnest> unnest
-    auto unnest = MakeShared<LogicalUnnest>(bind_context->GetNewLogicalNodeId(), expressions);
+    expressions = {bind_context->unnest_exprs_};
+    SizeT unnest_idx = bind_context->unnest_table_index_;
+    auto unnest = MakeShared<LogicalUnnest>(bind_context->GetNewLogicalNodeId(), expressions, unnest_idx);
     return unnest;
 }
 

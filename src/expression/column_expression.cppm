@@ -82,7 +82,6 @@ public:
 
     bool Eq(const BaseExpression &other) const override;
 
-private:
     String ToString() const final;
 
 private:

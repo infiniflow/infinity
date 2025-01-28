@@ -22,10 +22,19 @@ import stl;
 import column_binding;
 import logical_node;
 import internal_types;
+import expression_type;
+import column_expression;
 
 namespace infinity {
 
-Vector<ColumnBinding> LogicalUnnest::GetColumnBindings() const { return LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this); }
+Vector<ColumnBinding> LogicalUnnest::GetColumnBindings() const {
+    Vector<ColumnBinding> result;
+    SizeT unnest_count = expression_list_.size();
+    for (SizeT i = 0; i < unnest_count; ++i) {
+        result.emplace_back(unnest_idx_, i);
+    }
+    return result;
+}
 
 SharedPtr<Vector<String>> LogicalUnnest::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 

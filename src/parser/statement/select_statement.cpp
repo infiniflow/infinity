@@ -39,14 +39,6 @@ SelectStatement::~SelectStatement() {
         highlight_list_ = nullptr;
     }
 
-    if (unnest_expr_list_ != nullptr) {
-        for (auto &expr_ptr : *unnest_expr_list_) {
-            delete expr_ptr;
-        }
-        delete unnest_expr_list_;
-        unnest_expr_list_ = nullptr;
-    }
-
     if (search_expr_ != nullptr) {
         delete search_expr_;
         search_expr_ = nullptr;

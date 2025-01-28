@@ -28,8 +28,8 @@ namespace infinity {
 
 export class LogicalUnnest : public LogicalNode {
 public:
-    explicit LogicalUnnest(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions)
-        : LogicalNode(node_id, LogicalNodeType::kUnnest), expression_list_(std::move(expressions)) {}
+    explicit LogicalUnnest(u64 node_id, Vector<SharedPtr<BaseExpression>> expressions, u64 unnest_idx)
+        : LogicalNode(node_id, LogicalNodeType::kUnnest), expression_list_(std::move(expressions)), unnest_idx_(unnest_idx) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const;
 
@@ -41,11 +41,15 @@ public:
 
     inline String name() final { return "LogicalUnnest"; }
 
+public:
+    // getter
     Vector<SharedPtr<BaseExpression>> &expression_list() { return expression_list_; }
     const Vector<SharedPtr<BaseExpression>> &expression_list() const { return expression_list_; }
+    u64 unnest_idx() const { return unnest_idx_; }
 
 private:
     Vector<SharedPtr<BaseExpression>> expression_list_{};
+    u64 unnest_idx_{};
 };
 
 } // namespace infinity

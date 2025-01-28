@@ -47,7 +47,7 @@ public:
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
 
-    inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+    SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
     SizeT TaskletCount() override { return left_->TaskletCount(); }
 

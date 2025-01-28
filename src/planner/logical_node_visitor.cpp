@@ -198,7 +198,15 @@ void LogicalNodeVisitor::VisitNodeExpression(LogicalNode &op) {
 void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) {
     SharedPtr<BaseExpression> result;
     switch (expression->type()) {
-
+        case ExpressionType::kUnnest: {
+            auto unnest_expression = static_pointer_cast<UnnestExpression>(expression);
+            VisitExpression(unnest_expression->arguments()[0]);
+            result = VisitReplace(unnest_expression);
+            if (result.get() != nullptr) {
+                expression = result;
+            }
+            break;
+        }
         case ExpressionType::kAggregate: {
             auto aggregate_expression = static_pointer_cast<AggregateExpression>(expression);
             for (auto &argument : aggregate_expression->arguments()) {
@@ -464,5 +472,7 @@ SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<InExp
 SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<SubqueryExpression> &) { return nullptr; }
 
 SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<KnnExpression> &) { return nullptr; }
+
+SharedPtr<BaseExpression> LogicalNodeVisitor::VisitReplace(const SharedPtr<UnnestExpression> &) { return nullptr; }
 
 } // namespace infinity

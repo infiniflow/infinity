@@ -109,5 +109,8 @@ export enum class ExpressionType {
 
     // Fulltext filter
     kFilterFullText,
+
+    // Unnest
+    kUnnest,
 };
 }

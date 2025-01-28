@@ -1,0 +1,27 @@
+statement ok
+DROP TABLE IF EXISTS test_unnest;
+
+statement ok
+CREATE TABLE test_unnest (c1 INT, c2 ARRAY(INT));
+
+statement ok
+INSERT INTO test_unnest VALUES
+(1, {0, 1}),
+(2, {2, 3}),
+(3, {0, 1, 2}),
+(4, {0, 2, 3});
+
+
+query IT
+SELECT unnest(c2) FROM test_unnest;
+----
+0
+1
+2
+3
+0
+1
+2
+0
+2
+3
