@@ -1164,11 +1164,11 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    auto [table_info, status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    status = table_entry->AddWriteTxnNum(txn);
+    status = txn->AddWriteTxnNum(statement->schema_name_, statement->table_name_);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1180,7 +1180,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     }
 
     SharedPtr<LogicalNode> logical_import = MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                      table_entry,
+                                                                      table_info,
                                                                       statement->file_path_,
                                                                       statement->header_,
                                                                       statement->delimiter_,

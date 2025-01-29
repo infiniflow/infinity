@@ -1970,12 +1970,12 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<V
 
     {
         SharedPtr<String> schema_name =
-            MakeShared<String>(String(intent_size, ' ') + " - database name: " + *import_node->table_entry()->GetDBName());
+            MakeShared<String>(String(intent_size, ' ') + " - database name: " + *(import_node->table_info()->db_name_));
         result->emplace_back(schema_name);
     }
 
     {
-        SharedPtr<String> table_name = MakeShared<String>(String(intent_size, ' ') + " - table name: " + *import_node->table_entry()->GetTableName());
+        SharedPtr<String> table_name = MakeShared<String>(String(intent_size, ' ') + " - table name: " + *(import_node->table_info()->table_name_));
         result->emplace_back(table_name);
     }
 

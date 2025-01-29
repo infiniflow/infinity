@@ -639,6 +639,16 @@ Status Txn::AddWriteTxnNum(const String &db_name, const String &table_name) {
     return table_entry->AddWriteTxnNum(this);
 }
 
+Tuple<SharedPtr<SegmentEntry>, Status> Txn::MakeNewSegment(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    u64 segment_id = Catalog::GetNextSegmentID(table_entry);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, this);
+    return {segment_entry, Status::OK()};
+}
+
 Status Txn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: CreateView"};
 }

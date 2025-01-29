@@ -72,7 +72,7 @@ import infinity_context;
 
 namespace infinity {
 
-void PhysicalImport::Init(QueryContext* query_context) {}
+void PhysicalImport::Init(QueryContext *query_context) {}
 
 /**
  * @brief copy statement execute function
@@ -134,11 +134,11 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
 }
 
 void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
-    if (table_entry_->ColumnCount() != 1) {
+    if (table_info_->column_count_ != 1) {
         Status status = Status::ImportFileFormatError("FVECS file must have only one column.");
         RecoverableError(status);
     }
-    auto &column_type = table_entry_->GetColumnDefByIdx(0)->column_type_;
+    auto &column_type = table_info_->GetColumnDefByIdx(0)->column_type_;
     if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("FVECS file must have only one embedding column.");
         RecoverableError(status);
@@ -189,9 +189,14 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
 
     Txn *txn = query_context->GetTxn();
 
-    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
-    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+    auto [segment_entry, segment_status] = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+    if (!segment_status.ok()) {
+        RecoverableError(segment_status);
+    }
+
+    //    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
+    //    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_info_->column_count_, txn);
     try {
         BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
         SizeT row_idx = 0;
@@ -214,20 +219,24 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
 
             if (row_idx == vector_n) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
-                SaveSegmentData(table_entry_, txn, segment_entry);
+                SaveSegmentData(table_info_.get(), txn, segment_entry);
                 break;
             }
 
             if (block_entry->GetAvailableCapacity() <= 0) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 if (segment_entry->Room() <= 0) {
-                    SaveSegmentData(table_entry_, txn, segment_entry);
+                    SaveSegmentData(table_info_.get(), txn, segment_entry);
 
-                    segment_id = Catalog::GetNextSegmentID(table_entry_);
-                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+                    std::tie(segment_entry, segment_status) = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+                    if (!segment_status.ok()) {
+                        RecoverableError(segment_status);
+                    }
+                    //                    segment_id = Catalog::GetNextSegmentID(table_entry_);
+                    //                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
                 }
 
-                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_info_->column_count_, txn);
                 buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
                 buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
             }
@@ -242,11 +251,11 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
 }
 
 void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
-    if (table_entry_->ColumnCount() != 1) {
+    if (table_info_->column_count_ != 1) {
         Status status = Status::ImportFileFormatError("BVECS file must have only one column.");
         RecoverableError(status);
     }
-    auto &column_type = table_entry_->GetColumnDefByIdx(0)->column_type_;
+    auto &column_type = table_info_->GetColumnDefByIdx(0)->column_type_;
     if (column_type->type() != LogicalType::kEmbedding) {
         Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column.");
         RecoverableError(status);
@@ -297,9 +306,13 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
 
     Txn *txn = query_context->GetTxn();
 
-    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
-    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+    auto [segment_entry, segment_status] = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+    if (!segment_status.ok()) {
+        RecoverableError(segment_status);
+    }
+    //    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
+    //    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_info_->column_count_, txn);
     try {
         BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
         SizeT row_idx = 0;
@@ -331,20 +344,23 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
 
             if (row_idx == vector_n) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
-                SaveSegmentData(table_entry_, txn, segment_entry);
+                SaveSegmentData(table_info_.get(), txn, segment_entry);
                 break;
             }
 
             if (block_entry->GetAvailableCapacity() <= 0) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 if (segment_entry->Room() <= 0) {
-                    SaveSegmentData(table_entry_, txn, segment_entry);
-
-                    segment_id = Catalog::GetNextSegmentID(table_entry_);
-                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+                    SaveSegmentData(table_info_.get(), txn, segment_entry);
+                    std::tie(segment_entry, segment_status) = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+                    if (!segment_status.ok()) {
+                        RecoverableError(segment_status);
+                    }
+                    //                    segment_id = Catalog::GetNextSegmentID(table_entry_);
+                    //                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
                 }
 
-                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_info_->column_count_, txn);
                 buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
                 buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
             }
@@ -395,11 +411,11 @@ UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo 
 }
 
 void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state) {
-    if (table_entry_->ColumnCount() != 1) {
+    if (table_info_->column_count_ != 1) {
         Status status = Status::ImportFileFormatError("CSR file must have only one column.");
         RecoverableError(status);
     }
-    auto &column_type = table_entry_->GetColumnDefByIdx(0)->column_type_;
+    auto &column_type = table_info_->GetColumnDefByIdx(0)->column_type_;
     if (column_type->type() != LogicalType::kSparse) {
         Status status = Status::ImportFileFormatError("CSR file must have only one sparse column.");
         RecoverableError(status);
@@ -452,9 +468,13 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
     Txn *txn = query_context->GetTxn();
     auto *buffer_mgr = txn->buffer_mgr();
 
-    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
-    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+    auto [segment_entry, segment_status] = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+    if (!segment_status.ok()) {
+        RecoverableError(segment_status);
+    }
+    //    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
+    //    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_info_->column_count_, txn);
     try {
         auto column_vector = MakeShared<ColumnVector>(block_entry->GetColumnVector(buffer_mgr, 0));
 
@@ -478,18 +498,21 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
             ++row_id;
             if (row_id == nrow) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
-                SaveSegmentData(table_entry_, txn, segment_entry);
+                SaveSegmentData(table_info_.get(), txn, segment_entry);
                 break;
             }
             if (block_entry->GetAvailableCapacity() <= 0) {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 if (segment_entry->Room() <= 0) {
-                    SaveSegmentData(table_entry_, txn, segment_entry);
-
-                    segment_id = Catalog::GetNextSegmentID(table_entry_);
-                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+                    SaveSegmentData(table_info_.get(), txn, segment_entry);
+                    std::tie(segment_entry, segment_status) = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+                    if (!segment_status.ok()) {
+                        RecoverableError(segment_status);
+                    }
+                    //                    segment_id = Catalog::GetNextSegmentID(table_entry_);
+                    //                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
                 }
-                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_info_->column_count_, txn);
                 column_vector = MakeShared<ColumnVector>(block_entry->GetColumnVector(buffer_mgr, 0));
             }
         }
@@ -516,15 +539,20 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     Txn *txn = query_context->GetTxn();
     {
         auto *buffer_mgr = txn->buffer_mgr();
-        u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-        SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
-        UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+        auto [segment_entry, segment_status] = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+        if (!segment_status.ok()) {
+            RecoverableError(segment_status);
+        }
+        //        u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+        //        SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+        UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_info_->column_count_, txn);
         Vector<ColumnVector> column_vectors;
-        int column_count = table_entry_->ColumnCount();
+        int column_count = table_info_->column_count_;
         for (int i = 0; i < column_count; ++i) {
             column_vectors.emplace_back(block_entry->GetColumnVector(buffer_mgr, i));
         }
-        parser_context = MakeUnique<ZxvParserCtx>(table_entry_, txn, segment_entry, std::move(block_entry), std::move(column_vectors), delimiter_);
+        parser_context =
+            MakeUnique<ZxvParserCtx>(table_info_.get(), txn, segment_entry, std::move(block_entry), std::move(column_vectors), delimiter_);
     }
 
     auto opts = MakeUnique<ZsvOpts>();
@@ -571,7 +599,7 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
             parser_context->column_vectors_.clear();
             std::move(*segment_entry).Cleanup();
         } else {
-            SaveSegmentData(table_entry_, txn, segment_entry);
+            SaveSegmentData(table_info_.get(), txn, segment_entry);
         }
     }
     fclose(fp);
@@ -593,12 +621,16 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     UniquePtr<StreamReader> stream_reader = VirtualStore::OpenStreamReader(file_path_);
 
     Txn *txn = query_context->GetTxn();
-    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
-    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+    auto [segment_entry, segment_status] = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+    if (!segment_status.ok()) {
+        RecoverableError(segment_status);
+    }
+    //    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+    //    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_info_->column_count_, txn);
 
     Vector<ColumnVector> column_vectors;
-    for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+    for (i64 i = 0; i < table_info_->column_count_; ++i) {
         column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
     }
 
@@ -623,14 +655,18 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 if (segment_entry->Room() <= 0) {
                     LOG_DEBUG(fmt::format("Segment {} saved, total rows: {}", segment_entry->segment_id(), row_count));
-                    SaveSegmentData(table_entry_, txn, segment_entry);
-                    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+                    SaveSegmentData(table_info_.get(), txn, segment_entry);
+                    std::tie(segment_entry, segment_status) = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+                    if (!segment_status.ok()) {
+                        RecoverableError(segment_status);
+                    }
+                    //                    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+                    //                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
                 }
 
-                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_info_->column_count_, txn);
                 column_vectors.clear();
-                for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+                for (i64 i = 0; i < table_info_->column_count_; ++i) {
                     column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
                 }
             }
@@ -644,7 +680,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
             if (segment_entry->row_count() == 0) {
                 std::move(*segment_entry).Cleanup();
             } else {
-                SaveSegmentData(table_entry_, txn, segment_entry);
+                SaveSegmentData(table_info_.get(), txn, segment_entry);
                 LOG_DEBUG(fmt::format("Last segment {} saved, total rows: {}", segment_entry->segment_id(), row_count));
             }
             break;
@@ -687,12 +723,16 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
     }
 
     Txn *txn = query_context->GetTxn();
-    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
-    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+    auto [segment_entry, segment_status] = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+    if (!segment_status.ok()) {
+        RecoverableError(segment_status);
+    }
+    //    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+    //    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_info_->column_count_, txn);
 
     Vector<ColumnVector> column_vectors;
-    for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+    for (i64 i = 0; i < table_info_->column_count_; ++i) {
         column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
     }
 
@@ -709,14 +749,18 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
             segment_entry->AppendBlockEntry(std::move(block_entry));
             if (segment_entry->Room() <= 0) {
                 LOG_DEBUG(fmt::format("Segment {} saved", segment_entry->segment_id()));
-                SaveSegmentData(table_entry_, txn, segment_entry);
-                u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+                SaveSegmentData(table_info_.get(), txn, segment_entry);
+                std::tie(segment_entry, segment_status) = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+                if (!segment_status.ok()) {
+                    RecoverableError(segment_status);
+                }
+                //                u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+                //                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
             }
 
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_info_->column_count_, txn);
             column_vectors.clear();
-            for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+            for (i64 i = 0; i < table_info_->column_count_; ++i) {
                 column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
             }
         }
@@ -733,7 +777,7 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
     }
 
     segment_entry->AppendBlockEntry(std::move(block_entry));
-    SaveSegmentData(table_entry_, txn, segment_entry);
+    SaveSegmentData(table_info_.get(), txn, segment_entry);
 
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
     import_op_state->result_msg_ = std::move(result_msg);
@@ -744,7 +788,7 @@ void PhysicalImport::CSVHeaderHandler(void *context) {
     ZsvParser &parser = parser_context->parser_;
     SizeT csv_column_count = parser.CellCount();
 
-    SizeT table_column_count = parser_context->table_entry_->ColumnCount();
+    SizeT table_column_count = parser_context->table_info_->column_count_;
     if (csv_column_count != table_column_count) {
         parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column count ({} != {})", csv_column_count, table_column_count));
 
@@ -755,7 +799,7 @@ void PhysicalImport::CSVHeaderHandler(void *context) {
     // Not check the header column name
     for (SizeT idx = 0; idx < csv_column_count; ++idx) {
         auto *csv_col_name = reinterpret_cast<const char *>(parser.GetCellStr(idx));
-        const char *table_col_name = parser_context->table_entry_->GetColumnDefByIdx(idx)->name().c_str();
+        const char *table_col_name = parser_context->table_info_->GetColumnDefByIdx(idx)->name().c_str();
         if (!strcmp(csv_col_name, table_col_name)) {
             parser_context->err_msg_ = MakeShared<String>(fmt::format("Unmatched column name({} != {})", csv_col_name, table_col_name));
 
@@ -771,7 +815,7 @@ void PhysicalImport::CSVHeaderHandler(void *context) {
 void PhysicalImport::CSVRowHandler(void *context) {
     ZxvParserCtx *parser_context = static_cast<ZxvParserCtx *>(context);
 
-    auto *table_entry = parser_context->table_entry_;
+    auto *table_info = parser_context->table_info_;
     SizeT column_count = parser_context->parser_.CellCount();
 
     auto *txn = parser_context->txn_;
@@ -781,12 +825,12 @@ void PhysicalImport::CSVRowHandler(void *context) {
     UniquePtr<BlockEntry> &block_entry = parser_context->block_entry_;
 
     // if column count is larger than columns defined from schema, extra columns are abandoned
-    if (column_count > table_entry->ColumnCount()) {
+    if (column_count > SizeT(table_info->column_count_)) {
         UniquePtr<String> err_msg = MakeUnique<String>(
             fmt::format("CSV file column count isn't match with table schema, row id: {}, column_count: {}, table_entry->ColumnCount: {}.",
                         parser_context->row_count_,
                         column_count,
-                        table_entry->ColumnCount()));
+                        table_info->column_count_));
         for (SizeT i = 0; i < column_count; ++i) {
             ZsvCell cell = parser_context->parser_.GetCell(i);
             LOG_ERROR(fmt::format("Column {}: {}", i, std::string_view((char *)cell.str, cell.len)));
@@ -802,7 +846,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
         ZsvCell cell = parser_context->parser_.GetCell(column_idx);
         std::string_view str_view{};
-        auto column_def = table_entry->GetColumnDefByIdx(column_idx);
+        auto column_def = table_info->GetColumnDefByIdx(column_idx);
         if (cell.len) {
             str_view = std::string_view((char *)cell.str, cell.len);
             auto &column_vector = parser_context->column_vectors_[column_idx];
@@ -821,8 +865,8 @@ void PhysicalImport::CSVRowHandler(void *context) {
             }
         }
     }
-    for (SizeT column_idx = column_count; column_idx < table_entry->ColumnCount(); ++column_idx) {
-        auto column_def = table_entry->GetColumnDefByIdx(column_idx);
+    for (i64 column_idx = column_count; column_idx < table_info->column_count_; ++column_idx) {
+        auto column_def = table_info->GetColumnDefByIdx(column_idx);
         auto &column_vector = parser_context->column_vectors_[column_idx];
         if (column_def->has_default_value()) {
             auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
@@ -839,7 +883,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
                                                                       column_def->name_,
                                                                       column_idx,
                                                                       parser_context->row_count_,
-                                                                      table_entry->ColumnCount(),
+                                                                      table_info->column_count_,
                                                                       column_count,
                                                                       parsed_row));
             RecoverableError(status);
@@ -854,13 +898,18 @@ void PhysicalImport::CSVRowHandler(void *context) {
         // we have already used all space of the segment
         if (segment_entry->Room() <= 0) {
             LOG_DEBUG(fmt::format("Segment {} saved", segment_entry->segment_id()));
-            SaveSegmentData(table_entry, txn, segment_entry);
-            u64 segment_id = Catalog::GetNextSegmentID(parser_context->table_entry_);
-            segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            SaveSegmentData(table_info, txn, segment_entry);
+            Status segment_status{Status::OK()};
+            std::tie(segment_entry, segment_status) = txn->MakeNewSegment(*table_info->db_name_, *table_info->table_name_);
+            if (!segment_status.ok()) {
+                RecoverableError(segment_status);
+            }
+            //            u64 segment_id = Catalog::GetNextSegmentID(parser_context->table_entry_);
+            //            segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
             parser_context->segment_entry_ = segment_entry;
         }
 
-        block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry->ColumnCount(), txn);
+        block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_info->column_count_, txn);
         parser_context->column_vectors_.clear();
         for (SizeT i = 0; i < column_count; ++i) {
             parser_context->column_vectors_.emplace_back(block_entry->GetColumnVector(buffer_mgr, i));
@@ -1071,7 +1120,7 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
 
 void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors) {
     for (SizeT i = 0; auto &column_vector : column_vectors) {
-        const ColumnDef *column_def = table_entry_->GetColumnDefByIdx(i++);
+        const ColumnDef *column_def = table_info_->GetColumnDefByIdx(i++);
 
         if (line_json.contains(column_def->name_)) {
             switch (column_vector.data_type()->type()) {
@@ -1325,14 +1374,14 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
 
 namespace {
 
-Status CheckParquetColumns(TableEntry *table_entry, arrow::ParquetFileReader *arrow_reader) {
+Status CheckParquetColumns(TableInfo *table_info, arrow::ParquetFileReader *arrow_reader) {
     SharedPtr<arrow::Schema> schema;
     arrow::Status status = arrow_reader->GetSchema(&schema);
     if (!status.ok()) {
         return Status::ImportFileFormatError(status.ToString());
     }
     const arrow::FieldVector &fields = schema->fields();
-    const Vector<SharedPtr<ColumnDef>> &column_defs = table_entry->column_defs();
+    const Vector<SharedPtr<ColumnDef>> &column_defs = table_info->column_defs_;
     if (fields.size() != column_defs.size()) {
         return Status::ColumnCountMismatch(fmt::format("Column count mismatch: {} != {}", fields.size(), column_defs.size()));
     }
@@ -1375,7 +1424,7 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
     }
     std::unique_ptr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
 
-    if (Status status = CheckParquetColumns(table_entry_, arrow_reader.get()); !status.ok()) {
+    if (Status status = CheckParquetColumns(table_info_.get(), arrow_reader.get()); !status.ok()) {
         RecoverableError(status);
     }
 
@@ -1385,15 +1434,19 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
     }
 
     Txn *txn = query_context->GetTxn();
-    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
     SizeT row_count = 0;
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    auto [segment_entry, segment_status] = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+    if (!segment_status.ok()) {
+        RecoverableError(segment_status);
+    }
+    //    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+    //    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry{};
     Vector<ColumnVector> column_vectors;
     auto init_column_vectors_and_block_entry = [&] {
-        block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+        block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_info_->column_count_, txn);
         column_vectors.clear();
-        for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+        for (i64 i = 0; i < table_info_->column_count_; ++i) {
             column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
         }
     };
@@ -1425,9 +1478,13 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
                 if (block_entry->GetAvailableCapacity() <= 0) {
                     segment_entry->AppendBlockEntry(std::move(block_entry));
                     if (segment_entry->Room() <= 0) {
-                        SaveSegmentData(table_entry_, txn, segment_entry);
-                        segment_id = Catalog::GetNextSegmentID(table_entry_);
-                        segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+                        SaveSegmentData(table_info_.get(), txn, segment_entry);
+                        std::tie(segment_entry, segment_status) = txn->MakeNewSegment(*table_info_->db_name_, *table_info_->table_name_);
+                        if (!segment_status.ok()) {
+                            RecoverableError(segment_status);
+                        }
+                        //                        segment_id = Catalog::GetNextSegmentID(table_entry_);
+                        //                        segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
                     }
                     init_column_vectors_and_block_entry();
                 }
@@ -1440,7 +1497,7 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
         segment_entry->AppendBlockEntry(std::move(block_entry));
     }
     if (segment_entry->row_count() > 0) {
-        SaveSegmentData(table_entry_, txn, segment_entry);
+        SaveSegmentData(table_info_.get(), txn, segment_entry);
     }
 
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
@@ -2250,9 +2307,9 @@ Value GetValueFromParquetRecursively(const DataType &data_type, const SharedPtr<
     }
 }
 
-void PhysicalImport::SaveSegmentData(TableEntry *table_entry, Txn *txn, SharedPtr<SegmentEntry> segment_entry) {
+void PhysicalImport::SaveSegmentData(TableInfo *table_info, Txn *txn, SharedPtr<SegmentEntry> segment_entry) {
     segment_entry->FlushNewData();
-    txn->Import(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(segment_entry));
+    txn->Import(*table_info->db_name_, *table_info->table_name_, std::move(segment_entry));
 }
 
 } // namespace infinity

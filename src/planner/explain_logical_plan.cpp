@@ -2319,13 +2319,13 @@ Status ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<V
 
     {
         SharedPtr<String> schema_name =
-            MakeShared<String>(fmt::format("{} - database name: {}", String(intent_size, ' '), *import_node->table_entry()->GetDBName()));
+            MakeShared<String>(fmt::format("{} - database name: {}", String(intent_size, ' '), *(import_node->table_info()->db_name_)));
         result->emplace_back(schema_name);
     }
 
     {
         SharedPtr<String> table_name =
-            MakeShared<String>(fmt::format("{} - table name: {}", String(intent_size, ' '), *import_node->table_entry()->GetTableName()));
+            MakeShared<String>(fmt::format("{} - table name: {}", String(intent_size, ' '), *(import_node->table_info()->table_name_)));
         result->emplace_back(table_name);
     }
 
