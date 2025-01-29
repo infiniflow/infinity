@@ -577,6 +577,14 @@ Tuple<Vector<SharedPtr<BlockInfo>>, Status> Txn::GetBlocksInfo(const String &db_
     return catalog_->GetBlocksInfo(db_name, table_name, segment_id, this);
 }
 
+Status Txn::CheckTableExist(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 bool Txn::CheckTableHasDelete(const String &db_name, const String &table_name) {
     auto [table_entry, status] = this->GetTableByName(db_name, table_name);
     if (!status.ok()) {

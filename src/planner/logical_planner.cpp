@@ -1332,7 +1332,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             if (unlock_table->db_name().empty()) {
                 unlock_table->SetDBName(query_context_ptr_->schema_name());
             }
-            auto [table_entry, status] = txn->GetTableByName(unlock_table->db_name(), unlock_table->table_name());
+            Status status = txn->CheckTableExist(unlock_table->db_name(), unlock_table->table_name());
             if (!status.ok()) {
                 return status;
             }
