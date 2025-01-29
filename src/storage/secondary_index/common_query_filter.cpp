@@ -115,7 +115,7 @@ void MergeFalseIntoBitmask(const VectorBuffer *input_bool_column_buffer,
     });
 }
 
-CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, Txn* txn_ptr)
+CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, Txn *txn_ptr)
     : txn_ptr_(txn_ptr), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
     const auto &segment_index = base_table_ref_->block_index_->segment_block_index_;
     if (segment_index.empty()) {
@@ -128,12 +128,8 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
         total_task_num_ = tasks_.size();
     }
 
-    auto [table_entry, status] = txn_ptr->GetTableByName(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
-    if(!status.ok()) {
-        RecoverableError(status);
-    }
-
-    always_true_ = original_filter_ == nullptr && !table_entry->CheckAnyDelete(txn_ptr_->BeginTS());
+    always_true_ = original_filter_ == nullptr &&
+                   !txn_ptr->CheckTableHasDelete(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
     if (always_true_) {
         finish_build_.test_and_set(std::memory_order_release);
     }
