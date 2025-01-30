@@ -347,14 +347,28 @@ Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name,
     return db_entry->GetTableInfo(table_name, txn);
 }
 
-Tuple<SharedPtr<BlockInfo>, Status>
-Catalog::GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, Txn *txn) {
-    auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return {nullptr, status};
+Tuple<Vector<SharedPtr<SegmentInfo>>, Status>
+Catalog::GetSegmentsInfo(const String &db_name, const String &table_name, Txn* txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {Vector<SharedPtr<SegmentInfo>>(), table_status};
     }
 
-    auto segment_entry = table_entry->GetSegmentByID(segment_id, txn->BeginTS());
+    return {table_entry->GetSegmentsInfo(txn_ptr), Status::OK()};
+}
+
+Tuple<SharedPtr<BlockInfo>, Status>
+Catalog::GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+
+    auto segment_entry = table_entry->GetSegmentByID(segment_id, txn_ptr->BeginTS());
     if (!segment_entry) {
         return {nullptr, Status::SegmentNotExist(segment_id)};
     }
@@ -364,23 +378,25 @@ Catalog::GetBlockInfo(const String &db_name, const String &table_name, SegmentID
         return {nullptr, Status::BlockNotExist(block_id)};
     }
 
-    return {block_entry->GetBlockInfo(txn), Status::OK()};
+    return {block_entry->GetBlockInfo(txn_ptr), Status::OK()};
 }
 
-Tuple<Vector<SharedPtr<BlockInfo>>, Status> Catalog::GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn) {
+Tuple<Vector<SharedPtr<BlockInfo>>, Status> Catalog::GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn_ptr) {
 
     Vector<SharedPtr<BlockInfo>> null_result;
-    auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
-    if (!status.ok()) {
-        return {null_result, status};
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {null_result, table_status};
     }
 
-    auto segment_entry = table_entry->GetSegmentByID(segment_id, txn->BeginTS());
+    auto segment_entry = table_entry->GetSegmentByID(segment_id, txn_ptr->BeginTS());
     if (!segment_entry) {
         return {null_result, Status::SegmentNotExist(segment_id)};
     }
 
-    return {segment_entry->GetBlocksInfo(txn), Status::OK()};
+    return {segment_entry->GetBlocksInfo(txn_ptr), Status::OK()};
 }
 
 Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {

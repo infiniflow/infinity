@@ -1994,7 +1994,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [segment_info_list, status] = txn->GetSegmentsInfo(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2012,7 +2012,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
-    for (auto &[_, segment_entry] : table_entry->segment_map()) {
+    for (auto &segment_info : segment_info_list) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -2020,14 +2020,14 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         SizeT column_id = 0;
         {
-            Value value = Value::MakeBigInt(segment_entry->segment_id());
+            Value value = Value::MakeBigInt(segment_info->segment_id_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_entry->status()));
+            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_info->status_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2035,11 +2035,11 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         ++column_id;
         {
             String segment_size_str;
-            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
+            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_info->segment_dir_;
             if (query_context->persistence_manager() == nullptr) {
                 segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             } else {
-                Vector<String> paths = segment_entry->GetFilePath(txn);
+                const Vector<String>& paths = segment_info->files_;
                 SizeT segment_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);

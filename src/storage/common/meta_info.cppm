@@ -23,6 +23,8 @@ export module meta_info;
 
 namespace infinity {
 
+enum class SegmentStatus;
+
 export struct DatabaseInfo {
     SharedPtr<String> db_name_{};
     SharedPtr<String> db_entry_dir_{};
@@ -60,6 +62,19 @@ export struct TableIndexInfo {
     SharedPtr<String> index_other_params_{};
     SharedPtr<String> index_column_ids_{};
     SharedPtr<String> index_column_names_{};
+};
+
+export struct SegmentInfo {
+    SegmentID segment_id_{};
+    SegmentStatus status_{};
+    SharedPtr<String> segment_dir_{};
+    i64 block_count_{};
+    i64 row_count_{};
+    i64 actual_row_count_{};
+    i64 row_capacity_{};
+    i64 column_count_{};
+    SizeT storage_size_{};
+    Vector<String> files_{};
 };
 
 export struct BlockInfo {

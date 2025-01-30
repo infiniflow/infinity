@@ -300,6 +300,8 @@ public:
 
     void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 
+    SharedPtr<SegmentInfo> GetSegmentInfo(Txn* txn_ptr) const;
+
     SharedPtr<SegmentSnapshotInfo> GetSnapshotInfo() const;
 };
 

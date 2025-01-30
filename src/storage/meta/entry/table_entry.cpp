@@ -426,6 +426,19 @@ void TableEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> new_segment, String
     iter->second->UpdateSegmentReplay(new_segment, std::move(segment_filter_binary_data));
 }
 
+Vector<SharedPtr<SegmentInfo>> TableEntry::GetSegmentsInfo(Txn *txn_ptr) {
+    Vector<SharedPtr<SegmentInfo>> result;
+    std::shared_lock lock(this->rw_locker_);
+    result.reserve(segment_map_.size());
+    for (const auto &[segment_id, segment] : segment_map_) {
+        if (segment->min_row_ts() > txn_ptr->BeginTS()) {
+            continue;
+        }
+        result.emplace_back(segment->GetSegmentInfo(txn_ptr));
+    }
+    return result;
+}
+
 void TableEntry::GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer) {
     column2analyzer.clear();
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
@@ -1515,7 +1528,7 @@ void TableEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> TableEntry::GetFilePath(Txn* txn) const {
+Vector<String> TableEntry::GetFilePath(Txn *txn) const {
     Vector<TableIndexEntry *> table_index_entries = TableIndexes(txn->TxnID(), txn->BeginTS());
     Vector<String> res;
     res.reserve(table_index_entries.size());

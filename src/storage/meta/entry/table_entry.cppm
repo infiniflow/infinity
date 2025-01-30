@@ -160,6 +160,8 @@ public:
 
     void AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entry);
 
+    Vector<SharedPtr<SegmentInfo>> GetSegmentsInfo(Txn* txn);
+
 private:
     void AddSegmentReplayWal(SharedPtr<SegmentEntry> segment_entry);
 
@@ -367,7 +369,7 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
-    Vector<String> GetFilePath(Txn* txn) const final;
+    Vector<String> GetFilePath(Txn *txn) const final;
 
 public:
     Status AddWriteTxnNum(Txn *txn);
