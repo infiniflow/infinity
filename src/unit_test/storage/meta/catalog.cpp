@@ -388,7 +388,7 @@ TEST_P(CatalogTest, get_table_index_info_test) {
 
     // get index info
     {
-        auto [index_info, status] = catalog->GetTableIndexInfo("default_db", "tbl1", "hnsw_index", txn1->TxnID(), txn1->BeginTS());
+        auto [index_info, status] = catalog->GetTableIndexInfo("default_db", "tbl1", "hnsw_index", txn1);
         EXPECT_TRUE(status.ok());
         EXPECT_STREQ("hnsw_index", index_info->index_name_->c_str());
     }

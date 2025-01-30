@@ -794,6 +794,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     auto [database_info, status] = txn->GetDatabaseInfo(db_name_);
 
     if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
         RecoverableError(status);
         return;
     }
@@ -1022,12 +1023,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
     auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, *object_name_, index_name_.value());
     if (!status.ok()) {
-        RecoverableError(status);
-        return;
-    }
-
-    auto [table_index_entry, index_status] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
-    if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
         RecoverableError(status);
         return;
     }
@@ -1194,7 +1190,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             if (query_context->persistence_manager() == nullptr) {
                 index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
             } else {
-                Vector<String> paths = table_index_entry->GetFilePath(txn);
+                const Vector<String> &paths = table_index_info->files_;
                 SizeT index_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -3536,8 +3532,8 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 
     auto [table_entry, table_status] = txn->GetTableByName(db_name_, *object_name_);
     if (!table_status.ok()) {
-        show_operator_state->status_ = table_status;
-        //        Error<UnrecoverableException>(table_status.message());
+        show_operator_state->status_ = table_status.clone();
+        RecoverableError(table_status);
         return;
     }
 

@@ -482,12 +482,14 @@ Catalog::GetIndexByName(const String &db_name, const String &table_name, const S
 }
 
 Tuple<SharedPtr<TableIndexInfo>, Status>
-Catalog::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+Catalog::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name, Txn *txn_ptr) {
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    TransactionID txn_id = txn_ptr->TxnID();
+    auto [table_entry, table_status] = GetTableByName(db_name, table_name, txn_id, begin_ts);
     if (!table_status.ok()) {
         return {nullptr, table_status};
     }
-    return table_entry->GetTableIndexInfo(index_name, txn_id, begin_ts);
+    return table_entry->GetTableIndexInfo(index_name, txn_ptr);
 }
 
 Status Catalog::RemoveIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id) {

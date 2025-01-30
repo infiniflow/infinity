@@ -129,7 +129,7 @@ public:
 
     Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &index_name, Txn *txn_ptr);
 
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 

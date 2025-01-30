@@ -306,12 +306,12 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     return index_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
-Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const String &index_name, Txn *txn_ptr) {
     auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
     if (!status.ok()) {
         return {nullptr, status};
     }
-    return index_meta->GetTableIndexInfo(std::move(r_lock), txn_id, begin_ts);
+    return index_meta->GetTableIndexInfo(std::move(r_lock), txn_ptr);
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
@@ -426,7 +426,7 @@ void TableEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> new_segment, String
     iter->second->UpdateSegmentReplay(new_segment, std::move(segment_filter_binary_data));
 }
 
-SharedPtr<SegmentInfo> TableEntry::GetSegmentInfo(SegmentID segment_id, Txn* txn_ptr) {
+SharedPtr<SegmentInfo> TableEntry::GetSegmentInfo(SegmentID segment_id, Txn *txn_ptr) {
     std::shared_lock lock(this->rw_locker_);
     auto iter = segment_map_.find(segment_id);
     if (iter == segment_map_.end()) {

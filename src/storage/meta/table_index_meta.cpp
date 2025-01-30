@@ -133,8 +133,9 @@ bool TableIndexMeta::CheckIfIndexColumn(ColumnID column_id, TransactionID txn_id
     return index_entry->CheckIfIndexColumn(column_id);
 }
 
-Tuple<SharedPtr<TableIndexInfo>, Status>
-TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<SharedPtr<TableIndexInfo>, Status> TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, Txn *txn_ptr) {
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    TransactionID txn_id = txn_ptr->TxnID();
     auto [table_index_entry, status] = index_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
     if (!status.ok()) {
         return {nullptr, status};
@@ -166,7 +167,7 @@ TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, 
     }
     table_index_info->index_column_names_ = MakeShared<String>(column_names);
     table_index_info->index_column_ids_ = MakeShared<String>(column_ids);
-
+    table_index_info->files_ = table_index_entry->GetFilePath(txn_ptr);
     return {table_index_info, status};
 }
 

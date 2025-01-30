@@ -63,6 +63,7 @@ export struct TableIndexInfo {
     SharedPtr<String> index_other_params_{};
     SharedPtr<String> index_column_ids_{};
     SharedPtr<String> index_column_names_{};
+    Vector<String> files_{};
 };
 
 export struct SegmentInfo {

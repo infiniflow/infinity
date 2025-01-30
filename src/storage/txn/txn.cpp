@@ -446,8 +446,7 @@ Tuple<TableIndexEntry *, Status> Txn::GetIndexByName(const String &db_name, cons
 }
 
 Tuple<SharedPtr<TableIndexInfo>, Status> Txn::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name) {
-    TxnTimeStamp begin_ts = this->BeginTS();
-    return catalog_->GetTableIndexInfo(db_name, table_name, index_name, txn_context_ptr_->txn_id_, begin_ts);
+    return catalog_->GetTableIndexInfo(db_name, table_name, index_name, this);
 }
 
 Pair<Vector<SegmentIndexEntry *>, Status>
