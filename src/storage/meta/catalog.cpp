@@ -347,8 +347,18 @@ Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name,
     return db_entry->GetTableInfo(table_name, txn);
 }
 
-Tuple<Vector<SharedPtr<SegmentInfo>>, Status>
-Catalog::GetSegmentsInfo(const String &db_name, const String &table_name, Txn* txn_ptr) {
+Tuple<SharedPtr<SegmentInfo>, Status> Catalog::GetSegmentInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+
+    return {table_entry->GetSegmentInfo(segment_id, txn_ptr), Status::OK()};
+}
+
+Tuple<Vector<SharedPtr<SegmentInfo>>, Status> Catalog::GetSegmentsInfo(const String &db_name, const String &table_name, Txn *txn_ptr) {
     TransactionID txn_id = txn_ptr->TxnID();
     TxnTimeStamp begin_ts = txn_ptr->BeginTS();
     auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
@@ -381,7 +391,8 @@ Catalog::GetBlockInfo(const String &db_name, const String &table_name, SegmentID
     return {block_entry->GetBlockInfo(txn_ptr), Status::OK()};
 }
 
-Tuple<Vector<SharedPtr<BlockInfo>>, Status> Catalog::GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn_ptr) {
+Tuple<Vector<SharedPtr<BlockInfo>>, Status>
+Catalog::GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn_ptr) {
 
     Vector<SharedPtr<BlockInfo>> null_result;
     TransactionID txn_id = txn_ptr->TxnID();

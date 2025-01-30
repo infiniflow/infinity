@@ -569,6 +569,10 @@ Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String &db_name, con
     return catalog_->GetTableInfo(db_name, table_name, this);
 }
 
+Tuple<SharedPtr<SegmentInfo>, Status> Txn::GetSegmentInfo(const String &db_name, const String &table_name, SegmentID segment_id) {
+    return catalog_->GetSegmentInfo(db_name, table_name, segment_id, this);
+}
+
 Tuple<Vector<SharedPtr<SegmentInfo>>, Status> Txn::GetSegmentsInfo(const String &db_name, const String &table_name) {
     return catalog_->GetSegmentsInfo(db_name, table_name, this);
 }

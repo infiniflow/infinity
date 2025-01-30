@@ -2039,7 +2039,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
             if (query_context->persistence_manager() == nullptr) {
                 segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             } else {
-                const Vector<String>& paths = segment_info->files_;
+                const Vector<String> &paths = segment_info->files_;
                 SizeT segment_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -2071,11 +2071,9 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
 void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts = txn->BeginTS();
-
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [segment_info, status] = txn->GetSegmentInfo(db_name_, *object_name_, *segment_id_);
     if (!status.ok()) {
-        show_operator_state->status_ = status.clone();
+        Status status = Status::SegmentNotExist(*segment_id_);
         RecoverableError(status);
         return;
     }
@@ -2084,13 +2082,6 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
-
-    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
-    if (segment_entry == nullptr) {
-        Status status = Status::SegmentNotExist(*segment_id_);
-        RecoverableError(status);
-        return;
-    }
 
     {
         SizeT column_id = 0;
@@ -2102,7 +2093,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->segment_id()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->segment_id_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2118,7 +2109,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_entry->status()));
+            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_info->status_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2134,7 +2125,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(*segment_entry->segment_dir());
+            Value value = Value::MakeVarchar(*segment_info->segment_dir_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2151,7 +2142,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         ++column_id;
         {
             String segment_size_str;
-            segment_size_str = Utility::FormatByteSize(segment_entry->GetStorageSize());
+            segment_size_str = Utility::FormatByteSize(segment_info->storage_size_);
             Value value = Value::MakeVarchar(segment_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2168,7 +2159,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->block_entries().size()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->block_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2184,7 +2175,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->row_capacity()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->row_capacity_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2200,7 +2191,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->row_count()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->row_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2216,7 +2207,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->actual_row_count()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->actual_row_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2232,7 +2223,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->Room()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->row_capacity_ - segment_info->row_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2248,7 +2239,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->column_count()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->column_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }

@@ -160,7 +160,9 @@ public:
 
     void AddSegmentReplayWalCompact(SharedPtr<SegmentEntry> segment_entry);
 
-    Vector<SharedPtr<SegmentInfo>> GetSegmentsInfo(Txn* txn);
+    SharedPtr<SegmentInfo> GetSegmentInfo(SegmentID segment_id, Txn *txn);
+
+    Vector<SharedPtr<SegmentInfo>> GetSegmentsInfo(Txn *txn);
 
 private:
     void AddSegmentReplayWal(SharedPtr<SegmentEntry> segment_entry);

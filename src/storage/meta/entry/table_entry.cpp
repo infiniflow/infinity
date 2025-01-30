@@ -426,6 +426,19 @@ void TableEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> new_segment, String
     iter->second->UpdateSegmentReplay(new_segment, std::move(segment_filter_binary_data));
 }
 
+SharedPtr<SegmentInfo> TableEntry::GetSegmentInfo(SegmentID segment_id, Txn* txn_ptr) {
+    std::shared_lock lock(this->rw_locker_);
+    auto iter = segment_map_.find(segment_id);
+    if (iter == segment_map_.end()) {
+        return nullptr;
+    }
+    const auto &segment = iter->second;
+    if (segment->min_row_ts() > txn_ptr->BeginTS()) {
+        return nullptr;
+    }
+    return segment->GetSegmentInfo(txn_ptr);
+}
+
 Vector<SharedPtr<SegmentInfo>> TableEntry::GetSegmentsInfo(Txn *txn_ptr) {
     Vector<SharedPtr<SegmentInfo>> result;
     std::shared_lock lock(this->rw_locker_);
