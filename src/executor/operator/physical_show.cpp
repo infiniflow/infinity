@@ -1914,7 +1914,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [table_info, status] = txn->GetTableInfo(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -1934,14 +1934,14 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
-    SizeT column_count = table_entry->ColumnCount();
+    SizeT column_count = table_info->column_count_;
     for (SizeT input_column_id = 0; input_column_id < column_count; ++input_column_id) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
         }
 
-        const ColumnDef *column = table_entry->GetColumnDefByIdx(input_column_id);
+        const ColumnDef *column = table_info->GetColumnDefByIdx(input_column_id);
 
         SizeT output_column_idx = 0;
         {

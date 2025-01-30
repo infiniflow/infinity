@@ -209,7 +209,7 @@ SharedPtr<BlockInfo> BlockEntry::GetBlockInfo(Txn* txn) const {
     block_info->files_.reserve(columns_.size());
     for (const auto &block_column_entry : columns_) {
         Vector<String> files = block_column_entry->GetFilePath(txn);
-        block_info->files_.insert(block_info->files_.end(), block_info->files_.begin(), files.end());
+        block_info->files_.insert(block_info->files_.end(), files.begin(), files.end());
     }
     return block_info;
 }
