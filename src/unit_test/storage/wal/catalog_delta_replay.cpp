@@ -79,12 +79,11 @@ protected:
         for (SizeT segment_size : segment_sizes) {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import data"), TransactionType::kNormal);
 
-            auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
+            auto [table_info, status] = txn->GetTableInfo("default_db", table_name);
             // table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
-            auto column_count = table_entry->ColumnCount();
+            auto column_count = table_info->column_count_;
 
-            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            auto [segment_entry, segment_status] = txn->MakeNewSegment("default_db", table_name);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
 
             while (segment_size > 0) {
@@ -104,7 +103,7 @@ protected:
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, 1, txn);
             }
-            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
+            PhysicalImport::SaveSegmentData(table_info.get(), txn, segment_entry);
             txn_mgr->CommitTxn(txn);
         }
     }

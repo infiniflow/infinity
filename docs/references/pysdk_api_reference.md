@@ -939,7 +939,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"product_quantization_subspace_bits"`: *Required* for product quantization. Must be in the range `[4, 16]`.
   - Parameter settings for a full-text index:
     - `"ANALYZER"`: *Optional*
-      - `"standard"`: (Default) The standard analyzer, segmented by token, lowercase processing, and provides stemming output. Use `-` to specify the languages stemmer. `English` is the default stemmer: `"standard-english"` and `"standard"` are the same stemmer setting. Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, and `Turkish`.
+      - `"standard"`: (Default) The standard analyzer, segmented by token, lowercase processing, and provides stemming output. Use `-` to specify the languages' stemmer. `English` is the default stemmer: `"standard-english"` and `"standard"` are the same stemmer setting. Supported language stemmers include: `Danish`, `Dutch`, `English`, `Finnish`, `French`, `German`, `Hungarian`, `Italian`, `Norwegian`, `Porter`, `Portuguese`, `Romanian`, `Russian`, `Spanish`, `Swedish`, and `Turkish`.
       - `"rag"`: Multilingual RAG analyzer imported from [RAGFlow](https://github.com/infiniflow/ragflow/blob/main/rag/nlp/rag_tokenizer.py), supporting `Chinese` and `English`. Use `-fine` to output the fine-grained analyzer results.
       - `"ik"`: Bilingual analyzer imported from [ik-analyzer](https://github.com/infinilabs/analysis-ik), supporting `Chinese` and `English`. Use `-fine` to output the fine-grained analyzer results.
       - `"chinese"`: Simplified Chinese. Use `-fine` to output the fine-grained analyzer results.
@@ -1328,7 +1328,7 @@ Inserts rows of data into the current table.
 Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and a table cell value.
 
 :::tip NOTE
-- When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table()`. Otherwise, an error will occur.
+- When inserting incomplete rows of data, ensure that all un-inserted columns have default values when calling `create_table()`. Otherwise, an error will occur.
 - You are not allowed to insert both complete and incomplete rows of data in one request.
 For information about setting default column values, see `create_table()`.
 :::
@@ -1375,7 +1375,7 @@ table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 ##### Insert dense vectors
 
 ```python
-# Create a table with a integer column and a 3-d vector column:
+# Create a table with an integer column and a 3-d vector column:
 table_object = db_object.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
 
 # Insert one incomplete row into the table:
@@ -1391,11 +1391,11 @@ table_object.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4,
 
 ```python
 from infinity.common import SparseVector
-# Create a table with a integer column and a 100-d sparse vector column:
+# Create a table with an integer column and a 100-d sparse vector column:
 table_object = db_object.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
 
 # Insert one row into the table:
-# `indices` specifies the correspoing indices to the values in `values`.
+# `indices` specifies the corresponding indices to the values in `values`.
 # Note that the second row sets "c1" as 2024 by default. 
 table_object.insert([{"c1": 2022, "sparse_column": SparseVector([10, 20, 30], [1.1, 2.2, 3.3])}, {"sparse_column": SparseVector([70, 80, 90], [7.7, 8.8, 9.9])}])
 ```
@@ -1711,7 +1711,7 @@ A non-empty list of strings specifying the columns to include in the output. Eac
   - `_score`: A BM25 score used in full-text search.
   - `_similarity`: Used by IP and cosine metrics in dense or sparse vector search.
   - `_distance`: Used by L2 metric in dense vector search.
-- An aggregation function: Apply an aggregation operation on specified columns. Supported aggragation functions include:
+- An aggregation function: Apply an aggregation operation on specified columns. Supported aggregation functions include:
   - `count`
   - `min`
   - `max`
@@ -2447,7 +2447,7 @@ A dictionary representing additional options for the selected reranking method:
 
 - **weighted_sum-specific options**: *Optional*  
   Settings when employing Weighted Sum for reranking.  
-  - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
+  - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assigned the default weight of `1.0`.
 
 - **match_tensor-specific options**: *Optional*  
   Settings when employing match_tensor for reranking.

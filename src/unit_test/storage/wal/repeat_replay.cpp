@@ -198,10 +198,9 @@ TEST_P(RepeatReplayTest, import) {
 
     auto TestImport = [&](TxnManager *txn_mgr, BufferManager *buffer_mgr) {
         Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"), TransactionType::kNormal);
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+        auto [table_info, status] = txn->GetTableInfo(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
-        SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-        auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+        auto [segment_entry, segment_status] = txn->MakeNewSegment(*db_name, *table_name);
         auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0 /*block_id*/, 0 /*checkpoint_ts*/, 2 /*column_count*/, txn);
 
         Vector<SharedPtr<ColumnVector>> columns_vector;
@@ -226,7 +225,7 @@ TEST_P(RepeatReplayTest, import) {
         block_entry->IncreaseRowCount(1 /*rows*/);
         segment_entry->AppendBlockEntry(std::move(block_entry));
 
-        PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
+        PhysicalImport::SaveSegmentData(table_info.get(), txn, segment_entry);
         txn_mgr->CommitTxn(txn);
     };
     auto CheckTable = [&](TxnManager *txn_mgr, size_t row_cnt) {
