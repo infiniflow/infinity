@@ -36,6 +36,7 @@ import column_def;
 import constant_expr;
 import snapshot_info;
 import meta_info;
+import status;
 
 namespace infinity {
 
@@ -114,10 +115,8 @@ public:
                                                          TxnTimeStamp begin_ts,
                                                          TransactionID txn_id);
 
-    static SharedPtr<SegmentEntry> ApplySegmentSnapshot(TableEntry *table_entry,
-                                                        SegmentSnapshotInfo *segment_snapshot_info,
-                                                        TransactionID txn_id,
-                                                        TxnTimeStamp begin_ts);
+    static SharedPtr<SegmentEntry>
+    ApplySegmentSnapshot(TableEntry *table_entry, SegmentSnapshotInfo *segment_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     void UpdateSegmentReplay(SharedPtr<SegmentEntry> segment_entry, String segment_filter_binary_data);
 
@@ -223,7 +222,11 @@ public:
 
     SharedPtr<BlockEntry> GetBlockEntryByID(BlockID block_id) const;
 
-    Vector<SharedPtr<BlockInfo>> GetBlocksInfo(Txn* txn) const;
+    Tuple<SharedPtr<BlockColumnInfo>, Status> GetBlockColumnInfo(BlockID block_id, ColumnID column_id, Txn *txn) const;
+
+    SharedPtr<BlockInfo> GetBlockInfo(BlockID block_id, Txn *txn) const;
+
+    Vector<SharedPtr<BlockInfo>> GetBlocksInfo(Txn *txn) const;
 
     BlocksGuard GetBlocksGuard() const { return BlocksGuard{block_entries_, std::shared_lock(rw_locker_)}; }
 
@@ -294,13 +297,13 @@ public:
 
     void PickCleanup(CleanupScanner *scanner) override;
 
-    Vector<String> GetFilePath(Txn* txn) const override;
+    Vector<String> GetFilePath(Txn *txn) const override;
 
     void AddColumns(const Vector<Pair<ColumnID, const Value *>> &columns, TxnTableStore *table_store);
 
     void DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore *table_store);
 
-    SharedPtr<SegmentInfo> GetSegmentInfo(Txn* txn_ptr) const;
+    SharedPtr<SegmentInfo> GetSegmentInfo(Txn *txn_ptr) const;
 
     SharedPtr<SegmentSnapshotInfo> GetSnapshotInfo() const;
 };

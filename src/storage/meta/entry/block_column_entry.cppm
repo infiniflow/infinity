@@ -30,6 +30,7 @@ import column_def;
 import value;
 import cleanup_scanner;
 import snapshot_info;
+import meta_info;
 
 namespace infinity {
 
@@ -69,6 +70,8 @@ public:
                                                                 BlockColumnSnapshotInfo *block_column_snapshot_info,
                                                                 TransactionID txn_id,
                                                                 TxnTimeStamp begin_ts);
+
+    SharedPtr<BlockColumnInfo> GetColumnInfo() const;
 
     SharedPtr<BlockColumnSnapshotInfo> GetSnapshotInfo() const;
 

@@ -562,6 +562,23 @@ SharedPtr<BlockEntry> SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
     return block_entries_[block_id];
 }
 
+Tuple<SharedPtr<BlockColumnInfo>, Status> SegmentEntry::GetBlockColumnInfo(BlockID block_id, ColumnID column_id, Txn *txn) const {
+    std::shared_lock lock(rw_locker_);
+    if (block_id >= block_entries_.size()) {
+        return {nullptr, Status::BlockNotExist(block_id)};
+    }
+    BlockEntry *block_entry = block_entries_[block_id].get();
+    return block_entry->GetBlockColumnInfo(column_id);
+}
+
+SharedPtr<BlockInfo> SegmentEntry::GetBlockInfo(BlockID block_id, Txn *txn_ptr) const {
+    std::shared_lock lock(rw_locker_);
+    if (block_id >= block_entries_.size()) {
+        return nullptr;
+    }
+    return block_entries_[block_id]->GetBlockInfo(txn_ptr);
+}
+
 Vector<SharedPtr<BlockInfo>> SegmentEntry::GetBlocksInfo(Txn *txn) const {
     Vector<SharedPtr<BlockInfo>> blocks_info;
     std::shared_lock lock(rw_locker_);
@@ -762,7 +779,7 @@ void SegmentEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore
     }
 }
 
-SharedPtr<SegmentInfo> SegmentEntry::GetSegmentInfo(Txn* txn_ptr) const {
+SharedPtr<SegmentInfo> SegmentEntry::GetSegmentInfo(Txn *txn_ptr) const {
     SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
     std::shared_lock lock(rw_locker_);
     segment_info->segment_id_ = segment_id_;

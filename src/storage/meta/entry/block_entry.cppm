@@ -39,6 +39,7 @@ import cleanup_scanner;
 import snapshot_info;
 import meta_info;
 import txn;
+import status;
 
 namespace infinity {
 
@@ -106,7 +107,7 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
-    Vector<String> GetFilePath(Txn* txn) const final;
+    Vector<String> GetFilePath(Txn *txn) const final;
 
     void Flush(TxnTimeStamp checkpoint_ts);
 
@@ -201,7 +202,9 @@ public:
 
     SharedPtr<BlockSnapshotInfo> GetSnapshotInfo() const;
 
-    SharedPtr<BlockInfo> GetBlockInfo(Txn* txn) const;
+    SharedPtr<BlockInfo> GetBlockInfo(Txn *txn) const;
+
+    Tuple<SharedPtr<BlockColumnInfo>, Status> GetBlockColumnInfo(ColumnID column_id) const;
 
 public:
     // Setter, Used in import, segment append block, and block append block in compact

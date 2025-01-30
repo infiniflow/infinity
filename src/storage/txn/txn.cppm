@@ -154,6 +154,9 @@ public:
 
     Tuple<Vector<SharedPtr<BlockInfo>>, Status> GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id);
 
+    Tuple<SharedPtr<BlockColumnInfo>, Status>
+    GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
+
     Status CheckTableExist(const String &db_name, const String &table_name);
 
     bool CheckTableHasDelete(const String &db_name, const String &table_name);

@@ -196,7 +196,7 @@ SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
     return block_snapshot_info;
 }
 
-SharedPtr<BlockInfo> BlockEntry::GetBlockInfo(Txn* txn) const {
+SharedPtr<BlockInfo> BlockEntry::GetBlockInfo(Txn *txn) const {
     SharedPtr<BlockInfo> block_info = MakeShared<BlockInfo>();
     block_info->block_id_ = this->block_id();
     block_info->block_dir_ = this->block_dir();
@@ -212,6 +212,13 @@ SharedPtr<BlockInfo> BlockEntry::GetBlockInfo(Txn* txn) const {
         block_info->files_.insert(block_info->files_.end(), files.begin(), files.end());
     }
     return block_info;
+}
+
+Tuple<SharedPtr<BlockColumnInfo>, Status> BlockEntry::GetBlockColumnInfo(ColumnID column_id) const {
+    if (column_id >= columns_.size()) {
+        return {nullptr, Status::ColumnNotExist(fmt::format("ColumnID: {}", column_id))};
+    }
+    return {columns_[column_id]->GetColumnInfo(), Status::OK()};
 }
 
 // Used to replay DeltaOp to update a BlockEntry
@@ -636,7 +643,7 @@ void BlockEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> BlockEntry::GetFilePath(Txn* txn) const {
+Vector<String> BlockEntry::GetFilePath(Txn *txn) const {
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     Vector<String> res;
     res.reserve(columns_.size());

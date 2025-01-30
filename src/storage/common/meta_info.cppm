@@ -18,6 +18,7 @@ import stl;
 import table_entry_type;
 import column_def;
 import default_values;
+import data_type;
 
 export module meta_info;
 
@@ -87,6 +88,15 @@ export struct BlockInfo {
     TxnTimeStamp checkpoint_ts_{};
     SizeT storage_size_{};
     Vector<String> files_{};
+};
+
+export struct BlockColumnInfo {
+    ColumnID column_id_;
+    SharedPtr<DataType> data_type_{};
+    SharedPtr<String> filename_{};
+    i64 storage_size_{};
+    SizeT extra_file_count_{};
+    Vector<SharedPtr<String>> extra_file_names_{};
 };
 
 export struct TableDetail {

@@ -167,6 +167,9 @@ public:
 
     Tuple<Vector<SharedPtr<BlockInfo>>, Status> GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn);
 
+    Tuple<SharedPtr<BlockColumnInfo>, Status>
+    GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id, Txn *txn);
+
     static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id);
 
     // Index Related methods
