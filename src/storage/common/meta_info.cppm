@@ -19,6 +19,7 @@ import table_entry_type;
 import column_def;
 import default_values;
 import data_type;
+import create_index_info;
 
 export module meta_info;
 
@@ -116,6 +117,14 @@ export struct ViewDetail {
     SharedPtr<String> db_name_{};
     SharedPtr<String> view_name_{};
     i64 column_count_{};
+};
+
+export struct SegmentIndexInfo {
+    SegmentID segment_id_{};
+    IndexType index_type_{};
+    SharedPtr<String> index_dir_{};
+    SizeT chunk_count_{};
+    Vector<String> files_{};
 };
 
 } // namespace infinity

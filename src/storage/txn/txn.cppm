@@ -203,6 +203,9 @@ public:
 
     SharedPtr<IndexReader> GetFullTextIndexReader(const String &db_name, const String &table_name);
 
+    Tuple<SharedPtr<SegmentIndexInfo>, Status>
+    GetSegmentIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
     // View Ops
     // Fixme: view definition should be given
     Status CreateView(const String &db_name, const String &view_name, ConflictType conflict_type, BaseEntry *&view_entry);

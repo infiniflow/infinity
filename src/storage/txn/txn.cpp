@@ -546,6 +546,28 @@ SharedPtr<IndexReader> Txn::GetFullTextIndexReader(const String &db_name, const 
     return table_entry->GetFullTextIndexReader(this);
 }
 
+Tuple<SharedPtr<SegmentIndexInfo>, Status>
+Txn::GetSegmentIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+
+    auto [table_index_entry, index_status] = this->GetIndexByName(db_name, table_name, index_name);
+    if (!index_status.ok()) {
+        return {nullptr, index_status};
+    }
+
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> segment_map = table_index_entry->GetIndexBySegmentSnapshot(table_entry, this);
+    auto iter = segment_map.find(segment_id);
+    if (iter == segment_map.end()) {
+        return {nullptr, Status::SegmentNotExist(segment_id)};
+    }
+    SegmentIndexEntry *segment_index_entry = iter->second.get();
+
+    return {segment_index_entry->GetSegmentIndexInfo(this), Status::OK()};
+}
+
 Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const String &table_name) {
     this->CheckTxn(db_name);
 

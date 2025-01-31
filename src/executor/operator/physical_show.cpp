@@ -1234,26 +1234,13 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_entry, status1] = txn->GetTableByName(db_name_, *object_name_);
-    if (!status1.ok()) {
-        RecoverableError(status1);
+    auto [segment_index_info, status] = txn->GetSegmentIndexInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value());
+    if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
+        RecoverableError(status);
         return;
     }
 
-    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
-    if (!status2.ok()) {
-        RecoverableError(status2);
-        return;
-    }
-
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> segment_map = table_index_entry->GetIndexBySegmentSnapshot(table_entry, txn);
-    auto iter = segment_map.find(segment_id_.value());
-    if (iter == segment_map.end()) {
-        show_operator_state->status_ = Status::SegmentNotExist(segment_id_.value());
-        RecoverableError(show_operator_state->status_);
-    }
-
-    SegmentIndexEntry *segment_index_entry = iter->second.get();
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
@@ -1276,7 +1263,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         }
     }
 
-    String full_segment_index_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_index_entry->index_dir();
+    String full_segment_index_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_index_info->index_dir_;
     {
         SizeT column_id = 0;
         {
@@ -1307,7 +1294,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
             if (query_context->persistence_manager() == nullptr) {
                 index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
             } else {
-                Vector<String> paths = segment_index_entry->GetFilePath(txn);
+                Vector<String> &paths = segment_index_info->files_;
                 SizeT index_segment_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -1335,44 +1322,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
         ++column_id;
         {
-            IndexBase *index_base = table_index_entry->table_index_def().get();
-            String index_type_name = IndexInfo::IndexTypeToString(index_base->index_type_);
-
-            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            switch (index_base->index_type_) {
-                case IndexType::kIVF: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetIVFIndexSnapshot());
-                    break;
-                }
-                case IndexType::kHnsw: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetHnswIndexSnapshot());
-                    break;
-                }
-                case IndexType::kFullText: {
-                    SharedPtr<MemoryIndexer> memory_indexer;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, query_context->GetTxn());
-                    break;
-                }
-                case IndexType::kSecondary: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetSecondaryIndexSnapshot());
-                    break;
-                }
-                case IndexType::kEMVB: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetEMVBIndexSnapshot());
-                    break;
-                }
-                case IndexType::kBMP: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetBMPIndexSnapshot());
-                    break;
-                }
-                case IndexType::kDiskAnn:
-                case IndexType::kInvalid: {
-                    Status status3 = Status::InvalidIndexName(index_type_name);
-                    RecoverableError(status3);
-                    break;
-                }
-            }
-            Value value = Value::MakeVarchar(std::to_string(chunk_index_entries.size()));
+            Value value = Value::MakeVarchar(std::to_string(segment_index_info->chunk_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
