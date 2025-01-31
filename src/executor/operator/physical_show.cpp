@@ -1175,37 +1175,37 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("storage_size");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
-            String index_size_str;
-            if (query_context->persistence_manager() == nullptr) {
-                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
-            } else {
-                const Vector<String> &paths = table_index_info->files_;
-                SizeT index_size = 0;
-                for (const String &path : paths) {
-                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
-                    if (!status.ok()) {
-                        RecoverableError(status);
-                    }
-                    index_size += file_size;
-                }
-                index_size_str = Utility::FormatByteSize(index_size);
-            }
-            Value value = Value::MakeVarchar(index_size_str);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
+//    {
+//        SizeT column_id = 0;
+//        {
+//            Value value = Value::MakeVarchar("storage_size");
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//        }
+//
+//        ++column_id;
+//        {
+//            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
+//            String index_size_str;
+//            if (query_context->persistence_manager() == nullptr) {
+//                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
+//            } else {
+//                const Vector<String> &paths = table_index_info->files_;
+//                SizeT index_size = 0;
+//                for (const String &path : paths) {
+//                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
+//                    if (!status.ok()) {
+//                        RecoverableError(status);
+//                    }
+//                    index_size += file_size;
+//                }
+//                index_size_str = Utility::FormatByteSize(index_size);
+//            }
+//            Value value = Value::MakeVarchar(index_size_str);
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//        }
+//    }
 
     {
         SizeT column_id = 0;

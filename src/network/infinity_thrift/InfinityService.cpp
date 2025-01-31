@@ -8,13662 +8,14585 @@
 
 namespace infinity_thrift_rpc {
 
-InfinityService_Connect_args::~InfinityService_Connect_args() noexcept {}
 
-uint32_t InfinityService_Connect_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Connect_args::~InfinityService_Connect_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Connect_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Connect_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Connect_args");
+uint32_t InfinityService_Connect_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Connect_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
-
-InfinityService_Connect_pargs::~InfinityService_Connect_pargs() noexcept {}
 
-uint32_t InfinityService_Connect_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Connect_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Connect_pargs::~InfinityService_Connect_pargs() noexcept {
 }
 
-InfinityService_Connect_result::~InfinityService_Connect_result() noexcept {}
 
-uint32_t InfinityService_Connect_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Connect_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Connect_pargs");
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+InfinityService_Connect_result::~InfinityService_Connect_result() noexcept {
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
-}
+uint32_t InfinityService_Connect_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_Connect_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    uint32_t xfer = 0;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += oprot->writeStructBegin("InfinityService_Connect_result");
+  using ::apache::thrift::protocol::TProtocolException;
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
 
-InfinityService_Connect_presult::~InfinityService_Connect_presult() noexcept {}
+  xfer += iprot->readStructEnd();
 
-uint32_t InfinityService_Connect_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+  return xfer;
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_Connect_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    xfer += iprot->readStructBegin(fname);
+  uint32_t xfer = 0;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeStructBegin("InfinityService_Connect_result");
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_Connect_presult::~InfinityService_Connect_presult() noexcept {
 }
 
-InfinityService_Disconnect_args::~InfinityService_Disconnect_args() noexcept {}
 
-uint32_t InfinityService_Disconnect_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Connect_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_Disconnect_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Disconnect_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Disconnect_args::~InfinityService_Disconnect_args() noexcept {
 }
-
-InfinityService_Disconnect_pargs::~InfinityService_Disconnect_pargs() noexcept {}
 
-uint32_t InfinityService_Disconnect_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Disconnect_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-InfinityService_Disconnect_result::~InfinityService_Disconnect_result() noexcept {}
+uint32_t InfinityService_Disconnect_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_Disconnect_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += iprot->readStructBegin(fname);
+  using ::apache::thrift::protocol::TProtocolException;
 
-    using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Disconnect_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Disconnect_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Disconnect_args");
 
-    uint32_t xfer = 0;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeStructBegin("InfinityService_Disconnect_result");
-
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Disconnect_presult::~InfinityService_Disconnect_presult() noexcept {}
 
-uint32_t InfinityService_Disconnect_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Disconnect_pargs::~InfinityService_Disconnect_pargs() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Disconnect_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Disconnect_pargs");
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_Disconnect_result::~InfinityService_Disconnect_result() noexcept {
 }
 
-InfinityService_CreateDatabase_args::~InfinityService_CreateDatabase_args() noexcept {}
 
-uint32_t InfinityService_CreateDatabase_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Disconnect_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_CreateDatabase_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_CreateDatabase_args");
+uint32_t InfinityService_Disconnect_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-InfinityService_CreateDatabase_pargs::~InfinityService_CreateDatabase_pargs() noexcept {}
+  uint32_t xfer = 0;
 
-uint32_t InfinityService_CreateDatabase_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_CreateDatabase_pargs");
+  xfer += oprot->writeStructBegin("InfinityService_Disconnect_result");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
     xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Disconnect_presult::~InfinityService_Disconnect_presult() noexcept {
 }
 
-InfinityService_CreateDatabase_result::~InfinityService_CreateDatabase_result() noexcept {}
 
-uint32_t InfinityService_CreateDatabase_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Disconnect_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_CreateDatabase_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
 
-    uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_CreateDatabase_result");
-
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_CreateDatabase_args::~InfinityService_CreateDatabase_args() noexcept {
 }
 
-InfinityService_CreateDatabase_presult::~InfinityService_CreateDatabase_presult() noexcept {}
 
-uint32_t InfinityService_CreateDatabase_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_CreateDatabase_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-InfinityService_DropDatabase_args::~InfinityService_DropDatabase_args() noexcept {}
 
-uint32_t InfinityService_DropDatabase_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_CreateDatabase_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_CreateDatabase_args");
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_CreateDatabase_pargs::~InfinityService_CreateDatabase_pargs() noexcept {
 }
 
-uint32_t InfinityService_DropDatabase_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_DropDatabase_args");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+uint32_t InfinityService_CreateDatabase_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_CreateDatabase_pargs");
 
-InfinityService_DropDatabase_pargs::~InfinityService_DropDatabase_pargs() noexcept {}
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-uint32_t InfinityService_DropDatabase_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_DropDatabase_pargs");
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_CreateDatabase_result::~InfinityService_CreateDatabase_result() noexcept {
 }
 
-InfinityService_DropDatabase_result::~InfinityService_DropDatabase_result() noexcept {}
 
-uint32_t InfinityService_DropDatabase_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_CreateDatabase_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_DropDatabase_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_CreateDatabase_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_DropDatabase_result");
+  xfer += oprot->writeStructBegin("InfinityService_CreateDatabase_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_DropDatabase_presult::~InfinityService_DropDatabase_presult() noexcept {}
 
-uint32_t InfinityService_DropDatabase_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_CreateDatabase_presult::~InfinityService_CreateDatabase_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_CreateDatabase_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_CreateTable_args::~InfinityService_CreateTable_args() noexcept {}
 
-uint32_t InfinityService_CreateTable_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_DropDatabase_args::~InfinityService_DropDatabase_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_DropDatabase_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_CreateTable_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_CreateTable_args");
+uint32_t InfinityService_DropDatabase_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_DropDatabase_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
-
-InfinityService_CreateTable_pargs::~InfinityService_CreateTable_pargs() noexcept {}
 
-uint32_t InfinityService_CreateTable_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_CreateTable_pargs");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_DropDatabase_pargs::~InfinityService_DropDatabase_pargs() noexcept {
 }
 
-InfinityService_CreateTable_result::~InfinityService_CreateTable_result() noexcept {}
 
-uint32_t InfinityService_CreateTable_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_DropDatabase_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_DropDatabase_pargs");
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+InfinityService_DropDatabase_result::~InfinityService_DropDatabase_result() noexcept {
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
-}
+uint32_t InfinityService_DropDatabase_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_CreateTable_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    uint32_t xfer = 0;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += oprot->writeStructBegin("InfinityService_CreateTable_result");
+  using ::apache::thrift::protocol::TProtocolException;
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
 
-InfinityService_CreateTable_presult::~InfinityService_CreateTable_presult() noexcept {}
+  xfer += iprot->readStructEnd();
 
-uint32_t InfinityService_CreateTable_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+  return xfer;
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_DropDatabase_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    xfer += iprot->readStructBegin(fname);
+  uint32_t xfer = 0;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeStructBegin("InfinityService_DropDatabase_result");
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_DropDatabase_presult::~InfinityService_DropDatabase_presult() noexcept {
 }
 
-InfinityService_DropTable_args::~InfinityService_DropTable_args() noexcept {}
 
-uint32_t InfinityService_DropTable_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_DropDatabase_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_DropTable_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_DropTable_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_CreateTable_args::~InfinityService_CreateTable_args() noexcept {
 }
-
-InfinityService_DropTable_pargs::~InfinityService_DropTable_pargs() noexcept {}
-
-uint32_t InfinityService_DropTable_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_DropTable_pargs");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
 
-InfinityService_DropTable_result::~InfinityService_DropTable_result() noexcept {}
+uint32_t InfinityService_CreateTable_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_DropTable_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += iprot->readStructBegin(fname);
+  using ::apache::thrift::protocol::TProtocolException;
 
-    using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_DropTable_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_CreateTable_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_CreateTable_args");
 
-    uint32_t xfer = 0;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeStructBegin("InfinityService_DropTable_result");
-
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_DropTable_presult::~InfinityService_DropTable_presult() noexcept {}
 
-uint32_t InfinityService_DropTable_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_CreateTable_pargs::~InfinityService_CreateTable_pargs() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_CreateTable_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_CreateTable_pargs");
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_CreateTable_result::~InfinityService_CreateTable_result() noexcept {
 }
 
-InfinityService_Insert_args::~InfinityService_Insert_args() noexcept {}
 
-uint32_t InfinityService_Insert_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_CreateTable_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_Insert_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Insert_args");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+uint32_t InfinityService_CreateTable_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-InfinityService_Insert_pargs::~InfinityService_Insert_pargs() noexcept {}
+  uint32_t xfer = 0;
 
-uint32_t InfinityService_Insert_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Insert_pargs");
+  xfer += oprot->writeStructBegin("InfinityService_CreateTable_result");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
     xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_CreateTable_presult::~InfinityService_CreateTable_presult() noexcept {
 }
 
-InfinityService_Insert_result::~InfinityService_Insert_result() noexcept {}
 
-uint32_t InfinityService_Insert_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_CreateTable_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_Insert_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
 
-    uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_Insert_result");
-
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_DropTable_args::~InfinityService_DropTable_args() noexcept {
 }
 
-InfinityService_Insert_presult::~InfinityService_Insert_presult() noexcept {}
 
-uint32_t InfinityService_Insert_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_DropTable_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-InfinityService_Import_args::~InfinityService_Import_args() noexcept {}
-
-uint32_t InfinityService_Import_args::read(::apache::thrift::protocol::TProtocol *iprot) {
-
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_DropTable_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_DropTable_args");
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_DropTable_pargs::~InfinityService_DropTable_pargs() noexcept {
 }
 
-uint32_t InfinityService_Import_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Import_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+uint32_t InfinityService_DropTable_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_DropTable_pargs");
 
-InfinityService_Import_pargs::~InfinityService_Import_pargs() noexcept {}
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-uint32_t InfinityService_Import_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Import_pargs");
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_DropTable_result::~InfinityService_DropTable_result() noexcept {
 }
 
-InfinityService_Import_result::~InfinityService_Import_result() noexcept {}
 
-uint32_t InfinityService_Import_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_DropTable_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Import_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_DropTable_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_Import_result");
+  xfer += oprot->writeStructBegin("InfinityService_DropTable_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Import_presult::~InfinityService_Import_presult() noexcept {}
 
-uint32_t InfinityService_Import_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_DropTable_presult::~InfinityService_DropTable_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_DropTable_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_Export_args::~InfinityService_Export_args() noexcept {}
 
-uint32_t InfinityService_Export_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Insert_args::~InfinityService_Insert_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Insert_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Export_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Export_args");
+uint32_t InfinityService_Insert_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Insert_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Insert_pargs::~InfinityService_Insert_pargs() noexcept {
 }
 
-InfinityService_Export_pargs::~InfinityService_Export_pargs() noexcept {}
 
-uint32_t InfinityService_Export_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Export_pargs");
+uint32_t InfinityService_Insert_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Insert_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Insert_result::~InfinityService_Insert_result() noexcept {
 }
 
-InfinityService_Export_result::~InfinityService_Export_result() noexcept {}
 
-uint32_t InfinityService_Export_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Insert_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Export_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Insert_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_Export_result");
+  xfer += oprot->writeStructBegin("InfinityService_Insert_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_Insert_presult::~InfinityService_Insert_presult() noexcept {
 }
 
-InfinityService_Export_presult::~InfinityService_Export_presult() noexcept {}
 
-uint32_t InfinityService_Export_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Insert_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
+
 
-InfinityService_Select_args::~InfinityService_Select_args() noexcept {}
+InfinityService_Import_args::~InfinityService_Import_args() noexcept {
+}
 
-uint32_t InfinityService_Select_args::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_Import_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Select_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Select_args");
+uint32_t InfinityService_Import_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Import_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Select_pargs::~InfinityService_Select_pargs() noexcept {}
 
-uint32_t InfinityService_Select_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Select_pargs");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Import_pargs::~InfinityService_Import_pargs() noexcept {
 }
+
 
-InfinityService_Select_result::~InfinityService_Select_result() noexcept {}
+uint32_t InfinityService_Import_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Import_pargs");
 
-uint32_t InfinityService_Select_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+InfinityService_Import_result::~InfinityService_Import_result() noexcept {
+}
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
 
-    xfer += iprot->readStructEnd();
+uint32_t InfinityService_Import_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    return xfer;
-}
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-uint32_t InfinityService_Select_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+  xfer += iprot->readStructBegin(fname);
 
-    uint32_t xfer = 0;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    xfer += oprot->writeStructBegin("InfinityService_Select_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
 
-InfinityService_Select_presult::~InfinityService_Select_presult() noexcept {}
+  xfer += iprot->readStructEnd();
 
-uint32_t InfinityService_Select_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+  return xfer;
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_Import_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    xfer += iprot->readStructBegin(fname);
+  uint32_t xfer = 0;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeStructBegin("InfinityService_Import_result");
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_Import_presult::~InfinityService_Import_presult() noexcept {
 }
 
-InfinityService_Explain_args::~InfinityService_Explain_args() noexcept {}
 
-uint32_t InfinityService_Explain_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Import_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Explain_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Explain_args");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Export_args::~InfinityService_Export_args() noexcept {
 }
-
-InfinityService_Explain_pargs::~InfinityService_Explain_pargs() noexcept {}
-
-uint32_t InfinityService_Explain_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Explain_pargs");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
 
-InfinityService_Explain_result::~InfinityService_Explain_result() noexcept {}
+uint32_t InfinityService_Export_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_Explain_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += iprot->readStructBegin(fname);
+  using ::apache::thrift::protocol::TProtocolException;
 
-    using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_Explain_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
 
-    uint32_t xfer = 0;
+uint32_t InfinityService_Export_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Export_args");
 
-    xfer += oprot->writeStructBegin("InfinityService_Explain_result");
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Explain_presult::~InfinityService_Explain_presult() noexcept {}
 
-uint32_t InfinityService_Explain_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Export_pargs::~InfinityService_Export_pargs() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Export_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Export_pargs");
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_Export_result::~InfinityService_Export_result() noexcept {
 }
 
-InfinityService_Delete_args::~InfinityService_Delete_args() noexcept {}
 
-uint32_t InfinityService_Delete_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Export_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_Delete_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Delete_args");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+uint32_t InfinityService_Export_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-InfinityService_Delete_pargs::~InfinityService_Delete_pargs() noexcept {}
+  uint32_t xfer = 0;
 
-uint32_t InfinityService_Delete_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Delete_pargs");
+  xfer += oprot->writeStructBegin("InfinityService_Export_result");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
     xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+
+InfinityService_Export_presult::~InfinityService_Export_presult() noexcept {
 }
 
-InfinityService_Delete_result::~InfinityService_Delete_result() noexcept {}
 
-uint32_t InfinityService_Delete_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Export_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Delete_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
 
-    uint32_t xfer = 0;
-
-    xfer += oprot->writeStructBegin("InfinityService_Delete_result");
-
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Select_args::~InfinityService_Select_args() noexcept {
 }
 
-InfinityService_Delete_presult::~InfinityService_Delete_presult() noexcept {}
 
-uint32_t InfinityService_Delete_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Select_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-InfinityService_Update_args::~InfinityService_Update_args() noexcept {}
 
-uint32_t InfinityService_Update_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Select_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Select_args");
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_Select_pargs::~InfinityService_Select_pargs() noexcept {
 }
 
-uint32_t InfinityService_Update_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Update_args");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+uint32_t InfinityService_Select_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Select_pargs");
 
-InfinityService_Update_pargs::~InfinityService_Update_pargs() noexcept {}
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-uint32_t InfinityService_Update_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Update_pargs");
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Select_result::~InfinityService_Select_result() noexcept {
 }
 
-InfinityService_Update_result::~InfinityService_Update_result() noexcept {}
 
-uint32_t InfinityService_Update_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Select_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Update_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Select_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_Update_result");
+  xfer += oprot->writeStructBegin("InfinityService_Select_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Update_presult::~InfinityService_Update_presult() noexcept {}
 
-uint32_t InfinityService_Update_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Select_presult::~InfinityService_Select_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Select_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_ListDatabase_args::~InfinityService_ListDatabase_args() noexcept {}
 
-uint32_t InfinityService_ListDatabase_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Explain_args::~InfinityService_Explain_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Explain_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ListDatabase_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ListDatabase_args");
+uint32_t InfinityService_Explain_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Explain_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
-
-InfinityService_ListDatabase_pargs::~InfinityService_ListDatabase_pargs() noexcept {}
 
-uint32_t InfinityService_ListDatabase_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ListDatabase_pargs");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Explain_pargs::~InfinityService_Explain_pargs() noexcept {
 }
 
-InfinityService_ListDatabase_result::~InfinityService_ListDatabase_result() noexcept {}
 
-uint32_t InfinityService_ListDatabase_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Explain_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Explain_pargs");
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+InfinityService_Explain_result::~InfinityService_Explain_result() noexcept {
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
-}
+uint32_t InfinityService_Explain_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_ListDatabase_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    uint32_t xfer = 0;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += oprot->writeStructBegin("InfinityService_ListDatabase_result");
+  using ::apache::thrift::protocol::TProtocolException;
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
 
-InfinityService_ListDatabase_presult::~InfinityService_ListDatabase_presult() noexcept {}
+  xfer += iprot->readStructEnd();
 
-uint32_t InfinityService_ListDatabase_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+  return xfer;
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_Explain_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    xfer += iprot->readStructBegin(fname);
+  uint32_t xfer = 0;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeStructBegin("InfinityService_Explain_result");
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_Explain_presult::~InfinityService_Explain_presult() noexcept {
 }
 
-InfinityService_ListTable_args::~InfinityService_ListTable_args() noexcept {}
 
-uint32_t InfinityService_ListTable_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Explain_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_ListTable_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ListTable_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Delete_args::~InfinityService_Delete_args() noexcept {
 }
-
-InfinityService_ListTable_pargs::~InfinityService_ListTable_pargs() noexcept {}
-
-uint32_t InfinityService_ListTable_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ListTable_pargs");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
 
-InfinityService_ListTable_result::~InfinityService_ListTable_result() noexcept {}
+uint32_t InfinityService_Delete_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_ListTable_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += iprot->readStructBegin(fname);
+  using ::apache::thrift::protocol::TProtocolException;
 
-    using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ListTable_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Delete_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Delete_args");
 
-    uint32_t xfer = 0;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeStructBegin("InfinityService_ListTable_result");
-
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ListTable_presult::~InfinityService_ListTable_presult() noexcept {}
 
-uint32_t InfinityService_ListTable_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Delete_pargs::~InfinityService_Delete_pargs() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Delete_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Delete_pargs");
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_Delete_result::~InfinityService_Delete_result() noexcept {
 }
 
-InfinityService_ListIndex_args::~InfinityService_ListIndex_args() noexcept {}
 
-uint32_t InfinityService_ListIndex_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Delete_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_ListIndex_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ListIndex_args");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+uint32_t InfinityService_Delete_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-InfinityService_ListIndex_pargs::~InfinityService_ListIndex_pargs() noexcept {}
+  uint32_t xfer = 0;
 
-uint32_t InfinityService_ListIndex_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ListIndex_pargs");
+  xfer += oprot->writeStructBegin("InfinityService_Delete_result");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
     xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Delete_presult::~InfinityService_Delete_presult() noexcept {
 }
 
-InfinityService_ListIndex_result::~InfinityService_ListIndex_result() noexcept {}
 
-uint32_t InfinityService_ListIndex_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Delete_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_ListIndex_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
 
-    uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ListIndex_result");
-
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Update_args::~InfinityService_Update_args() noexcept {
 }
 
-InfinityService_ListIndex_presult::~InfinityService_ListIndex_presult() noexcept {}
 
-uint32_t InfinityService_ListIndex_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Update_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-InfinityService_ShowTable_args::~InfinityService_ShowTable_args() noexcept {}
-
-uint32_t InfinityService_ShowTable_args::read(::apache::thrift::protocol::TProtocol *iprot) {
-
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Update_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Update_args");
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_Update_pargs::~InfinityService_Update_pargs() noexcept {
 }
 
-uint32_t InfinityService_ShowTable_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowTable_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+uint32_t InfinityService_Update_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Update_pargs");
 
-InfinityService_ShowTable_pargs::~InfinityService_ShowTable_pargs() noexcept {}
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-uint32_t InfinityService_ShowTable_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowTable_pargs");
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Update_result::~InfinityService_Update_result() noexcept {
 }
 
-InfinityService_ShowTable_result::~InfinityService_ShowTable_result() noexcept {}
 
-uint32_t InfinityService_ShowTable_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Update_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowTable_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Update_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowTable_result");
+  xfer += oprot->writeStructBegin("InfinityService_Update_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowTable_presult::~InfinityService_ShowTable_presult() noexcept {}
 
-uint32_t InfinityService_ShowTable_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Update_presult::~InfinityService_Update_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Update_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_ShowColumns_args::~InfinityService_ShowColumns_args() noexcept {}
 
-uint32_t InfinityService_ShowColumns_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ListDatabase_args::~InfinityService_ListDatabase_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ListDatabase_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowColumns_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowColumns_args");
+uint32_t InfinityService_ListDatabase_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ListDatabase_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_ListDatabase_pargs::~InfinityService_ListDatabase_pargs() noexcept {
 }
 
-InfinityService_ShowColumns_pargs::~InfinityService_ShowColumns_pargs() noexcept {}
 
-uint32_t InfinityService_ShowColumns_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowColumns_pargs");
+uint32_t InfinityService_ListDatabase_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ListDatabase_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_ListDatabase_result::~InfinityService_ListDatabase_result() noexcept {
 }
 
-InfinityService_ShowColumns_result::~InfinityService_ShowColumns_result() noexcept {}
 
-uint32_t InfinityService_ShowColumns_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ListDatabase_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowColumns_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_ListDatabase_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowColumns_result");
+  xfer += oprot->writeStructBegin("InfinityService_ListDatabase_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ListDatabase_presult::~InfinityService_ListDatabase_presult() noexcept {
 }
 
-InfinityService_ShowColumns_presult::~InfinityService_ShowColumns_presult() noexcept {}
 
-uint32_t InfinityService_ShowColumns_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ListDatabase_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
+
 
-InfinityService_ShowDatabase_args::~InfinityService_ShowDatabase_args() noexcept {}
+InfinityService_ListTable_args::~InfinityService_ListTable_args() noexcept {
+}
 
-uint32_t InfinityService_ShowDatabase_args::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_ListTable_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowDatabase_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowDatabase_args");
+uint32_t InfinityService_ListTable_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ListTable_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowDatabase_pargs::~InfinityService_ShowDatabase_pargs() noexcept {}
 
-uint32_t InfinityService_ShowDatabase_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowDatabase_pargs");
+InfinityService_ListTable_pargs::~InfinityService_ListTable_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+
+uint32_t InfinityService_ListTable_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ListTable_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowDatabase_result::~InfinityService_ShowDatabase_result() noexcept {}
 
-uint32_t InfinityService_ShowDatabase_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ListTable_result::~InfinityService_ListTable_result() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ListTable_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowDatabase_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_ListTable_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowDatabase_result");
+  xfer += oprot->writeStructBegin("InfinityService_ListTable_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowDatabase_presult::~InfinityService_ShowDatabase_presult() noexcept {}
 
-uint32_t InfinityService_ShowDatabase_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ListTable_presult::~InfinityService_ListTable_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ListTable_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_ShowTables_args::~InfinityService_ShowTables_args() noexcept {}
 
-uint32_t InfinityService_ShowTables_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ListIndex_args::~InfinityService_ListIndex_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ListIndex_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowTables_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowTables_args");
+uint32_t InfinityService_ListIndex_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ListIndex_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
+
 
-InfinityService_ShowTables_pargs::~InfinityService_ShowTables_pargs() noexcept {}
+InfinityService_ListIndex_pargs::~InfinityService_ListIndex_pargs() noexcept {
+}
 
-uint32_t InfinityService_ShowTables_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowTables_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+uint32_t InfinityService_ListIndex_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ListIndex_pargs");
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
+
 
-InfinityService_ShowTables_result::~InfinityService_ShowTables_result() noexcept {}
+InfinityService_ListIndex_result::~InfinityService_ListIndex_result() noexcept {
+}
 
-uint32_t InfinityService_ShowTables_result::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_ListIndex_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowTables_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_ListIndex_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowTables_result");
+  xfer += oprot->writeStructBegin("InfinityService_ListIndex_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
+
 
-InfinityService_ShowTables_presult::~InfinityService_ShowTables_presult() noexcept {}
+InfinityService_ListIndex_presult::~InfinityService_ListIndex_presult() noexcept {
+}
 
-uint32_t InfinityService_ShowTables_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_ListIndex_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
 
-    xfer += iprot->readStructEnd();
+  return xfer;
+}
+
 
-    return xfer;
+InfinityService_ShowTable_args::~InfinityService_ShowTable_args() noexcept {
 }
 
-InfinityService_ShowSegments_args::~InfinityService_ShowSegments_args() noexcept {}
 
-uint32_t InfinityService_ShowSegments_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ShowTable_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowSegments_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowSegments_args");
+uint32_t InfinityService_ShowTable_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowTable_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowSegments_pargs::~InfinityService_ShowSegments_pargs() noexcept {}
 
-uint32_t InfinityService_ShowSegments_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowSegments_pargs");
+InfinityService_ShowTable_pargs::~InfinityService_ShowTable_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+uint32_t InfinityService_ShowTable_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowTable_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowSegments_result::~InfinityService_ShowSegments_result() noexcept {}
 
-uint32_t InfinityService_ShowSegments_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowTable_result::~InfinityService_ShowTable_result() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ShowTable_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowSegments_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_ShowTable_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowSegments_result");
+  xfer += oprot->writeStructBegin("InfinityService_ShowTable_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowSegments_presult::~InfinityService_ShowSegments_presult() noexcept {}
 
-uint32_t InfinityService_ShowSegments_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowTable_presult::~InfinityService_ShowTable_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ShowTable_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_ShowSegment_args::~InfinityService_ShowSegment_args() noexcept {}
 
-uint32_t InfinityService_ShowSegment_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowColumns_args::~InfinityService_ShowColumns_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ShowColumns_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowSegment_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowSegment_args");
+uint32_t InfinityService_ShowColumns_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowColumns_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_ShowColumns_pargs::~InfinityService_ShowColumns_pargs() noexcept {
 }
 
-InfinityService_ShowSegment_pargs::~InfinityService_ShowSegment_pargs() noexcept {}
 
-uint32_t InfinityService_ShowSegment_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowSegment_pargs");
+uint32_t InfinityService_ShowColumns_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowColumns_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_ShowColumns_result::~InfinityService_ShowColumns_result() noexcept {
 }
 
-InfinityService_ShowSegment_result::~InfinityService_ShowSegment_result() noexcept {}
 
-uint32_t InfinityService_ShowSegment_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ShowColumns_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowSegment_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_ShowColumns_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowSegment_result");
+  xfer += oprot->writeStructBegin("InfinityService_ShowColumns_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowColumns_presult::~InfinityService_ShowColumns_presult() noexcept {
 }
 
-InfinityService_ShowSegment_presult::~InfinityService_ShowSegment_presult() noexcept {}
 
-uint32_t InfinityService_ShowSegment_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ShowColumns_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
+
 
-InfinityService_ShowBlocks_args::~InfinityService_ShowBlocks_args() noexcept {}
+InfinityService_ShowDatabase_args::~InfinityService_ShowDatabase_args() noexcept {
+}
 
-uint32_t InfinityService_ShowBlocks_args::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_ShowDatabase_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowBlocks_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowBlocks_args");
+uint32_t InfinityService_ShowDatabase_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowDatabase_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowBlocks_pargs::~InfinityService_ShowBlocks_pargs() noexcept {}
 
-uint32_t InfinityService_ShowBlocks_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowBlocks_pargs");
+InfinityService_ShowDatabase_pargs::~InfinityService_ShowDatabase_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+
+uint32_t InfinityService_ShowDatabase_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowDatabase_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowBlocks_result::~InfinityService_ShowBlocks_result() noexcept {}
 
-uint32_t InfinityService_ShowBlocks_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowDatabase_result::~InfinityService_ShowDatabase_result() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ShowDatabase_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowBlocks_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_ShowDatabase_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowBlocks_result");
+  xfer += oprot->writeStructBegin("InfinityService_ShowDatabase_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowBlocks_presult::~InfinityService_ShowBlocks_presult() noexcept {}
 
-uint32_t InfinityService_ShowBlocks_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowDatabase_presult::~InfinityService_ShowDatabase_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ShowDatabase_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
 
-    xfer += iprot->readStructEnd();
+  return xfer;
+}
 
-    return xfer;
+
+InfinityService_ShowTables_args::~InfinityService_ShowTables_args() noexcept {
 }
 
-InfinityService_ShowBlock_args::~InfinityService_ShowBlock_args() noexcept {}
 
-uint32_t InfinityService_ShowBlock_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ShowTables_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowBlock_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowBlock_args");
+uint32_t InfinityService_ShowTables_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowTables_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowBlock_pargs::~InfinityService_ShowBlock_pargs() noexcept {}
 
-uint32_t InfinityService_ShowBlock_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowBlock_pargs");
+InfinityService_ShowTables_pargs::~InfinityService_ShowTables_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+
+uint32_t InfinityService_ShowTables_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowTables_pargs");
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowBlock_result::~InfinityService_ShowBlock_result() noexcept {}
 
-uint32_t InfinityService_ShowBlock_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowTables_result::~InfinityService_ShowTables_result() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ShowTables_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowBlock_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_ShowTables_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowBlock_result");
+  xfer += oprot->writeStructBegin("InfinityService_ShowTables_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowBlock_presult::~InfinityService_ShowBlock_presult() noexcept {}
 
-uint32_t InfinityService_ShowBlock_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowTables_presult::~InfinityService_ShowTables_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ShowTables_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_ShowBlockColumn_args::~InfinityService_ShowBlockColumn_args() noexcept {}
 
-uint32_t InfinityService_ShowBlockColumn_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowSegments_args::~InfinityService_ShowSegments_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ShowSegments_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowBlockColumn_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowBlockColumn_args");
+uint32_t InfinityService_ShowSegments_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowSegments_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_ShowBlockColumn_pargs::~InfinityService_ShowBlockColumn_pargs() noexcept {}
 
-uint32_t InfinityService_ShowBlockColumn_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowBlockColumn_pargs");
+InfinityService_ShowSegments_pargs::~InfinityService_ShowSegments_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+
+uint32_t InfinityService_ShowSegments_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowSegments_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+
+InfinityService_ShowSegments_result::~InfinityService_ShowSegments_result() noexcept {
 }
+
 
-InfinityService_ShowBlockColumn_result::~InfinityService_ShowBlockColumn_result() noexcept {}
+uint32_t InfinityService_ShowSegments_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_ShowBlockColumn_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += iprot->readStructBegin(fname);
+  using ::apache::thrift::protocol::TProtocolException;
 
-    using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_ShowSegments_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
+
+  uint32_t xfer = 0;
+
+  xfer += oprot->writeStructBegin("InfinityService_ShowSegments_result");
+
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowSegments_presult::~InfinityService_ShowSegments_presult() noexcept {
+}
+
+
+uint32_t InfinityService_ShowSegments_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_ShowSegment_args::~InfinityService_ShowSegment_args() noexcept {
 }
+
+
+uint32_t InfinityService_ShowSegment_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_ShowBlockColumn_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    uint32_t xfer = 0;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowBlockColumn_result");
+  using ::apache::thrift::protocol::TProtocolException;
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_ShowSegment_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowSegment_args");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowSegment_pargs::~InfinityService_ShowSegment_pargs() noexcept {
 }
 
-InfinityService_ShowBlockColumn_presult::~InfinityService_ShowBlockColumn_presult() noexcept {}
 
-uint32_t InfinityService_ShowBlockColumn_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ShowSegment_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowSegment_pargs");
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowSegment_result::~InfinityService_ShowSegment_result() noexcept {
+}
+
+
+uint32_t InfinityService_ShowSegment_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_ShowSegment_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
+
+  uint32_t xfer = 0;
+
+  xfer += oprot->writeStructBegin("InfinityService_ShowSegment_result");
+
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowSegment_presult::~InfinityService_ShowSegment_presult() noexcept {
+}
+
+
+uint32_t InfinityService_ShowSegment_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_ShowCurrentNode_args::~InfinityService_ShowCurrentNode_args() noexcept {}
 
-uint32_t InfinityService_ShowCurrentNode_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowBlocks_args::~InfinityService_ShowBlocks_args() noexcept {
+}
+
+
+uint32_t InfinityService_ShowBlocks_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_ShowBlocks_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowBlocks_args");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowBlocks_pargs::~InfinityService_ShowBlocks_pargs() noexcept {
+}
+
+
+uint32_t InfinityService_ShowBlocks_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowBlocks_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowBlocks_result::~InfinityService_ShowBlocks_result() noexcept {
+}
+
+
+uint32_t InfinityService_ShowBlocks_result::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
+
+uint32_t InfinityService_ShowBlocks_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
+
+  uint32_t xfer = 0;
 
-uint32_t InfinityService_ShowCurrentNode_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowCurrentNode_args");
+  xfer += oprot->writeStructBegin("InfinityService_ShowBlocks_result");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
     xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+
+InfinityService_ShowBlocks_presult::~InfinityService_ShowBlocks_presult() noexcept {
 }
 
-InfinityService_ShowCurrentNode_pargs::~InfinityService_ShowCurrentNode_pargs() noexcept {}
 
-uint32_t InfinityService_ShowCurrentNode_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowCurrentNode_pargs");
+uint32_t InfinityService_ShowBlocks_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+
+InfinityService_ShowBlock_args::~InfinityService_ShowBlock_args() noexcept {
 }
+
 
-InfinityService_ShowCurrentNode_result::~InfinityService_ShowCurrentNode_result() noexcept {}
+uint32_t InfinityService_ShowBlock_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-uint32_t InfinityService_ShowCurrentNode_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += iprot->readStructBegin(fname);
 
-    xfer += iprot->readStructBegin(fname);
+  using ::apache::thrift::protocol::TProtocolException;
 
-    using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_ShowBlock_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowBlock_args");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowBlock_pargs::~InfinityService_ShowBlock_pargs() noexcept {
+}
+
+
+uint32_t InfinityService_ShowBlock_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowBlock_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowBlock_result::~InfinityService_ShowBlock_result() noexcept {
+}
+
+
+uint32_t InfinityService_ShowBlock_result::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
+uint32_t InfinityService_ShowBlock_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    return xfer;
+  uint32_t xfer = 0;
+
+  xfer += oprot->writeStructBegin("InfinityService_ShowBlock_result");
+
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowBlock_presult::~InfinityService_ShowBlock_presult() noexcept {
 }
 
-uint32_t InfinityService_ShowCurrentNode_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
 
-    uint32_t xfer = 0;
+uint32_t InfinityService_ShowBlock_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowCurrentNode_result");
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
     }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+
+InfinityService_ShowBlockColumn_args::~InfinityService_ShowBlockColumn_args() noexcept {
 }
 
-InfinityService_ShowCurrentNode_presult::~InfinityService_ShowCurrentNode_presult() noexcept {}
 
-uint32_t InfinityService_ShowCurrentNode_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ShowBlockColumn_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_ShowBlockColumn_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowBlockColumn_args");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowBlockColumn_pargs::~InfinityService_ShowBlockColumn_pargs() noexcept {
+}
+
+
+uint32_t InfinityService_ShowBlockColumn_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowBlockColumn_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowBlockColumn_result::~InfinityService_ShowBlockColumn_result() noexcept {
+}
+
+
+uint32_t InfinityService_ShowBlockColumn_result::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
+uint32_t InfinityService_ShowBlockColumn_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    return xfer;
+  uint32_t xfer = 0;
+
+  xfer += oprot->writeStructBegin("InfinityService_ShowBlockColumn_result");
+
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowBlockColumn_presult::~InfinityService_ShowBlockColumn_presult() noexcept {
 }
 
-InfinityService_GetDatabase_args::~InfinityService_GetDatabase_args() noexcept {}
 
-uint32_t InfinityService_GetDatabase_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ShowBlockColumn_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+
+InfinityService_ShowCurrentNode_args::~InfinityService_ShowCurrentNode_args() noexcept {
+}
+
+
+uint32_t InfinityService_ShowCurrentNode_args::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_GetDatabase_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_GetDatabase_args");
+uint32_t InfinityService_ShowCurrentNode_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowCurrentNode_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_GetDatabase_pargs::~InfinityService_GetDatabase_pargs() noexcept {}
 
-uint32_t InfinityService_GetDatabase_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_GetDatabase_pargs");
+InfinityService_ShowCurrentNode_pargs::~InfinityService_ShowCurrentNode_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+
+uint32_t InfinityService_ShowCurrentNode_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowCurrentNode_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+
+InfinityService_ShowCurrentNode_result::~InfinityService_ShowCurrentNode_result() noexcept {
 }
 
-InfinityService_GetDatabase_result::~InfinityService_GetDatabase_result() noexcept {}
 
-uint32_t InfinityService_GetDatabase_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_ShowCurrentNode_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_ShowCurrentNode_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
+
+  uint32_t xfer = 0;
+
+  xfer += oprot->writeStructBegin("InfinityService_ShowCurrentNode_result");
+
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_ShowCurrentNode_presult::~InfinityService_ShowCurrentNode_presult() noexcept {
+}
+
+
+uint32_t InfinityService_ShowCurrentNode_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
 
-    xfer += iprot->readStructEnd();
+  return xfer;
+}
 
-    return xfer;
+
+InfinityService_GetDatabase_args::~InfinityService_GetDatabase_args() noexcept {
 }
+
 
-uint32_t InfinityService_GetDatabase_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_GetDatabase_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    uint32_t xfer = 0;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += oprot->writeStructBegin("InfinityService_GetDatabase_result");
+  xfer += iprot->readStructBegin(fname);
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_GetDatabase_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_GetDatabase_args");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_GetDatabase_pargs::~InfinityService_GetDatabase_pargs() noexcept {
+}
+
+
+uint32_t InfinityService_GetDatabase_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_GetDatabase_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_GetDatabase_result::~InfinityService_GetDatabase_result() noexcept {
 }
 
-InfinityService_GetDatabase_presult::~InfinityService_GetDatabase_presult() noexcept {}
 
-uint32_t InfinityService_GetDatabase_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_GetDatabase_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_GetDatabase_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
+
+  uint32_t xfer = 0;
+
+  xfer += oprot->writeStructBegin("InfinityService_GetDatabase_result");
+
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_GetDatabase_presult::~InfinityService_GetDatabase_presult() noexcept {
+}
+
+
+uint32_t InfinityService_GetDatabase_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_GetTable_args::~InfinityService_GetTable_args() noexcept {
 }
 
-InfinityService_GetTable_args::~InfinityService_GetTable_args() noexcept {}
 
-uint32_t InfinityService_GetTable_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_GetTable_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
+
+  return xfer;
+}
+
+uint32_t InfinityService_GetTable_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_GetTable_args");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_GetTable_pargs::~InfinityService_GetTable_pargs() noexcept {
+}
+
+
+uint32_t InfinityService_GetTable_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_GetTable_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_GetTable_result::~InfinityService_GetTable_result() noexcept {
+}
+
+
+uint32_t InfinityService_GetTable_result::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_GetTable_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_GetTable_args");
+uint32_t InfinityService_GetTable_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
+  uint32_t xfer = 0;
+
+  xfer += oprot->writeStructBegin("InfinityService_GetTable_result");
+
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
     xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+
+InfinityService_GetTable_presult::~InfinityService_GetTable_presult() noexcept {
 }
+
+
+uint32_t InfinityService_GetTable_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
+
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
+
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
+        }
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
+    }
+    xfer += iprot->readFieldEnd();
+  }
 
-InfinityService_GetTable_pargs::~InfinityService_GetTable_pargs() noexcept {}
+  xfer += iprot->readStructEnd();
 
-uint32_t InfinityService_GetTable_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_GetTable_pargs");
+  return xfer;
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_CreateIndex_args::~InfinityService_CreateIndex_args() noexcept {
 }
 
-InfinityService_GetTable_result::~InfinityService_GetTable_result() noexcept {}
 
-uint32_t InfinityService_GetTable_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_CreateIndex_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_GetTable_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_CreateIndex_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_CreateIndex_args");
 
-    uint32_t xfer = 0;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeStructBegin("InfinityService_GetTable_result");
-
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_GetTable_presult::~InfinityService_GetTable_presult() noexcept {}
 
-uint32_t InfinityService_GetTable_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_CreateIndex_pargs::~InfinityService_CreateIndex_pargs() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_CreateIndex_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_CreateIndex_pargs");
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_CreateIndex_result::~InfinityService_CreateIndex_result() noexcept {
 }
 
-InfinityService_CreateIndex_args::~InfinityService_CreateIndex_args() noexcept {}
 
-uint32_t InfinityService_CreateIndex_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_CreateIndex_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_CreateIndex_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_CreateIndex_args");
+uint32_t InfinityService_CreateIndex_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
-
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
-
-InfinityService_CreateIndex_pargs::~InfinityService_CreateIndex_pargs() noexcept {}
+  uint32_t xfer = 0;
 
-uint32_t InfinityService_CreateIndex_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_CreateIndex_pargs");
+  xfer += oprot->writeStructBegin("InfinityService_CreateIndex_result");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
     xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_CreateIndex_presult::~InfinityService_CreateIndex_presult() noexcept {
 }
 
-InfinityService_CreateIndex_result::~InfinityService_CreateIndex_result() noexcept {}
 
-uint32_t InfinityService_CreateIndex_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_CreateIndex_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-uint32_t InfinityService_CreateIndex_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
 
-    uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_CreateIndex_result");
-
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_DropIndex_args::~InfinityService_DropIndex_args() noexcept {
 }
 
-InfinityService_CreateIndex_presult::~InfinityService_CreateIndex_presult() noexcept {}
 
-uint32_t InfinityService_CreateIndex_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_DropIndex_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
-
-InfinityService_DropIndex_args::~InfinityService_DropIndex_args() noexcept {}
 
-uint32_t InfinityService_DropIndex_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_DropIndex_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_DropIndex_args");
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += iprot->readStructBegin(fname);
-
-    using ::apache::thrift::protocol::TProtocolException;
-
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
-        }
-        xfer += iprot->readFieldEnd();
-    }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += iprot->readStructEnd();
 
-    return xfer;
+InfinityService_DropIndex_pargs::~InfinityService_DropIndex_pargs() noexcept {
 }
 
-uint32_t InfinityService_DropIndex_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_DropIndex_args");
-
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
-}
+uint32_t InfinityService_DropIndex_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_DropIndex_pargs");
 
-InfinityService_DropIndex_pargs::~InfinityService_DropIndex_pargs() noexcept {}
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-uint32_t InfinityService_DropIndex_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_DropIndex_pargs");
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_DropIndex_result::~InfinityService_DropIndex_result() noexcept {
 }
 
-InfinityService_DropIndex_result::~InfinityService_DropIndex_result() noexcept {}
 
-uint32_t InfinityService_DropIndex_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_DropIndex_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_DropIndex_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_DropIndex_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_DropIndex_result");
+  xfer += oprot->writeStructBegin("InfinityService_DropIndex_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_DropIndex_presult::~InfinityService_DropIndex_presult() noexcept {}
 
-uint32_t InfinityService_DropIndex_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_DropIndex_presult::~InfinityService_DropIndex_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_DropIndex_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_ShowIndex_args::~InfinityService_ShowIndex_args() noexcept {}
 
-uint32_t InfinityService_ShowIndex_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_ShowIndex_args::~InfinityService_ShowIndex_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_ShowIndex_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowIndex_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowIndex_args");
+uint32_t InfinityService_ShowIndex_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowIndex_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
+
 
-InfinityService_ShowIndex_pargs::~InfinityService_ShowIndex_pargs() noexcept {}
+InfinityService_ShowIndex_pargs::~InfinityService_ShowIndex_pargs() noexcept {
+}
 
-uint32_t InfinityService_ShowIndex_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_ShowIndex_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+uint32_t InfinityService_ShowIndex_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_ShowIndex_pargs");
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
+
 
-InfinityService_ShowIndex_result::~InfinityService_ShowIndex_result() noexcept {}
+InfinityService_ShowIndex_result::~InfinityService_ShowIndex_result() noexcept {
+}
 
-uint32_t InfinityService_ShowIndex_result::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_ShowIndex_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_ShowIndex_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_ShowIndex_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_ShowIndex_result");
+  xfer += oprot->writeStructBegin("InfinityService_ShowIndex_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
+
 
-InfinityService_ShowIndex_presult::~InfinityService_ShowIndex_presult() noexcept {}
+InfinityService_ShowIndex_presult::~InfinityService_ShowIndex_presult() noexcept {
+}
 
-uint32_t InfinityService_ShowIndex_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_ShowIndex_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
 
-    xfer += iprot->readStructEnd();
+  return xfer;
+}
+
 
-    return xfer;
+InfinityService_Optimize_args::~InfinityService_Optimize_args() noexcept {
 }
 
-InfinityService_Optimize_args::~InfinityService_Optimize_args() noexcept {}
 
-uint32_t InfinityService_Optimize_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Optimize_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Optimize_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Optimize_args");
+uint32_t InfinityService_Optimize_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Optimize_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Optimize_pargs::~InfinityService_Optimize_pargs() noexcept {}
 
-uint32_t InfinityService_Optimize_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Optimize_pargs");
+InfinityService_Optimize_pargs::~InfinityService_Optimize_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+uint32_t InfinityService_Optimize_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Optimize_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Optimize_result::~InfinityService_Optimize_result() noexcept {}
 
-uint32_t InfinityService_Optimize_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Optimize_result::~InfinityService_Optimize_result() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Optimize_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Optimize_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Optimize_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_Optimize_result");
+  xfer += oprot->writeStructBegin("InfinityService_Optimize_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Optimize_presult::~InfinityService_Optimize_presult() noexcept {}
 
-uint32_t InfinityService_Optimize_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Optimize_presult::~InfinityService_Optimize_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Optimize_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_AddColumns_args::~InfinityService_AddColumns_args() noexcept {}
 
-uint32_t InfinityService_AddColumns_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_AddColumns_args::~InfinityService_AddColumns_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_AddColumns_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_AddColumns_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_AddColumns_args");
+uint32_t InfinityService_AddColumns_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_AddColumns_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_AddColumns_pargs::~InfinityService_AddColumns_pargs() noexcept {
 }
 
-InfinityService_AddColumns_pargs::~InfinityService_AddColumns_pargs() noexcept {}
 
-uint32_t InfinityService_AddColumns_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_AddColumns_pargs");
+uint32_t InfinityService_AddColumns_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_AddColumns_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_AddColumns_result::~InfinityService_AddColumns_result() noexcept {
 }
 
-InfinityService_AddColumns_result::~InfinityService_AddColumns_result() noexcept {}
 
-uint32_t InfinityService_AddColumns_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_AddColumns_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_AddColumns_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_AddColumns_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_AddColumns_result");
+  xfer += oprot->writeStructBegin("InfinityService_AddColumns_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_AddColumns_presult::~InfinityService_AddColumns_presult() noexcept {
 }
 
-InfinityService_AddColumns_presult::~InfinityService_AddColumns_presult() noexcept {}
 
-uint32_t InfinityService_AddColumns_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_AddColumns_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
+
 
-InfinityService_DropColumns_args::~InfinityService_DropColumns_args() noexcept {}
+InfinityService_DropColumns_args::~InfinityService_DropColumns_args() noexcept {
+}
 
-uint32_t InfinityService_DropColumns_args::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_DropColumns_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_DropColumns_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_DropColumns_args");
+uint32_t InfinityService_DropColumns_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_DropColumns_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_DropColumns_pargs::~InfinityService_DropColumns_pargs() noexcept {}
 
-uint32_t InfinityService_DropColumns_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_DropColumns_pargs");
+InfinityService_DropColumns_pargs::~InfinityService_DropColumns_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+
+uint32_t InfinityService_DropColumns_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_DropColumns_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_DropColumns_result::~InfinityService_DropColumns_result() noexcept {}
 
-uint32_t InfinityService_DropColumns_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_DropColumns_result::~InfinityService_DropColumns_result() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_DropColumns_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_DropColumns_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_DropColumns_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_DropColumns_result");
+  xfer += oprot->writeStructBegin("InfinityService_DropColumns_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_DropColumns_presult::~InfinityService_DropColumns_presult() noexcept {}
 
-uint32_t InfinityService_DropColumns_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_DropColumns_presult::~InfinityService_DropColumns_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_DropColumns_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_Cleanup_args::~InfinityService_Cleanup_args() noexcept {}
 
-uint32_t InfinityService_Cleanup_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Cleanup_args::~InfinityService_Cleanup_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Cleanup_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Cleanup_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Cleanup_args");
+uint32_t InfinityService_Cleanup_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Cleanup_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
+
 
-InfinityService_Cleanup_pargs::~InfinityService_Cleanup_pargs() noexcept {}
+InfinityService_Cleanup_pargs::~InfinityService_Cleanup_pargs() noexcept {
+}
 
-uint32_t InfinityService_Cleanup_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Cleanup_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+uint32_t InfinityService_Cleanup_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Cleanup_pargs");
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
+
 
-InfinityService_Cleanup_result::~InfinityService_Cleanup_result() noexcept {}
+InfinityService_Cleanup_result::~InfinityService_Cleanup_result() noexcept {
+}
 
-uint32_t InfinityService_Cleanup_result::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_Cleanup_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Cleanup_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Cleanup_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_Cleanup_result");
+  xfer += oprot->writeStructBegin("InfinityService_Cleanup_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
+
 
-InfinityService_Cleanup_presult::~InfinityService_Cleanup_presult() noexcept {}
+InfinityService_Cleanup_presult::~InfinityService_Cleanup_presult() noexcept {
+}
 
-uint32_t InfinityService_Cleanup_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_Cleanup_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
+
+  xfer += iprot->readStructEnd();
 
-    xfer += iprot->readStructEnd();
+  return xfer;
+}
+
 
-    return xfer;
+InfinityService_Command_args::~InfinityService_Command_args() noexcept {
 }
 
-InfinityService_Command_args::~InfinityService_Command_args() noexcept {}
 
-uint32_t InfinityService_Command_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Command_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Command_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Command_args");
+uint32_t InfinityService_Command_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Command_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Command_pargs::~InfinityService_Command_pargs() noexcept {}
 
-uint32_t InfinityService_Command_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Command_pargs");
+InfinityService_Command_pargs::~InfinityService_Command_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+uint32_t InfinityService_Command_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Command_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Command_result::~InfinityService_Command_result() noexcept {}
 
-uint32_t InfinityService_Command_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Command_result::~InfinityService_Command_result() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Command_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Command_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Command_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_Command_result");
+  xfer += oprot->writeStructBegin("InfinityService_Command_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Command_presult::~InfinityService_Command_presult() noexcept {}
 
-uint32_t InfinityService_Command_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Command_presult::~InfinityService_Command_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Command_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-InfinityService_Flush_args::~InfinityService_Flush_args() noexcept {}
 
-uint32_t InfinityService_Flush_args::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Flush_args::~InfinityService_Flush_args() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Flush_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Flush_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Flush_args");
+uint32_t InfinityService_Flush_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Flush_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Flush_pargs::~InfinityService_Flush_pargs() noexcept {
 }
 
-InfinityService_Flush_pargs::~InfinityService_Flush_pargs() noexcept {}
 
-uint32_t InfinityService_Flush_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Flush_pargs");
+uint32_t InfinityService_Flush_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Flush_pargs");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
+
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+InfinityService_Flush_result::~InfinityService_Flush_result() noexcept {
 }
 
-InfinityService_Flush_result::~InfinityService_Flush_result() noexcept {}
 
-uint32_t InfinityService_Flush_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Flush_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Flush_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Flush_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_Flush_result");
+  xfer += oprot->writeStructBegin("InfinityService_Flush_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
+}
+
+
+InfinityService_Flush_presult::~InfinityService_Flush_presult() noexcept {
 }
 
-InfinityService_Flush_presult::~InfinityService_Flush_presult() noexcept {}
 
-uint32_t InfinityService_Flush_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+uint32_t InfinityService_Flush_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+  xfer += iprot->readStructBegin(fname);
 
-    using ::apache::thrift::protocol::TProtocolException;
+  using ::apache::thrift::protocol::TProtocolException;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
+
 
-InfinityService_Compact_args::~InfinityService_Compact_args() noexcept {}
+InfinityService_Compact_args::~InfinityService_Compact_args() noexcept {
+}
 
-uint32_t InfinityService_Compact_args::read(::apache::thrift::protocol::TProtocol *iprot) {
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
+uint32_t InfinityService_Compact_args::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    xfer += iprot->readStructBegin(fname);
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    using ::apache::thrift::protocol::TProtocolException;
+  xfer += iprot->readStructBegin(fname);
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 1:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->request.read(iprot);
-                    this->__isset.request = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 1:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->request.read(iprot);
+          this->__isset.request = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Compact_args::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Compact_args");
+uint32_t InfinityService_Compact_args::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Compact_args");
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += this->request.write(oprot);
-    xfer += oprot->writeFieldEnd();
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += this->request.write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Compact_pargs::~InfinityService_Compact_pargs() noexcept {}
 
-uint32_t InfinityService_Compact_pargs::write(::apache::thrift::protocol::TProtocol *oprot) const {
-    uint32_t xfer = 0;
-    ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
-    xfer += oprot->writeStructBegin("InfinityService_Compact_pargs");
+InfinityService_Compact_pargs::~InfinityService_Compact_pargs() noexcept {
+}
 
-    xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
-    xfer += (*(this->request)).write(oprot);
-    xfer += oprot->writeFieldEnd();
+
+uint32_t InfinityService_Compact_pargs::write(::apache::thrift::protocol::TProtocol* oprot) const {
+  uint32_t xfer = 0;
+  ::apache::thrift::protocol::TOutputRecursionTracker tracker(*oprot);
+  xfer += oprot->writeStructBegin("InfinityService_Compact_pargs");
+
+  xfer += oprot->writeFieldBegin("request", ::apache::thrift::protocol::T_STRUCT, 1);
+  xfer += (*(this->request)).write(oprot);
+  xfer += oprot->writeFieldEnd();
 
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Compact_result::~InfinityService_Compact_result() noexcept {}
 
-uint32_t InfinityService_Compact_result::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Compact_result::~InfinityService_Compact_result() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Compact_result::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += this->success.read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += this->success.read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-uint32_t InfinityService_Compact_result::write(::apache::thrift::protocol::TProtocol *oprot) const {
+uint32_t InfinityService_Compact_result::write(::apache::thrift::protocol::TProtocol* oprot) const {
 
-    uint32_t xfer = 0;
+  uint32_t xfer = 0;
 
-    xfer += oprot->writeStructBegin("InfinityService_Compact_result");
+  xfer += oprot->writeStructBegin("InfinityService_Compact_result");
 
-    if (this->__isset.success) {
-        xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
-        xfer += this->success.write(oprot);
-        xfer += oprot->writeFieldEnd();
-    }
-    xfer += oprot->writeFieldStop();
-    xfer += oprot->writeStructEnd();
-    return xfer;
+  if (this->__isset.success) {
+    xfer += oprot->writeFieldBegin("success", ::apache::thrift::protocol::T_STRUCT, 0);
+    xfer += this->success.write(oprot);
+    xfer += oprot->writeFieldEnd();
+  }
+  xfer += oprot->writeFieldStop();
+  xfer += oprot->writeStructEnd();
+  return xfer;
 }
 
-InfinityService_Compact_presult::~InfinityService_Compact_presult() noexcept {}
 
-uint32_t InfinityService_Compact_presult::read(::apache::thrift::protocol::TProtocol *iprot) {
+InfinityService_Compact_presult::~InfinityService_Compact_presult() noexcept {
+}
 
-    ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
-    uint32_t xfer = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TType ftype;
-    int16_t fid;
 
-    xfer += iprot->readStructBegin(fname);
+uint32_t InfinityService_Compact_presult::read(::apache::thrift::protocol::TProtocol* iprot) {
 
-    using ::apache::thrift::protocol::TProtocolException;
+  ::apache::thrift::protocol::TInputRecursionTracker tracker(*iprot);
+  uint32_t xfer = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TType ftype;
+  int16_t fid;
 
-    while (true) {
-        xfer += iprot->readFieldBegin(fname, ftype, fid);
-        if (ftype == ::apache::thrift::protocol::T_STOP) {
-            break;
-        }
-        switch (fid) {
-            case 0:
-                if (ftype == ::apache::thrift::protocol::T_STRUCT) {
-                    xfer += (*(this->success)).read(iprot);
-                    this->__isset.success = true;
-                } else {
-                    xfer += iprot->skip(ftype);
-                }
-                break;
-            default:
-                xfer += iprot->skip(ftype);
-                break;
+  xfer += iprot->readStructBegin(fname);
+
+  using ::apache::thrift::protocol::TProtocolException;
+
+
+  while (true)
+  {
+    xfer += iprot->readFieldBegin(fname, ftype, fid);
+    if (ftype == ::apache::thrift::protocol::T_STOP) {
+      break;
+    }
+    switch (fid)
+    {
+      case 0:
+        if (ftype == ::apache::thrift::protocol::T_STRUCT) {
+          xfer += (*(this->success)).read(iprot);
+          this->__isset.success = true;
+        } else {
+          xfer += iprot->skip(ftype);
         }
-        xfer += iprot->readFieldEnd();
+        break;
+      default:
+        xfer += iprot->skip(ftype);
+        break;
     }
+    xfer += iprot->readFieldEnd();
+  }
 
-    xfer += iprot->readStructEnd();
+  xfer += iprot->readStructEnd();
 
-    return xfer;
+  return xfer;
 }
 
-void InfinityServiceClient::Connect(CommonResponse &_return, const ConnectRequest &request) {
-    send_Connect(request);
-    recv_Connect(_return);
+void InfinityServiceClient::Connect(CommonResponse& _return, const ConnectRequest& request)
+{
+  send_Connect(request);
+  recv_Connect(_return);
 }
 
-void InfinityServiceClient::send_Connect(const ConnectRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Connect", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_Connect(const ConnectRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Connect", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_Connect_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_Connect_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_Connect(CommonResponse &_return) {
+void InfinityServiceClient::recv_Connect(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Connect") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Connect_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Connect failed: unknown result");
-}
-
-void InfinityServiceClient::Disconnect(CommonResponse &_return, const CommonRequest &request) {
-    send_Disconnect(request);
-    recv_Disconnect(_return);
-}
-
-void InfinityServiceClient::send_Disconnect(const CommonRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Disconnect", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Disconnect_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_Disconnect(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Disconnect") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Disconnect_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Disconnect failed: unknown result");
-}
-
-void InfinityServiceClient::CreateDatabase(CommonResponse &_return, const CreateDatabaseRequest &request) {
-    send_CreateDatabase(request);
-    recv_CreateDatabase(_return);
-}
-
-void InfinityServiceClient::send_CreateDatabase(const CreateDatabaseRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("CreateDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_CreateDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_CreateDatabase(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("CreateDatabase") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_CreateDatabase_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("Connect") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Connect_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "CreateDatabase failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Connect failed: unknown result");
 }
 
-void InfinityServiceClient::DropDatabase(CommonResponse &_return, const DropDatabaseRequest &request) {
-    send_DropDatabase(request);
-    recv_DropDatabase(_return);
+void InfinityServiceClient::Disconnect(CommonResponse& _return, const CommonRequest& request)
+{
+  send_Disconnect(request);
+  recv_Disconnect(_return);
 }
 
-void InfinityServiceClient::send_DropDatabase(const DropDatabaseRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("DropDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_Disconnect(const CommonRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Disconnect", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_DropDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_Disconnect_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_DropDatabase(CommonResponse &_return) {
+void InfinityServiceClient::recv_Disconnect(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("DropDatabase") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_DropDatabase_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropDatabase failed: unknown result");
-}
-
-void InfinityServiceClient::CreateTable(CommonResponse &_return, const CreateTableRequest &request) {
-    send_CreateTable(request);
-    recv_CreateTable(_return);
-}
-
-void InfinityServiceClient::send_CreateTable(const CreateTableRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("CreateTable", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_CreateTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_CreateTable(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("CreateTable") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_CreateTable_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "CreateTable failed: unknown result");
-}
-
-void InfinityServiceClient::DropTable(CommonResponse &_return, const DropTableRequest &request) {
-    send_DropTable(request);
-    recv_DropTable(_return);
-}
-
-void InfinityServiceClient::send_DropTable(const DropTableRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("DropTable", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_DropTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_DropTable(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("DropTable") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_DropTable_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("Disconnect") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Disconnect_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropTable failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Disconnect failed: unknown result");
 }
 
-void InfinityServiceClient::Insert(CommonResponse &_return, const InsertRequest &request) {
-    send_Insert(request);
-    recv_Insert(_return);
+void InfinityServiceClient::CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request)
+{
+  send_CreateDatabase(request);
+  recv_CreateDatabase(_return);
 }
 
-void InfinityServiceClient::send_Insert(const InsertRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Insert", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_CreateDatabase(const CreateDatabaseRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("CreateDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_Insert_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_CreateDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_Insert(CommonResponse &_return) {
+void InfinityServiceClient::recv_CreateDatabase(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Insert") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Insert_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Insert failed: unknown result");
-}
-
-void InfinityServiceClient::Import(CommonResponse &_return, const ImportRequest &request) {
-    send_Import(request);
-    recv_Import(_return);
-}
-
-void InfinityServiceClient::send_Import(const ImportRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Import", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Import_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_Import(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Import") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Import_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Import failed: unknown result");
-}
-
-void InfinityServiceClient::Export(CommonResponse &_return, const ExportRequest &request) {
-    send_Export(request);
-    recv_Export(_return);
-}
-
-void InfinityServiceClient::send_Export(const ExportRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Export", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Export_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_Export(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Export") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Export_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("CreateDatabase") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_CreateDatabase_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Export failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "CreateDatabase failed: unknown result");
 }
 
-void InfinityServiceClient::Select(SelectResponse &_return, const SelectRequest &request) {
-    send_Select(request);
-    recv_Select(_return);
+void InfinityServiceClient::DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request)
+{
+  send_DropDatabase(request);
+  recv_DropDatabase(_return);
 }
 
-void InfinityServiceClient::send_Select(const SelectRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Select", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_DropDatabase(const DropDatabaseRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("DropDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_Select_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_DropDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_Select(SelectResponse &_return) {
+void InfinityServiceClient::recv_DropDatabase(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Select") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Select_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Select failed: unknown result");
-}
-
-void InfinityServiceClient::Explain(SelectResponse &_return, const ExplainRequest &request) {
-    send_Explain(request);
-    recv_Explain(_return);
-}
-
-void InfinityServiceClient::send_Explain(const ExplainRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Explain", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Explain_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_Explain(SelectResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Explain") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Explain_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Explain failed: unknown result");
-}
-
-void InfinityServiceClient::Delete(DeleteResponse &_return, const DeleteRequest &request) {
-    send_Delete(request);
-    recv_Delete(_return);
-}
-
-void InfinityServiceClient::send_Delete(const DeleteRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Delete", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Delete_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_Delete(DeleteResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Delete") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Delete_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("DropDatabase") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_DropDatabase_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Delete failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropDatabase failed: unknown result");
 }
 
-void InfinityServiceClient::Update(CommonResponse &_return, const UpdateRequest &request) {
-    send_Update(request);
-    recv_Update(_return);
+void InfinityServiceClient::CreateTable(CommonResponse& _return, const CreateTableRequest& request)
+{
+  send_CreateTable(request);
+  recv_CreateTable(_return);
 }
 
-void InfinityServiceClient::send_Update(const UpdateRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Update", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_CreateTable(const CreateTableRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("CreateTable", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_Update_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_CreateTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_Update(CommonResponse &_return) {
+void InfinityServiceClient::recv_CreateTable(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Update") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Update_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Update failed: unknown result");
-}
-
-void InfinityServiceClient::ListDatabase(ListDatabaseResponse &_return, const ListDatabaseRequest &request) {
-    send_ListDatabase(request);
-    recv_ListDatabase(_return);
-}
-
-void InfinityServiceClient::send_ListDatabase(const ListDatabaseRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ListDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ListDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_ListDatabase(ListDatabaseResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ListDatabase") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ListDatabase_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ListDatabase failed: unknown result");
-}
-
-void InfinityServiceClient::ListTable(ListTableResponse &_return, const ListTableRequest &request) {
-    send_ListTable(request);
-    recv_ListTable(_return);
-}
-
-void InfinityServiceClient::send_ListTable(const ListTableRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ListTable", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ListTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_ListTable(ListTableResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ListTable") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ListTable_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("CreateTable") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_CreateTable_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ListTable failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "CreateTable failed: unknown result");
 }
 
-void InfinityServiceClient::ListIndex(ListIndexResponse &_return, const ListIndexRequest &request) {
-    send_ListIndex(request);
-    recv_ListIndex(_return);
+void InfinityServiceClient::DropTable(CommonResponse& _return, const DropTableRequest& request)
+{
+  send_DropTable(request);
+  recv_DropTable(_return);
 }
 
-void InfinityServiceClient::send_ListIndex(const ListIndexRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ListIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_DropTable(const DropTableRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("DropTable", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_ListIndex_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_DropTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_ListIndex(ListIndexResponse &_return) {
+void InfinityServiceClient::recv_DropTable(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ListIndex") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ListIndex_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ListIndex failed: unknown result");
-}
-
-void InfinityServiceClient::ShowTable(ShowTableResponse &_return, const ShowTableRequest &request) {
-    send_ShowTable(request);
-    recv_ShowTable(_return);
-}
-
-void InfinityServiceClient::send_ShowTable(const ShowTableRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowTable", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_ShowTable(ShowTableResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowTable") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowTable_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowTable failed: unknown result");
-}
-
-void InfinityServiceClient::ShowColumns(SelectResponse &_return, const ShowColumnsRequest &request) {
-    send_ShowColumns(request);
-    recv_ShowColumns(_return);
-}
-
-void InfinityServiceClient::send_ShowColumns(const ShowColumnsRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowColumns", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowColumns_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_ShowColumns(SelectResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowColumns") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowColumns_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("DropTable") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_DropTable_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowColumns failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropTable failed: unknown result");
 }
 
-void InfinityServiceClient::ShowDatabase(ShowDatabaseResponse &_return, const ShowDatabaseRequest &request) {
-    send_ShowDatabase(request);
-    recv_ShowDatabase(_return);
+void InfinityServiceClient::Insert(CommonResponse& _return, const InsertRequest& request)
+{
+  send_Insert(request);
+  recv_Insert(_return);
 }
 
-void InfinityServiceClient::send_ShowDatabase(const ShowDatabaseRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_Insert(const InsertRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Insert", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_ShowDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_Insert_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_ShowDatabase(ShowDatabaseResponse &_return) {
+void InfinityServiceClient::recv_Insert(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowDatabase") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowDatabase_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowDatabase failed: unknown result");
-}
-
-void InfinityServiceClient::ShowTables(SelectResponse &_return, const ShowTablesRequest &request) {
-    send_ShowTables(request);
-    recv_ShowTables(_return);
-}
-
-void InfinityServiceClient::send_ShowTables(const ShowTablesRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowTables", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowTables_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_ShowTables(SelectResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowTables") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowTables_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowTables failed: unknown result");
-}
-
-void InfinityServiceClient::ShowSegments(SelectResponse &_return, const ShowSegmentsRequest &request) {
-    send_ShowSegments(request);
-    recv_ShowSegments(_return);
-}
-
-void InfinityServiceClient::send_ShowSegments(const ShowSegmentsRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowSegments", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowSegments_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_ShowSegments(SelectResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowSegments") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowSegments_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("Insert") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Insert_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowSegments failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Insert failed: unknown result");
 }
 
-void InfinityServiceClient::ShowSegment(ShowSegmentResponse &_return, const ShowSegmentRequest &request) {
-    send_ShowSegment(request);
-    recv_ShowSegment(_return);
+void InfinityServiceClient::Import(CommonResponse& _return, const ImportRequest& request)
+{
+  send_Import(request);
+  recv_Import(_return);
 }
 
-void InfinityServiceClient::send_ShowSegment(const ShowSegmentRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowSegment", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_Import(const ImportRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Import", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_ShowSegment_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_Import_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_ShowSegment(ShowSegmentResponse &_return) {
+void InfinityServiceClient::recv_Import(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowSegment") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowSegment_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowSegment failed: unknown result");
-}
-
-void InfinityServiceClient::ShowBlocks(SelectResponse &_return, const ShowBlocksRequest &request) {
-    send_ShowBlocks(request);
-    recv_ShowBlocks(_return);
-}
-
-void InfinityServiceClient::send_ShowBlocks(const ShowBlocksRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowBlocks", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowBlocks_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_ShowBlocks(SelectResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowBlocks") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowBlocks_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowBlocks failed: unknown result");
-}
-
-void InfinityServiceClient::ShowBlock(ShowBlockResponse &_return, const ShowBlockRequest &request) {
-    send_ShowBlock(request);
-    recv_ShowBlock(_return);
-}
-
-void InfinityServiceClient::send_ShowBlock(const ShowBlockRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowBlock", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowBlock_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_ShowBlock(ShowBlockResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowBlock") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowBlock_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("Import") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Import_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowBlock failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Import failed: unknown result");
 }
 
-void InfinityServiceClient::ShowBlockColumn(ShowBlockColumnResponse &_return, const ShowBlockColumnRequest &request) {
-    send_ShowBlockColumn(request);
-    recv_ShowBlockColumn(_return);
+void InfinityServiceClient::Export(CommonResponse& _return, const ExportRequest& request)
+{
+  send_Export(request);
+  recv_Export(_return);
 }
 
-void InfinityServiceClient::send_ShowBlockColumn(const ShowBlockColumnRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowBlockColumn", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_Export(const ExportRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Export", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_ShowBlockColumn_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_Export_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_ShowBlockColumn(ShowBlockColumnResponse &_return) {
+void InfinityServiceClient::recv_Export(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowBlockColumn") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowBlockColumn_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowBlockColumn failed: unknown result");
-}
-
-void InfinityServiceClient::ShowCurrentNode(ShowCurrentNodeResponse &_return, const ShowCurrentNodeRequest &request) {
-    send_ShowCurrentNode(request);
-    recv_ShowCurrentNode(_return);
-}
-
-void InfinityServiceClient::send_ShowCurrentNode(const ShowCurrentNodeRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowCurrentNode", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowCurrentNode_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_ShowCurrentNode(ShowCurrentNodeResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowCurrentNode") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowCurrentNode_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowCurrentNode failed: unknown result");
-}
-
-void InfinityServiceClient::GetDatabase(CommonResponse &_return, const GetDatabaseRequest &request) {
-    send_GetDatabase(request);
-    recv_GetDatabase(_return);
-}
-
-void InfinityServiceClient::send_GetDatabase(const GetDatabaseRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("GetDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_GetDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_GetDatabase(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("GetDatabase") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_GetDatabase_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("Export") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Export_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "GetDatabase failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Export failed: unknown result");
 }
 
-void InfinityServiceClient::GetTable(CommonResponse &_return, const GetTableRequest &request) {
-    send_GetTable(request);
-    recv_GetTable(_return);
+void InfinityServiceClient::Select(SelectResponse& _return, const SelectRequest& request)
+{
+  send_Select(request);
+  recv_Select(_return);
 }
 
-void InfinityServiceClient::send_GetTable(const GetTableRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("GetTable", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_Select(const SelectRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Select", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_GetTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_Select_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_GetTable(CommonResponse &_return) {
+void InfinityServiceClient::recv_Select(SelectResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("GetTable") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_GetTable_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "GetTable failed: unknown result");
-}
-
-void InfinityServiceClient::CreateIndex(CommonResponse &_return, const CreateIndexRequest &request) {
-    send_CreateIndex(request);
-    recv_CreateIndex(_return);
-}
-
-void InfinityServiceClient::send_CreateIndex(const CreateIndexRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("CreateIndex", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_CreateIndex_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_CreateIndex(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("CreateIndex") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_CreateIndex_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "CreateIndex failed: unknown result");
-}
-
-void InfinityServiceClient::DropIndex(CommonResponse &_return, const DropIndexRequest &request) {
-    send_DropIndex(request);
-    recv_DropIndex(_return);
-}
-
-void InfinityServiceClient::send_DropIndex(const DropIndexRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("DropIndex", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_DropIndex_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_DropIndex(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("DropIndex") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_DropIndex_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("Select") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Select_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropIndex failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Select failed: unknown result");
 }
 
-void InfinityServiceClient::ShowIndex(ShowIndexResponse &_return, const ShowIndexRequest &request) {
-    send_ShowIndex(request);
-    recv_ShowIndex(_return);
+void InfinityServiceClient::Explain(SelectResponse& _return, const ExplainRequest& request)
+{
+  send_Explain(request);
+  recv_Explain(_return);
 }
 
-void InfinityServiceClient::send_ShowIndex(const ShowIndexRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("ShowIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_Explain(const ExplainRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Explain", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_ShowIndex_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_Explain_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_ShowIndex(ShowIndexResponse &_return) {
+void InfinityServiceClient::recv_Explain(SelectResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("ShowIndex") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_ShowIndex_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowIndex failed: unknown result");
-}
-
-void InfinityServiceClient::Optimize(CommonResponse &_return, const OptimizeRequest &request) {
-    send_Optimize(request);
-    recv_Optimize(_return);
-}
-
-void InfinityServiceClient::send_Optimize(const OptimizeRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Optimize", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Optimize_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_Optimize(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Optimize") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Optimize_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Optimize failed: unknown result");
-}
-
-void InfinityServiceClient::AddColumns(CommonResponse &_return, const AddColumnsRequest &request) {
-    send_AddColumns(request);
-    recv_AddColumns(_return);
-}
-
-void InfinityServiceClient::send_AddColumns(const AddColumnsRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("AddColumns", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_AddColumns_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_AddColumns(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("AddColumns") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_AddColumns_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("Explain") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Explain_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "AddColumns failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Explain failed: unknown result");
 }
 
-void InfinityServiceClient::DropColumns(CommonResponse &_return, const DropColumnsRequest &request) {
-    send_DropColumns(request);
-    recv_DropColumns(_return);
+void InfinityServiceClient::Delete(DeleteResponse& _return, const DeleteRequest& request)
+{
+  send_Delete(request);
+  recv_Delete(_return);
 }
 
-void InfinityServiceClient::send_DropColumns(const DropColumnsRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("DropColumns", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_Delete(const DeleteRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Delete", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_DropColumns_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_Delete_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_DropColumns(CommonResponse &_return) {
+void InfinityServiceClient::recv_Delete(DeleteResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("DropColumns") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_DropColumns_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropColumns failed: unknown result");
-}
-
-void InfinityServiceClient::Cleanup(CommonResponse &_return, const CommonRequest &request) {
-    send_Cleanup(request);
-    recv_Cleanup(_return);
-}
-
-void InfinityServiceClient::send_Cleanup(const CommonRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Cleanup", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Cleanup_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_Cleanup(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Cleanup") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Cleanup_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Cleanup failed: unknown result");
-}
-
-void InfinityServiceClient::Command(CommonResponse &_return, const CommandRequest &request) {
-    send_Command(request);
-    recv_Command(_return);
-}
-
-void InfinityServiceClient::send_Command(const CommandRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Command", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Command_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_Command(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Command") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Command_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  }
+  if (fname.compare("Delete") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Delete_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Command failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Delete failed: unknown result");
 }
 
-void InfinityServiceClient::Flush(CommonResponse &_return, const FlushRequest &request) {
-    send_Flush(request);
-    recv_Flush(_return);
+void InfinityServiceClient::Update(CommonResponse& _return, const UpdateRequest& request)
+{
+  send_Update(request);
+  recv_Update(_return);
 }
 
-void InfinityServiceClient::send_Flush(const FlushRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Flush", ::apache::thrift::protocol::T_CALL, cseqid);
+void InfinityServiceClient::send_Update(const UpdateRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Update", ::apache::thrift::protocol::T_CALL, cseqid);
 
-    InfinityService_Flush_pargs args;
-    args.request = &request;
-    args.write(oprot_);
+  InfinityService_Update_pargs args;
+  args.request = &request;
+  args.write(oprot_);
 
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
 }
 
-void InfinityServiceClient::recv_Flush(CommonResponse &_return) {
+void InfinityServiceClient::recv_Update(CommonResponse& _return)
+{
 
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
 
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Flush") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Flush_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
-
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Flush failed: unknown result");
-}
-
-void InfinityServiceClient::Compact(CommonResponse &_return, const CompactRequest &request) {
-    send_Compact(request);
-    recv_Compact(_return);
-}
-
-void InfinityServiceClient::send_Compact(const CompactRequest &request) {
-    int32_t cseqid = 0;
-    oprot_->writeMessageBegin("Compact", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Compact_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-}
-
-void InfinityServiceClient::recv_Compact(CommonResponse &_return) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    iprot_->readMessageBegin(fname, mtype, rseqid);
-    if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-        ::apache::thrift::TApplicationException x;
-        x.read(iprot_);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-        throw x;
-    }
-    if (mtype != ::apache::thrift::protocol::T_REPLY) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    if (fname.compare("Compact") != 0) {
-        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot_->readMessageEnd();
-        iprot_->getTransport()->readEnd();
-    }
-    InfinityService_Compact_presult result;
-    result.success = &_return;
-    result.read(iprot_);
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
     iprot_->readMessageEnd();
     iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("Update") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Update_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
 
-    if (result.__isset.success) {
-        // _return pointer has now been filled
-        return;
-    }
-    throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Compact failed: unknown result");
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Update failed: unknown result");
 }
 
-bool InfinityServiceProcessor::dispatchCall(::apache::thrift::protocol::TProtocol *iprot,
-                                            ::apache::thrift::protocol::TProtocol *oprot,
-                                            const std::string &fname,
-                                            int32_t seqid,
-                                            void *callContext) {
-    ProcessMap::iterator pfn;
-    pfn = processMap_.find(fname);
-    if (pfn == processMap_.end()) {
-        iprot->skip(::apache::thrift::protocol::T_STRUCT);
-        iprot->readMessageEnd();
-        iprot->getTransport()->readEnd();
-        ::apache::thrift::TApplicationException x(::apache::thrift::TApplicationException::UNKNOWN_METHOD, "Invalid method name: '" + fname + "'");
-        oprot->writeMessageBegin(fname, ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return true;
-    }
-    (this->*(pfn->second))(seqid, iprot, oprot, callContext);
+void InfinityServiceClient::ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request)
+{
+  send_ListDatabase(request);
+  recv_ListDatabase(_return);
+}
+
+void InfinityServiceClient::send_ListDatabase(const ListDatabaseRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ListDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ListDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ListDatabase(ListDatabaseResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ListDatabase") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ListDatabase_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ListDatabase failed: unknown result");
+}
+
+void InfinityServiceClient::ListTable(ListTableResponse& _return, const ListTableRequest& request)
+{
+  send_ListTable(request);
+  recv_ListTable(_return);
+}
+
+void InfinityServiceClient::send_ListTable(const ListTableRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ListTable", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ListTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ListTable(ListTableResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ListTable") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ListTable_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ListTable failed: unknown result");
+}
+
+void InfinityServiceClient::ListIndex(ListIndexResponse& _return, const ListIndexRequest& request)
+{
+  send_ListIndex(request);
+  recv_ListIndex(_return);
+}
+
+void InfinityServiceClient::send_ListIndex(const ListIndexRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ListIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ListIndex_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ListIndex(ListIndexResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ListIndex") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ListIndex_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ListIndex failed: unknown result");
+}
+
+void InfinityServiceClient::ShowTable(ShowTableResponse& _return, const ShowTableRequest& request)
+{
+  send_ShowTable(request);
+  recv_ShowTable(_return);
+}
+
+void InfinityServiceClient::send_ShowTable(const ShowTableRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowTable", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowTable(ShowTableResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowTable") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowTable_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowTable failed: unknown result");
+}
+
+void InfinityServiceClient::ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request)
+{
+  send_ShowColumns(request);
+  recv_ShowColumns(_return);
+}
+
+void InfinityServiceClient::send_ShowColumns(const ShowColumnsRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowColumns", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowColumns_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowColumns(SelectResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowColumns") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowColumns_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowColumns failed: unknown result");
+}
+
+void InfinityServiceClient::ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request)
+{
+  send_ShowDatabase(request);
+  recv_ShowDatabase(_return);
+}
+
+void InfinityServiceClient::send_ShowDatabase(const ShowDatabaseRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowDatabase(ShowDatabaseResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowDatabase") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowDatabase_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowDatabase failed: unknown result");
+}
+
+void InfinityServiceClient::ShowTables(SelectResponse& _return, const ShowTablesRequest& request)
+{
+  send_ShowTables(request);
+  recv_ShowTables(_return);
+}
+
+void InfinityServiceClient::send_ShowTables(const ShowTablesRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowTables", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowTables_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowTables(SelectResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowTables") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowTables_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowTables failed: unknown result");
+}
+
+void InfinityServiceClient::ShowSegments(SelectResponse& _return, const ShowSegmentsRequest& request)
+{
+  send_ShowSegments(request);
+  recv_ShowSegments(_return);
+}
+
+void InfinityServiceClient::send_ShowSegments(const ShowSegmentsRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowSegments", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowSegments_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowSegments(SelectResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowSegments") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowSegments_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowSegments failed: unknown result");
+}
+
+void InfinityServiceClient::ShowSegment(ShowSegmentResponse& _return, const ShowSegmentRequest& request)
+{
+  send_ShowSegment(request);
+  recv_ShowSegment(_return);
+}
+
+void InfinityServiceClient::send_ShowSegment(const ShowSegmentRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowSegment", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowSegment_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowSegment(ShowSegmentResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowSegment") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowSegment_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowSegment failed: unknown result");
+}
+
+void InfinityServiceClient::ShowBlocks(SelectResponse& _return, const ShowBlocksRequest& request)
+{
+  send_ShowBlocks(request);
+  recv_ShowBlocks(_return);
+}
+
+void InfinityServiceClient::send_ShowBlocks(const ShowBlocksRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowBlocks", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowBlocks_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowBlocks(SelectResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowBlocks") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowBlocks_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowBlocks failed: unknown result");
+}
+
+void InfinityServiceClient::ShowBlock(ShowBlockResponse& _return, const ShowBlockRequest& request)
+{
+  send_ShowBlock(request);
+  recv_ShowBlock(_return);
+}
+
+void InfinityServiceClient::send_ShowBlock(const ShowBlockRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowBlock", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowBlock_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowBlock(ShowBlockResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowBlock") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowBlock_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowBlock failed: unknown result");
+}
+
+void InfinityServiceClient::ShowBlockColumn(ShowBlockColumnResponse& _return, const ShowBlockColumnRequest& request)
+{
+  send_ShowBlockColumn(request);
+  recv_ShowBlockColumn(_return);
+}
+
+void InfinityServiceClient::send_ShowBlockColumn(const ShowBlockColumnRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowBlockColumn", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowBlockColumn_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowBlockColumn(ShowBlockColumnResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowBlockColumn") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowBlockColumn_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowBlockColumn failed: unknown result");
+}
+
+void InfinityServiceClient::ShowCurrentNode(ShowCurrentNodeResponse& _return, const ShowCurrentNodeRequest& request)
+{
+  send_ShowCurrentNode(request);
+  recv_ShowCurrentNode(_return);
+}
+
+void InfinityServiceClient::send_ShowCurrentNode(const ShowCurrentNodeRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowCurrentNode", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowCurrentNode_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowCurrentNode(ShowCurrentNodeResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowCurrentNode") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowCurrentNode_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowCurrentNode failed: unknown result");
+}
+
+void InfinityServiceClient::GetDatabase(CommonResponse& _return, const GetDatabaseRequest& request)
+{
+  send_GetDatabase(request);
+  recv_GetDatabase(_return);
+}
+
+void InfinityServiceClient::send_GetDatabase(const GetDatabaseRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("GetDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_GetDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_GetDatabase(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("GetDatabase") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_GetDatabase_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "GetDatabase failed: unknown result");
+}
+
+void InfinityServiceClient::GetTable(CommonResponse& _return, const GetTableRequest& request)
+{
+  send_GetTable(request);
+  recv_GetTable(_return);
+}
+
+void InfinityServiceClient::send_GetTable(const GetTableRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("GetTable", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_GetTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_GetTable(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("GetTable") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_GetTable_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "GetTable failed: unknown result");
+}
+
+void InfinityServiceClient::CreateIndex(CommonResponse& _return, const CreateIndexRequest& request)
+{
+  send_CreateIndex(request);
+  recv_CreateIndex(_return);
+}
+
+void InfinityServiceClient::send_CreateIndex(const CreateIndexRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("CreateIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_CreateIndex_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_CreateIndex(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("CreateIndex") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_CreateIndex_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "CreateIndex failed: unknown result");
+}
+
+void InfinityServiceClient::DropIndex(CommonResponse& _return, const DropIndexRequest& request)
+{
+  send_DropIndex(request);
+  recv_DropIndex(_return);
+}
+
+void InfinityServiceClient::send_DropIndex(const DropIndexRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("DropIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_DropIndex_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_DropIndex(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("DropIndex") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_DropIndex_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropIndex failed: unknown result");
+}
+
+void InfinityServiceClient::ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request)
+{
+  send_ShowIndex(request);
+  recv_ShowIndex(_return);
+}
+
+void InfinityServiceClient::send_ShowIndex(const ShowIndexRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("ShowIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowIndex_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_ShowIndex(ShowIndexResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("ShowIndex") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_ShowIndex_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowIndex failed: unknown result");
+}
+
+void InfinityServiceClient::Optimize(CommonResponse& _return, const OptimizeRequest& request)
+{
+  send_Optimize(request);
+  recv_Optimize(_return);
+}
+
+void InfinityServiceClient::send_Optimize(const OptimizeRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Optimize", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Optimize_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_Optimize(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("Optimize") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Optimize_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Optimize failed: unknown result");
+}
+
+void InfinityServiceClient::AddColumns(CommonResponse& _return, const AddColumnsRequest& request)
+{
+  send_AddColumns(request);
+  recv_AddColumns(_return);
+}
+
+void InfinityServiceClient::send_AddColumns(const AddColumnsRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("AddColumns", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_AddColumns_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_AddColumns(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("AddColumns") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_AddColumns_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "AddColumns failed: unknown result");
+}
+
+void InfinityServiceClient::DropColumns(CommonResponse& _return, const DropColumnsRequest& request)
+{
+  send_DropColumns(request);
+  recv_DropColumns(_return);
+}
+
+void InfinityServiceClient::send_DropColumns(const DropColumnsRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("DropColumns", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_DropColumns_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_DropColumns(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("DropColumns") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_DropColumns_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropColumns failed: unknown result");
+}
+
+void InfinityServiceClient::Cleanup(CommonResponse& _return, const CommonRequest& request)
+{
+  send_Cleanup(request);
+  recv_Cleanup(_return);
+}
+
+void InfinityServiceClient::send_Cleanup(const CommonRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Cleanup", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Cleanup_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_Cleanup(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("Cleanup") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Cleanup_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Cleanup failed: unknown result");
+}
+
+void InfinityServiceClient::Command(CommonResponse& _return, const CommandRequest& request)
+{
+  send_Command(request);
+  recv_Command(_return);
+}
+
+void InfinityServiceClient::send_Command(const CommandRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Command", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Command_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_Command(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("Command") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Command_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Command failed: unknown result");
+}
+
+void InfinityServiceClient::Flush(CommonResponse& _return, const FlushRequest& request)
+{
+  send_Flush(request);
+  recv_Flush(_return);
+}
+
+void InfinityServiceClient::send_Flush(const FlushRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Flush", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Flush_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_Flush(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("Flush") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Flush_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Flush failed: unknown result");
+}
+
+void InfinityServiceClient::Compact(CommonResponse& _return, const CompactRequest& request)
+{
+  send_Compact(request);
+  recv_Compact(_return);
+}
+
+void InfinityServiceClient::send_Compact(const CompactRequest& request)
+{
+  int32_t cseqid = 0;
+  oprot_->writeMessageBegin("Compact", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Compact_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+}
+
+void InfinityServiceClient::recv_Compact(CommonResponse& _return)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  iprot_->readMessageBegin(fname, mtype, rseqid);
+  if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+    ::apache::thrift::TApplicationException x;
+    x.read(iprot_);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+    throw x;
+  }
+  if (mtype != ::apache::thrift::protocol::T_REPLY) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  if (fname.compare("Compact") != 0) {
+    iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot_->readMessageEnd();
+    iprot_->getTransport()->readEnd();
+  }
+  InfinityService_Compact_presult result;
+  result.success = &_return;
+  result.read(iprot_);
+  iprot_->readMessageEnd();
+  iprot_->getTransport()->readEnd();
+
+  if (result.__isset.success) {
+    // _return pointer has now been filled
+    return;
+  }
+  throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Compact failed: unknown result");
+}
+
+bool InfinityServiceProcessor::dispatchCall(::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, const std::string& fname, int32_t seqid, void* callContext) {
+  ProcessMap::iterator pfn;
+  pfn = processMap_.find(fname);
+  if (pfn == processMap_.end()) {
+    iprot->skip(::apache::thrift::protocol::T_STRUCT);
+    iprot->readMessageEnd();
+    iprot->getTransport()->readEnd();
+    ::apache::thrift::TApplicationException x(::apache::thrift::TApplicationException::UNKNOWN_METHOD, "Invalid method name: '"+fname+"'");
+    oprot->writeMessageBegin(fname, ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
+    oprot->writeMessageEnd();
+    oprot->getTransport()->writeEnd();
+    oprot->getTransport()->flush();
     return true;
+  }
+  (this->*(pfn->second))(seqid, iprot, oprot, callContext);
+  return true;
 }
 
-void InfinityServiceProcessor::process_Connect(int32_t seqid,
-                                               ::apache::thrift::protocol::TProtocol *iprot,
-                                               ::apache::thrift::protocol::TProtocol *oprot,
-                                               void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Connect(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Connect", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Connect");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Connect");
+  }
+
+  InfinityService_Connect_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Connect", bytes);
+  }
+
+  InfinityService_Connect_result result;
+  try {
+    iface_->Connect(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Connect", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Connect");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Connect");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Connect");
     }
 
-    InfinityService_Connect_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Connect", bytes);
-    }
-
-    InfinityService_Connect_result result;
-    try {
-        iface_->Connect(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Connect");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Connect", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Connect");
-    }
-
-    oprot->writeMessageBegin("Connect", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Connect", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Connect", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Connect");
+  }
+
+  oprot->writeMessageBegin("Connect", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Connect", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Disconnect(int32_t seqid,
-                                                  ::apache::thrift::protocol::TProtocol *iprot,
-                                                  ::apache::thrift::protocol::TProtocol *oprot,
-                                                  void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Disconnect(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Disconnect", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Disconnect");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Disconnect");
+  }
+
+  InfinityService_Disconnect_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Disconnect", bytes);
+  }
+
+  InfinityService_Disconnect_result result;
+  try {
+    iface_->Disconnect(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Disconnect", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Disconnect");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Disconnect");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Disconnect");
     }
 
-    InfinityService_Disconnect_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Disconnect", bytes);
-    }
-
-    InfinityService_Disconnect_result result;
-    try {
-        iface_->Disconnect(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Disconnect");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Disconnect", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Disconnect");
-    }
-
-    oprot->writeMessageBegin("Disconnect", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Disconnect", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Disconnect", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Disconnect");
+  }
+
+  oprot->writeMessageBegin("Disconnect", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Disconnect", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_CreateDatabase(int32_t seqid,
-                                                      ::apache::thrift::protocol::TProtocol *iprot,
-                                                      ::apache::thrift::protocol::TProtocol *oprot,
-                                                      void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_CreateDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.CreateDatabase", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.CreateDatabase");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.CreateDatabase");
+  }
+
+  InfinityService_CreateDatabase_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.CreateDatabase", bytes);
+  }
+
+  InfinityService_CreateDatabase_result result;
+  try {
+    iface_->CreateDatabase(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.CreateDatabase", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.CreateDatabase");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.CreateDatabase");
+      this->eventHandler_->handlerError(ctx, "InfinityService.CreateDatabase");
     }
 
-    InfinityService_CreateDatabase_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.CreateDatabase", bytes);
-    }
-
-    InfinityService_CreateDatabase_result result;
-    try {
-        iface_->CreateDatabase(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.CreateDatabase");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("CreateDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.CreateDatabase");
-    }
-
-    oprot->writeMessageBegin("CreateDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("CreateDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.CreateDatabase", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.CreateDatabase");
+  }
+
+  oprot->writeMessageBegin("CreateDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.CreateDatabase", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_DropDatabase(int32_t seqid,
-                                                    ::apache::thrift::protocol::TProtocol *iprot,
-                                                    ::apache::thrift::protocol::TProtocol *oprot,
-                                                    void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_DropDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.DropDatabase", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.DropDatabase");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.DropDatabase");
+  }
+
+  InfinityService_DropDatabase_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.DropDatabase", bytes);
+  }
+
+  InfinityService_DropDatabase_result result;
+  try {
+    iface_->DropDatabase(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.DropDatabase", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.DropDatabase");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.DropDatabase");
+      this->eventHandler_->handlerError(ctx, "InfinityService.DropDatabase");
     }
 
-    InfinityService_DropDatabase_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.DropDatabase", bytes);
-    }
-
-    InfinityService_DropDatabase_result result;
-    try {
-        iface_->DropDatabase(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.DropDatabase");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("DropDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.DropDatabase");
-    }
-
-    oprot->writeMessageBegin("DropDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("DropDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.DropDatabase", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.DropDatabase");
+  }
+
+  oprot->writeMessageBegin("DropDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.DropDatabase", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_CreateTable(int32_t seqid,
-                                                   ::apache::thrift::protocol::TProtocol *iprot,
-                                                   ::apache::thrift::protocol::TProtocol *oprot,
-                                                   void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_CreateTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.CreateTable", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.CreateTable");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.CreateTable");
+  }
+
+  InfinityService_CreateTable_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.CreateTable", bytes);
+  }
+
+  InfinityService_CreateTable_result result;
+  try {
+    iface_->CreateTable(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.CreateTable", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.CreateTable");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.CreateTable");
+      this->eventHandler_->handlerError(ctx, "InfinityService.CreateTable");
     }
 
-    InfinityService_CreateTable_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.CreateTable", bytes);
-    }
-
-    InfinityService_CreateTable_result result;
-    try {
-        iface_->CreateTable(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.CreateTable");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("CreateTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.CreateTable");
-    }
-
-    oprot->writeMessageBegin("CreateTable", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("CreateTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.CreateTable", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.CreateTable");
+  }
+
+  oprot->writeMessageBegin("CreateTable", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.CreateTable", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_DropTable(int32_t seqid,
-                                                 ::apache::thrift::protocol::TProtocol *iprot,
-                                                 ::apache::thrift::protocol::TProtocol *oprot,
-                                                 void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_DropTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.DropTable", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.DropTable");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.DropTable");
+  }
+
+  InfinityService_DropTable_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.DropTable", bytes);
+  }
+
+  InfinityService_DropTable_result result;
+  try {
+    iface_->DropTable(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.DropTable", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.DropTable");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.DropTable");
+      this->eventHandler_->handlerError(ctx, "InfinityService.DropTable");
     }
 
-    InfinityService_DropTable_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.DropTable", bytes);
-    }
-
-    InfinityService_DropTable_result result;
-    try {
-        iface_->DropTable(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.DropTable");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("DropTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.DropTable");
-    }
-
-    oprot->writeMessageBegin("DropTable", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("DropTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.DropTable", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.DropTable");
+  }
+
+  oprot->writeMessageBegin("DropTable", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.DropTable", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Insert(int32_t seqid,
-                                              ::apache::thrift::protocol::TProtocol *iprot,
-                                              ::apache::thrift::protocol::TProtocol *oprot,
-                                              void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Insert(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Insert", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Insert");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Insert");
+  }
+
+  InfinityService_Insert_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Insert", bytes);
+  }
+
+  InfinityService_Insert_result result;
+  try {
+    iface_->Insert(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Insert", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Insert");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Insert");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Insert");
     }
 
-    InfinityService_Insert_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Insert", bytes);
-    }
-
-    InfinityService_Insert_result result;
-    try {
-        iface_->Insert(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Insert");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Insert", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Insert");
-    }
-
-    oprot->writeMessageBegin("Insert", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Insert", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Insert", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Insert");
+  }
+
+  oprot->writeMessageBegin("Insert", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Insert", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Import(int32_t seqid,
-                                              ::apache::thrift::protocol::TProtocol *iprot,
-                                              ::apache::thrift::protocol::TProtocol *oprot,
-                                              void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Import(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Import", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Import");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Import");
+  }
+
+  InfinityService_Import_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Import", bytes);
+  }
+
+  InfinityService_Import_result result;
+  try {
+    iface_->Import(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Import", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Import");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Import");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Import");
     }
 
-    InfinityService_Import_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Import", bytes);
-    }
-
-    InfinityService_Import_result result;
-    try {
-        iface_->Import(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Import");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Import", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Import");
-    }
-
-    oprot->writeMessageBegin("Import", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Import", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Import", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Import");
+  }
+
+  oprot->writeMessageBegin("Import", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Import", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Export(int32_t seqid,
-                                              ::apache::thrift::protocol::TProtocol *iprot,
-                                              ::apache::thrift::protocol::TProtocol *oprot,
-                                              void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Export(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Export", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Export");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Export");
+  }
+
+  InfinityService_Export_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Export", bytes);
+  }
+
+  InfinityService_Export_result result;
+  try {
+    iface_->Export(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Export", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Export");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Export");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Export");
     }
 
-    InfinityService_Export_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Export", bytes);
-    }
-
-    InfinityService_Export_result result;
-    try {
-        iface_->Export(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Export");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Export", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Export");
-    }
-
-    oprot->writeMessageBegin("Export", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Export", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Export", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Export");
+  }
+
+  oprot->writeMessageBegin("Export", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Export", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Select(int32_t seqid,
-                                              ::apache::thrift::protocol::TProtocol *iprot,
-                                              ::apache::thrift::protocol::TProtocol *oprot,
-                                              void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Select(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Select", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Select");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Select");
+  }
+
+  InfinityService_Select_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Select", bytes);
+  }
+
+  InfinityService_Select_result result;
+  try {
+    iface_->Select(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Select", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Select");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Select");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Select");
     }
 
-    InfinityService_Select_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Select", bytes);
-    }
-
-    InfinityService_Select_result result;
-    try {
-        iface_->Select(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Select");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Select", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Select");
-    }
-
-    oprot->writeMessageBegin("Select", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Select", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Select", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Select");
+  }
+
+  oprot->writeMessageBegin("Select", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Select", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Explain(int32_t seqid,
-                                               ::apache::thrift::protocol::TProtocol *iprot,
-                                               ::apache::thrift::protocol::TProtocol *oprot,
-                                               void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Explain(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Explain", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Explain");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Explain");
+  }
+
+  InfinityService_Explain_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Explain", bytes);
+  }
+
+  InfinityService_Explain_result result;
+  try {
+    iface_->Explain(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Explain", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Explain");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Explain");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Explain");
     }
 
-    InfinityService_Explain_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Explain", bytes);
-    }
-
-    InfinityService_Explain_result result;
-    try {
-        iface_->Explain(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Explain");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Explain", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Explain");
-    }
-
-    oprot->writeMessageBegin("Explain", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Explain", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Explain", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Explain");
+  }
+
+  oprot->writeMessageBegin("Explain", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Explain", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Delete(int32_t seqid,
-                                              ::apache::thrift::protocol::TProtocol *iprot,
-                                              ::apache::thrift::protocol::TProtocol *oprot,
-                                              void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Delete(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Delete", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Delete");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Delete");
+  }
+
+  InfinityService_Delete_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Delete", bytes);
+  }
+
+  InfinityService_Delete_result result;
+  try {
+    iface_->Delete(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Delete", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Delete");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Delete");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Delete");
     }
 
-    InfinityService_Delete_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Delete", bytes);
-    }
-
-    InfinityService_Delete_result result;
-    try {
-        iface_->Delete(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Delete");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Delete", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Delete");
-    }
-
-    oprot->writeMessageBegin("Delete", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Delete", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Delete", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Delete");
+  }
+
+  oprot->writeMessageBegin("Delete", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Delete", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Update(int32_t seqid,
-                                              ::apache::thrift::protocol::TProtocol *iprot,
-                                              ::apache::thrift::protocol::TProtocol *oprot,
-                                              void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Update(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Update", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Update");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Update");
+  }
+
+  InfinityService_Update_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Update", bytes);
+  }
+
+  InfinityService_Update_result result;
+  try {
+    iface_->Update(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Update", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Update");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Update");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Update");
     }
 
-    InfinityService_Update_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Update", bytes);
-    }
-
-    InfinityService_Update_result result;
-    try {
-        iface_->Update(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Update");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Update", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Update");
-    }
-
-    oprot->writeMessageBegin("Update", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Update", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Update", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Update");
+  }
+
+  oprot->writeMessageBegin("Update", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Update", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ListDatabase(int32_t seqid,
-                                                    ::apache::thrift::protocol::TProtocol *iprot,
-                                                    ::apache::thrift::protocol::TProtocol *oprot,
-                                                    void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ListDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ListDatabase", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ListDatabase");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ListDatabase");
+  }
+
+  InfinityService_ListDatabase_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ListDatabase", bytes);
+  }
+
+  InfinityService_ListDatabase_result result;
+  try {
+    iface_->ListDatabase(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ListDatabase", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ListDatabase");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ListDatabase");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ListDatabase");
     }
 
-    InfinityService_ListDatabase_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ListDatabase", bytes);
-    }
-
-    InfinityService_ListDatabase_result result;
-    try {
-        iface_->ListDatabase(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ListDatabase");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ListDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ListDatabase");
-    }
-
-    oprot->writeMessageBegin("ListDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ListDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ListDatabase", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ListDatabase");
+  }
+
+  oprot->writeMessageBegin("ListDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ListDatabase", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ListTable(int32_t seqid,
-                                                 ::apache::thrift::protocol::TProtocol *iprot,
-                                                 ::apache::thrift::protocol::TProtocol *oprot,
-                                                 void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ListTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ListTable", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ListTable");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ListTable");
+  }
+
+  InfinityService_ListTable_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ListTable", bytes);
+  }
+
+  InfinityService_ListTable_result result;
+  try {
+    iface_->ListTable(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ListTable", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ListTable");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ListTable");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ListTable");
     }
 
-    InfinityService_ListTable_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ListTable", bytes);
-    }
-
-    InfinityService_ListTable_result result;
-    try {
-        iface_->ListTable(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ListTable");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ListTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ListTable");
-    }
-
-    oprot->writeMessageBegin("ListTable", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ListTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ListTable", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ListTable");
+  }
+
+  oprot->writeMessageBegin("ListTable", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ListTable", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ListIndex(int32_t seqid,
-                                                 ::apache::thrift::protocol::TProtocol *iprot,
-                                                 ::apache::thrift::protocol::TProtocol *oprot,
-                                                 void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ListIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ListIndex", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ListIndex");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ListIndex");
+  }
+
+  InfinityService_ListIndex_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ListIndex", bytes);
+  }
+
+  InfinityService_ListIndex_result result;
+  try {
+    iface_->ListIndex(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ListIndex", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ListIndex");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ListIndex");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ListIndex");
     }
 
-    InfinityService_ListIndex_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ListIndex", bytes);
-    }
-
-    InfinityService_ListIndex_result result;
-    try {
-        iface_->ListIndex(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ListIndex");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ListIndex", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ListIndex");
-    }
-
-    oprot->writeMessageBegin("ListIndex", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ListIndex", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ListIndex", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ListIndex");
+  }
+
+  oprot->writeMessageBegin("ListIndex", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ListIndex", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowTable(int32_t seqid,
-                                                 ::apache::thrift::protocol::TProtocol *iprot,
-                                                 ::apache::thrift::protocol::TProtocol *oprot,
-                                                 void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowTable", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowTable");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowTable");
+  }
+
+  InfinityService_ShowTable_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowTable", bytes);
+  }
+
+  InfinityService_ShowTable_result result;
+  try {
+    iface_->ShowTable(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowTable", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowTable");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowTable");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowTable");
     }
 
-    InfinityService_ShowTable_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowTable", bytes);
-    }
-
-    InfinityService_ShowTable_result result;
-    try {
-        iface_->ShowTable(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowTable");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowTable");
-    }
-
-    oprot->writeMessageBegin("ShowTable", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowTable", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowTable");
+  }
+
+  oprot->writeMessageBegin("ShowTable", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowTable", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowColumns(int32_t seqid,
-                                                   ::apache::thrift::protocol::TProtocol *iprot,
-                                                   ::apache::thrift::protocol::TProtocol *oprot,
-                                                   void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowColumns", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowColumns");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowColumns");
+  }
+
+  InfinityService_ShowColumns_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowColumns", bytes);
+  }
+
+  InfinityService_ShowColumns_result result;
+  try {
+    iface_->ShowColumns(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowColumns", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowColumns");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowColumns");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowColumns");
     }
 
-    InfinityService_ShowColumns_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowColumns", bytes);
-    }
-
-    InfinityService_ShowColumns_result result;
-    try {
-        iface_->ShowColumns(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowColumns");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowColumns", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowColumns");
-    }
-
-    oprot->writeMessageBegin("ShowColumns", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowColumns", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowColumns", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowColumns");
+  }
+
+  oprot->writeMessageBegin("ShowColumns", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowColumns", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowDatabase(int32_t seqid,
-                                                    ::apache::thrift::protocol::TProtocol *iprot,
-                                                    ::apache::thrift::protocol::TProtocol *oprot,
-                                                    void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowDatabase", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowDatabase");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowDatabase");
+  }
+
+  InfinityService_ShowDatabase_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowDatabase", bytes);
+  }
+
+  InfinityService_ShowDatabase_result result;
+  try {
+    iface_->ShowDatabase(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowDatabase", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowDatabase");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowDatabase");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowDatabase");
     }
 
-    InfinityService_ShowDatabase_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowDatabase", bytes);
-    }
-
-    InfinityService_ShowDatabase_result result;
-    try {
-        iface_->ShowDatabase(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowDatabase");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowDatabase");
-    }
-
-    oprot->writeMessageBegin("ShowDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowDatabase", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowDatabase");
+  }
+
+  oprot->writeMessageBegin("ShowDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowDatabase", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowTables(int32_t seqid,
-                                                  ::apache::thrift::protocol::TProtocol *iprot,
-                                                  ::apache::thrift::protocol::TProtocol *oprot,
-                                                  void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowTables(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowTables", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowTables");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowTables");
+  }
+
+  InfinityService_ShowTables_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowTables", bytes);
+  }
+
+  InfinityService_ShowTables_result result;
+  try {
+    iface_->ShowTables(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowTables", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowTables");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowTables");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowTables");
     }
 
-    InfinityService_ShowTables_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowTables", bytes);
-    }
-
-    InfinityService_ShowTables_result result;
-    try {
-        iface_->ShowTables(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowTables");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowTables", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowTables");
-    }
-
-    oprot->writeMessageBegin("ShowTables", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowTables", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowTables", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowTables");
+  }
+
+  oprot->writeMessageBegin("ShowTables", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowTables", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowSegments(int32_t seqid,
-                                                    ::apache::thrift::protocol::TProtocol *iprot,
-                                                    ::apache::thrift::protocol::TProtocol *oprot,
-                                                    void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowSegments(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowSegments", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowSegments");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowSegments");
+  }
+
+  InfinityService_ShowSegments_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowSegments", bytes);
+  }
+
+  InfinityService_ShowSegments_result result;
+  try {
+    iface_->ShowSegments(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowSegments", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowSegments");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowSegments");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowSegments");
     }
 
-    InfinityService_ShowSegments_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowSegments", bytes);
-    }
-
-    InfinityService_ShowSegments_result result;
-    try {
-        iface_->ShowSegments(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowSegments");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowSegments", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowSegments");
-    }
-
-    oprot->writeMessageBegin("ShowSegments", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowSegments", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowSegments", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowSegments");
+  }
+
+  oprot->writeMessageBegin("ShowSegments", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowSegments", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowSegment(int32_t seqid,
-                                                   ::apache::thrift::protocol::TProtocol *iprot,
-                                                   ::apache::thrift::protocol::TProtocol *oprot,
-                                                   void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowSegment(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowSegment", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowSegment");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowSegment");
+  }
+
+  InfinityService_ShowSegment_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowSegment", bytes);
+  }
+
+  InfinityService_ShowSegment_result result;
+  try {
+    iface_->ShowSegment(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowSegment", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowSegment");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowSegment");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowSegment");
     }
 
-    InfinityService_ShowSegment_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowSegment", bytes);
-    }
-
-    InfinityService_ShowSegment_result result;
-    try {
-        iface_->ShowSegment(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowSegment");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowSegment", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowSegment");
-    }
-
-    oprot->writeMessageBegin("ShowSegment", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowSegment", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowSegment", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowSegment");
+  }
+
+  oprot->writeMessageBegin("ShowSegment", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowSegment", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowBlocks(int32_t seqid,
-                                                  ::apache::thrift::protocol::TProtocol *iprot,
-                                                  ::apache::thrift::protocol::TProtocol *oprot,
-                                                  void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowBlocks(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowBlocks", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowBlocks");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowBlocks");
+  }
+
+  InfinityService_ShowBlocks_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowBlocks", bytes);
+  }
+
+  InfinityService_ShowBlocks_result result;
+  try {
+    iface_->ShowBlocks(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowBlocks", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowBlocks");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowBlocks");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowBlocks");
     }
 
-    InfinityService_ShowBlocks_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowBlocks", bytes);
-    }
-
-    InfinityService_ShowBlocks_result result;
-    try {
-        iface_->ShowBlocks(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowBlocks");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowBlocks", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowBlocks");
-    }
-
-    oprot->writeMessageBegin("ShowBlocks", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowBlocks", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowBlocks", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowBlocks");
+  }
+
+  oprot->writeMessageBegin("ShowBlocks", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowBlocks", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowBlock(int32_t seqid,
-                                                 ::apache::thrift::protocol::TProtocol *iprot,
-                                                 ::apache::thrift::protocol::TProtocol *oprot,
-                                                 void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowBlock(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowBlock", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowBlock");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowBlock");
+  }
+
+  InfinityService_ShowBlock_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowBlock", bytes);
+  }
+
+  InfinityService_ShowBlock_result result;
+  try {
+    iface_->ShowBlock(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowBlock", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowBlock");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowBlock");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowBlock");
     }
 
-    InfinityService_ShowBlock_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowBlock", bytes);
-    }
-
-    InfinityService_ShowBlock_result result;
-    try {
-        iface_->ShowBlock(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowBlock");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowBlock", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowBlock");
-    }
-
-    oprot->writeMessageBegin("ShowBlock", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowBlock", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowBlock", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowBlock");
+  }
+
+  oprot->writeMessageBegin("ShowBlock", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowBlock", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowBlockColumn(int32_t seqid,
-                                                       ::apache::thrift::protocol::TProtocol *iprot,
-                                                       ::apache::thrift::protocol::TProtocol *oprot,
-                                                       void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowBlockColumn(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowBlockColumn", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowBlockColumn");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowBlockColumn");
+  }
+
+  InfinityService_ShowBlockColumn_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowBlockColumn", bytes);
+  }
+
+  InfinityService_ShowBlockColumn_result result;
+  try {
+    iface_->ShowBlockColumn(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowBlockColumn", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowBlockColumn");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowBlockColumn");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowBlockColumn");
     }
 
-    InfinityService_ShowBlockColumn_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowBlockColumn", bytes);
-    }
-
-    InfinityService_ShowBlockColumn_result result;
-    try {
-        iface_->ShowBlockColumn(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowBlockColumn");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowBlockColumn", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowBlockColumn");
-    }
-
-    oprot->writeMessageBegin("ShowBlockColumn", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowBlockColumn", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowBlockColumn", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowBlockColumn");
+  }
+
+  oprot->writeMessageBegin("ShowBlockColumn", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowBlockColumn", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowCurrentNode(int32_t seqid,
-                                                       ::apache::thrift::protocol::TProtocol *iprot,
-                                                       ::apache::thrift::protocol::TProtocol *oprot,
-                                                       void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowCurrentNode(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowCurrentNode", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowCurrentNode");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowCurrentNode");
+  }
+
+  InfinityService_ShowCurrentNode_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowCurrentNode", bytes);
+  }
+
+  InfinityService_ShowCurrentNode_result result;
+  try {
+    iface_->ShowCurrentNode(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowCurrentNode", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowCurrentNode");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowCurrentNode");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowCurrentNode");
     }
 
-    InfinityService_ShowCurrentNode_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowCurrentNode", bytes);
-    }
-
-    InfinityService_ShowCurrentNode_result result;
-    try {
-        iface_->ShowCurrentNode(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowCurrentNode");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowCurrentNode", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowCurrentNode");
-    }
-
-    oprot->writeMessageBegin("ShowCurrentNode", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowCurrentNode", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowCurrentNode", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowCurrentNode");
+  }
+
+  oprot->writeMessageBegin("ShowCurrentNode", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowCurrentNode", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_GetDatabase(int32_t seqid,
-                                                   ::apache::thrift::protocol::TProtocol *iprot,
-                                                   ::apache::thrift::protocol::TProtocol *oprot,
-                                                   void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_GetDatabase(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.GetDatabase", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.GetDatabase");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.GetDatabase");
+  }
+
+  InfinityService_GetDatabase_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.GetDatabase", bytes);
+  }
+
+  InfinityService_GetDatabase_result result;
+  try {
+    iface_->GetDatabase(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.GetDatabase", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.GetDatabase");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.GetDatabase");
+      this->eventHandler_->handlerError(ctx, "InfinityService.GetDatabase");
     }
 
-    InfinityService_GetDatabase_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.GetDatabase", bytes);
-    }
-
-    InfinityService_GetDatabase_result result;
-    try {
-        iface_->GetDatabase(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.GetDatabase");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("GetDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.GetDatabase");
-    }
-
-    oprot->writeMessageBegin("GetDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("GetDatabase", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.GetDatabase", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.GetDatabase");
+  }
+
+  oprot->writeMessageBegin("GetDatabase", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.GetDatabase", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_GetTable(int32_t seqid,
-                                                ::apache::thrift::protocol::TProtocol *iprot,
-                                                ::apache::thrift::protocol::TProtocol *oprot,
-                                                void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_GetTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.GetTable", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.GetTable");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.GetTable");
+  }
+
+  InfinityService_GetTable_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.GetTable", bytes);
+  }
+
+  InfinityService_GetTable_result result;
+  try {
+    iface_->GetTable(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.GetTable", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.GetTable");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.GetTable");
+      this->eventHandler_->handlerError(ctx, "InfinityService.GetTable");
     }
 
-    InfinityService_GetTable_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.GetTable", bytes);
-    }
-
-    InfinityService_GetTable_result result;
-    try {
-        iface_->GetTable(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.GetTable");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("GetTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.GetTable");
-    }
-
-    oprot->writeMessageBegin("GetTable", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("GetTable", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.GetTable", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.GetTable");
+  }
+
+  oprot->writeMessageBegin("GetTable", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.GetTable", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_CreateIndex(int32_t seqid,
-                                                   ::apache::thrift::protocol::TProtocol *iprot,
-                                                   ::apache::thrift::protocol::TProtocol *oprot,
-                                                   void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_CreateIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.CreateIndex", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.CreateIndex");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.CreateIndex");
+  }
+
+  InfinityService_CreateIndex_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.CreateIndex", bytes);
+  }
+
+  InfinityService_CreateIndex_result result;
+  try {
+    iface_->CreateIndex(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.CreateIndex", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.CreateIndex");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.CreateIndex");
+      this->eventHandler_->handlerError(ctx, "InfinityService.CreateIndex");
     }
 
-    InfinityService_CreateIndex_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.CreateIndex", bytes);
-    }
-
-    InfinityService_CreateIndex_result result;
-    try {
-        iface_->CreateIndex(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.CreateIndex");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("CreateIndex", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.CreateIndex");
-    }
-
-    oprot->writeMessageBegin("CreateIndex", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("CreateIndex", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.CreateIndex", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.CreateIndex");
+  }
+
+  oprot->writeMessageBegin("CreateIndex", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.CreateIndex", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_DropIndex(int32_t seqid,
-                                                 ::apache::thrift::protocol::TProtocol *iprot,
-                                                 ::apache::thrift::protocol::TProtocol *oprot,
-                                                 void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_DropIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.DropIndex", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.DropIndex");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.DropIndex");
+  }
+
+  InfinityService_DropIndex_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.DropIndex", bytes);
+  }
+
+  InfinityService_DropIndex_result result;
+  try {
+    iface_->DropIndex(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.DropIndex", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.DropIndex");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.DropIndex");
+      this->eventHandler_->handlerError(ctx, "InfinityService.DropIndex");
     }
 
-    InfinityService_DropIndex_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.DropIndex", bytes);
-    }
-
-    InfinityService_DropIndex_result result;
-    try {
-        iface_->DropIndex(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.DropIndex");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("DropIndex", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.DropIndex");
-    }
-
-    oprot->writeMessageBegin("DropIndex", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("DropIndex", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.DropIndex", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.DropIndex");
+  }
+
+  oprot->writeMessageBegin("DropIndex", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.DropIndex", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_ShowIndex(int32_t seqid,
-                                                 ::apache::thrift::protocol::TProtocol *iprot,
-                                                 ::apache::thrift::protocol::TProtocol *oprot,
-                                                 void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_ShowIndex(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.ShowIndex", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowIndex");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.ShowIndex");
+  }
+
+  InfinityService_ShowIndex_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.ShowIndex", bytes);
+  }
+
+  InfinityService_ShowIndex_result result;
+  try {
+    iface_->ShowIndex(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.ShowIndex", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.ShowIndex");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.ShowIndex");
+      this->eventHandler_->handlerError(ctx, "InfinityService.ShowIndex");
     }
 
-    InfinityService_ShowIndex_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.ShowIndex", bytes);
-    }
-
-    InfinityService_ShowIndex_result result;
-    try {
-        iface_->ShowIndex(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.ShowIndex");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("ShowIndex", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.ShowIndex");
-    }
-
-    oprot->writeMessageBegin("ShowIndex", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("ShowIndex", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.ShowIndex", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.ShowIndex");
+  }
+
+  oprot->writeMessageBegin("ShowIndex", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.ShowIndex", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Optimize(int32_t seqid,
-                                                ::apache::thrift::protocol::TProtocol *iprot,
-                                                ::apache::thrift::protocol::TProtocol *oprot,
-                                                void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Optimize(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Optimize", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Optimize");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Optimize");
+  }
+
+  InfinityService_Optimize_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Optimize", bytes);
+  }
+
+  InfinityService_Optimize_result result;
+  try {
+    iface_->Optimize(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Optimize", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Optimize");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Optimize");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Optimize");
     }
 
-    InfinityService_Optimize_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Optimize", bytes);
-    }
-
-    InfinityService_Optimize_result result;
-    try {
-        iface_->Optimize(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Optimize");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Optimize", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Optimize");
-    }
-
-    oprot->writeMessageBegin("Optimize", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Optimize", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Optimize", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Optimize");
+  }
+
+  oprot->writeMessageBegin("Optimize", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Optimize", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_AddColumns(int32_t seqid,
-                                                  ::apache::thrift::protocol::TProtocol *iprot,
-                                                  ::apache::thrift::protocol::TProtocol *oprot,
-                                                  void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_AddColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.AddColumns", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.AddColumns");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.AddColumns");
+  }
+
+  InfinityService_AddColumns_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.AddColumns", bytes);
+  }
+
+  InfinityService_AddColumns_result result;
+  try {
+    iface_->AddColumns(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.AddColumns", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.AddColumns");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.AddColumns");
+      this->eventHandler_->handlerError(ctx, "InfinityService.AddColumns");
     }
 
-    InfinityService_AddColumns_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.AddColumns", bytes);
-    }
-
-    InfinityService_AddColumns_result result;
-    try {
-        iface_->AddColumns(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.AddColumns");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("AddColumns", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.AddColumns");
-    }
-
-    oprot->writeMessageBegin("AddColumns", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("AddColumns", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.AddColumns", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.AddColumns");
+  }
+
+  oprot->writeMessageBegin("AddColumns", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.AddColumns", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_DropColumns(int32_t seqid,
-                                                   ::apache::thrift::protocol::TProtocol *iprot,
-                                                   ::apache::thrift::protocol::TProtocol *oprot,
-                                                   void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_DropColumns(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.DropColumns", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.DropColumns");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.DropColumns");
+  }
+
+  InfinityService_DropColumns_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.DropColumns", bytes);
+  }
+
+  InfinityService_DropColumns_result result;
+  try {
+    iface_->DropColumns(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.DropColumns", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.DropColumns");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.DropColumns");
+      this->eventHandler_->handlerError(ctx, "InfinityService.DropColumns");
     }
 
-    InfinityService_DropColumns_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.DropColumns", bytes);
-    }
-
-    InfinityService_DropColumns_result result;
-    try {
-        iface_->DropColumns(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.DropColumns");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("DropColumns", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.DropColumns");
-    }
-
-    oprot->writeMessageBegin("DropColumns", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("DropColumns", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.DropColumns", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.DropColumns");
+  }
+
+  oprot->writeMessageBegin("DropColumns", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.DropColumns", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Cleanup(int32_t seqid,
-                                               ::apache::thrift::protocol::TProtocol *iprot,
-                                               ::apache::thrift::protocol::TProtocol *oprot,
-                                               void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Cleanup(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Cleanup", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Cleanup");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Cleanup");
+  }
+
+  InfinityService_Cleanup_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Cleanup", bytes);
+  }
+
+  InfinityService_Cleanup_result result;
+  try {
+    iface_->Cleanup(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Cleanup", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Cleanup");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Cleanup");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Cleanup");
     }
 
-    InfinityService_Cleanup_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Cleanup", bytes);
-    }
-
-    InfinityService_Cleanup_result result;
-    try {
-        iface_->Cleanup(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Cleanup");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Cleanup", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Cleanup");
-    }
-
-    oprot->writeMessageBegin("Cleanup", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Cleanup", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Cleanup", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Cleanup");
+  }
+
+  oprot->writeMessageBegin("Cleanup", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Cleanup", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Command(int32_t seqid,
-                                               ::apache::thrift::protocol::TProtocol *iprot,
-                                               ::apache::thrift::protocol::TProtocol *oprot,
-                                               void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Command(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Command", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Command");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Command");
+  }
+
+  InfinityService_Command_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Command", bytes);
+  }
+
+  InfinityService_Command_result result;
+  try {
+    iface_->Command(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Command", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Command");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Command");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Command");
     }
 
-    InfinityService_Command_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Command", bytes);
-    }
-
-    InfinityService_Command_result result;
-    try {
-        iface_->Command(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Command");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Command", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Command");
-    }
-
-    oprot->writeMessageBegin("Command", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Command", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Command", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Command");
+  }
+
+  oprot->writeMessageBegin("Command", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Command", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Flush(int32_t seqid,
-                                             ::apache::thrift::protocol::TProtocol *iprot,
-                                             ::apache::thrift::protocol::TProtocol *oprot,
-                                             void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Flush(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Flush", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Flush");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Flush");
+  }
+
+  InfinityService_Flush_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Flush", bytes);
+  }
+
+  InfinityService_Flush_result result;
+  try {
+    iface_->Flush(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Flush", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Flush");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Flush");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Flush");
     }
 
-    InfinityService_Flush_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Flush", bytes);
-    }
-
-    InfinityService_Flush_result result;
-    try {
-        iface_->Flush(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Flush");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Flush", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Flush");
-    }
-
-    oprot->writeMessageBegin("Flush", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Flush", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Flush", bytes);
-    }
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Flush");
+  }
+
+  oprot->writeMessageBegin("Flush", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Flush", bytes);
+  }
 }
 
-void InfinityServiceProcessor::process_Compact(int32_t seqid,
-                                               ::apache::thrift::protocol::TProtocol *iprot,
-                                               ::apache::thrift::protocol::TProtocol *oprot,
-                                               void *callContext) {
-    void *ctx = nullptr;
+void InfinityServiceProcessor::process_Compact(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext)
+{
+  void* ctx = nullptr;
+  if (this->eventHandler_.get() != nullptr) {
+    ctx = this->eventHandler_->getContext("InfinityService.Compact", callContext);
+  }
+  ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Compact");
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preRead(ctx, "InfinityService.Compact");
+  }
+
+  InfinityService_Compact_args args;
+  args.read(iprot);
+  iprot->readMessageEnd();
+  uint32_t bytes = iprot->getTransport()->readEnd();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postRead(ctx, "InfinityService.Compact", bytes);
+  }
+
+  InfinityService_Compact_result result;
+  try {
+    iface_->Compact(result.success, args.request);
+    result.__isset.success = true;
+  } catch (const std::exception& e) {
     if (this->eventHandler_.get() != nullptr) {
-        ctx = this->eventHandler_->getContext("InfinityService.Compact", callContext);
-    }
-    ::apache::thrift::TProcessorContextFreer freer(this->eventHandler_.get(), ctx, "InfinityService.Compact");
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preRead(ctx, "InfinityService.Compact");
+      this->eventHandler_->handlerError(ctx, "InfinityService.Compact");
     }
 
-    InfinityService_Compact_args args;
-    args.read(iprot);
-    iprot->readMessageEnd();
-    uint32_t bytes = iprot->getTransport()->readEnd();
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postRead(ctx, "InfinityService.Compact", bytes);
-    }
-
-    InfinityService_Compact_result result;
-    try {
-        iface_->Compact(result.success, args.request);
-        result.__isset.success = true;
-    } catch (const std::exception &e) {
-        if (this->eventHandler_.get() != nullptr) {
-            this->eventHandler_->handlerError(ctx, "InfinityService.Compact");
-        }
-
-        ::apache::thrift::TApplicationException x(e.what());
-        oprot->writeMessageBegin("Compact", ::apache::thrift::protocol::T_EXCEPTION, seqid);
-        x.write(oprot);
-        oprot->writeMessageEnd();
-        oprot->getTransport()->writeEnd();
-        oprot->getTransport()->flush();
-        return;
-    }
-
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->preWrite(ctx, "InfinityService.Compact");
-    }
-
-    oprot->writeMessageBegin("Compact", ::apache::thrift::protocol::T_REPLY, seqid);
-    result.write(oprot);
+    ::apache::thrift::TApplicationException x(e.what());
+    oprot->writeMessageBegin("Compact", ::apache::thrift::protocol::T_EXCEPTION, seqid);
+    x.write(oprot);
     oprot->writeMessageEnd();
-    bytes = oprot->getTransport()->writeEnd();
+    oprot->getTransport()->writeEnd();
     oprot->getTransport()->flush();
+    return;
+  }
 
-    if (this->eventHandler_.get() != nullptr) {
-        this->eventHandler_->postWrite(ctx, "InfinityService.Compact", bytes);
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->preWrite(ctx, "InfinityService.Compact");
+  }
+
+  oprot->writeMessageBegin("Compact", ::apache::thrift::protocol::T_REPLY, seqid);
+  result.write(oprot);
+  oprot->writeMessageEnd();
+  bytes = oprot->getTransport()->writeEnd();
+  oprot->getTransport()->flush();
+
+  if (this->eventHandler_.get() != nullptr) {
+    this->eventHandler_->postWrite(ctx, "InfinityService.Compact", bytes);
+  }
+}
+
+::std::shared_ptr< ::apache::thrift::TProcessor > InfinityServiceProcessorFactory::getProcessor(const ::apache::thrift::TConnectionInfo& connInfo) {
+  ::apache::thrift::ReleaseHandler< InfinityServiceIfFactory > cleanup(handlerFactory_);
+  ::std::shared_ptr< InfinityServiceIf > handler(handlerFactory_->getHandler(connInfo), cleanup);
+  ::std::shared_ptr< ::apache::thrift::TProcessor > processor(new InfinityServiceProcessor(handler));
+  return processor;
+}
+
+void InfinityServiceConcurrentClient::Connect(CommonResponse& _return, const ConnectRequest& request)
+{
+  int32_t seqid = send_Connect(request);
+  recv_Connect(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Connect(const ConnectRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Connect", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Connect_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Connect(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
     }
-}
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Connect") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Connect_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Connect failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Disconnect(CommonResponse& _return, const CommonRequest& request)
+{
+  int32_t seqid = send_Disconnect(request);
+  recv_Disconnect(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Disconnect(const CommonRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Disconnect", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Disconnect_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Disconnect(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Disconnect") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Disconnect_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Disconnect failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request)
+{
+  int32_t seqid = send_CreateDatabase(request);
+  recv_CreateDatabase(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_CreateDatabase(const CreateDatabaseRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("CreateDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_CreateDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_CreateDatabase(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("CreateDatabase") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_CreateDatabase_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "CreateDatabase failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request)
+{
+  int32_t seqid = send_DropDatabase(request);
+  recv_DropDatabase(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_DropDatabase(const DropDatabaseRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("DropDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_DropDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_DropDatabase(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("DropDatabase") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_DropDatabase_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropDatabase failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::CreateTable(CommonResponse& _return, const CreateTableRequest& request)
+{
+  int32_t seqid = send_CreateTable(request);
+  recv_CreateTable(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_CreateTable(const CreateTableRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("CreateTable", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_CreateTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_CreateTable(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("CreateTable") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_CreateTable_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "CreateTable failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::DropTable(CommonResponse& _return, const DropTableRequest& request)
+{
+  int32_t seqid = send_DropTable(request);
+  recv_DropTable(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_DropTable(const DropTableRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("DropTable", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_DropTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_DropTable(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("DropTable") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_DropTable_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropTable failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Insert(CommonResponse& _return, const InsertRequest& request)
+{
+  int32_t seqid = send_Insert(request);
+  recv_Insert(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Insert(const InsertRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Insert", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Insert_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Insert(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Insert") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Insert_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Insert failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Import(CommonResponse& _return, const ImportRequest& request)
+{
+  int32_t seqid = send_Import(request);
+  recv_Import(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Import(const ImportRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Import", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Import_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Import(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Import") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Import_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Import failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Export(CommonResponse& _return, const ExportRequest& request)
+{
+  int32_t seqid = send_Export(request);
+  recv_Export(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Export(const ExportRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Export", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Export_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Export(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Export") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Export_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Export failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Select(SelectResponse& _return, const SelectRequest& request)
+{
+  int32_t seqid = send_Select(request);
+  recv_Select(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Select(const SelectRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Select", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Select_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Select(SelectResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Select") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Select_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Select failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Explain(SelectResponse& _return, const ExplainRequest& request)
+{
+  int32_t seqid = send_Explain(request);
+  recv_Explain(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Explain(const ExplainRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Explain", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Explain_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Explain(SelectResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Explain") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Explain_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Explain failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Delete(DeleteResponse& _return, const DeleteRequest& request)
+{
+  int32_t seqid = send_Delete(request);
+  recv_Delete(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Delete(const DeleteRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Delete", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Delete_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Delete(DeleteResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Delete") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Delete_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Delete failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Update(CommonResponse& _return, const UpdateRequest& request)
+{
+  int32_t seqid = send_Update(request);
+  recv_Update(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Update(const UpdateRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Update", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Update_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Update(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Update") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Update_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Update failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ListDatabase(ListDatabaseResponse& _return, const ListDatabaseRequest& request)
+{
+  int32_t seqid = send_ListDatabase(request);
+  recv_ListDatabase(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ListDatabase(const ListDatabaseRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ListDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ListDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ListDatabase(ListDatabaseResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ListDatabase") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ListDatabase_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ListDatabase failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ListTable(ListTableResponse& _return, const ListTableRequest& request)
+{
+  int32_t seqid = send_ListTable(request);
+  recv_ListTable(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ListTable(const ListTableRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ListTable", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ListTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ListTable(ListTableResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ListTable") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ListTable_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ListTable failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ListIndex(ListIndexResponse& _return, const ListIndexRequest& request)
+{
+  int32_t seqid = send_ListIndex(request);
+  recv_ListIndex(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ListIndex(const ListIndexRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ListIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ListIndex_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ListIndex(ListIndexResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ListIndex") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ListIndex_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ListIndex failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowTable(ShowTableResponse& _return, const ShowTableRequest& request)
+{
+  int32_t seqid = send_ShowTable(request);
+  recv_ShowTable(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowTable(const ShowTableRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowTable", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowTable(ShowTableResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowTable") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowTable_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowTable failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowColumns(SelectResponse& _return, const ShowColumnsRequest& request)
+{
+  int32_t seqid = send_ShowColumns(request);
+  recv_ShowColumns(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowColumns(const ShowColumnsRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowColumns", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowColumns_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowColumns(SelectResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowColumns") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowColumns_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowColumns failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowDatabase(ShowDatabaseResponse& _return, const ShowDatabaseRequest& request)
+{
+  int32_t seqid = send_ShowDatabase(request);
+  recv_ShowDatabase(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowDatabase(const ShowDatabaseRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowDatabase(ShowDatabaseResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowDatabase") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowDatabase_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowDatabase failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowTables(SelectResponse& _return, const ShowTablesRequest& request)
+{
+  int32_t seqid = send_ShowTables(request);
+  recv_ShowTables(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowTables(const ShowTablesRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowTables", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowTables_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowTables(SelectResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowTables") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowTables_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowTables failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowSegments(SelectResponse& _return, const ShowSegmentsRequest& request)
+{
+  int32_t seqid = send_ShowSegments(request);
+  recv_ShowSegments(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowSegments(const ShowSegmentsRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowSegments", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowSegments_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowSegments(SelectResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowSegments") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowSegments_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowSegments failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowSegment(ShowSegmentResponse& _return, const ShowSegmentRequest& request)
+{
+  int32_t seqid = send_ShowSegment(request);
+  recv_ShowSegment(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowSegment(const ShowSegmentRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowSegment", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowSegment_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowSegment(ShowSegmentResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowSegment") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowSegment_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowSegment failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowBlocks(SelectResponse& _return, const ShowBlocksRequest& request)
+{
+  int32_t seqid = send_ShowBlocks(request);
+  recv_ShowBlocks(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowBlocks(const ShowBlocksRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowBlocks", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowBlocks_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowBlocks(SelectResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowBlocks") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowBlocks_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowBlocks failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowBlock(ShowBlockResponse& _return, const ShowBlockRequest& request)
+{
+  int32_t seqid = send_ShowBlock(request);
+  recv_ShowBlock(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowBlock(const ShowBlockRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowBlock", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowBlock_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowBlock(ShowBlockResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowBlock") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowBlock_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowBlock failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowBlockColumn(ShowBlockColumnResponse& _return, const ShowBlockColumnRequest& request)
+{
+  int32_t seqid = send_ShowBlockColumn(request);
+  recv_ShowBlockColumn(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowBlockColumn(const ShowBlockColumnRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowBlockColumn", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowBlockColumn_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowBlockColumn(ShowBlockColumnResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowBlockColumn") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowBlockColumn_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowBlockColumn failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowCurrentNode(ShowCurrentNodeResponse& _return, const ShowCurrentNodeRequest& request)
+{
+  int32_t seqid = send_ShowCurrentNode(request);
+  recv_ShowCurrentNode(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowCurrentNode(const ShowCurrentNodeRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowCurrentNode", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowCurrentNode_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowCurrentNode(ShowCurrentNodeResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowCurrentNode") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowCurrentNode_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowCurrentNode failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::GetDatabase(CommonResponse& _return, const GetDatabaseRequest& request)
+{
+  int32_t seqid = send_GetDatabase(request);
+  recv_GetDatabase(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_GetDatabase(const GetDatabaseRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("GetDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_GetDatabase_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_GetDatabase(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("GetDatabase") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_GetDatabase_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "GetDatabase failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::GetTable(CommonResponse& _return, const GetTableRequest& request)
+{
+  int32_t seqid = send_GetTable(request);
+  recv_GetTable(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_GetTable(const GetTableRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("GetTable", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_GetTable_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_GetTable(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("GetTable") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_GetTable_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "GetTable failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::CreateIndex(CommonResponse& _return, const CreateIndexRequest& request)
+{
+  int32_t seqid = send_CreateIndex(request);
+  recv_CreateIndex(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_CreateIndex(const CreateIndexRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("CreateIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_CreateIndex_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_CreateIndex(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("CreateIndex") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_CreateIndex_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "CreateIndex failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::DropIndex(CommonResponse& _return, const DropIndexRequest& request)
+{
+  int32_t seqid = send_DropIndex(request);
+  recv_DropIndex(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_DropIndex(const DropIndexRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("DropIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_DropIndex_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_DropIndex(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("DropIndex") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_DropIndex_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropIndex failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::ShowIndex(ShowIndexResponse& _return, const ShowIndexRequest& request)
+{
+  int32_t seqid = send_ShowIndex(request);
+  recv_ShowIndex(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_ShowIndex(const ShowIndexRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("ShowIndex", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_ShowIndex_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_ShowIndex(ShowIndexResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("ShowIndex") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_ShowIndex_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "ShowIndex failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Optimize(CommonResponse& _return, const OptimizeRequest& request)
+{
+  int32_t seqid = send_Optimize(request);
+  recv_Optimize(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Optimize(const OptimizeRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Optimize", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Optimize_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Optimize(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Optimize") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Optimize_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Optimize failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::AddColumns(CommonResponse& _return, const AddColumnsRequest& request)
+{
+  int32_t seqid = send_AddColumns(request);
+  recv_AddColumns(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_AddColumns(const AddColumnsRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("AddColumns", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_AddColumns_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_AddColumns(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("AddColumns") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_AddColumns_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "AddColumns failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::DropColumns(CommonResponse& _return, const DropColumnsRequest& request)
+{
+  int32_t seqid = send_DropColumns(request);
+  recv_DropColumns(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_DropColumns(const DropColumnsRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("DropColumns", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_DropColumns_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_DropColumns(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("DropColumns") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_DropColumns_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "DropColumns failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Cleanup(CommonResponse& _return, const CommonRequest& request)
+{
+  int32_t seqid = send_Cleanup(request);
+  recv_Cleanup(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Cleanup(const CommonRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Cleanup", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Cleanup_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Cleanup(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Cleanup") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Cleanup_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Cleanup failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Command(CommonResponse& _return, const CommandRequest& request)
+{
+  int32_t seqid = send_Command(request);
+  recv_Command(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Command(const CommandRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Command", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Command_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Command(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Command") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Command_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Command failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Flush(CommonResponse& _return, const FlushRequest& request)
+{
+  int32_t seqid = send_Flush(request);
+  recv_Flush(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Flush(const FlushRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Flush", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Flush_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Flush(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Flush") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Flush_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Flush failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+void InfinityServiceConcurrentClient::Compact(CommonResponse& _return, const CompactRequest& request)
+{
+  int32_t seqid = send_Compact(request);
+  recv_Compact(_return, seqid);
+}
+
+int32_t InfinityServiceConcurrentClient::send_Compact(const CompactRequest& request)
+{
+  int32_t cseqid = this->sync_->generateSeqId();
+  ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
+  oprot_->writeMessageBegin("Compact", ::apache::thrift::protocol::T_CALL, cseqid);
+
+  InfinityService_Compact_pargs args;
+  args.request = &request;
+  args.write(oprot_);
+
+  oprot_->writeMessageEnd();
+  oprot_->getTransport()->writeEnd();
+  oprot_->getTransport()->flush();
+
+  sentry.commit();
+  return cseqid;
+}
+
+void InfinityServiceConcurrentClient::recv_Compact(CommonResponse& _return, const int32_t seqid)
+{
+
+  int32_t rseqid = 0;
+  std::string fname;
+  ::apache::thrift::protocol::TMessageType mtype;
+
+  // the read mutex gets dropped and reacquired as part of waitForWork()
+  // The destructor of this sentry wakes up other clients
+  ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
+
+  while(true) {
+    if(!this->sync_->getPending(fname, mtype, rseqid)) {
+      iprot_->readMessageBegin(fname, mtype, rseqid);
+    }
+    if(seqid == rseqid) {
+      if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
+        ::apache::thrift::TApplicationException x;
+        x.read(iprot_);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+        sentry.commit();
+        throw x;
+      }
+      if (mtype != ::apache::thrift::protocol::T_REPLY) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+      }
+      if (fname.compare("Compact") != 0) {
+        iprot_->skip(::apache::thrift::protocol::T_STRUCT);
+        iprot_->readMessageEnd();
+        iprot_->getTransport()->readEnd();
+
+        // in a bad state, don't commit
+        using ::apache::thrift::protocol::TProtocolException;
+        throw TProtocolException(TProtocolException::INVALID_DATA);
+      }
+      InfinityService_Compact_presult result;
+      result.success = &_return;
+      result.read(iprot_);
+      iprot_->readMessageEnd();
+      iprot_->getTransport()->readEnd();
+
+      if (result.__isset.success) {
+        // _return pointer has now been filled
+        sentry.commit();
+        return;
+      }
+      // in a bad state, don't commit
+      throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Compact failed: unknown result");
+    }
+    // seqid != rseqid
+    this->sync_->updatePending(fname, mtype, rseqid);
+
+    // this will temporarily unlock the readMutex, and let other clients get work done
+    this->sync_->waitForWork(seqid);
+  } // end while(true)
+}
+
+} // namespace
 
-::std::shared_ptr<::apache::thrift::TProcessor> InfinityServiceProcessorFactory::getProcessor(const ::apache::thrift::TConnectionInfo &connInfo) {
-    ::apache::thrift::ReleaseHandler<InfinityServiceIfFactory> cleanup(handlerFactory_);
-    ::std::shared_ptr<InfinityServiceIf> handler(handlerFactory_->getHandler(connInfo), cleanup);
-    ::std::shared_ptr<::apache::thrift::TProcessor> processor(new InfinityServiceProcessor(handler));
-    return processor;
-}
-
-void InfinityServiceConcurrentClient::Connect(CommonResponse &_return, const ConnectRequest &request) {
-    int32_t seqid = send_Connect(request);
-    recv_Connect(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Connect(const ConnectRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Connect", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Connect_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Connect(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Connect") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Connect_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Connect failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Disconnect(CommonResponse &_return, const CommonRequest &request) {
-    int32_t seqid = send_Disconnect(request);
-    recv_Disconnect(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Disconnect(const CommonRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Disconnect", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Disconnect_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Disconnect(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Disconnect") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Disconnect_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "Disconnect failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::CreateDatabase(CommonResponse &_return, const CreateDatabaseRequest &request) {
-    int32_t seqid = send_CreateDatabase(request);
-    recv_CreateDatabase(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_CreateDatabase(const CreateDatabaseRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("CreateDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_CreateDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_CreateDatabase(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("CreateDatabase") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_CreateDatabase_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "CreateDatabase failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::DropDatabase(CommonResponse &_return, const DropDatabaseRequest &request) {
-    int32_t seqid = send_DropDatabase(request);
-    recv_DropDatabase(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_DropDatabase(const DropDatabaseRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("DropDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_DropDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_DropDatabase(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("DropDatabase") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_DropDatabase_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "DropDatabase failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::CreateTable(CommonResponse &_return, const CreateTableRequest &request) {
-    int32_t seqid = send_CreateTable(request);
-    recv_CreateTable(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_CreateTable(const CreateTableRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("CreateTable", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_CreateTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_CreateTable(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("CreateTable") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_CreateTable_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "CreateTable failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::DropTable(CommonResponse &_return, const DropTableRequest &request) {
-    int32_t seqid = send_DropTable(request);
-    recv_DropTable(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_DropTable(const DropTableRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("DropTable", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_DropTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_DropTable(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("DropTable") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_DropTable_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "DropTable failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Insert(CommonResponse &_return, const InsertRequest &request) {
-    int32_t seqid = send_Insert(request);
-    recv_Insert(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Insert(const InsertRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Insert", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Insert_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Insert(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Insert") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Insert_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Insert failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Import(CommonResponse &_return, const ImportRequest &request) {
-    int32_t seqid = send_Import(request);
-    recv_Import(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Import(const ImportRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Import", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Import_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Import(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Import") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Import_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Import failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Export(CommonResponse &_return, const ExportRequest &request) {
-    int32_t seqid = send_Export(request);
-    recv_Export(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Export(const ExportRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Export", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Export_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Export(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Export") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Export_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Export failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Select(SelectResponse &_return, const SelectRequest &request) {
-    int32_t seqid = send_Select(request);
-    recv_Select(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Select(const SelectRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Select", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Select_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Select(SelectResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Select") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Select_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Select failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Explain(SelectResponse &_return, const ExplainRequest &request) {
-    int32_t seqid = send_Explain(request);
-    recv_Explain(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Explain(const ExplainRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Explain", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Explain_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Explain(SelectResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Explain") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Explain_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Explain failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Delete(DeleteResponse &_return, const DeleteRequest &request) {
-    int32_t seqid = send_Delete(request);
-    recv_Delete(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Delete(const DeleteRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Delete", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Delete_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Delete(DeleteResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Delete") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Delete_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Delete failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Update(CommonResponse &_return, const UpdateRequest &request) {
-    int32_t seqid = send_Update(request);
-    recv_Update(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Update(const UpdateRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Update", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Update_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Update(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Update") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Update_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Update failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ListDatabase(ListDatabaseResponse &_return, const ListDatabaseRequest &request) {
-    int32_t seqid = send_ListDatabase(request);
-    recv_ListDatabase(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ListDatabase(const ListDatabaseRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ListDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ListDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ListDatabase(ListDatabaseResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ListDatabase") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ListDatabase_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ListDatabase failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ListTable(ListTableResponse &_return, const ListTableRequest &request) {
-    int32_t seqid = send_ListTable(request);
-    recv_ListTable(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ListTable(const ListTableRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ListTable", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ListTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ListTable(ListTableResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ListTable") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ListTable_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ListTable failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ListIndex(ListIndexResponse &_return, const ListIndexRequest &request) {
-    int32_t seqid = send_ListIndex(request);
-    recv_ListIndex(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ListIndex(const ListIndexRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ListIndex", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ListIndex_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ListIndex(ListIndexResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ListIndex") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ListIndex_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ListIndex failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowTable(ShowTableResponse &_return, const ShowTableRequest &request) {
-    int32_t seqid = send_ShowTable(request);
-    recv_ShowTable(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowTable(const ShowTableRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowTable", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowTable(ShowTableResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowTable") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowTable_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowTable failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowColumns(SelectResponse &_return, const ShowColumnsRequest &request) {
-    int32_t seqid = send_ShowColumns(request);
-    recv_ShowColumns(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowColumns(const ShowColumnsRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowColumns", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowColumns_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowColumns(SelectResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowColumns") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowColumns_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowColumns failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowDatabase(ShowDatabaseResponse &_return, const ShowDatabaseRequest &request) {
-    int32_t seqid = send_ShowDatabase(request);
-    recv_ShowDatabase(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowDatabase(const ShowDatabaseRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowDatabase(ShowDatabaseResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowDatabase") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowDatabase_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowDatabase failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowTables(SelectResponse &_return, const ShowTablesRequest &request) {
-    int32_t seqid = send_ShowTables(request);
-    recv_ShowTables(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowTables(const ShowTablesRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowTables", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowTables_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowTables(SelectResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowTables") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowTables_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowTables failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowSegments(SelectResponse &_return, const ShowSegmentsRequest &request) {
-    int32_t seqid = send_ShowSegments(request);
-    recv_ShowSegments(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowSegments(const ShowSegmentsRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowSegments", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowSegments_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowSegments(SelectResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowSegments") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowSegments_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowSegments failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowSegment(ShowSegmentResponse &_return, const ShowSegmentRequest &request) {
-    int32_t seqid = send_ShowSegment(request);
-    recv_ShowSegment(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowSegment(const ShowSegmentRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowSegment", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowSegment_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowSegment(ShowSegmentResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowSegment") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowSegment_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowSegment failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowBlocks(SelectResponse &_return, const ShowBlocksRequest &request) {
-    int32_t seqid = send_ShowBlocks(request);
-    recv_ShowBlocks(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowBlocks(const ShowBlocksRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowBlocks", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowBlocks_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowBlocks(SelectResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowBlocks") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowBlocks_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowBlocks failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowBlock(ShowBlockResponse &_return, const ShowBlockRequest &request) {
-    int32_t seqid = send_ShowBlock(request);
-    recv_ShowBlock(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowBlock(const ShowBlockRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowBlock", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowBlock_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowBlock(ShowBlockResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowBlock") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowBlock_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowBlock failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowBlockColumn(ShowBlockColumnResponse &_return, const ShowBlockColumnRequest &request) {
-    int32_t seqid = send_ShowBlockColumn(request);
-    recv_ShowBlockColumn(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowBlockColumn(const ShowBlockColumnRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowBlockColumn", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowBlockColumn_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowBlockColumn(ShowBlockColumnResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowBlockColumn") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowBlockColumn_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowBlockColumn failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowCurrentNode(ShowCurrentNodeResponse &_return, const ShowCurrentNodeRequest &request) {
-    int32_t seqid = send_ShowCurrentNode(request);
-    recv_ShowCurrentNode(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowCurrentNode(const ShowCurrentNodeRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowCurrentNode", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowCurrentNode_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowCurrentNode(ShowCurrentNodeResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowCurrentNode") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowCurrentNode_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowCurrentNode failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::GetDatabase(CommonResponse &_return, const GetDatabaseRequest &request) {
-    int32_t seqid = send_GetDatabase(request);
-    recv_GetDatabase(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_GetDatabase(const GetDatabaseRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("GetDatabase", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_GetDatabase_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_GetDatabase(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("GetDatabase") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_GetDatabase_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "GetDatabase failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::GetTable(CommonResponse &_return, const GetTableRequest &request) {
-    int32_t seqid = send_GetTable(request);
-    recv_GetTable(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_GetTable(const GetTableRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("GetTable", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_GetTable_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_GetTable(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("GetTable") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_GetTable_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "GetTable failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::CreateIndex(CommonResponse &_return, const CreateIndexRequest &request) {
-    int32_t seqid = send_CreateIndex(request);
-    recv_CreateIndex(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_CreateIndex(const CreateIndexRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("CreateIndex", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_CreateIndex_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_CreateIndex(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("CreateIndex") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_CreateIndex_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "CreateIndex failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::DropIndex(CommonResponse &_return, const DropIndexRequest &request) {
-    int32_t seqid = send_DropIndex(request);
-    recv_DropIndex(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_DropIndex(const DropIndexRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("DropIndex", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_DropIndex_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_DropIndex(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("DropIndex") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_DropIndex_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "DropIndex failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::ShowIndex(ShowIndexResponse &_return, const ShowIndexRequest &request) {
-    int32_t seqid = send_ShowIndex(request);
-    recv_ShowIndex(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_ShowIndex(const ShowIndexRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("ShowIndex", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_ShowIndex_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_ShowIndex(ShowIndexResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("ShowIndex") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_ShowIndex_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "ShowIndex failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Optimize(CommonResponse &_return, const OptimizeRequest &request) {
-    int32_t seqid = send_Optimize(request);
-    recv_Optimize(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Optimize(const OptimizeRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Optimize", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Optimize_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Optimize(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Optimize") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Optimize_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Optimize failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::AddColumns(CommonResponse &_return, const AddColumnsRequest &request) {
-    int32_t seqid = send_AddColumns(request);
-    recv_AddColumns(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_AddColumns(const AddColumnsRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("AddColumns", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_AddColumns_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_AddColumns(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("AddColumns") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_AddColumns_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "AddColumns failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::DropColumns(CommonResponse &_return, const DropColumnsRequest &request) {
-    int32_t seqid = send_DropColumns(request);
-    recv_DropColumns(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_DropColumns(const DropColumnsRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("DropColumns", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_DropColumns_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_DropColumns(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("DropColumns") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_DropColumns_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT,
-                                                          "DropColumns failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Cleanup(CommonResponse &_return, const CommonRequest &request) {
-    int32_t seqid = send_Cleanup(request);
-    recv_Cleanup(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Cleanup(const CommonRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Cleanup", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Cleanup_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Cleanup(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Cleanup") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Cleanup_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Cleanup failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Command(CommonResponse &_return, const CommandRequest &request) {
-    int32_t seqid = send_Command(request);
-    recv_Command(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Command(const CommandRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Command", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Command_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Command(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Command") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Command_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Command failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Flush(CommonResponse &_return, const FlushRequest &request) {
-    int32_t seqid = send_Flush(request);
-    recv_Flush(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Flush(const FlushRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Flush", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Flush_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Flush(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Flush") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Flush_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Flush failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-void InfinityServiceConcurrentClient::Compact(CommonResponse &_return, const CompactRequest &request) {
-    int32_t seqid = send_Compact(request);
-    recv_Compact(_return, seqid);
-}
-
-int32_t InfinityServiceConcurrentClient::send_Compact(const CompactRequest &request) {
-    int32_t cseqid = this->sync_->generateSeqId();
-    ::apache::thrift::async::TConcurrentSendSentry sentry(this->sync_.get());
-    oprot_->writeMessageBegin("Compact", ::apache::thrift::protocol::T_CALL, cseqid);
-
-    InfinityService_Compact_pargs args;
-    args.request = &request;
-    args.write(oprot_);
-
-    oprot_->writeMessageEnd();
-    oprot_->getTransport()->writeEnd();
-    oprot_->getTransport()->flush();
-
-    sentry.commit();
-    return cseqid;
-}
-
-void InfinityServiceConcurrentClient::recv_Compact(CommonResponse &_return, const int32_t seqid) {
-
-    int32_t rseqid = 0;
-    std::string fname;
-    ::apache::thrift::protocol::TMessageType mtype;
-
-    // the read mutex gets dropped and reacquired as part of waitForWork()
-    // The destructor of this sentry wakes up other clients
-    ::apache::thrift::async::TConcurrentRecvSentry sentry(this->sync_.get(), seqid);
-
-    while (true) {
-        if (!this->sync_->getPending(fname, mtype, rseqid)) {
-            iprot_->readMessageBegin(fname, mtype, rseqid);
-        }
-        if (seqid == rseqid) {
-            if (mtype == ::apache::thrift::protocol::T_EXCEPTION) {
-                ::apache::thrift::TApplicationException x;
-                x.read(iprot_);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-                sentry.commit();
-                throw x;
-            }
-            if (mtype != ::apache::thrift::protocol::T_REPLY) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-            }
-            if (fname.compare("Compact") != 0) {
-                iprot_->skip(::apache::thrift::protocol::T_STRUCT);
-                iprot_->readMessageEnd();
-                iprot_->getTransport()->readEnd();
-
-                // in a bad state, don't commit
-                using ::apache::thrift::protocol::TProtocolException;
-                throw TProtocolException(TProtocolException::INVALID_DATA);
-            }
-            InfinityService_Compact_presult result;
-            result.success = &_return;
-            result.read(iprot_);
-            iprot_->readMessageEnd();
-            iprot_->getTransport()->readEnd();
-
-            if (result.__isset.success) {
-                // _return pointer has now been filled
-                sentry.commit();
-                return;
-            }
-            // in a bad state, don't commit
-            throw ::apache::thrift::TApplicationException(::apache::thrift::TApplicationException::MISSING_RESULT, "Compact failed: unknown result");
-        }
-        // seqid != rseqid
-        this->sync_->updatePending(fname, mtype, rseqid);
-
-        // this will temporarily unlock the readMutex, and let other clients get work done
-        this->sync_->waitForWork(seqid);
-    } // end while(true)
-}
-
-} // namespace infinity_thrift_rpc

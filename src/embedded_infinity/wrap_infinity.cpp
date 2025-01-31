@@ -886,7 +886,7 @@ WrapQueryResult WrapShowIndex(Infinity &instance, const String &db_name, const S
     if (query_result.IsOk()) {
         SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
-        if (row_count != 11) {
+        if (row_count != 10) {
             String error_message = "ShowDatabase: query result is invalid.";
             UnrecoverableError(error_message);
         }

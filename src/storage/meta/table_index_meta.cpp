@@ -167,7 +167,6 @@ Tuple<SharedPtr<TableIndexInfo>, Status> TableIndexMeta::GetTableIndexInfo(std::
     }
     table_index_info->index_column_names_ = MakeShared<String>(column_names);
     table_index_info->index_column_ids_ = MakeShared<String>(column_ids);
-    table_index_info->files_ = table_index_entry->GetFilePath(txn_ptr);
     return {table_index_info, status};
 }
 
