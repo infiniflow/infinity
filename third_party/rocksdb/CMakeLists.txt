@@ -35,9 +35,9 @@
 cmake_minimum_required(VERSION 3.12)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules/")
-include(ReadVersion)
+#include(ReadVersion)
 #include(GoogleTest)
-get_rocksdb_version(rocksdb_VERSION)
+#get_rocksdb_version(rocksdb_VERSION)
 project(rocksdb
   VERSION ${rocksdb_VERSION}
   DESCRIPTION "An embeddable persistent key-value store for fast storage"
@@ -1009,11 +1009,11 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
     INSTALL_DESTINATION ${package_config_destination}
   )
 
-  write_basic_package_version_file(
-    RocksDBConfigVersion.cmake
-    VERSION ${rocksdb_VERSION}
-    COMPATIBILITY SameMajorVersion
-  )
+#  write_basic_package_version_file(
+#    RocksDBConfigVersion.cmake
+#    VERSION ${rocksdb_VERSION}
+#    COMPATIBILITY SameMajorVersion
+#  )
 
   configure_file(
     ${PROJECT_NAME}.pc.in

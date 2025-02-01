@@ -21,7 +21,9 @@ module;
 import stl;
 import logger;
 import txn_manager;
+import new_txn_manager;
 import txn;
+import new_txn;
 import storage;
 import virtual_store;
 import third_party;
@@ -141,6 +143,7 @@ void WalManager::Stop() {
 
     // pop all the entries in the queue. and notify the condition variable.
     wait_flush_.Enqueue(nullptr);
+    new_wait_flush_.Enqueue(nullptr);
 
     // Wait for flush thread to stop
     LOG_TRACE("WalManager::Stop flush thread join");
@@ -155,6 +158,13 @@ void WalManager::SubmitTxn(Vector<Txn *> &txn_array) {
         return;
     }
     wait_flush_.EnqueueBulk(txn_array);
+}
+
+void WalManager::SubmitTxn(Vector<NewTxn *> &txn_array) {
+    if (!running_.load()) {
+        return;
+    }
+    new_wait_flush_.EnqueueBulk(txn_array);
 }
 
 TxnTimeStamp WalManager::LastCheckpointTS() const {
@@ -294,6 +304,128 @@ void WalManager::Flush() {
     ClusterManager *cluster_manager = nullptr;
     while (running_.load()) {
         wait_flush_.DequeueBulk(txn_batch);
+        if (txn_batch.empty()) {
+            LOG_WARN("WalManager::Dequeue empty batch logs");
+            continue;
+        }
+
+        for (const auto &txn : txn_batch) {
+            if (txn == nullptr) {
+                // terminate entry
+                LOG_INFO("Terminate WAL Manager flush thread");
+                running_ = false;
+                break;
+            }
+
+            WalEntry *entry = txn->GetWALEntry();
+            // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
+
+            if (entry->cmds_.empty()) {
+                continue;
+            }
+
+            if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+                LOG_INFO(fmt::format("Full or delta checkpoint begin at {}, cur txn commit_ts: {}, swap to new wal file",
+                                     txn->BeginTS(),
+                                     txn->CommitTS()));
+                this->SwapWalFile(max_commit_ts_, true);
+            }
+
+            for (const SharedPtr<WalCmd> &cmd : entry->cmds_) {
+                LOG_TRACE(fmt::format("WAL CMD: {}", cmd->ToString()));
+            }
+
+            i32 exp_size = entry->GetSizeInBytes();
+            SharedPtr<String> buf = MakeShared<String>(exp_size, 0);
+            char *ptr = buf->data();
+            entry->WriteAdv(ptr);
+            i32 act_size = ptr - buf->data();
+            if (exp_size != act_size) {
+                String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}, entry {}",
+                                                   exp_size,
+                                                   act_size,
+                                                   entry->ToString());
+                UnrecoverableError(error_message);
+            }
+            ofs_.write(buf->data(), ptr - buf->data());
+
+            if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
+                if (cluster_manager == nullptr) {
+                    cluster_manager = InfinityContext::instance().cluster_manager();
+                }
+                cluster_manager->PrepareLogs(buf);
+            }
+
+            LOG_TRACE(fmt::format("WalManager::Flush done writing wal for txn_id {}, commit_ts {}", entry->txn_id_, entry->commit_ts_));
+
+            UpdateCommitState(entry->commit_ts_, wal_size_ + act_size);
+        }
+
+        if (!running_.load()) {
+            break;
+        }
+
+        switch (flush_option_) {
+            case FlushOptionType::kFlushAtOnce: {
+                ofs_.flush();
+                break;
+            }
+            case FlushOptionType::kOnlyWrite: {
+                ofs_.flush(); // FIXME: not flush, only write
+                break;
+            }
+            case FlushOptionType::kFlushPerSecond: {
+                ofs_.flush(); // FIXME: not flush, flush per second
+                break;
+            }
+        }
+
+        if (InfinityContext::instance().GetServerRole() == NodeRole::kLeader) {
+            cluster_manager->SyncLogs();
+        }
+
+        // Commit bottom
+        for (const auto &txn : txn_batch) {
+            txn->CommitBottom();
+            // TODO: if txn is checkpoint, swap WAL file
+        }
+        txn_batch.clear();
+
+        // Check if the wal file is too large, swap to a new one.
+        try {
+            auto file_size = VirtualStore::GetFileSize(wal_path_);
+            if (file_size > cfg_wal_size_threshold_) {
+                LOG_INFO(fmt::format("WAL size: {} is larger than threshold: {}", file_size, cfg_wal_size_threshold_));
+                this->SwapWalFile(max_commit_ts_, true);
+            }
+        } catch (RecoverableException &e) {
+            LOG_ERROR(e.what());
+        } catch (UnrecoverableException &e) {
+            LOG_CRITICAL(e.what());
+            throw e;
+        }
+
+        // Check if total wal is too large, do delta checkpoint
+        i64 last_ckp_wal_size = GetLastCkpWalSize();
+        if (wal_size_ - last_ckp_wal_size > i64(cfg_delta_checkpoint_interval_wal_bytes_)) {
+            LOG_TRACE("Reach the WAL limit trigger the DELTA checkpoint");
+            auto checkpoint_task = MakeShared<CheckpointTask>(false /*delta checkpoint*/);
+            if (!this->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
+                LOG_TRACE("Skip delta checkpoint(size) because there is already a checkpoint task running.");
+            }
+        }
+        LOG_TRACE("WAL flush is finished.");
+    }
+    LOG_TRACE("WalManager::Flush mainloop end");
+}
+
+void WalManager::NewFlush() {
+    LOG_TRACE("WalManager::Flush log mainloop begin");
+
+    Deque<NewTxn *> txn_batch{};
+    ClusterManager *cluster_manager = nullptr;
+    while (running_.load()) {
+        new_wait_flush_.DequeueBulk(txn_batch);
         if (txn_batch.empty()) {
             LOG_WARN("WalManager::Dequeue empty batch logs");
             continue;

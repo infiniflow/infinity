@@ -30,6 +30,7 @@ class Storage;
 class BGTaskProcessor;
 struct TableEntry;
 class Txn;
+class NewTxn;
 struct SegmentEntry;
 class Catalog;
 
@@ -80,12 +81,14 @@ public:
     void Stop();
 
     void SubmitTxn(Vector<Txn *> &txn_batch);
+    void SubmitTxn(Vector<NewTxn *> &txn_batch);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
     // ~10s. So it's necessary to sync for a batch of transactions, and to
     // checkpoint for a batch of sync.
     void Flush();
+    void NewFlush();
 
     void FlushLogByReplication(const Vector<String> &synced_logs, bool on_startup);
 
@@ -172,6 +175,7 @@ private:
 
     // TxnManager and Flush thread access following members
     BlockingQueue<Txn *> wait_flush_{"WalManager"};
+    BlockingQueue<NewTxn *> new_wait_flush_{"WalManager"};
 
     // Only Flush thread access following members
     std::ofstream ofs_{};
