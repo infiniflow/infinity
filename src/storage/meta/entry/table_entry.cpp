@@ -306,6 +306,27 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     return index_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
+Tuple<Vector<SharedPtr<TableIndexInfo>>, Status> TableEntry::GetTableIndexesInfo(Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+
+    Vector<SharedPtr<TableIndexInfo>> indexes_info;
+    auto map_guard = index_meta_map_.GetMetaMap();
+    indexes_info.reserve((*map_guard).size());
+
+    for (auto &[index_name, index_meta] : *map_guard) {
+        auto [index_entry, meta_status] = index_meta->GetEntryNolock(txn_id, begin_ts);
+        if (!meta_status.ok()) {
+            LOG_TRACE(fmt::format("error when get table index entry: {} index name: {}", meta_status.message(), *index_meta->index_name()));
+        } else {
+            auto table_index_info = index_entry->GetTableIndexInfo(txn_ptr);
+            indexes_info.emplace_back(table_index_info);
+        }
+    }
+
+    return {indexes_info, Status::OK()};
+}
+
 Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const String &index_name, Txn *txn_ptr) {
     auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
     if (!status.ok()) {
@@ -1497,7 +1518,7 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
             // If segment can be cleaned up, segment.deprecate_ts > visible_ts, and visible_ts must > txn.begin_ts
             // So the used segment will not be cleaned up.
             bool deprecate = segment->CheckDeprecate(visible_ts);
-            LOG_INFO(fmt::format("Check deprecate of segment {} in table {}. check_ts: {}, drepcate_ts: {}. result: {}",
+            LOG_INFO(fmt::format("Check deprecate of segment {} in table {}. check_ts: {}, deprecate_ts: {}. result: {}",
                                  segment->segment_id(),
                                  *table_name_,
                                  visible_ts,

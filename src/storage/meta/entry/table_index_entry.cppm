@@ -34,6 +34,7 @@ import column_def;
 import snapshot_info;
 import block_entry;
 import txn;
+import meta_info;
 
 namespace infinity {
 
@@ -177,13 +178,15 @@ private:
 public:
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
-    Vector<String> GetFilePath(Txn* txn) const final;
+    Vector<String> GetFilePath(Txn *txn) const final;
 
     void PickCleanup(CleanupScanner *scanner) override;
 
     void PickCleanupBySegments(const Vector<SegmentID> &sorted_segment_ids, CleanupScanner *scanner);
 
     SharedPtr<TableIndexSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
+
+    SharedPtr<TableIndexInfo> GetTableIndexInfo(Txn *txn_ptr);
 };
 
 } // namespace infinity

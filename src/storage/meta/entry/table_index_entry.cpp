@@ -596,4 +596,19 @@ SharedPtr<TableIndexSnapshotInfo> TableIndexEntry::GetSnapshotInfo(Txn *txn_ptr)
     return snapshot_info;
 }
 
+SharedPtr<TableIndexInfo> TableIndexEntry::GetTableIndexInfo(Txn *txn_ptr) {
+    std::shared_lock lock(rw_locker_);
+    SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
+    table_index_info->index_name_ = index_base_->index_name_;
+    table_index_info->index_entry_dir_ = index_dir_;
+    table_index_info->segment_index_count_ = index_by_segment_.size();
+
+    table_index_info->index_comment_ = MakeShared<String>(*index_base_->index_comment_);
+    table_index_info->index_type_ = MakeShared<String>(IndexInfo::IndexTypeToString(index_base_->index_type_));
+    table_index_info->index_other_params_ = MakeShared<String>(index_base_->BuildOtherParamsString());
+    table_index_info->index_column_names_ = MakeShared<String>(column_def_->name_);
+    table_index_info->index_column_ids_ = MakeShared<String>(std::to_string(column_def_->id_));
+    return table_index_info;
+}
+
 } // namespace infinity

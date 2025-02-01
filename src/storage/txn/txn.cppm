@@ -185,6 +185,8 @@ public:
 
     Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name);
 
+    Tuple<Vector<SharedPtr<TableIndexInfo>>, Status> GetTableIndexesInfo(const String &db_name, const String &table_name);
+
     Pair<Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 

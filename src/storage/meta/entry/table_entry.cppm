@@ -129,6 +129,8 @@ public:
 
     Tuple<TableIndexEntry *, Status> GetIndex(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    Tuple<Vector<SharedPtr<TableIndexInfo>>, Status> GetTableIndexesInfo(Txn *txn_ptr);
+
     Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &index_name, Txn *txn_ptr);
 
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
@@ -209,7 +211,7 @@ public:
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
     void MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges);
 
-    // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
+    // User shall invoke this regularly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();
 
     // Invoked once at init stage to recovery memory index.

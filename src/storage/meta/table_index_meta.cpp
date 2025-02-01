@@ -141,33 +141,7 @@ Tuple<SharedPtr<TableIndexInfo>, Status> TableIndexMeta::GetTableIndexInfo(std::
         return {nullptr, status};
     }
 
-    SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
-    table_index_info->index_name_ = index_name_;
-    table_index_info->index_entry_dir_ = table_index_entry->index_dir();
-    table_index_info->segment_index_count_ = table_index_entry->index_by_segment().size();
-
-    auto index_base = table_index_entry->index_base();
-    table_index_info->index_comment_ = MakeShared<String>(*index_base->index_comment_);
-    table_index_info->index_type_ = MakeShared<String>(IndexInfo::IndexTypeToString(index_base->index_type_));
-    table_index_info->index_other_params_ = MakeShared<String>(index_base->BuildOtherParamsString());
-
-    // Append index column names to the third column
-    String column_names;
-    String column_ids;
-    SizeT idx = 0;
-    for (auto &column_name : index_base->column_names_) {
-        column_names += column_name;
-        auto column_id = table_entry_->GetColumnIdByName(column_name);
-        column_ids += std::to_string(column_id);
-        if (idx < index_base->column_names_.size() - 1) {
-            column_names += ",";
-            column_ids += ",";
-        }
-        idx++;
-    }
-    table_index_info->index_column_names_ = MakeShared<String>(column_names);
-    table_index_info->index_column_ids_ = MakeShared<String>(column_ids);
-    return {table_index_info, status};
+    return {table_index_entry->GetTableIndexInfo(txn_ptr), status};
 }
 
 SharedPtr<String> TableIndexMeta::ToString() {
