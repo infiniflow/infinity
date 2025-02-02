@@ -24,15 +24,15 @@ namespace infinity {
 
 export class KVStore {
 public:
-    KVStore();
-    ~KVStore();
+    KVStore() = default;
+    ~KVStore() = default;
 
-    Status Init();
+    Status Init(const String &db_path);
     Status Uninit();
 
 public:
 private:
-    TransactionDB *transaction_db_{}; // RocksDB transaction db
+    rocksdb::TransactionDB *transaction_db_{}; // RocksDB transaction db
 };
 
 } // namespace infinity

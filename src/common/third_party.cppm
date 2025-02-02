@@ -342,7 +342,16 @@ export using HTTPStatus = oatpp::web::protocol::http::Status;
 // Python
 export using PyObject = PyObject;
 
-export using TransactionDB = ::ROCKSDB_NAMESPACE::TransactionDB;
+export namespace rocksdb {
+using Options = ::ROCKSDB_NAMESPACE::Options;
+using ReadOptions = ::ROCKSDB_NAMESPACE::ReadOptions;
+using Snapshot = ::ROCKSDB_NAMESPACE::Snapshot;
+using Status = ::ROCKSDB_NAMESPACE::Status;
+using Transaction = ::ROCKSDB_NAMESPACE::Transaction;
+using TransactionDB = ::ROCKSDB_NAMESPACE::TransactionDB;
+using TransactionDBOptions = ::ROCKSDB_NAMESPACE::TransactionDBOptions;
+using TransactionOptions = ::ROCKSDB_NAMESPACE::TransactionOptions;
+using WriteOptions = ::ROCKSDB_NAMESPACE::WriteOptions;
+} // namespace rocksdb
 
 } // namespace infinity
-
