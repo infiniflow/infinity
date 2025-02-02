@@ -295,6 +295,379 @@ TEST_P(NewCatalogTest, simple_test1) {
     //    txn_mgr->CommitTxn(txn1);
     //    txn_mgr->CommitTxn(txn2);
 }
+
+TEST_P(NewCatalogTest, two_phases_commit) {
+    using namespace infinity;
+
+    using ROCKSDB_NAMESPACE::DestroyDB;
+    using ROCKSDB_NAMESPACE::Options;
+    using ROCKSDB_NAMESPACE::ReadOptions;
+    using ROCKSDB_NAMESPACE::Snapshot;
+    using ROCKSDB_NAMESPACE::Status;
+    using ROCKSDB_NAMESPACE::Transaction;
+    using ROCKSDB_NAMESPACE::TransactionDB;
+    using ROCKSDB_NAMESPACE::TransactionDBOptions;
+    using ROCKSDB_NAMESPACE::TransactionOptions;
+    using ROCKSDB_NAMESPACE::WriteOptions;
+
+    const std::string db_path = "/tmp/rocksdb_two_phases_transaction";
+
+    {
+        // No conflict
+        // open DB
+        Options options;
+        TransactionDBOptions txn_db_options;
+        options.create_if_missing = true;
+        TransactionDB *txn_db;
+
+        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
+        EXPECT_TRUE(s.ok());
+
+        WriteOptions write_options;
+        ReadOptions read_options;
+        //    TransactionOptions txn_options;
+        std::string value;
+
+        Transaction *txn1 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn1 != nullptr);
+
+        // Write a key in this transaction
+        s = txn1->Put("abc", "def");
+        EXPECT_TRUE(s.ok());
+
+        Transaction *txn2 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn2 != nullptr);
+
+        s = txn2->Put("abc", "def");
+        EXPECT_FALSE(s.ok());
+
+        s = txn1->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn1;
+
+        s = txn2->Get(read_options, "abc", &value);
+        EXPECT_TRUE(s.ok());
+
+        s = txn2->Rollback();
+        EXPECT_TRUE(s.ok());
+        delete txn2;
+
+        // Cleanup
+        delete txn_db;
+        DestroyDB(db_path, options);
+    }
+
+    {
+        // Conflict before commit
+        // open DB
+        Options options;
+        TransactionDBOptions txn_db_options;
+        options.create_if_missing = true;
+        TransactionDB *txn_db;
+
+        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
+        EXPECT_TRUE(s.ok());
+
+        WriteOptions write_options;
+        ReadOptions read_options;
+        //    TransactionOptions txn_options;
+        std::string value;
+
+        Transaction *txn1 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn1 != nullptr);
+
+        // Write a key in this transaction
+        s = txn1->Put("abc", "def");
+        EXPECT_TRUE(s.ok());
+
+        s = txn1->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn1;
+
+        Transaction *txn2 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn2 != nullptr);
+
+        s = txn2->Put("abc", "def");
+        EXPECT_TRUE(s.ok());
+
+        s = txn2->Get(read_options, "abc", &value);
+        EXPECT_TRUE(s.ok());
+
+        s = txn2->Rollback();
+        EXPECT_TRUE(s.ok());
+        delete txn2;
+
+        // Cleanup
+        delete txn_db;
+        DestroyDB(db_path, options);
+    }
+
+    {
+        // Conflict after commit
+        // open DB
+        Options options;
+        TransactionDBOptions txn_db_options;
+        options.create_if_missing = true;
+        TransactionOptions txn_options;
+        txn_options.set_snapshot = true;
+        TransactionDB *txn_db;
+
+        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
+        EXPECT_TRUE(s.ok());
+
+        WriteOptions write_options;
+        ReadOptions read_options;
+        //    TransactionOptions txn_options;
+        std::string value;
+
+        Transaction *txn1 = txn_db->BeginTransaction(write_options, txn_options);
+        EXPECT_TRUE(txn1 != nullptr);
+
+        Transaction *txn2 = txn_db->BeginTransaction(write_options, txn_options);
+        EXPECT_TRUE(txn2 != nullptr);
+        txn2->SetSnapshot();
+
+        Transaction *txn3 = txn_db->BeginTransaction(write_options, txn_options);
+        EXPECT_TRUE(txn3 != nullptr);
+        txn3->SetSnapshot();
+
+        // Write a key in this transaction
+        s = txn1->Put("abc", "def");
+        EXPECT_TRUE(s.ok());
+
+        s = txn1->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn1;
+
+        s = txn2->Put("abc", "def");
+        EXPECT_FALSE(s.ok());
+
+        s = txn2->Get(read_options, "abc", &value);
+        EXPECT_TRUE(s.ok());
+
+        s = txn2->Rollback();
+        EXPECT_TRUE(s.ok());
+        delete txn2;
+
+        s = txn3->Put("cde", "def");
+        EXPECT_TRUE(s.ok());
+
+        s = txn3->Get(read_options, "cde", &value);
+        EXPECT_TRUE(s.ok());
+
+        s = txn3->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn3;
+
+        // Cleanup
+        delete txn_db;
+        DestroyDB(db_path, options);
+    }
+}
+
+TEST_P(NewCatalogTest, disable_WAL) {
+    using namespace infinity;
+
+    using ROCKSDB_NAMESPACE::DestroyDB;
+    using ROCKSDB_NAMESPACE::FlushOptions;
+    using ROCKSDB_NAMESPACE::Options;
+    using ROCKSDB_NAMESPACE::ReadOptions;
+    using ROCKSDB_NAMESPACE::Snapshot;
+    using ROCKSDB_NAMESPACE::Status;
+    using ROCKSDB_NAMESPACE::Transaction;
+    using ROCKSDB_NAMESPACE::TransactionDB;
+    using ROCKSDB_NAMESPACE::TransactionDBOptions;
+    using ROCKSDB_NAMESPACE::TransactionOptions;
+    using ROCKSDB_NAMESPACE::WriteOptions;
+
+    const std::string db_path = "/tmp/rocksdb_two_phases_transaction";
+
+    {
+        // open DB
+        Options options;
+        TransactionDBOptions txn_db_options;
+        options.create_if_missing = true;
+        options.manual_wal_flush = true;
+        options.avoid_flush_during_shutdown = true;
+        TransactionDB *txn_db;
+
+        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
+        EXPECT_TRUE(s.ok());
+
+        WriteOptions write_options;
+        write_options.disableWAL = true;
+        ReadOptions read_options;
+        //    TransactionOptions txn_options;
+        std::string value;
+
+        Transaction *txn1 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn1 != nullptr);
+
+        // Write a key in this transaction
+        s = txn1->Put("abc", "def");
+        EXPECT_TRUE(s.ok());
+
+        s = txn1->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn1;
+
+        Transaction *txn2 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn2 != nullptr);
+
+        s = txn2->Get(read_options, "abc", &value);
+        EXPECT_TRUE(s.ok());
+
+        s = txn2->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn2;
+
+        // Cleanup
+        delete txn_db;
+
+        s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
+        EXPECT_TRUE(s.ok());
+
+        txn1 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn1 != nullptr);
+
+        s = txn1->Get(read_options, "abc", &value);
+        EXPECT_FALSE(s.ok());
+
+        s = txn1->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn1;
+
+        delete txn_db;
+        DestroyDB(db_path, options);
+    }
+
+    {
+        // open DB
+        Options options;
+        TransactionDBOptions txn_db_options;
+        options.create_if_missing = true;
+        options.manual_wal_flush = true;
+        options.avoid_flush_during_shutdown = true;
+        TransactionDB *txn_db;
+
+        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
+        EXPECT_TRUE(s.ok());
+
+        WriteOptions write_options;
+        write_options.disableWAL = true;
+        ReadOptions read_options;
+        //    TransactionOptions txn_options;
+        std::string value;
+
+        Transaction *txn1 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn1 != nullptr);
+
+        // Write a key in this transaction
+        s = txn1->Put("abc", "def");
+        EXPECT_TRUE(s.ok());
+
+        s = txn1->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn1;
+
+        Transaction *txn2 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn2 != nullptr);
+
+        s = txn2->Get(read_options, "abc", &value);
+        EXPECT_TRUE(s.ok());
+
+        s = txn2->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn2;
+
+        FlushOptions flush_opts;
+        txn_db->Flush(flush_opts);
+
+        // Cleanup
+        delete txn_db;
+
+        s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
+        EXPECT_TRUE(s.ok());
+
+        txn1 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn1 != nullptr);
+
+        s = txn1->Get(read_options, "abc", &value);
+        EXPECT_TRUE(s.ok());
+
+        s = txn1->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn1;
+
+        delete txn_db;
+        DestroyDB(db_path, options);
+    }
+}
+
+TEST_P(NewCatalogTest, timestamp) {
+    using namespace infinity;
+
+    using ROCKSDB_NAMESPACE::DestroyDB;
+    using ROCKSDB_NAMESPACE::FlushOptions;
+    using ROCKSDB_NAMESPACE::Options;
+    using ROCKSDB_NAMESPACE::ReadOptions;
+    using ROCKSDB_NAMESPACE::Snapshot;
+    using ROCKSDB_NAMESPACE::Status;
+    using ROCKSDB_NAMESPACE::Transaction;
+    using ROCKSDB_NAMESPACE::TransactionDB;
+    using ROCKSDB_NAMESPACE::TransactionDBOptions;
+    using ROCKSDB_NAMESPACE::TransactionOptions;
+    using ROCKSDB_NAMESPACE::WriteOptions;
+    using ROCKSDB_NAMESPACE::Slice;
+
+    const std::string db_path = "/tmp/rocksdb_two_phases_transaction";
+
+    {
+        // open DB
+        Options options;
+        TransactionDBOptions txn_db_options;
+        options.create_if_missing = true;
+        options.manual_wal_flush = true;
+        options.avoid_flush_during_shutdown = true;
+        TransactionDB *txn_db;
+
+        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
+        EXPECT_TRUE(s.ok());
+
+        WriteOptions write_options;
+        write_options.disableWAL = true;
+        ReadOptions read_options;
+        std::string value;
+
+        Transaction *txn1 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn1 != nullptr);
+
+        // Write a key in this transaction
+        s = txn1->Put("abc", "def");
+        EXPECT_TRUE(s.ok());
+
+        s = txn1->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn1;
+
+        Transaction *txn2 = txn_db->BeginTransaction(write_options);
+        EXPECT_TRUE(txn2 != nullptr);
+
+        s = txn2->Get(read_options, "abc", &value);
+        EXPECT_TRUE(s.ok());
+
+        EXPECT_STREQ(value.c_str(), "def");
+
+        s = txn2->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn2;
+
+        // Cleanup
+        delete txn_db;
+        DestroyDB(db_path, options);
+    }
+}
+
 //
 //// txn1: create db1, commit.
 //// txn2: start,              get db1, commit
