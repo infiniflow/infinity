@@ -82,6 +82,9 @@ public:
     //                            TxnTimeStamp begin_ts);
     //
     //    DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+private:
+
 };
 
 } // namespace infinity

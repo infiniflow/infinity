@@ -69,6 +69,13 @@ module;
 #include <arrow/io/interfaces.h>
 #include <arrow/type.h>
 #include <miniocpp/client.h>
+
+#include "rocksdb/db.h"
+#include "rocksdb/options.h"
+#include "rocksdb/slice.h"
+#include "rocksdb/utilities/transaction.h"
+#include "rocksdb/utilities/transaction_db.h"
+
 #pragma clang diagnostic pop
 
 export module third_party;
@@ -335,4 +342,7 @@ export using HTTPStatus = oatpp::web::protocol::http::Status;
 // Python
 export using PyObject = PyObject;
 
+export using TransactionDB = ::ROCKSDB_NAMESPACE::TransactionDB;
+
 } // namespace infinity
+

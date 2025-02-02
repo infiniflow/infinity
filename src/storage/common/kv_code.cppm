@@ -22,17 +22,22 @@ namespace infinity {
 
 class KeyEncode {
 public:
-    static String DatabaseKey(const String &db_name, TxnTimeStamp ts);
+    static String DatabaseKey(const String &db_name, TxnTimeStamp ts, TransactionID txn_id);
     static String DatabasePrefix(const String &db_name);
 
-    static String TableKey(const String &db_name, const String &tbl_name, TxnTimeStamp ts);
+    static String TableKey(const String &db_name, const String &tbl_name, TxnTimeStamp ts, TransactionID txn_id);
     static String TableKeyPrefix(const String &db_name, const String &tbl_name);
 
-    static String TableSegmentKey(const String &db_name, const String &tbl_name, SegmentID segment_id, TxnTimeStamp ts);
+    static String TableSegmentKey(const String &db_name, const String &tbl_name, SegmentID segment_id, TxnTimeStamp ts, TransactionID txn_id);
     static String TableSegmentKeyPrefix(const String &db_name, const String &tbl_name);
 
-    static String
-    TableSegmentBlockKey(const String &db_name, const String &tbl_name, SegmentID segment_id, BlockID block_id, ColumnID column_id, TxnTimeStamp ts);
+    static String TableSegmentBlockKey(const String &db_name,
+                                       const String &tbl_name,
+                                       SegmentID segment_id,
+                                       BlockID block_id,
+                                       ColumnID column_id,
+                                       TxnTimeStamp ts,
+                                       TransactionID txn_id);
     static String TableSegmentBlockKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id);
 
     static String TableSegmentBlockColumnKey(const String &db_name,
@@ -40,14 +45,19 @@ public:
                                              SegmentID segment_id,
                                              BlockID block_id,
                                              ColumnID column_id,
-                                             TxnTimeStamp ts);
+                                             TxnTimeStamp ts,
+                                             TransactionID txn_id);
     static String TableSegmentBlockColumnKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id, BlockID block_id);
 
-    static String TableIndexKey(const String &db_name, const String &tbl_name, const String &index_name, TxnTimeStamp ts);
+    static String TableIndexKey(const String &db_name, const String &tbl_name, const String &index_name, TxnTimeStamp ts, TransactionID txn_id);
     static String TableIndexKeyPrefix(const String &db_name, const String &tbl_name, const String &index_name);
 
-    static String
-    TableIndexSegmentKey(const String &db_name, const String &tbl_name, const String &index_name, SegmentID segment_id, TxnTimeStamp ts);
+    static String TableIndexSegmentKey(const String &db_name,
+                                       const String &tbl_name,
+                                       const String &index_name,
+                                       SegmentID segment_id,
+                                       TxnTimeStamp ts,
+                                       TransactionID txn_id);
     static String TableIndexSegmentKeyPrefix(const String &db_name, const String &tbl_name, const String &index_name);
 
     static String TableIndexChunkKey(const String &db_name,
@@ -55,7 +65,8 @@ public:
                                      const String &index_name,
                                      SegmentID segment_id,
                                      ChunkID chunk_id,
-                                     TxnTimeStamp ts);
+                                     TxnTimeStamp ts,
+                                     TransactionID txn_id);
     static String TableIndexChunkKeyPrefix(const String &db_name, const String &tbl_name, const String &index_name);
 };
 
