@@ -604,13 +604,14 @@ TEST_P(NewCatalogTest, disable_WAL) {
     }
 }
 
-TEST_P(NewCatalogTest, timestamp) {
+TEST_P(NewCatalogTest, multi_version) {
     using namespace infinity;
 
     using ROCKSDB_NAMESPACE::DestroyDB;
     using ROCKSDB_NAMESPACE::FlushOptions;
     using ROCKSDB_NAMESPACE::Options;
     using ROCKSDB_NAMESPACE::ReadOptions;
+    using ROCKSDB_NAMESPACE::Slice;
     using ROCKSDB_NAMESPACE::Snapshot;
     using ROCKSDB_NAMESPACE::Status;
     using ROCKSDB_NAMESPACE::Transaction;
@@ -618,7 +619,6 @@ TEST_P(NewCatalogTest, timestamp) {
     using ROCKSDB_NAMESPACE::TransactionDBOptions;
     using ROCKSDB_NAMESPACE::TransactionOptions;
     using ROCKSDB_NAMESPACE::WriteOptions;
-    using ROCKSDB_NAMESPACE::Slice;
 
     const std::string db_path = "/tmp/rocksdb_two_phases_transaction";
 
@@ -630,6 +630,8 @@ TEST_P(NewCatalogTest, timestamp) {
         options.manual_wal_flush = true;
         options.avoid_flush_during_shutdown = true;
         TransactionDB *txn_db;
+        TransactionOptions txn_options;
+        txn_options.set_snapshot = true;
 
         Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
         EXPECT_TRUE(s.ok());
@@ -639,27 +641,50 @@ TEST_P(NewCatalogTest, timestamp) {
         ReadOptions read_options;
         std::string value;
 
-        Transaction *txn1 = txn_db->BeginTransaction(write_options);
+        Transaction *txn1 = txn_db->BeginTransaction(write_options, txn_options);
         EXPECT_TRUE(txn1 != nullptr);
 
         // Write a key in this transaction
-        s = txn1->Put("abc", "def");
+        s = txn1->Put("db|db1|10", "10");
         EXPECT_TRUE(s.ok());
 
         s = txn1->Commit();
         EXPECT_TRUE(s.ok());
         delete txn1;
 
-        Transaction *txn2 = txn_db->BeginTransaction(write_options);
+        Transaction *txn2 = txn_db->BeginTransaction(write_options, txn_options);
         EXPECT_TRUE(txn2 != nullptr);
+        txn2->SetSnapshot();
+        const Snapshot* snapshot = txn2->GetSnapshot();
 
-        s = txn2->Get(read_options, "abc", &value);
+
+        txn1 = txn_db->BeginTransaction(write_options, txn_options);
+        EXPECT_TRUE(txn1 != nullptr);
+
+        s = txn1->Delete("db|db1|10");
         EXPECT_TRUE(s.ok());
 
-        EXPECT_STREQ(value.c_str(), "def");
-
-        s = txn2->Commit();
+        s = txn1->Put("db|db1|20", "20");
         EXPECT_TRUE(s.ok());
+
+        s = txn1->Commit();
+        EXPECT_TRUE(s.ok());
+        delete txn1;
+
+        const String prefix = "db|db1|";
+        read_options.snapshot = snapshot;
+        auto iter2 = txn2->GetIterator(read_options);
+        iter2->Seek(prefix);
+        while (iter2->Valid() && iter2->key().starts_with(prefix)) {
+            EXPECT_STREQ(iter2->key().ToString().c_str(), "db|db1|10");
+            EXPECT_STREQ(iter2->value().ToString().c_str(), "10");
+//            std::cout << iter2->key().ToString() << ": " << iter2->value().ToString() << std::endl;
+            iter2->Next();
+        }
+        delete iter2;
+        txn2->Commit();
+        read_options.snapshot = nullptr;
+
         delete txn2;
 
         // Cleanup
