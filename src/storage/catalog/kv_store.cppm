@@ -53,11 +53,13 @@ public:
     Status Init(const String &db_path);
     Status Uninit();
     Status Flush();
+    Status CreateBackup(const String& backup_path, Vector<rocksdb::BackupInfo>& backup_info_list);
+    static Status RestoreFromBackup(const String& backup_path, const String& db_path);
 
     UniquePtr<KVInstance> GetInstance();
 
     // For UT
-    Status Destroy();
+    static Status Destroy(const String &db_path);
 
 private:
     String db_path_{};

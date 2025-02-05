@@ -101,6 +101,39 @@ Status KVStore::Flush() {
     return Status::OK();
 }
 
+Status KVStore::CreateBackup(const String &backup_path, Vector<rocksdb::BackupInfo>& backup_info_list) {
+    rocksdb::BackupEngine *backup_engine;
+    rocksdb::Status s = rocksdb::BackupEngine::Open(rocksdb::Env::Default(), rocksdb::BackupEngineOptions(backup_path), &backup_engine);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+
+    rocksdb::IOStatus io_status = backup_engine->CreateNewBackup(transaction_db_);
+    if (!io_status.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", io_status.ToString()));
+    }
+
+    backup_engine->GetBackupInfo(&backup_info_list, true);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+
+    return Status::OK();
+}
+
+Status KVStore::RestoreFromBackup(const String &backup_path, const String& db_path) {
+    rocksdb::BackupEngineReadOnly *backup_engine_ro{};
+    rocksdb::IOStatus s = rocksdb::BackupEngineReadOnly::Open(rocksdb::Env::Default(), rocksdb::BackupEngineOptions(backup_path), &backup_engine_ro);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    s = backup_engine_ro->RestoreDBFromLatestBackup(db_path, db_path);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
 UniquePtr<KVInstance> KVStore::GetInstance() {
     UniquePtr<KVInstance> kv_instance = MakeUnique<KVInstance>();
     kv_instance->transaction_ = transaction_db_->BeginTransaction(write_options_, txn_options_);
@@ -108,8 +141,13 @@ UniquePtr<KVInstance> KVStore::GetInstance() {
     return kv_instance;
 }
 
-Status KVStore::Destroy() {
-    rocksdb::Status s = ::rocksdb::DestroyDB(db_path_, options_);
+Status KVStore::Destroy(const String &db_path) {
+    rocksdb::Options options;
+    options.create_if_missing = true;
+    options.manual_wal_flush = true;
+    options.avoid_flush_during_shutdown = true;
+
+    rocksdb::Status s = ::rocksdb::DestroyDB(db_path, options);
     if (!s.ok()) {
         return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
     }

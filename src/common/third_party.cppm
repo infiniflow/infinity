@@ -73,8 +73,10 @@ module;
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
+#include "rocksdb/io_status.h"
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
+#include "rocksdb/utilities/backup_engine.h"
 
 #pragma clang diagnostic pop
 
@@ -354,6 +356,12 @@ using TransactionOptions = ::ROCKSDB_NAMESPACE::TransactionOptions;
 using WriteOptions = ::ROCKSDB_NAMESPACE::WriteOptions;
 using FlushOptions = ::ROCKSDB_NAMESPACE::FlushOptions;
 using Iterator = ::ROCKSDB_NAMESPACE::Iterator;
+using BackupEngine = ::ROCKSDB_NAMESPACE::BackupEngine;
+using BackupInfo = ::ROCKSDB_NAMESPACE::BackupInfo;
+using BackupEngineReadOnly = ::ROCKSDB_NAMESPACE::BackupEngineReadOnly;
+using BackupEngineOptions = ::ROCKSDB_NAMESPACE::BackupEngineOptions;
+using Env = ::ROCKSDB_NAMESPACE::Env;
+using IOStatus = ::ROCKSDB_NAMESPACE::IOStatus;
 } // namespace rocksdb
 
 } // namespace infinity

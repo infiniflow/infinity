@@ -15,11 +15,11 @@
 #include "type/complex/embedding_type.h"
 #include "gtest/gtest.h"
 
-#include "rocksdb/db.h"
-#include "rocksdb/options.h"
-#include "rocksdb/slice.h"
-#include "rocksdb/utilities/transaction.h"
-#include "rocksdb/utilities/transaction_db.h"
+// #include "rocksdb/db.h"
+// #include "rocksdb/options.h"
+// #include "rocksdb/slice.h"
+// #include "rocksdb/utilities/transaction.h"
+// #include "rocksdb/utilities/transaction_db.h"
 
 import base_test;
 
@@ -28,7 +28,7 @@ import infinity_exception;
 
 import stl;
 import global_resource_usage;
-// import third_party;
+import third_party;
 import logger;
 import table_def;
 import value;
@@ -122,7 +122,7 @@ TEST_P(NewCatalogTest, kv_store1) {
 
     status = kv_store->Uninit();
     EXPECT_TRUE(status.ok());
-    status = kv_store->Destroy();
+    status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
     EXPECT_TRUE(status.ok());
 }
 
@@ -161,7 +161,7 @@ TEST_P(NewCatalogTest, kv_store2) {
 
         status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());
-        status = kv_store->Destroy();
+        status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
         EXPECT_TRUE(status.ok());
     }
 
@@ -206,7 +206,7 @@ TEST_P(NewCatalogTest, kv_store2) {
             status = kv_store->Uninit();
             EXPECT_TRUE(status.ok());
 
-            status = kv_store->Destroy();
+            status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
             EXPECT_TRUE(status.ok());
         }
     }
@@ -259,7 +259,69 @@ TEST_P(NewCatalogTest, kv_store3) {
 
         status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());
-        status = kv_store->Destroy();
+        status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
+        EXPECT_TRUE(status.ok());
+    }
+}
+
+TEST_P(NewCatalogTest, kv_store4) {
+    using namespace infinity;
+
+    // Backup
+    {
+        UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
+        kv_store->Init("/tmp/rocksdb_transaction_example");
+        UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
+
+        Status status = kv_instance1->Put("db|db1|10", "10");
+        EXPECT_TRUE(status.ok());
+
+        status = kv_instance1->Put("abc", "def");
+        EXPECT_TRUE(status.ok());
+
+        status = kv_instance1->Commit();
+        EXPECT_TRUE(status.ok());
+
+        kv_store->Flush();
+
+        Vector<rocksdb::BackupInfo> backup_info_list;
+        status = kv_store->CreateBackup("/tmp/rocksdb_example_backup", backup_info_list);
+        EXPECT_TRUE(status.ok());
+
+        for (const auto &backup_info : backup_info_list) {
+            std::cout << backup_info.number_files << std::endl;
+        }
+
+        status = kv_store->Uninit();
+        EXPECT_TRUE(status.ok());
+        status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        Status status = KVStore::RestoreFromBackup("/tmp/rocksdb_example_backup", "/tmp/rocksdb_transaction_example");
+        UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
+        kv_store->Init("/tmp/rocksdb_transaction_example");
+        UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
+        const String prefix = "db|db1|";
+        auto iter2 = kv_instance1->GetIterator();
+        iter2->Seek(prefix);
+        while (iter2->Valid() && iter2->key().starts_with(prefix)) {
+            EXPECT_STREQ(iter2->key().ToString().c_str(), "db|db1|10");
+            EXPECT_STREQ(iter2->value().ToString().c_str(), "10");
+            //            std::cout << iter2->key().ToString() << ": " << iter2->value().ToString() << std::endl;
+            iter2->Next();
+        }
+        delete iter2;
+
+        std::string value;
+        status = kv_instance1->Get("abc", value);
+        EXPECT_TRUE(status.ok());
+        EXPECT_STREQ(value.c_str(), "def");
+
+        kv_instance1->Commit();
+        status = kv_store->Uninit();
+        EXPECT_TRUE(status.ok());
+        status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
         EXPECT_TRUE(status.ok());
     }
 }
