@@ -57,17 +57,19 @@ import global_resource_usage;
 import wal_manager;
 import defer_op;
 import snapshot_info;
+import kv_store;
 
 namespace infinity {
 
 NewTxn::NewTxn(NewTxnManager *txn_manager,
-         BufferManager *buffer_manager,
-         TransactionID txn_id,
-         TxnTimeStamp begin_ts,
-         SharedPtr<String> txn_text,
-         TransactionType txn_type)
+               BufferManager *buffer_manager,
+               TransactionID txn_id,
+               TxnTimeStamp begin_ts,
+               UniquePtr<KVInstance> kv_instance,
+               SharedPtr<String> txn_text,
+               TransactionType txn_type)
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(nullptr), wal_entry_(MakeShared<WalEntry>()),
-      txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), txn_text_(std::move(txn_text)) {
+      txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), kv_instance_(std::move(kv_instance)), txn_text_(std::move(txn_text)) {
     catalog_ = InfinityContext::instance().storage()->catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");
@@ -79,9 +81,14 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
     txn_context_ptr_->txn_type_ = txn_type;
 }
 
-NewTxn::NewTxn(BufferManager *buffer_mgr, NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TransactionType txn_type)
+NewTxn::NewTxn(BufferManager *buffer_mgr,
+               NewTxnManager *txn_mgr,
+               TransactionID txn_id,
+               TxnTimeStamp begin_ts,
+               UniquePtr<KVInstance> kv_instance,
+               TransactionType txn_type)
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(nullptr), wal_entry_(MakeShared<WalEntry>()),
-      txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {
+      txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), kv_instance_(std::move(kv_instance)) {
     catalog_ = InfinityContext::instance().storage()->catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");
@@ -92,9 +99,13 @@ NewTxn::NewTxn(BufferManager *buffer_mgr, NewTxnManager *txn_mgr, TransactionID 
     txn_context_ptr_->txn_type_ = txn_type;
 }
 
-UniquePtr<NewTxn>
-NewTxn::NewReplayTxn(BufferManager *buffer_mgr, NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TransactionType txn_type) {
-    auto txn = MakeUnique<NewTxn>(buffer_mgr, txn_mgr, txn_id, begin_ts, txn_type);
+UniquePtr<NewTxn> NewTxn::NewReplayTxn(BufferManager *buffer_mgr,
+                                       NewTxnManager *txn_mgr,
+                                       TransactionID txn_id,
+                                       TxnTimeStamp begin_ts,
+                                       UniquePtr<KVInstance> kv_instance,
+                                       TransactionType txn_type) {
+    auto txn = MakeUnique<NewTxn>(buffer_mgr, txn_mgr, txn_id, begin_ts, std::move(kv_instance), txn_type);
     txn->txn_context_ptr_->commit_ts_ = begin_ts;
     txn->txn_context_ptr_->state_ = TxnState::kCommitted;
     return txn;
@@ -427,9 +438,9 @@ Status NewTxn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, 
 }
 
 Status NewTxn::CreateIndexDo(TableEntry *table_entry,
-                          const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
-                          const String &index_name,
-                          HashMap<SegmentID, atomic_u64> &create_index_idxes) {
+                             const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
+                             const String &index_name,
+                             HashMap<SegmentID, atomic_u64> &create_index_idxes) {
     // auto *table_entry = table_ref->table_entry_ptr_;
     const auto &db_name = *table_entry->GetDBName();
     const auto &table_name = *table_entry->GetTableName();
@@ -604,7 +615,7 @@ TxnTimeStamp NewTxn::Commit() {
     DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
     if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly()) {
         // Don't need to write empty WalEntry (read-only transactions).
-        TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(nullptr);
+        TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
         return commit_ts;
@@ -619,7 +630,7 @@ TxnTimeStamp NewTxn::Commit() {
     }
 
     // register commit ts in wal manager here, define the commit sequence
-    TxnTimeStamp commit_ts = txn_mgr_->GetWriteCommitTS(nullptr);
+    TxnTimeStamp commit_ts = txn_mgr_->GetWriteCommitTS(this);
     LOG_TRACE(fmt::format("NewTxn: {} is committing, begin_ts:{} committing ts: {}", txn_context_ptr_->txn_id_, BeginTS(), commit_ts));
 
     this->SetTxnCommitting(commit_ts);
@@ -627,17 +638,19 @@ TxnTimeStamp NewTxn::Commit() {
     txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("NewTxn {} commit ts: {}", txn_context_ptr_->txn_id_, commit_ts));
 
-    if (const auto conflict_reason = txn_mgr_->CheckTxnConflict(nullptr); conflict_reason) {
-        LOG_ERROR(
-            fmt::format("NewTxn: {} is rolled back. rollback ts: {}. NewTxn conflict reason: {}.", txn_context_ptr_->txn_id_, commit_ts, *conflict_reason));
+    if (const auto conflict_reason = txn_mgr_->CheckTxnConflict(this); conflict_reason) {
+        LOG_ERROR(fmt::format("NewTxn: {} is rolled back. rollback ts: {}. NewTxn conflict reason: {}.",
+                              txn_context_ptr_->txn_id_,
+                              commit_ts,
+                              *conflict_reason));
         wal_entry_ = nullptr;
-        txn_mgr_->SendToWAL(nullptr);
+        txn_mgr_->SendToWAL(this);
         RecoverableError(Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", *conflict_reason)));
     }
 
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
-    txn_mgr_->SendToWAL(nullptr);
+    txn_mgr_->SendToWAL(this);
 
     // Wait until CommitTxnBottom is done.
     std::unique_lock<std::mutex> lk(commit_lock_);

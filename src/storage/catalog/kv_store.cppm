@@ -35,6 +35,7 @@ public:
     Status Put(const String &key, const String &value);
     Status Delete(const String &key);
     Status Get(const String &key, String &value);
+    Status GetForUpdate(const String &key, String &value);
     rocksdb::Iterator* GetIterator();
 
     Status Commit();

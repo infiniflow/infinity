@@ -14,75 +14,44 @@
 
 module;
 
-// #include <cassert>
-// #include <filesystem>
-// #include <fstream>
-// #include <thread>
-// #include <vector>
-
 module new_catalog;
-//
+
 import stl;
-// import defer_op;
-// import data_type;
-// import txn_manager;
-// import logger;
-// import third_party;
+import new_txn;
 import status;
-// import infinity_exception;
-// import function_set;
-// import scalar_function_set;
-// import table_function;
-// import special_function;
-// import buffer_manager;
-// import column_def;
-// import virtual_store;
-// import table_def;
-// import table_entry_type;
-// import meta_info;
-// import index_base;
-// import txn_store;
-// import data_access_state;
-// import catalog_delta_entry;
-// import file_writer;
 import extra_ddl_info;
-// import index_defines;
-// import infinity_context;
-// import create_index_info;
-// import persistence_manager;
-//
-// import table_meta;
-// import table_index_meta;
-// import base_entry;
-// import block_entry;
-// import block_column_entry;
-// import segment_index_entry;
-// import chunk_index_entry;
-// import log_file;
-// import persist_result_handler;
-// import local_file_handle;
-// import admin_statement;
-// import global_resource_usage;
-// import snapshot_info;
+import kv_store;
 
 namespace infinity {
 
-Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name,
-                                  const SharedPtr<String> &comment,
-                                  TransactionID txn_id,
-                                  TxnTimeStamp begin_ts,
-                                  ConflictType conflict_type) {
+NewCatalog::NewCatalog(KVStore *kv_store) : kv_store_(kv_store) {}
+
+Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const SharedPtr<String> &comment, NewTxn *new_txn, ConflictType conflict_type) {
+    KVInstance *kv_instance = new_txn->kv_instance();
+    switch (conflict_type) {
+        case ConflictType::kError:
+            //            if (CheckDatabaseExists(db_name, new_txn)) {
+            //                return {ErrorCode::kDatabaseAlreadyExists, "Database already exists"};
+            //            }
+            kv_instance->Put("abc", "abc");
+            break;
+        case ConflictType::kIgnore:
+            //            if (CheckDatabaseExists(db_name, new_txn)) {
+            //                return Status::OK();
+            //            }
+            break;
+        case ConflictType::kReplace:
+            break;
+        default:
+            return {ErrorCode::kInvalidConflictType, "Invalid conflict type"};
+    }
     return Status::OK();
 }
 
-Status NewCatalog::DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, ConflictType conflict_type) {
-    return Status::OK();
-}
+Status NewCatalog::DropDatabase(const SharedPtr<String> &db_name, NewTxn *new_txn, ConflictType conflict_type) { return Status::OK(); }
 
-bool NewCatalog::CheckDatabaseExists(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) { return true; }
+bool NewCatalog::CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *new_txn) { return true; }
 
-Tuple<SharedPtr<DatabaseInfo>, Status> NewCatalog::GetDatabaseInfo(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    return {nullptr, Status::OK()};
-}
+Tuple<SharedPtr<DatabaseInfo>, Status> NewCatalog::GetDatabaseInfo(const String &db_name, NewTxn *new_txn) { return {nullptr, Status::OK()}; }
 
 } // namespace infinity

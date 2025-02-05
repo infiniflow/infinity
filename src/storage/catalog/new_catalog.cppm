@@ -16,56 +16,34 @@ module;
 
 export module new_catalog;
 
-
 import stl;
 import table_def;
-//import function;
-//import function_set;
-//import table_function;
-//import special_function;
-//import third_party;
-//import buffer_manager;
-//import profiler;
 import status;
-//import default_values;
 import meta_info;
-//import index_base;
-//import txn_store;
-//import data_access_state;
 import extra_ddl_info;
-//import db_entry;
-//import table_entry;
-//import table_index_entry;
-//import segment_entry;
-//import db_meta;
-//import meta_map;
-//import base_entry;
-//import column_def;
-//import cleanup_scanner;
-//import log_file;
-//import snapshot_info;
-
+import kv_store;
 
 namespace infinity {
 
+class NewTxn;
+
 export struct NewCatalog {
 public:
-    NewCatalog();
-    ~NewCatalog();
+    explicit NewCatalog(KVStore *kv_store);
+    ~NewCatalog() = default;
 
 public:
     // Database related functions
     Status CreateDatabase(const SharedPtr<String> &db_name,
                           const SharedPtr<String> &comment,
-                          TransactionID txn_id,
-                          TxnTimeStamp begin_ts,
+                          NewTxn *txn,
                           ConflictType conflict_type = ConflictType::kError);
 
-    Status DropDatabase(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts, ConflictType conflict_type = ConflictType::kError);
+    Status DropDatabase(const SharedPtr<String> &db_name, NewTxn *txn, ConflictType conflict_type = ConflictType::kError);
 
-    bool CheckDatabaseExists(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    bool CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *txn);
 
-    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name, NewTxn *txn);
 
     //    void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
     //
@@ -84,7 +62,7 @@ public:
     //    DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
 private:
-
+    KVStore *kv_store_{};
 };
 
 } // namespace infinity

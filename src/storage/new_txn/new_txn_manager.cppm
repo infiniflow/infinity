@@ -24,6 +24,7 @@ import wal_entry;
 import default_values;
 import txn_context;
 import txn_manager;
+import kv_store;
 
 namespace infinity {
 
@@ -33,7 +34,7 @@ class CatalogDeltaEntry;
 
 export class NewTxnManager {
 public:
-    explicit NewTxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts);
+    explicit NewTxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, KVStore *kv_store, TxnTimeStamp start_ts);
 
     ~NewTxnManager();
 
@@ -114,16 +115,18 @@ private:
     Deque<SharedPtr<TxnContext>> txn_context_histories_{};
 
     WalManager *wal_mgr_;
+    KVStore *kv_store_;
 
     Deque<WeakPtr<NewTxn>> beginned_txns_;        // sorted by begin ts
     Map<TxnTimeStamp, NewTxn *> committing_txns_; // the txns in committing stage
-    Set<TxnTimeStamp> checking_ts_{};          // the begin ts of txn that is used to check conflict
+    Set<TxnTimeStamp> checking_ts_{};             // the begin ts of txn that is used to check conflict
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> current_ts_{}; // The next txn ts
     Atomic<TxnTimeStamp> max_committed_ts_{};
-    Atomic<TxnTimeStamp> ckp_begin_ts_ = UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
+    Atomic<TxnTimeStamp> ckp_begin_ts_ =
+        UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 
     // For stop the txn manager
     atomic_bool is_running_{false};

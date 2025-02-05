@@ -257,6 +257,8 @@ export {
     constexpr std::string_view LOG_LEVEL_OPTION_NAME = "log_level";
 
     constexpr std::string_view DATA_DIR_OPTION_NAME = "data_dir";
+    constexpr std::string_view CATALOG_DIR_OPTION_NAME = "catalog_dir";
+    constexpr std::string_view SNAPSHOT_DIR_OPTION_NAME = "snapshot_dir";
     constexpr std::string_view CLEANUP_INTERVAL_OPTION_NAME = "cleanup_interval";
     constexpr std::string_view COMPACT_INTERVAL_OPTION_NAME = "compact_interval";
     constexpr std::string_view OPTIMIZE_INTERVAL_OPTION_NAME = "optimize_interval";
@@ -297,7 +299,6 @@ export {
 
     constexpr std::string_view RECORD_RUNNING_QUERY_OPTION_NAME = "record_running_query";
 
-    constexpr std::string_view SNAPSHOT_DIR_OPTION_NAME = "snapshot_dir";
     // Variable name
     constexpr std::string_view QUERY_COUNT_VAR_NAME = "query_count";                         // global and session
     constexpr std::string_view SESSION_COUNT_VAR_NAME = "session_count";                     // global

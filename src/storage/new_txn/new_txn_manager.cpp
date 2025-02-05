@@ -35,11 +35,12 @@ import defer_op;
 import infinity_context;
 import global_resource_usage;
 import bg_task;
+import kv_store;
 
 namespace infinity {
 
-NewTxnManager::NewTxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, TxnTimeStamp start_ts)
-    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), current_ts_(start_ts), max_committed_ts_(start_ts), is_running_(false) {
+NewTxnManager::NewTxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, KVStore *kv_store, TxnTimeStamp start_ts)
+    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), kv_store_(kv_store), current_ts_(start_ts), max_committed_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxnManager");
 #endif
@@ -81,7 +82,7 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
     }
 
     // Create txn instance
-    auto new_txn = SharedPtr<NewTxn>(new NewTxn(this, buffer_mgr_, new_txn_id, begin_ts, std::move(txn_text), txn_type));
+    auto new_txn = SharedPtr<NewTxn>(new NewTxn(this, buffer_mgr_, new_txn_id, begin_ts, kv_store_->GetInstance(), std::move(txn_text), txn_type));
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
@@ -210,12 +211,12 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
         wait_conflict_ck_.erase(commit_ts); // rollback
     }
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
-//        Vector<NewTxn *> txn_array;
-//        do {
-//            txn_array.push_back(wait_conflict_ck_.begin()->second);
-//            wait_conflict_ck_.erase(wait_conflict_ck_.begin());
-//        } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
-//        wal_mgr_->SubmitTxn(txn_array);
+        //        Vector<NewTxn *> txn_array;
+        //        do {
+        //            txn_array.push_back(wait_conflict_ck_.begin()->second);
+        //            wait_conflict_ck_.erase(wait_conflict_ck_.begin());
+        //        } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
+        //        wal_mgr_->SubmitTxn(txn_array);
     }
 }
 

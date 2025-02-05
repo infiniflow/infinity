@@ -394,6 +394,18 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Catalog Dir
+        String catalog_dir = "/var/infinity/catalog";
+        if (default_config != nullptr) {
+            catalog_dir = default_config->default_catalog_dir_;
+        }
+        UniquePtr<StringOption> catalog_dir_option = MakeUnique<StringOption>(CATALOG_DIR_OPTION_NAME, catalog_dir);
+        status = global_options_.AddOption(std::move(catalog_dir_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Persistence Dir
         String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
         if (default_config != nullptr) {
@@ -1528,6 +1540,22 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kCatalogDir: {
+                            // Catalog Dir
+                            String catalog_dir = "/var/infinity/catalog";
+                            if (elem.second.is_string()) {
+                                catalog_dir = elem.second.value_or(catalog_dir);
+                            } else {
+                                return Status::InvalidConfig("'catalog_dir' field isn't string.");
+                            }
+
+                            UniquePtr<StringOption> catalog_dir_option = MakeUnique<StringOption>(CATALOG_DIR_OPTION_NAME, catalog_dir);
+                            Status status = global_options_.AddOption(std::move(catalog_dir_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
                         case GlobalOptionIndex::kPersistenceDir: {
                             String persistence_dir;
                             if (elem.second.is_string()) {
@@ -1880,11 +1908,22 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                                   0);
                     global_options_.AddOption(std::move(persistence_object_size_limit_option));
                 }
+
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kDataDir) == nullptr) {
                     // Data Dir
                     String data_dir = "/var/infinity/data";
                     UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
                     Status status = global_options_.AddOption(std::move(data_dir_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kCatalogDir) == nullptr) {
+                    // Catalog Dir
+                    String catalog_dir = "/var/infinity/catalog";
+                    UniquePtr<StringOption> catalog_dir_option = MakeUnique<StringOption>(CATALOG_DIR_OPTION_NAME, catalog_dir);
+                    Status status = global_options_.AddOption(std::move(catalog_dir_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2652,6 +2691,11 @@ LogLevel Config::GetLogLevel() {
 String Config::DataDir() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetStringValue(GlobalOptionIndex::kDataDir);
+}
+
+String Config::CatalogDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kCatalogDir);
 }
 
 i64 Config::CleanupInterval() {

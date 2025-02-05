@@ -15,36 +15,9 @@
 #include "gtest/gtest.h"
 
 import base_test;
-
-import infinity_context;
-import infinity_exception;
-
 import stl;
-import global_resource_usage;
 import third_party;
-import logger;
-import table_def;
-import value;
-
-import data_block;
-import default_values;
-import txn_manager;
-import buffer_manager;
-import txn;
-import catalog;
 import status;
-import extra_ddl_info;
-import column_def;
-import data_type;
-import logical_type;
-import embedding_info;
-import index_hnsw;
-import statement_common;
-import data_access_state;
-import txn_store;
-import txn_state;
-
-import base_entry;
 import kv_store;
 
 using namespace infinity;

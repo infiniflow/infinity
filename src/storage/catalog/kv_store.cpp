@@ -52,6 +52,14 @@ Status KVInstance::Get(const String &key, String &value) {
     return Status::OK();
 }
 
+Status KVInstance::GetForUpdate(const String &key, String &value) {
+    rocksdb::Status s = transaction_->GetForUpdate(read_options_, key, &value);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
 rocksdb::Iterator *KVInstance::GetIterator() { return transaction_->GetIterator(read_options_); }
 
 Status KVInstance::Commit() {
@@ -101,7 +109,7 @@ Status KVStore::Flush() {
     return Status::OK();
 }
 
-Status KVStore::CreateBackup(const String &backup_path, Vector<rocksdb::BackupInfo>& backup_info_list) {
+Status KVStore::CreateBackup(const String &backup_path, Vector<rocksdb::BackupInfo> &backup_info_list) {
     rocksdb::BackupEngine *backup_engine;
     rocksdb::Status s = rocksdb::BackupEngine::Open(rocksdb::Env::Default(), rocksdb::BackupEngineOptions(backup_path), &backup_engine);
     if (!s.ok()) {
@@ -121,7 +129,7 @@ Status KVStore::CreateBackup(const String &backup_path, Vector<rocksdb::BackupIn
     return Status::OK();
 }
 
-Status KVStore::RestoreFromBackup(const String &backup_path, const String& db_path) {
+Status KVStore::RestoreFromBackup(const String &backup_path, const String &db_path) {
     rocksdb::BackupEngineReadOnly *backup_engine_ro{};
     rocksdb::IOStatus s = rocksdb::BackupEngineReadOnly::Open(rocksdb::Env::Default(), rocksdb::BackupEngineOptions(backup_path), &backup_engine_ro);
     if (!s.ok()) {

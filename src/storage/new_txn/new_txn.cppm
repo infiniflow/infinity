@@ -34,6 +34,7 @@ import column_def;
 import value;
 import snapshot_info;
 import txn_context;
+import kv_store;
 
 namespace infinity {
 
@@ -57,19 +58,29 @@ export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
     // For new txn
     explicit NewTxn(NewTxnManager *txn_manager,
-                 BufferManager *buffer_manager,
-                 TransactionID txn_id,
-                 TxnTimeStamp begin_ts,
-                 SharedPtr<String> txn_text,
-                 TransactionType txn_type);
+                    BufferManager *buffer_manager,
+                    TransactionID txn_id,
+                    TxnTimeStamp begin_ts,
+                    UniquePtr<KVInstance> kv_instance,
+                    SharedPtr<String> txn_text,
+                    TransactionType txn_type);
 
     // For replay txn
-    explicit NewTxn(BufferManager *buffer_mgr, NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TransactionType txn_type);
+    explicit NewTxn(BufferManager *buffer_mgr,
+                    NewTxnManager *txn_mgr,
+                    TransactionID txn_id,
+                    TxnTimeStamp begin_ts,
+                    UniquePtr<KVInstance> kv_instance,
+                    TransactionType txn_type);
 
     virtual ~NewTxn();
 
-    static UniquePtr<NewTxn>
-    NewReplayTxn(BufferManager *buffer_mgr, NewTxnManager *txn_mgr, TransactionID txn_id, TxnTimeStamp begin_ts, TransactionType txn_type);
+    static UniquePtr<NewTxn> NewReplayTxn(BufferManager *buffer_mgr,
+                                          NewTxnManager *txn_mgr,
+                                          TransactionID txn_id,
+                                          TxnTimeStamp begin_ts,
+                                          UniquePtr<KVInstance> kv_instance,
+                                          TransactionType txn_type);
 
     // NewTxn steps:
     // 1. CreateTxn
@@ -245,6 +256,8 @@ public:
     void AddOperation(const SharedPtr<String> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
     Vector<SharedPtr<String>> GetOperations() const { return txn_context_ptr_->GetOperations(); }
 
+    KVInstance *kv_instance() const { return kv_instance_.get(); }
+
 private:
     void CheckTxnStatus();
 
@@ -274,6 +287,9 @@ private:
     std::mutex commit_lock_{};
     std::condition_variable commit_cv_{};
     bool commit_bottom_done_{false};
+
+    // KV txn instance
+    UniquePtr<KVInstance> kv_instance_{};
 
     // String
     SharedPtr<String> txn_text_{nullptr};
