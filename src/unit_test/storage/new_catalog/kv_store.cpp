@@ -49,13 +49,13 @@ import kv_store;
 
 using namespace infinity;
 
-class NewCatalogTest : public BaseTestParamStr {};
+class KVStoreTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         NewCatalogTest,
+                         KVStoreTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-TEST_P(NewCatalogTest, kv_store1) {
+TEST_P(KVStoreTest, kv_store1) {
     using namespace infinity;
 
     // Test multi-version
@@ -119,7 +119,7 @@ TEST_P(NewCatalogTest, kv_store1) {
     EXPECT_TRUE(status.ok());
 }
 
-TEST_P(NewCatalogTest, kv_store2) {
+TEST_P(KVStoreTest, kv_store2) {
     using namespace infinity;
 
     // Test disable WAL
@@ -205,7 +205,7 @@ TEST_P(NewCatalogTest, kv_store2) {
     }
 }
 
-TEST_P(NewCatalogTest, kv_store3) {
+TEST_P(KVStoreTest, kv_store3) {
     using namespace infinity;
 
     // Test disable WAL
@@ -257,7 +257,7 @@ TEST_P(NewCatalogTest, kv_store3) {
     }
 }
 
-TEST_P(NewCatalogTest, kv_store4) {
+TEST_P(KVStoreTest, kv_store4) {
     using namespace infinity;
 
     // Backup
