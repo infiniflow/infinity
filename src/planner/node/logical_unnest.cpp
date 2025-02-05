@@ -24,21 +24,43 @@ import logical_node;
 import internal_types;
 import expression_type;
 import column_expression;
+import unnest_expression;
+import reference_expression;
 
 namespace infinity {
 
 Vector<ColumnBinding> LogicalUnnest::GetColumnBindings() const {
-    Vector<ColumnBinding> result;
+    Vector<ColumnBinding> result = LogicalCommonFunctionUsingLoadMeta::GetColumnBindings(*this);
     SizeT unnest_count = expression_list_.size();
     for (SizeT i = 0; i < unnest_count; ++i) {
-        result.emplace_back(unnest_idx_, i);
+        auto *unnest_expr = static_cast<UnnestExpression *>(expression_list_[i].get());
+        auto *unnest_ref_expr = static_cast<ReferenceExpression *>(unnest_expr->arguments()[0].get());
+        result[unnest_ref_expr->column_index()] = ColumnBinding(unnest_idx_, i);
     }
     return result;
 }
 
-SharedPtr<Vector<String>> LogicalUnnest::GetOutputNames() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+SharedPtr<Vector<String>> LogicalUnnest::GetOutputNames() const {
+    SharedPtr<Vector<String>> result = LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this);
+    SizeT unnest_count = expression_list_.size();
+    result->reserve(unnest_count);
+    for (SizeT i = 0; i < unnest_count; ++i) {
+        result->emplace_back(expression_list_[i]->Name());
+    }
+    return result;
+}
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalUnnest::GetOutputTypes() const { return LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this); }
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalUnnest::GetOutputTypes() const {
+    SharedPtr<Vector<SharedPtr<DataType>>> result = LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+    SizeT unnest_count = expression_list_.size();
+    result->reserve(unnest_count);
+    for (SizeT i = 0; i < unnest_count; ++i) {
+        auto *unnest_expr = static_cast<UnnestExpression *>(expression_list_[i].get());
+        auto *unnest_ref_expr = static_cast<ReferenceExpression *>(unnest_expr->arguments()[0].get());
+        (*result)[unnest_ref_expr->column_index()] = MakeShared<DataType>(expression_list_[i]->Type());
+    }
+    return result;
+}
 
 String LogicalUnnest::ToString(i64 &space) const {
     std::stringstream ss;

@@ -38,11 +38,13 @@ import column_vector;
 import logical_type;
 import status;
 
+import unnest_expression;
+import reference_expression;
+import expression_type;
+
 namespace infinity {
 
 void PhysicalUnnest::Init() {}
-
-namespace {
 
 void AppendArrayToColumnVector(const char *array_data, SizeT size, SizeT offset, ColumnVector *column_vector, const DataType &data_type) {
     switch (data_type.type()) {
@@ -59,20 +61,10 @@ void AppendArrayToColumnVector(const char *array_data, SizeT size, SizeT offset,
     }
 }
 
-void AppendRowIDToColumnVector(RowID row_id, SizeT size, SizeT offset, ColumnVector *column_vector) {
-    for (SizeT i = offset; i < size; ++i) {
-        column_vector->AppendByPtr(reinterpret_cast<const_ptr_t>(&row_id));
+void AppendScaleToColumnVector(const ColumnVector &input_col, SizeT write_size, SizeT written, ColumnVector &cur_col) {
+    for (SizeT i = 0; i < write_size; ++i) {
+        cur_col.AppendWith(input_col, written, 1);
     }
-}
-
-[[maybe_unused]] bool CheckRowIDInColumnVector(RowID row_id, SizeT size, SizeT offset, ColumnVector *column_vector) {
-    for (SizeT i = offset; i < size; ++i) {
-        RowID cur_row_id = column_vector->GetValue(i).value_.row;
-        if (cur_row_id != row_id) {
-            return false;
-        }
-    }
-    return true;
 }
 
 Vector<UniquePtr<DataBlock>> MakeDataBlocks(const Vector<Vector<SharedPtr<ColumnVector>>> &output_datas) {
@@ -99,8 +91,6 @@ Vector<UniquePtr<DataBlock>> MakeDataBlocks(const Vector<Vector<SharedPtr<Column
     return data_blocks;
 }
 
-} // namespace
-
 bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
     OperatorState *prev_op_state = operator_state->prev_op_state_;
     auto *unnest_op_state = static_cast<UnnestOperatorState *>(operator_state);
@@ -118,102 +108,81 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
         return true;
     }
 
-    Vector<SharedPtr<DataType>> output_types;
+    Vector<SharedPtr<DataType>> output_types = *this->GetOutputTypes();
     Vector<SharedPtr<DataType>> input_types = input_data_blocks[0]->types();
-    output_types.reserve(input_types.size());
-    Vector<ArrayInfo *> array_infos;
 
-    Optional<SizeT> rowid_idx = None;
-    for (SizeT col_idx = 0; const auto &col : input_data_blocks[0]->column_vectors) {
-        if (col->data_type()->type() == LogicalType::kArray) {
-            auto *array_info = static_cast<ArrayInfo *>(col->data_type()->type_info().get());
-            array_infos.push_back(static_cast<ArrayInfo *>(array_info));
-            output_types.push_back(MakeShared<DataType>(array_info->ElemType()));
-        } else {
-            if (col->data_type()->type() == LogicalType::kRowID) {
-                rowid_idx = col_idx;
-                // skip
-            } else {
-                // not implemented.
-                RecoverableError(Status::InvalidDataType());
-            }
-            output_types.push_back(col->data_type());
-        }
-        ++col_idx;
-    }
+    SizeT unnest_idx = GetUnnestIdx();
 
     Vector<Vector<SharedPtr<ColumnVector>>> output_datas(output_types.size());
     for (const auto &input_data_block : input_data_blocks) {
-        bool set_row_id = false;
         u16 row_count = input_data_block->row_count();
-        for (SizeT col_idx = 0; col_idx < output_types.size(); ++col_idx) {
-            const auto &col = input_data_block->column_vectors[col_idx];
-            if (rowid_idx && col_idx == *rowid_idx) {
-                continue;
-            }
+        Vector<SizeT> array_lengths;
+        {
+            const auto &unnest_col = input_data_block->column_vectors[unnest_idx];
+            auto *array_info = static_cast<ArrayInfo *>(unnest_col->data_type()->type_info().get());
 
-            auto &output_column_vector = output_datas[col_idx];
-            ColumnVector *cur_col = nullptr;
-            ColumnVector *rowid_col = nullptr;
-            if (output_column_vector.empty()) {
-                auto col = ColumnVector::Make(output_types[col_idx]);
+            auto &output_cols = output_datas[unnest_idx];
+            if (output_cols.empty()) {
+                auto col = ColumnVector::Make(output_types[unnest_idx]);
                 col->Initialize();
-                output_column_vector.push_back(std::move(col));
+                output_cols.push_back(std::move(col));
             }
-            cur_col = output_column_vector.back().get();
+            ColumnVector *cur_col = output_cols.back().get();
 
-            if (!set_row_id) {
-                if (output_datas[*rowid_idx].empty()) {
-                    auto col = ColumnVector::Make(MakeShared<DataType>(LogicalType::kRowID));
-                    col->Initialize();
-                    output_datas[*rowid_idx].push_back(std::move(col));
-                }
-                rowid_col = output_datas[*rowid_idx].back().get();
-            }
-
-            if (*col->data_type() != *input_types[col_idx]) {
-                UnrecoverableError(fmt::format("Column type mismatch: {} vs {}", col->data_type()->ToString(), input_types[col_idx]->ToString()));
-            }
-            auto *data = reinterpret_cast<ArrayT *>(col->data());
+            auto *data = reinterpret_cast<ArrayT *>(unnest_col->data());
             for (u16 row_idx = 0; row_idx < row_count; ++row_idx) {
-                Pair<Span<const char>, SizeT> array_raw = col->GetArray(data[row_idx], col->buffer_.get(), array_infos[col_idx]);
+                Pair<Span<const char>, SizeT> array_raw = unnest_col->GetArray(data[row_idx], unnest_col->buffer_.get(), array_info);
                 const char *array_data = array_raw.first.data();
                 SizeT array_size = array_raw.second;
+                array_lengths.push_back(array_size);
 
                 SizeT written = 0;
                 while (written < array_size) {
                     SizeT write_size = std::min(array_size - written, cur_col->capacity() - cur_col->Size());
-                    AppendArrayToColumnVector(array_data, write_size, written, cur_col, *output_types[col_idx]);
+                    AppendArrayToColumnVector(array_data, write_size, written, cur_col, *output_types[unnest_idx]);
+                    written += write_size;
 
-                    if (rowid_col) {
-                        RowID row_id = input_data_block->GetValue(*rowid_idx, row_idx).value_.row;
-                        AppendRowIDToColumnVector(row_id, write_size, written, rowid_col);
+                    if (cur_col->capacity() == cur_col->Size()) {
+                        auto new_col = ColumnVector::Make(output_types[unnest_idx]);
+                        new_col->Initialize();
+                        output_cols.push_back(std::move(new_col));
+                        cur_col = output_cols.back().get();
                     }
+                }
+            }
+        }
+        for (SizeT col_idx = 0; col_idx < output_types.size(); ++col_idx) {
+            if (col_idx == unnest_idx) {
+                continue;
+            }
+            const auto &input_col = input_data_block->column_vectors[col_idx];
+            auto &output_cols = output_datas[col_idx];
+            if (output_cols.empty()) {
+                auto col = ColumnVector::Make(output_types[col_idx]);
+                col->Initialize();
+                output_cols.push_back(std::move(col));
+            }
+            ColumnVector *cur_col = output_cols.back().get();
+            SizeT input_offset = 0;
+            for (SizeT array_length : array_lengths) {
+                SizeT written = 0;
+                while (written < array_length) {
+                    SizeT write_size = std::min(array_length - written, cur_col->capacity() - cur_col->Size());
+                    AppendScaleToColumnVector(*input_col, write_size, input_offset, *cur_col);
                     written += write_size;
 
                     if (cur_col->capacity() == cur_col->Size()) {
                         auto new_col = ColumnVector::Make(output_types[col_idx]);
                         new_col->Initialize();
-                        output_column_vector.push_back(std::move(new_col));
-                        cur_col = output_column_vector.back().get();
-
-                        if (set_row_id) {
-                            auto new_col = ColumnVector::Make(MakeShared<DataType>(LogicalType::kRowID));
-                            new_col->Initialize();
-                            output_datas[*rowid_idx].push_back(std::move(new_col));
-                            rowid_col = output_datas[*rowid_idx].back().get();
-                        }
+                        output_cols.push_back(std::move(new_col));
+                        cur_col = output_cols.back().get();
                     }
                 }
+                ++input_offset;
             }
-            if (!set_row_id) {
-                set_row_id = true;
-            }
-        }
-        if (!set_row_id) {
-            UnrecoverableError("RowID not set.");
         }
     }
+
     for (auto &output_column_vector : output_datas) {
         if (auto &last_col = output_column_vector.back(); last_col->Size() == 0) {
             output_column_vector.pop_back();
@@ -229,12 +198,29 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
     return true;
 }
 
+SharedPtr<Vector<String>> PhysicalUnnest::GetOutputNames() const {
+    auto ret = PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this);
+    return ret;
+}
+
 SharedPtr<Vector<SharedPtr<DataType>>> PhysicalUnnest::GetOutputTypes() const {
-    SharedPtr<Vector<SharedPtr<DataType>>> result = MakeShared<Vector<SharedPtr<DataType>>>();
-    for (auto &expr : expression_list_) {
-        result->push_back(MakeShared<DataType>(expr->Type()));
-    }
+    SharedPtr<Vector<SharedPtr<DataType>>> result = PhysicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
+    SizeT unnest_idx = GetUnnestIdx();
+    (*result)[unnest_idx] = MakeShared<DataType>(static_cast<ArrayInfo *>((*result)[unnest_idx]->type_info().get())->ElemType());
     return result;
+}
+
+SizeT PhysicalUnnest::GetUnnestIdx() const {
+    if (expression_list_.size() != 1) {
+        RecoverableError(Status::SyntaxError(fmt::format("UNNEST only supports one expression, but got {}", expression_list_.size())));
+    }
+    auto *unnest_expr = static_cast<UnnestExpression *>(expression_list_[0].get());
+    if (unnest_expr->arguments().size() != 1 || unnest_expr->arguments()[0]->type() != ExpressionType::kReference) {
+        UnrecoverableError("UNNEST only supports one column reference.");
+    }
+    auto *unnest_ref_expr = static_cast<ReferenceExpression *>(unnest_expr->arguments()[0].get());
+    SizeT unnest_idx = unnest_ref_expr->column_index();
+    return unnest_idx;
 }
 
 } // namespace infinity
