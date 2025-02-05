@@ -12,14 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "type/complex/embedding_type.h"
 #include "gtest/gtest.h"
-
-// #include "rocksdb/db.h"
-// #include "rocksdb/options.h"
-// #include "rocksdb/slice.h"
-// #include "rocksdb/utilities/transaction.h"
-// #include "rocksdb/utilities/transaction_db.h"
 
 import base_test;
 

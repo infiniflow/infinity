@@ -20,7 +20,7 @@ import stl;
 
 namespace infinity {
 
-class KeyEncode {
+export class KeyEncode {
 public:
     static String DatabaseKey(const String &db_name, TxnTimeStamp ts, TransactionID txn_id);
     static String DatabasePrefix(const String &db_name);
@@ -29,16 +29,15 @@ public:
     static String TableKeyPrefix(const String &db_name, const String &tbl_name);
 
     static String TableSegmentKey(const String &db_name, const String &tbl_name, SegmentID segment_id, TxnTimeStamp ts, TransactionID txn_id);
-    static String TableSegmentKeyPrefix(const String &db_name, const String &tbl_name);
+    static String TableSegmentKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id);
 
     static String TableSegmentBlockKey(const String &db_name,
                                        const String &tbl_name,
                                        SegmentID segment_id,
                                        BlockID block_id,
-                                       ColumnID column_id,
                                        TxnTimeStamp ts,
                                        TransactionID txn_id);
-    static String TableSegmentBlockKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id);
+    static String TableSegmentBlockKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id, BlockID block_id);
 
     static String TableSegmentBlockColumnKey(const String &db_name,
                                              const String &tbl_name,
@@ -47,7 +46,8 @@ public:
                                              ColumnID column_id,
                                              TxnTimeStamp ts,
                                              TransactionID txn_id);
-    static String TableSegmentBlockColumnKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id, BlockID block_id);
+    static String
+    TableSegmentBlockColumnKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
 
     static String TableIndexKey(const String &db_name, const String &tbl_name, const String &index_name, TxnTimeStamp ts, TransactionID txn_id);
     static String TableIndexKeyPrefix(const String &db_name, const String &tbl_name, const String &index_name);

@@ -21,7 +21,9 @@ import third_party;
 
 namespace infinity {
 
-String KeyEncode::DatabaseKey(const String &db_name, TxnTimeStamp ts, TransactionID txn_id) { return fmt::format("db|{}|{}|{}", db_name, ts, txn_id); }
+String KeyEncode::DatabaseKey(const String &db_name, TxnTimeStamp ts, TransactionID txn_id) {
+    return fmt::format("db|{}|{}|{}", db_name, ts, txn_id);
+}
 String KeyEncode::DatabasePrefix(const String &db_name) { return fmt::format("db|{}|", db_name); }
 
 String KeyEncode::TableKey(const String &db_name, const String &tbl_name, TxnTimeStamp ts, TransactionID txn_id) {
@@ -32,19 +34,20 @@ String KeyEncode::TableKeyPrefix(const String &db_name, const String &tbl_name) 
 String KeyEncode::TableSegmentKey(const String &db_name, const String &tbl_name, SegmentID segment_id, TxnTimeStamp ts, TransactionID txn_id) {
     return fmt::format("seg|{}|{}|{}|{}|{}", db_name, tbl_name, segment_id, ts, txn_id);
 }
-String KeyEncode::TableSegmentKeyPrefix(const String &db_name, const String &tbl_name) { return fmt::format("seg|{}|{}|", db_name, tbl_name); }
+String KeyEncode::TableSegmentKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id) {
+    return fmt::format("seg|{}|{}|{}|", db_name, tbl_name, segment_id);
+}
 
 String KeyEncode::TableSegmentBlockKey(const String &db_name,
                                        const String &tbl_name,
                                        SegmentID segment_id,
                                        BlockID block_id,
-                                       ColumnID column_id,
                                        TxnTimeStamp ts,
                                        TransactionID txn_id) {
-    return fmt::format("blk|{}|{}|{}|{}|{}|{}|{}", db_name, tbl_name, segment_id, block_id, column_id, ts, txn_id);
+    return fmt::format("blk|{}|{}|{}|{}|{}|{}", db_name, tbl_name, segment_id, block_id, ts, txn_id);
 }
-String KeyEncode::TableSegmentBlockKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id) {
-    return fmt::format("blk|{}|{}|{}|", db_name, tbl_name, segment_id);
+String KeyEncode::TableSegmentBlockKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id, BlockID block_id) {
+    return fmt::format("blk|{}|{}|{}|{}|", db_name, tbl_name, segment_id, block_id);
 }
 
 String KeyEncode::TableSegmentBlockColumnKey(const String &db_name,
@@ -56,8 +59,12 @@ String KeyEncode::TableSegmentBlockColumnKey(const String &db_name,
                                              TransactionID txn_id) {
     return fmt::format("col|{}|{}|{}|{}|{}|{}|{}", db_name, tbl_name, segment_id, block_id, column_id, ts, txn_id);
 }
-String KeyEncode::TableSegmentBlockColumnKeyPrefix(const String &db_name, const String &tbl_name, SegmentID segment_id, BlockID block_id) {
-    return fmt::format("col|{}|{}|{}|{}|", db_name, tbl_name, segment_id, block_id);
+String KeyEncode::TableSegmentBlockColumnKeyPrefix(const String &db_name,
+                                                   const String &tbl_name,
+                                                   SegmentID segment_id,
+                                                   BlockID block_id,
+                                                   ColumnID column_id) {
+    return fmt::format("col|{}|{}|{}|{}|{}|", db_name, tbl_name, segment_id, block_id, column_id);
 }
 
 String KeyEncode::TableIndexKey(const String &db_name, const String &tbl_name, const String &index_name, TxnTimeStamp ts, TransactionID txn_id) {
