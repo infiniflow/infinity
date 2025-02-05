@@ -12,16 +12,42 @@ INSERT INTO test_unnest VALUES
 (4, {0, 2, 3});
 
 
-query IT
+query I rowsort
 SELECT unnest(c2) FROM test_unnest;
 ----
 0
-1
-2
-3
+0
 0
 1
+1
 2
-0
+2
 2
 3
+3
+
+query II rowsort
+SELECT c1, unnest(c2) FROM test_unnest;
+----
+1 0
+1 1
+2 2
+2 3
+3 0
+3 1
+3 2
+4 0
+4 2
+4 3
+
+query II rowsort
+SELECT c1, unnest(c2) as uc2 FROM test_unnest where uc2 > 1;
+----
+2 2
+2 3
+3 2
+4 2
+4 3
+
+statement ok
+DROP TABLE test_unnest;
