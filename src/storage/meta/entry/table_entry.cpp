@@ -970,29 +970,51 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                         opt_success = true;
                         continue;
                     }
-                    add_segment_optimizing();
                     String msg = fmt::format("merging {}", index_name);
                     Vector<String> base_names;
                     Vector<RowID> base_rowids;
-                    RowID base_rowid = chunk_index_entries[0]->base_rowid_;
+                    const RowID base_rowid = chunk_index_entries[0]->base_rowid_;
                     u32 total_row_count = 0;
+
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
-                        msg += " " + chunk_index_entry->base_name_;
-                        if (chunk_index_entry->base_rowid_ != chunk_index_entries[0]->base_rowid_ + total_row_count) {
-                            String error_msg = fmt::format("{}... chunk_index_entry {} base_rowid expects to be {:016x}",
-                                                           msg,
-                                                           chunk_index_entry->base_name_,
-                                                           (chunk_index_entries[0]->base_rowid_ + total_row_count).ToUint64());
+                        LOG_TRACE(fmt::format("Merge index, chunk_id: {}, base_name: {}, row_id: {}, row_count: {}",
+                                              chunk_index_entry->chunk_id_,
+                                              chunk_index_entry->base_name_,
+                                              chunk_index_entry->base_rowid_.ToUint64(),
+                                              chunk_index_entry->row_count_));
+                    }
 
-//                            merging text_index ft_0000000000000000_8000 ft_000000000000e000... chunk_index_entry ft_000000000000e000 base_rowid expects to be 0000000000008000@src/storage/meta/entry/table_entry.cpp:955
-
-                            UnrecoverableError(error_msg);
+                    for (auto it = chunk_index_entries.begin(); it != chunk_index_entries.end(); ++it) {
+                        auto &chunk_index_entry = *it;
+                        if (const RowID expect_base_row_id = base_rowid + total_row_count; chunk_index_entry->base_rowid_ > expect_base_row_id) {
+                            msg += fmt::format(" stop at gap to chunk {}, expect_base_row_id: {:016x}, base_row_id: {:016x}",
+                                               chunk_index_entry->base_name_,
+                                               expect_base_row_id.ToUint64(),
+                                               chunk_index_entry->base_rowid_.ToUint64());
+                            chunk_index_entries.erase(it, chunk_index_entries.end());
+                            break;
+                        } else if (chunk_index_entry->base_rowid_ < expect_base_row_id) {
+                            msg += fmt::format(" found overlap to chunk {}, expect_base_row_id: {:016x}, base_row_id: {:016x}",
+                                               chunk_index_entry->base_name_,
+                                               expect_base_row_id.ToUint64(),
+                                               chunk_index_entry->base_rowid_.ToUint64());
+                            UnrecoverableError(msg);
                         }
+                        msg += " " + chunk_index_entry->base_name_;
                         base_names.push_back(chunk_index_entry->base_name_);
                         base_rowids.push_back(chunk_index_entry->base_rowid_);
                         total_row_count += chunk_index_entry->row_count_;
                     }
+
+                    if (chunk_index_entries.size() <= 1) {
+                        msg += fmt::format(" skip merge due to only {} chunk", chunk_index_entries.size());
+                        LOG_INFO(msg);
+                        opt_success = true;
+                        continue;
+                    }
+
+                    add_segment_optimizing();
                     String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
                     msg += " -> " + dst_base_name;
                     LOG_INFO(msg);

@@ -45,6 +45,7 @@ class Query(ABC):
             search: Optional[SearchExpr],
             filter: Optional[ParsedExpr],
             groupby: Optional[List[ParsedExpr]],
+            having: Optional[ParsedExpr],
             limit: Optional[ParsedExpr],
             offset: Optional[ParsedExpr],
             sort: Optional[List[OrderByExpr]],
@@ -55,6 +56,7 @@ class Query(ABC):
         self.search = search
         self.filter = filter
         self.groupby = groupby
+        self.having = having
         self.limit = limit
         self.offset = offset
         self.sort = sort
@@ -69,12 +71,13 @@ class ExplainQuery(Query):
             search: Optional[SearchExpr],
             filter: Optional[ParsedExpr],
             groupby: Optional[List[ParsedExpr]],
+            having: Optional[ParsedExpr],
             limit: Optional[ParsedExpr],
             offset: Optional[ParsedExpr],
             sort: Optional[List[OrderByExpr]],
             explain_type: Optional[ExplainType],
     ):
-        super().__init__(columns, highlight, search, filter, groupby, limit, offset, sort, False)
+        super().__init__(columns, highlight, search, filter, groupby, having, limit, offset, sort, False)
         self.explain_type = explain_type
 
 
@@ -86,6 +89,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._search = None
         self._filter = None
         self._groupby = None
+        self._having = None
         self._limit = None
         self._offset = None
         self._sort = None
@@ -97,6 +101,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._search = None
         self._filter = None
         self._groupby = None
+        self._having = None
         self._limit = None
         self._offset = None
         self._sort = None
@@ -338,6 +343,22 @@ class InfinityThriftQueryBuilder(ABC):
         offset_expr = ParsedExpr(type=expr_type)
         self._offset = offset_expr
         return self
+    
+    def group_by(self, columns: List[str] | str) -> InfinityThriftQueryBuilder:
+        group_by_list: List[ParsedExpr] = []
+        if isinstance(columns, list):
+            for column in columns:
+                column = column.lower()
+                group_by_list.append(parse_expr(maybe_parse(column)))
+        else:
+            group_by_list.append(parse_expr(maybe_parse(columns)))
+        self._groupby = group_by_list
+        return self
+    
+    def having(self, having: Optional[str]) -> InfinityThriftQueryBuilder:
+        having_expr = traverse_conditions(condition(having))
+        self._having = having_expr
+        return self
 
     def output(self, columns: Optional[list]) -> InfinityThriftQueryBuilder:
         self._columns = columns
@@ -527,6 +548,7 @@ class InfinityThriftQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             groupby=self._groupby,
+            having=self._having,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,
@@ -558,6 +580,7 @@ class InfinityThriftQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             groupby=self._groupby,
+            having=self._having,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,

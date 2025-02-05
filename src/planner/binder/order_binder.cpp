@@ -62,6 +62,38 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
 }
 
 SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    String expr_name = expr.GetName();
+    // If the expr isn't from aggregate function and coming from group by lists.
+    if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
+        i64 groupby_index = bind_context_ptr->group_index_by_name_[expr_name];
+        const SharedPtr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[groupby_index];
+
+        SharedPtr<ColumnExpression> result = ColumnExpression::Make(group_expr->Type(),
+                                                                    bind_context_ptr->group_by_table_name_,
+                                                                    bind_context_ptr->group_by_table_index_,
+                                                                    expr_name,
+                                                                    groupby_index,
+                                                                    depth);
+
+        result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kGroupBy);
+        return result;
+    }
+    // If the expr is coming from aggregate function list
+    if (bind_context_ptr->aggregate_index_by_name_.contains(expr_name)) {
+        i64 aggregate_index = bind_context_ptr->aggregate_index_by_name_[expr_name];
+        const SharedPtr<BaseExpression> &aggregate_expr = bind_context_ptr->aggregate_exprs_[aggregate_index];
+
+        SharedPtr<ColumnExpression> result = ColumnExpression::Make(aggregate_expr->Type(),
+                                                                    bind_context_ptr->aggregate_table_name_,
+                                                                    bind_context_ptr->aggregate_table_index_,
+                                                                    expr_name,
+                                                                    aggregate_index,
+                                                                    depth);
+
+        result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
+        return result;
+    }
+
     if (expr.type_ == ParsedExprType::kFunction or expr.type_ == ParsedExprType::kColumn) {
         return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
     }

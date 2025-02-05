@@ -41,6 +41,7 @@ class Query(ABC):
             search: Optional[WrapSearchExpr],
             filter: Optional[WrapParsedExpr],
             group_by: Optional[List[WrapParsedExpr]],
+            having: Optional[WrapParsedExpr],
             limit: Optional[WrapParsedExpr],
             offset: Optional[WrapParsedExpr],
             sort: Optional[List[WrapOrderByExpr]],
@@ -51,6 +52,7 @@ class Query(ABC):
         self.search = search
         self.filter = filter
         self.group_by = group_by
+        self.having = having
         self.limit = limit
         self.offset = offset
         self.sort = sort
@@ -65,12 +67,13 @@ class ExplainQuery(Query):
             search: Optional[WrapSearchExpr],
             filter: Optional[WrapParsedExpr],
             group_by: Optional[List[WrapParsedExpr]],
+            having: Optional[WrapParsedExpr],
             limit: Optional[WrapParsedExpr],
             offset: Optional[WrapParsedExpr],
             sort: Optional[List[WrapOrderByExpr]],
             explain_type: Optional[BaseExplainType],
     ):
-        super().__init__(columns, highlight, search, filter, group_by, limit, offset, sort, None)
+        super().__init__(columns, highlight, search, filter, group_by, having, limit, offset, sort, None)
         self.explain_type = explain_type
 
 
@@ -82,6 +85,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._search = None
         self._filter = None
         self._group_by = None
+        self._having = None
         self._limit = None
         self._offset = None
         self._sort = None
@@ -93,6 +97,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._search = None
         self._filter = None
         self._group_by = None
+        self._having = None
         self._limit = None
         self._offset = None
         self._sort = None
@@ -421,6 +426,23 @@ class InfinityLocalQueryBuilder(ABC):
         self._offset = offset_expr
         return self
 
+    def group_by(self, columns: List[str] | str) -> InfinityLocalQueryBuilder:
+        group_by_list = []
+        if isinstance(columns, list):
+            for column in columns:
+                parsed_expr = parse_expr(maybe_parse(column))
+                group_by_list.append(parsed_expr)
+        else:
+            parsed_expr = parse_expr(maybe_parse(columns))
+            group_by_list.append(parsed_expr)
+        self._group_by = group_by_list
+        return self
+
+    def having(self, having: Optional[str]) -> InfinityLocalQueryBuilder:
+        having_expr = traverse_conditions(condition(having))
+        self._having = having_expr
+        return self
+
     def output(self, columns: Optional[list]) -> InfinityLocalQueryBuilder:
         self._columns = columns
         select_list: List[WrapParsedExpr] = []
@@ -688,6 +710,7 @@ class InfinityLocalQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             group_by=self._group_by,
+            having = self._having,
             limit=self._limit,
             offset=self._offset,
             sort=self._sort,
@@ -719,6 +742,7 @@ class InfinityLocalQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             group_by=self._group_by,
+            having=self._having,
             limit=self._limit,
             offset=self._offset,
             explain_type=explain_type,

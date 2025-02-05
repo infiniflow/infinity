@@ -378,6 +378,16 @@ class LocalTable():
     def offset(self, offset: Optional[int]):
         self.query_builder.offset(offset)
         return self
+    
+    def group_by(self, group_by_expr_list: Optional[List[str]] | Optional[str]):
+        if group_by_expr_list is None:
+            return self
+        self.query_builder.group_by(group_by_expr_list)
+        return self
+
+    def having(self, having: Optional[str]):
+        self.query_builder.having(having)
+        return self
 
     def sort(self, order_by_expr_list: Optional[List[list[str, SortType]]]):
         for order_by_expr in order_by_expr_list:
@@ -460,6 +470,7 @@ class LocalTable():
                                 highlight_list=highlight,
                                 order_by_list=order_by_list,
                                 group_by_list=group_by_list,
+                                having_expr=query.having,
                                 total_hits_count_flag=total_hits_count_flag,
                                 search_expr=query.search,
                                 where_expr=query.filter,
@@ -492,6 +503,7 @@ class LocalTable():
                                  highlight_list=highlight,
                                  order_by_list=order_by_list,
                                  group_by_list=group_by_list,
+                                 having_expr=query.having,
                                  search_expr=query.search,
                                  where_expr=query.filter,
                                  limit_expr=query.limit,

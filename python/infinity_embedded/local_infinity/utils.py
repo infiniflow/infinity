@@ -22,7 +22,7 @@ from sqlglot import condition
 import sqlglot.expressions as exp
 import numpy as np
 from infinity_embedded.errors import ErrorCode
-from infinity_embedded.common import InfinityException, SparseVector
+from infinity_embedded.common import InfinityException, SparseVector, Array
 from infinity_embedded.local_infinity.types import build_result, logic_type_to_dtype
 from infinity_embedded.utils import binary_exp_to_paser_exp
 from infinity_embedded.embedded_infinity_ext import WrapInExpr, WrapParsedExpr, WrapFunctionExpr, \
@@ -32,6 +32,11 @@ from infinity_embedded.embedded_infinity_ext import WrapEmbeddingType, WrapColum
 
 
 def traverse_conditions(cons, fn=None):
+    if isinstance(cons, exp.Alias):
+        expr = traverse_conditions(cons.args['this'])
+        expr.alias_name = cons.alias
+        return expr
+
     if isinstance(cons, exp.Binary):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
@@ -297,7 +302,10 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
                 case _:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                             f"Invalid sparse vector value type: {type(next(iter(value.values())))}")
-
+        case Array():
+            constant_expression.literal_type = LiteralType.kCurlyBracketsArray
+            constant_expression.curly_brackets_array = [get_local_constant_expr_from_python_value(child) for child in
+                                                        value.elements]
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
     return constant_expression
@@ -506,6 +514,10 @@ def get_data_type(column_info: dict) -> WrapDataType:
         raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, f"Column definition without data type")
     datatype = column_info["type"].lower()
     column_big_info = [item.strip() for item in datatype.split(",")]
+    return get_data_type_from_column_big_info(column_big_info)
+
+
+def get_data_type_from_column_big_info(column_big_info: list) -> WrapDataType:
     column_big_info_first_str = column_big_info[0]
     match column_big_info_first_str:
         case "vector" | "multivector" | "tensor" | "tensorarray":
@@ -516,9 +528,19 @@ def get_data_type(column_info: dict) -> WrapDataType:
             sparse_type = get_sparse_type(column_big_info)
             return sparse_type
             # return get_sparse_info(column_info, column_defs, column_name, index)
-        case _:
+        case "array":
+            if len(column_big_info) < 2:
+                raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"No element type for array!")
             proto_column_type = WrapDataType()
-            match datatype:
+            proto_column_type.logical_type = LogicalType.kArray
+            proto_column_type.array_type = get_data_type_from_column_big_info(column_big_info[1:])
+            return proto_column_type
+        case _:
+            if len(column_big_info) > 1:
+                raise InfinityException(ErrorCode.INVALID_DATA_TYPE,
+                                        f"Unknown datatype: {column_big_info}, too many arguments")
+            proto_column_type = WrapDataType()
+            match column_big_info_first_str:
                 case "int8":
                     proto_column_type.logical_type = LogicalType.kTinyInt
                 case "int16":
@@ -550,7 +572,7 @@ def get_data_type(column_info: dict) -> WrapDataType:
                 case "timestamp":
                     proto_column_type.logical_type = LogicalType.kTimestamp
                 case _:
-                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
+                    raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {column_big_info_first_str}")
             return proto_column_type
 
 

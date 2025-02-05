@@ -471,6 +471,10 @@ curl --request POST \
         - `"double"`/`"float64"`
         - `"float16"`
         - `"bfloat16"`
+    - Array: e.g., `"array,varchar"`, `"array,array,varchar"`
+      - `array`: The column is an array column.
+      - followed by the element type of the array. Can be recursive.
+      - for example, `"array,varchar"` is a one-dimensional array of strings, and `"array,array,varchar"` is a two-dimensional array of strings.
   - `"default"`: `Any`, *Optional*  
     The default value for unspecified cells in that column.
   - `"comment"`: `string`, *Optional*
@@ -1502,7 +1506,8 @@ curl --request POST \
                "sparse_column": {"10":1.1, "20":2.2, "30": 3.3},
                "tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
                "tensorarray_column": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]],
-               "multivector_column": [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+               "multivector_column": [[1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+               "array_array_varchar_column": {"array": [{"array": ["hello", "world"]}, {"array": ["!"]}, {"array": [""]}, {"array": []}]}
           },
           {
                "name": "Neil",
@@ -1512,7 +1517,8 @@ curl --request POST \
                "sparse_column": {"10":1.1, "20":2.2, "30": 3.3},
                "tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
                "tensorarray_column": [[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0]]],
-               "multivector_column": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
+               "multivector_column": [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+               "array_array_varchar_column": {"array": []}
           }
      ] '  
 ```
@@ -1776,6 +1782,8 @@ Searches for data in a specified table. The search can range from a simple vecto
   - `"filter"`: `string`
   - `"fusion"`: `object`
   - `"sort"` : `object[]`
+  - `"group_by"`: `string[]`
+  - `"having"`: `string`
   - `"limit"` : `string`
   - `"offset"` : `string`
   - `"option"` : `object`
@@ -2012,6 +2020,12 @@ curl --request GET \
 
 - `"sort"` : `object[]`
   Defines how to sort the results.
+
+- `"group_by"`: `string[]`
+  Indicates the expression to group by.
+
+- `"having"`: `string`
+  Indicates the having condition.
 
 - `"limit"` : `string`
   Indicates the limit row count.

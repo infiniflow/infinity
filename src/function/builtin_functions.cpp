@@ -48,6 +48,9 @@ import like;
 import minus;
 import modulo;
 import multiply;
+import current_date;
+import current_time;
+import current_timestamp;
 import century;
 import year;
 import month;
@@ -166,6 +169,9 @@ void BuiltinFunctions::RegisterScalarFunction() {
     RegisterPositionFunction(catalog_ptr_);
 
     // date and time functions
+    RegisterCurrentDateFunction(catalog_ptr_);
+    RegisterCurrentTimeFunction(catalog_ptr_);
+    RegisterCurrentTimestampFunction(catalog_ptr_);
     RegisterCenturyFunction(catalog_ptr_);
     RegisterYearFunction(catalog_ptr_);
     RegisterMonthFunction(catalog_ptr_);

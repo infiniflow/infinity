@@ -60,5 +60,11 @@ SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], '
 8
 8
 
+query I
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4) LIMIT 2;
+----
+8
+8
+
 statement ok
 DROP TABLE test_knn_hnsw_l2;

@@ -30,6 +30,7 @@ import logical_match;
 import logical_match_tensor_scan;
 import logical_match_scan_base;
 import logical_fusion;
+import logical_unnest;
 import base_table_ref;
 import load_meta;
 import special_function;

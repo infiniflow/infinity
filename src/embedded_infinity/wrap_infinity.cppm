@@ -81,6 +81,7 @@ export struct WrapDataType {
     LogicalType logical_type;
     WrapEmbeddingType embedding_type;
     WrapSparseType sparse_type;
+    SharedPtr<WrapDataType> array_type;
 };
 
 export struct WrapConstantExpr {
@@ -96,6 +97,7 @@ export struct WrapConstantExpr {
     Vector<Vector<Vector<i64>>> i64_tensor_array_value;
     Vector<Vector<Vector<f64>>> f64_tensor_array_value;
     Vector<i64> i64_array_idx;
+    Vector<SharedPtr<WrapConstantExpr>> curly_brackets_array;
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -279,6 +281,7 @@ export struct WrapParsedExpr {
     WrapFusionExpr fusion_expr;
     WrapSearchExpr search_expr;
     WrapInExpr in_expr;
+    String alias_name;
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -421,6 +424,7 @@ export WrapQueryResult WrapExplain(Infinity &instance,
                                    Vector<WrapParsedExpr> highlight_list,
                                    Vector<WrapOrderByExpr> order_by_list,
                                    Vector<WrapParsedExpr> group_by_list,
+                                   WrapParsedExpr *having_expr,
                                    WrapSearchExpr *wrap_search_expr,
                                    WrapParsedExpr *filter_expr,
                                    WrapParsedExpr *limit_expr,
@@ -433,6 +437,7 @@ export WrapQueryResult WrapSearch(Infinity &instance,
                                   Vector<WrapParsedExpr> highlight_list,
                                   Vector<WrapOrderByExpr> order_by_list,
                                   Vector<WrapParsedExpr> group_by_list,
+                                  WrapParsedExpr *having_expr,
                                   bool total_hits_count_flag,
                                   WrapSearchExpr *wrap_search_expr = nullptr,
                                   WrapParsedExpr *where_expr = nullptr,

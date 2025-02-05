@@ -48,6 +48,10 @@ curl --request POST \
              {
                   "name": "tensor",
                   "type": "tensor,4,float"
+             },
+             {
+                  "name": "nested_array",
+                  "type": "array,array,varchar"
              }
         ]
     } '
@@ -67,7 +71,8 @@ curl --request POST \
              "vec": [1.0, 1.2, 0.8, 0.9],
              "sparse_column": {"10":1.1, "20":2.2, "30": 3.3},
              "year": 2024,
-             "tensor": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]
+             "tensor": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
+             "nested_array": {"array": [{"array": ["hello", "world"]}, {"array": ["!"]}, {"array": [""]}, {"array": []}]}
          },
          {
              "num": 2,
@@ -76,7 +81,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column": {"40":4.4, "50":5.5, "60": 6.6},
              "year": 2023,
-             "tensor": [[4.0, 0.0, 4.3, 4.5], [4.0, 4.2, 4.4, 5.0]]
+             "tensor": [[4.0, 0.0, 4.3, 4.5], [4.0, 4.2, 4.4, 5.0]],
+             "nested_array": {"array": [{"array": ["hello world!"]}]}
          },
          {
              "num": 3,
@@ -85,7 +91,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.2],
              "sparse_column":  {"70":7.7, "80":8.8, "90": 9.9},
              "year": 2019,
-             "tensor": [[0.9, 0.1, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]
+             "tensor": [[0.9, 0.1, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
+             "nested_array": {"array": [{"array": []}]}
          },
          {
              "num": 4,
@@ -94,7 +101,8 @@ curl --request POST \
              "vec": [4.0, 4.2, 4.3, 4.5],
              "sparse_column":  {"20":7.7, "80":7.8, "90": 97.9},
              "year": 2018,
-             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]]
+             "tensor": [[5.0, 4.2, 4.3, 4.5], [4.0, 4.2, 4.3, 4.4]],
+             "nested_array": {"array": []}
          }
      ] '
 
