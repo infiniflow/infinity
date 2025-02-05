@@ -14,11 +14,11 @@
 
 module;
 
-//#include "rocksdb/db.h"
-//#include "rocksdb/options.h"
-//#include "rocksdb/slice.h"
-//#include "rocksdb/utilities/transaction.h"
-//#include "rocksdb/utilities/transaction_db.h"
+// #include "rocksdb/db.h"
+// #include "rocksdb/options.h"
+// #include "rocksdb/slice.h"
+// #include "rocksdb/utilities/transaction.h"
+#include "rocksdb/utilities/transaction_db.h"
 
 module kv_store;
 
@@ -28,13 +28,92 @@ import third_party;
 
 namespace infinity {
 
+Status KVInstance::Put(const String &key, const String &value) {
+    rocksdb::Status s = transaction_->Put(key, value);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
+Status KVInstance::Delete(const String &key) {
+    rocksdb::Status s = transaction_->Delete(key);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
+Status KVInstance::Get(const String &key, String &value) {
+    rocksdb::Status s = transaction_->Get(read_options_, key, &value);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
+rocksdb::Iterator *KVInstance::GetIterator() { return transaction_->GetIterator(read_options_); }
+
+Status KVInstance::Commit() {
+    rocksdb::Status s = transaction_->Commit();
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+Status KVInstance::Rollback() {
+    rocksdb::Status s = transaction_->Rollback();
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
 Status KVStore::Init(const String &db_path) {
-//    Options options;
-//    TransactionDBOptions txn_db_options;
-//    options.create_if_missing = true;
+    db_path_ = db_path;
+    options_.create_if_missing = true;
+    options_.manual_wal_flush = true;
+    options_.avoid_flush_during_shutdown = true;
+    txn_options_.set_snapshot = true;
 
-    return Status::OK(); }
+    write_options_.disableWAL = true;
 
-Status KVStore::Uninit() { return Status::OK(); }
+    rocksdb::Status s = rocksdb::TransactionDB::Open(options_, txn_db_options_, db_path_, &transaction_db_);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
+Status KVStore::Uninit() {
+    delete transaction_db_;
+    transaction_db_ = nullptr;
+
+    return Status::OK();
+}
+
+Status KVStore::Flush() {
+    rocksdb::FlushOptions flush_opts;
+    rocksdb::Status s = transaction_db_->Flush(flush_opts);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
+UniquePtr<KVInstance> KVStore::GetInstance() {
+    UniquePtr<KVInstance> kv_instance = MakeUnique<KVInstance>();
+    kv_instance->transaction_ = transaction_db_->BeginTransaction(write_options_, txn_options_);
+    kv_instance->read_options_.snapshot = kv_instance->transaction_->GetSnapshot();
+    return kv_instance;
+}
+
+Status KVStore::Destroy() {
+    rocksdb::Status s = ::rocksdb::DestroyDB(db_path_, options_);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
 
 } // namespace infinity

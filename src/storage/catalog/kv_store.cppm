@@ -22,17 +22,50 @@ import status;
 
 namespace infinity {
 
-export class KVStore {
+export class KVStore;
+
+export class KVInstance {
+
+    friend class KVStore;
+
+public:
+    KVInstance() = default;
+    ~KVInstance() = default;
+
+    Status Put(const String &key, const String &value);
+    Status Delete(const String &key);
+    Status Get(const String &key, String &value);
+    rocksdb::Iterator* GetIterator();
+
+    Status Commit();
+    Status Rollback();
+
+private:
+    rocksdb::Transaction *transaction_{};
+    rocksdb::ReadOptions read_options_;
+};
+
+class KVStore {
 public:
     KVStore() = default;
     ~KVStore() = default;
 
     Status Init(const String &db_path);
     Status Uninit();
+    Status Flush();
 
-public:
+    UniquePtr<KVInstance> GetInstance();
+
+    // For UT
+    Status Destroy();
+
 private:
+    String db_path_{};
     rocksdb::TransactionDB *transaction_db_{}; // RocksDB transaction db
+    rocksdb::Options options_;
+    rocksdb::TransactionDBOptions txn_db_options_;
+    rocksdb::TransactionOptions txn_options_;
+    rocksdb::WriteOptions write_options_;
 };
 
 } // namespace infinity

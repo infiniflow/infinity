@@ -352,6 +352,8 @@ using TransactionDB = ::ROCKSDB_NAMESPACE::TransactionDB;
 using TransactionDBOptions = ::ROCKSDB_NAMESPACE::TransactionDBOptions;
 using TransactionOptions = ::ROCKSDB_NAMESPACE::TransactionOptions;
 using WriteOptions = ::ROCKSDB_NAMESPACE::WriteOptions;
+using FlushOptions = ::ROCKSDB_NAMESPACE::FlushOptions;
+using Iterator = ::ROCKSDB_NAMESPACE::Iterator;
 } // namespace rocksdb
 
 } // namespace infinity

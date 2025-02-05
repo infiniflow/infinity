@@ -28,7 +28,7 @@ import infinity_exception;
 
 import stl;
 import global_resource_usage;
-import third_party;
+// import third_party;
 import logger;
 import table_def;
 import value;
@@ -52,6 +52,7 @@ import txn_store;
 import txn_state;
 
 import base_entry;
+import kv_store;
 
 using namespace infinity;
 
@@ -61,635 +62,205 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          NewCatalogTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-// txn1: create db1, get db1, delete db1, get db1, commit
-// txn2:             get db1,             get db1, commit
-TEST_P(NewCatalogTest, simple_test1) {
+TEST_P(NewCatalogTest, kv_store1) {
     using namespace infinity;
 
-    using ROCKSDB_NAMESPACE::Options;
-    using ROCKSDB_NAMESPACE::ReadOptions;
-    using ROCKSDB_NAMESPACE::Snapshot;
-    using ROCKSDB_NAMESPACE::Status;
-    using ROCKSDB_NAMESPACE::Transaction;
-    using ROCKSDB_NAMESPACE::TransactionDB;
-    using ROCKSDB_NAMESPACE::TransactionDBOptions;
-    using ROCKSDB_NAMESPACE::TransactionOptions;
-    using ROCKSDB_NAMESPACE::WriteOptions;
+    // Test multi-version
+    UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
+    kv_store->Init("/tmp/rocksdb_transaction_example");
+    UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
-    std::string kDBPath = "/tmp/rocksdb_transaction_example";
-
-    // open DB
-    Options options;
-    TransactionDBOptions txn_db_options;
-    options.create_if_missing = true;
-    TransactionDB *txn_db;
-
-    Status s = TransactionDB::Open(options, txn_db_options, kDBPath, &txn_db);
-    assert(s.ok());
-
-    WriteOptions write_options;
-    ReadOptions read_options;
-    TransactionOptions txn_options;
     std::string value;
 
-    ////////////////////////////////////////////////////////
-    //
-    // Simple Transaction Example ("Read Committed")
-    //
-    ////////////////////////////////////////////////////////
+    Status status = kv_instance1->Get("abc", value);
+    EXPECT_FALSE(status.ok());
 
-    // Start a transaction
-    Transaction *txn = txn_db->BeginTransaction(write_options);
-    assert(txn);
+    status = kv_instance1->Put("abc", "def");
+    EXPECT_TRUE(status.ok());
 
-    // Read a key in this transaction
-    s = txn->Get(read_options, "abc", &value);
-    assert(s.IsNotFound());
+    UniquePtr<KVInstance> kv_instance2 = kv_store->GetInstance();
 
-    // Write a key in this transaction
-    s = txn->Put("abc", "def");
-    assert(s.ok());
+    status = kv_instance2->Get("abc", value);
+    EXPECT_FALSE(status.ok());
 
-    // Read a key OUTSIDE this transaction. Does not affect txn.
-    s = txn_db->Get(read_options, "abc", &value);
-    assert(s.IsNotFound());
+    status = kv_instance2->Put("xyz", "zzz");
+    EXPECT_TRUE(status.ok());
 
-    // Write a key OUTSIDE of this transaction.
-    // Does not affect txn since this is an unrelated key.
-    s = txn_db->Put(write_options, "xyz", "zzz");
-    assert(s.ok());
+    status = kv_instance2->Put("abc", "def");
+    EXPECT_FALSE(status.ok()); // transaction conflict before commit
 
-    // Write a key OUTSIDE of this transaction.
-    // Fail because the key conflicts with the key written in txn.
-    s = txn_db->Put(write_options, "abc", "def");
-    assert(s.subcode() == Status::kLockTimeout);
+    status = kv_instance2->Get("xyz", value);
+    EXPECT_TRUE(status.ok());
+    EXPECT_STREQ(value.c_str(), "zzz");
 
-    // Value for key "xyz" has been committed, can be read in txn.
-    s = txn->Get(read_options, "xyz", &value);
-    assert(s.ok());
-    assert(value == "zzz");
+    UniquePtr<KVInstance> kv_instance4 = kv_store->GetInstance();
 
-    // Commit transaction
-    s = txn->Commit();
-    assert(s.ok());
-    delete txn;
+    status = kv_instance1->Commit();
+    EXPECT_TRUE(status.ok());
 
-    // Value is committed, can be read now.
-    s = txn_db->Get(read_options, "abc", &value);
-    assert(s.ok());
-    assert(value == "def");
+    status = kv_instance2->Commit();
+    EXPECT_TRUE(status.ok());
 
-    ////////////////////////////////////////////////////////
-    //
-    // "Repeatable Read" (Snapshot Isolation) Example
-    //   -- Using a single Snapshot
-    //
-    ////////////////////////////////////////////////////////
+    status = kv_instance4->Put("abc", "xxx");
+    EXPECT_FALSE(status.ok()); // transaction conflict after commit
 
-    // Set a snapshot at start of transaction by setting set_snapshot=true
-    txn_options.set_snapshot = true;
-    txn = txn_db->BeginTransaction(write_options, txn_options);
+    status = kv_instance4->Rollback();
+    EXPECT_TRUE(status.ok());
 
-    const Snapshot *snapshot = txn->GetSnapshot();
+    UniquePtr<KVInstance> kv_instance3 = kv_store->GetInstance();
 
-    // Write a key OUTSIDE of transaction
-    s = txn_db->Put(write_options, "abc", "xyz");
-    assert(s.ok());
+    status = kv_instance3->Get("xyz", value);
+    EXPECT_TRUE(status.ok());
+    EXPECT_STREQ(value.c_str(), "zzz");
 
-    // Read the latest committed value.
-    s = txn->Get(read_options, "abc", &value);
-    assert(s.ok());
-    assert(value == "xyz");
+    status = kv_instance3->Get("abc", value);
+    EXPECT_TRUE(status.ok());
+    EXPECT_STREQ(value.c_str(), "def");
 
-    // Read the snapshotted value.
-    read_options.snapshot = snapshot;
-    s = txn->Get(read_options, "abc", &value);
-    assert(s.ok());
-    assert(value == "def");
+    status = kv_instance3->Commit();
+    EXPECT_TRUE(status.ok());
 
-    // Attempt to read a key using the snapshot.  This will fail since
-    // the previous write outside this txn conflicts with this read.
-    s = txn->GetForUpdate(read_options, "abc", &value);
-    assert(s.IsBusy());
-
-    txn->Rollback();
-
-    // Snapshot will be released upon deleting the transaction.
-    delete txn;
-    // Clear snapshot from read options since it is no longer valid
-    read_options.snapshot = nullptr;
-    snapshot = nullptr;
-
-    ////////////////////////////////////////////////////////
-    //
-    // "Read Committed" (Monotonic Atomic Views) Example
-    //   --Using multiple Snapshots
-    //
-    ////////////////////////////////////////////////////////
-
-    // In this example, we set the snapshot multiple times.  This is probably
-    // only necessary if you have very strict isolation requirements to
-    // implement.
-
-    // Set a snapshot at start of transaction
-    txn_options.set_snapshot = true;
-    txn = txn_db->BeginTransaction(write_options, txn_options);
-
-    // Do some reads and writes to key "x"
-    read_options.snapshot = txn_db->GetSnapshot();
-    s = txn->Get(read_options, "x", &value);
-    assert(s.IsNotFound());
-    s = txn->Put("x", "x");
-    assert(s.ok());
-
-    // Do a write outside of the transaction to key "y"
-    s = txn_db->Put(write_options, "y", "y1");
-    assert(s.ok());
-
-    // Set a new snapshot in the transaction
-    txn->SetSnapshot();
-    txn->SetSavePoint();
-    read_options.snapshot = txn_db->GetSnapshot();
-
-    // Do some reads and writes to key "y"
-    // Since the snapshot was advanced, the write done outside of the
-    // transaction does not conflict.
-    s = txn->GetForUpdate(read_options, "y", &value);
-    assert(s.ok());
-    assert(value == "y1");
-    s = txn->Put("y", "y2");
-    assert(s.ok());
-
-    // Decide we want to revert the last write from this transaction.
-    txn->RollbackToSavePoint();
-
-    // Commit.
-    s = txn->Commit();
-    assert(s.ok());
-    delete txn;
-    // Clear snapshot from read options since it is no longer valid
-    read_options.snapshot = nullptr;
-
-    // db state is at the save point.
-    s = txn_db->Get(read_options, "x", &value);
-    assert(s.ok());
-    assert(value == "x");
-
-    s = txn_db->Get(read_options, "y", &value);
-    assert(s.ok());
-    assert(value == "y1");
-
-    // Cleanup
-    delete txn_db;
-    ROCKSDB_NAMESPACE::DestroyDB(kDBPath, options);
-
-    //
-    //    TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
-    //    Catalog *catalog = infinity::InfinityContext::instance().storage()->catalog();
-    //
-    //    // start txn1
-    //    auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-    //
-    //    // start txn2
-    //    auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
-    //
-    //    HashMap<String, BaseEntry *> databases;
-    //
-    //    // create db in empty catalog should be success
-    //    {
-    //        auto [base_entry, status] = catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn1->TxnID(), txn1->BeginTS(),
-    //        txn_mgr); EXPECT_TRUE(status.ok());
-    //        // store this entry
-    //        databases["db1"] = base_entry;
-    //    }
-    //
-    //    {
-    //        auto [db_entry1, status1] = catalog->GetDatabase("db1", txn1->TxnID(), txn1->BeginTS());
-    //        // should be visible to same txn
-    //        EXPECT_TRUE(status1.ok());
-    //        EXPECT_EQ(db_entry1, databases["db1"]);
-    //
-    //        // should not be visible to other txn
-    //        auto [db_entry2, status2] = catalog->GetDatabase("db1", txn2->TxnID(), txn2->BeginTS());
-    //        EXPECT_TRUE(!status2.ok());
-    //        EXPECT_EQ(db_entry2, nullptr);
-    //    }
-    //
-    //    // drop db should be success
-    //    {
-    //        auto [base_entry, status] = catalog->DropDatabase("db1", txn1->TxnID(), txn1->BeginTS(), txn_mgr);
-    //        EXPECT_TRUE(status.ok());
-    //        EXPECT_EQ(base_entry.get(), databases["db1"]);
-    //        // remove this entry
-    //        databases.erase("db1");
-    //
-    //        auto [db_entry1, status1] = catalog->GetDatabase("db1", txn1->TxnID(), txn1->BeginTS());
-    //        // should not be visible to same txn
-    //        EXPECT_TRUE(!status1.ok());
-    //
-    //        // should not be visible to other txn
-    //        auto [db_entry2, status2] = catalog->GetDatabase("db1", txn2->TxnID(), txn2->BeginTS());
-    //        EXPECT_TRUE(!status2.ok());
-    //    }
-    //
-    //    txn_mgr->CommitTxn(txn1);
-    //    txn_mgr->CommitTxn(txn2);
+    status = kv_store->Uninit();
+    EXPECT_TRUE(status.ok());
+    status = kv_store->Destroy();
+    EXPECT_TRUE(status.ok());
 }
 
-TEST_P(NewCatalogTest, two_phases_commit) {
+TEST_P(NewCatalogTest, kv_store2) {
     using namespace infinity;
 
-    using ROCKSDB_NAMESPACE::DestroyDB;
-    using ROCKSDB_NAMESPACE::Options;
-    using ROCKSDB_NAMESPACE::ReadOptions;
-    using ROCKSDB_NAMESPACE::Snapshot;
-    using ROCKSDB_NAMESPACE::Status;
-    using ROCKSDB_NAMESPACE::Transaction;
-    using ROCKSDB_NAMESPACE::TransactionDB;
-    using ROCKSDB_NAMESPACE::TransactionDBOptions;
-    using ROCKSDB_NAMESPACE::TransactionOptions;
-    using ROCKSDB_NAMESPACE::WriteOptions;
-
-    const std::string db_path = "/tmp/rocksdb_two_phases_transaction";
-
+    // Test disable WAL
     {
-        // No conflict
-        // open DB
-        Options options;
-        TransactionDBOptions txn_db_options;
-        options.create_if_missing = true;
-        TransactionDB *txn_db;
+        UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
+        kv_store->Init("/tmp/rocksdb_transaction_example");
+        UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
-        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
-        EXPECT_TRUE(s.ok());
-
-        WriteOptions write_options;
-        ReadOptions read_options;
-        //    TransactionOptions txn_options;
         std::string value;
 
-        Transaction *txn1 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn1 != nullptr);
+        Status status = kv_instance1->Get("abc", value);
+        EXPECT_FALSE(status.ok());
 
-        // Write a key in this transaction
-        s = txn1->Put("abc", "def");
-        EXPECT_TRUE(s.ok());
+        status = kv_instance1->Put("abc", "def");
+        EXPECT_TRUE(status.ok());
 
-        Transaction *txn2 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn2 != nullptr);
+        status = kv_instance1->Commit();
+        EXPECT_TRUE(status.ok());
 
-        s = txn2->Put("abc", "def");
-        EXPECT_FALSE(s.ok());
+        status = kv_store->Uninit();
+        EXPECT_TRUE(status.ok());
 
-        s = txn1->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn1;
+        kv_store = MakeUnique<KVStore>();
+        kv_store->Init("/tmp/rocksdb_transaction_example");
+        kv_instance1 = kv_store->GetInstance();
 
-        s = txn2->Get(read_options, "abc", &value);
-        EXPECT_TRUE(s.ok());
+        status = kv_instance1->Get("abc", value);
+        EXPECT_FALSE(status.ok());
 
-        s = txn2->Rollback();
-        EXPECT_TRUE(s.ok());
-        delete txn2;
+        status = kv_instance1->Commit();
+        EXPECT_TRUE(status.ok());
 
-        // Cleanup
-        delete txn_db;
-        DestroyDB(db_path, options);
+        status = kv_store->Uninit();
+        EXPECT_TRUE(status.ok());
+        status = kv_store->Destroy();
+        EXPECT_TRUE(status.ok());
     }
 
+    // Test disable WAL with Flush
     {
-        // Conflict before commit
-        // open DB
-        Options options;
-        TransactionDBOptions txn_db_options;
-        options.create_if_missing = true;
-        TransactionDB *txn_db;
+        {
+            UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
+            kv_store->Init("/tmp/rocksdb_transaction_example");
+            UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
-        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
-        EXPECT_TRUE(s.ok());
+            std::string value;
 
-        WriteOptions write_options;
-        ReadOptions read_options;
-        //    TransactionOptions txn_options;
-        std::string value;
+            Status status = kv_instance1->Get("abc", value);
+            EXPECT_FALSE(status.ok());
 
-        Transaction *txn1 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn1 != nullptr);
+            status = kv_instance1->Put("abc", "def");
+            EXPECT_TRUE(status.ok());
 
-        // Write a key in this transaction
-        s = txn1->Put("abc", "def");
-        EXPECT_TRUE(s.ok());
+            status = kv_instance1->Commit();
+            EXPECT_TRUE(status.ok());
 
-        s = txn1->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn1;
+            status = kv_store->Flush();
+            EXPECT_TRUE(status.ok());
 
-        Transaction *txn2 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn2 != nullptr);
+            status = kv_store->Uninit();
+            EXPECT_TRUE(status.ok());
+        }
 
-        s = txn2->Put("abc", "def");
-        EXPECT_TRUE(s.ok());
+        {
+            UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
+            kv_store->Init("/tmp/rocksdb_transaction_example");
+            UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
-        s = txn2->Get(read_options, "abc", &value);
-        EXPECT_TRUE(s.ok());
+            std::string value;
 
-        s = txn2->Rollback();
-        EXPECT_TRUE(s.ok());
-        delete txn2;
+            Status status = kv_instance1->Get("abc", value);
+            EXPECT_TRUE(status.ok());
 
-        // Cleanup
-        delete txn_db;
-        DestroyDB(db_path, options);
-    }
+            status = kv_instance1->Commit();
+            EXPECT_TRUE(status.ok());
 
-    {
-        // Conflict after commit
-        // open DB
-        Options options;
-        TransactionDBOptions txn_db_options;
-        options.create_if_missing = true;
-        TransactionOptions txn_options;
-        txn_options.set_snapshot = true;
-        TransactionDB *txn_db;
+            status = kv_store->Uninit();
+            EXPECT_TRUE(status.ok());
 
-        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
-        EXPECT_TRUE(s.ok());
-
-        WriteOptions write_options;
-        ReadOptions read_options;
-        //    TransactionOptions txn_options;
-        std::string value;
-
-        Transaction *txn1 = txn_db->BeginTransaction(write_options, txn_options);
-        EXPECT_TRUE(txn1 != nullptr);
-
-        Transaction *txn2 = txn_db->BeginTransaction(write_options, txn_options);
-        EXPECT_TRUE(txn2 != nullptr);
-        txn2->SetSnapshot();
-
-        Transaction *txn3 = txn_db->BeginTransaction(write_options, txn_options);
-        EXPECT_TRUE(txn3 != nullptr);
-        txn3->SetSnapshot();
-
-        // Write a key in this transaction
-        s = txn1->Put("abc", "def");
-        EXPECT_TRUE(s.ok());
-
-        s = txn1->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn1;
-
-        s = txn2->Put("abc", "def");
-        EXPECT_FALSE(s.ok());
-
-        s = txn2->Get(read_options, "abc", &value);
-        EXPECT_TRUE(s.ok());
-
-        s = txn2->Rollback();
-        EXPECT_TRUE(s.ok());
-        delete txn2;
-
-        s = txn3->Put("cde", "def");
-        EXPECT_TRUE(s.ok());
-
-        s = txn3->Get(read_options, "cde", &value);
-        EXPECT_TRUE(s.ok());
-
-        s = txn3->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn3;
-
-        // Cleanup
-        delete txn_db;
-        DestroyDB(db_path, options);
+            status = kv_store->Destroy();
+            EXPECT_TRUE(status.ok());
+        }
     }
 }
 
-TEST_P(NewCatalogTest, disable_WAL) {
+TEST_P(NewCatalogTest, kv_store3) {
     using namespace infinity;
 
-    using ROCKSDB_NAMESPACE::DestroyDB;
-    using ROCKSDB_NAMESPACE::FlushOptions;
-    using ROCKSDB_NAMESPACE::Options;
-    using ROCKSDB_NAMESPACE::ReadOptions;
-    using ROCKSDB_NAMESPACE::Snapshot;
-    using ROCKSDB_NAMESPACE::Status;
-    using ROCKSDB_NAMESPACE::Transaction;
-    using ROCKSDB_NAMESPACE::TransactionDB;
-    using ROCKSDB_NAMESPACE::TransactionDBOptions;
-    using ROCKSDB_NAMESPACE::TransactionOptions;
-    using ROCKSDB_NAMESPACE::WriteOptions;
-
-    const std::string db_path = "/tmp/rocksdb_two_phases_transaction";
-
+    // Test disable WAL
     {
-        // open DB
-        Options options;
-        TransactionDBOptions txn_db_options;
-        options.create_if_missing = true;
-        options.manual_wal_flush = true;
-        options.avoid_flush_during_shutdown = true;
-        TransactionDB *txn_db;
+        UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
+        kv_store->Init("/tmp/rocksdb_transaction_example");
+        UniquePtr<KVInstance> kv_instance1 = kv_store->GetInstance();
 
-        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
-        EXPECT_TRUE(s.ok());
-
-        WriteOptions write_options;
-        write_options.disableWAL = true;
-        ReadOptions read_options;
-        //    TransactionOptions txn_options;
         std::string value;
 
-        Transaction *txn1 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn1 != nullptr);
+        Status status = kv_instance1->Get("abc", value);
+        EXPECT_FALSE(status.ok());
 
-        // Write a key in this transaction
-        s = txn1->Put("abc", "def");
-        EXPECT_TRUE(s.ok());
+        status = kv_instance1->Put("db|db1|10", "10");
+        EXPECT_TRUE(status.ok());
 
-        s = txn1->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn1;
+        status = kv_instance1->Commit();
+        EXPECT_TRUE(status.ok());
 
-        Transaction *txn2 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn2 != nullptr);
+        UniquePtr<KVInstance> kv_instance2 = kv_store->GetInstance();
+        kv_instance1 = kv_store->GetInstance();
 
-        s = txn2->Get(read_options, "abc", &value);
-        EXPECT_TRUE(s.ok());
+        status = kv_instance1->Delete("db|db1|10");
+        EXPECT_TRUE(status.ok());
 
-        s = txn2->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn2;
+        status = kv_instance1->Put("db|db1|20", "20");
+        EXPECT_TRUE(status.ok());
 
-        // Cleanup
-        delete txn_db;
-
-        s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
-        EXPECT_TRUE(s.ok());
-
-        txn1 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn1 != nullptr);
-
-        s = txn1->Get(read_options, "abc", &value);
-        EXPECT_FALSE(s.ok());
-
-        s = txn1->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn1;
-
-        delete txn_db;
-        DestroyDB(db_path, options);
-    }
-
-    {
-        // open DB
-        Options options;
-        TransactionDBOptions txn_db_options;
-        options.create_if_missing = true;
-        options.manual_wal_flush = true;
-        options.avoid_flush_during_shutdown = true;
-        TransactionDB *txn_db;
-
-        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
-        EXPECT_TRUE(s.ok());
-
-        WriteOptions write_options;
-        write_options.disableWAL = true;
-        ReadOptions read_options;
-        //    TransactionOptions txn_options;
-        std::string value;
-
-        Transaction *txn1 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn1 != nullptr);
-
-        // Write a key in this transaction
-        s = txn1->Put("abc", "def");
-        EXPECT_TRUE(s.ok());
-
-        s = txn1->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn1;
-
-        Transaction *txn2 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn2 != nullptr);
-
-        s = txn2->Get(read_options, "abc", &value);
-        EXPECT_TRUE(s.ok());
-
-        s = txn2->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn2;
-
-        FlushOptions flush_opts;
-        txn_db->Flush(flush_opts);
-
-        // Cleanup
-        delete txn_db;
-
-        s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
-        EXPECT_TRUE(s.ok());
-
-        txn1 = txn_db->BeginTransaction(write_options);
-        EXPECT_TRUE(txn1 != nullptr);
-
-        s = txn1->Get(read_options, "abc", &value);
-        EXPECT_TRUE(s.ok());
-
-        s = txn1->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn1;
-
-        delete txn_db;
-        DestroyDB(db_path, options);
-    }
-}
-
-TEST_P(NewCatalogTest, multi_version) {
-    using namespace infinity;
-
-    using ROCKSDB_NAMESPACE::DestroyDB;
-    using ROCKSDB_NAMESPACE::FlushOptions;
-    using ROCKSDB_NAMESPACE::Options;
-    using ROCKSDB_NAMESPACE::ReadOptions;
-    using ROCKSDB_NAMESPACE::Slice;
-    using ROCKSDB_NAMESPACE::Snapshot;
-    using ROCKSDB_NAMESPACE::Status;
-    using ROCKSDB_NAMESPACE::Transaction;
-    using ROCKSDB_NAMESPACE::TransactionDB;
-    using ROCKSDB_NAMESPACE::TransactionDBOptions;
-    using ROCKSDB_NAMESPACE::TransactionOptions;
-    using ROCKSDB_NAMESPACE::WriteOptions;
-
-    const std::string db_path = "/tmp/rocksdb_two_phases_transaction";
-
-    {
-        // open DB
-        Options options;
-        TransactionDBOptions txn_db_options;
-        options.create_if_missing = true;
-        options.manual_wal_flush = true;
-        options.avoid_flush_during_shutdown = true;
-        TransactionDB *txn_db;
-        TransactionOptions txn_options;
-        txn_options.set_snapshot = true;
-
-        Status s = TransactionDB::Open(options, txn_db_options, db_path, &txn_db);
-        EXPECT_TRUE(s.ok());
-
-        WriteOptions write_options;
-        write_options.disableWAL = true;
-        ReadOptions read_options;
-        std::string value;
-
-        Transaction *txn1 = txn_db->BeginTransaction(write_options, txn_options);
-        EXPECT_TRUE(txn1 != nullptr);
-
-        // Write a key in this transaction
-        s = txn1->Put("db|db1|10", "10");
-        EXPECT_TRUE(s.ok());
-
-        s = txn1->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn1;
-
-        Transaction *txn2 = txn_db->BeginTransaction(write_options, txn_options);
-        EXPECT_TRUE(txn2 != nullptr);
-        txn2->SetSnapshot();
-        const Snapshot* snapshot = txn2->GetSnapshot();
-
-
-        txn1 = txn_db->BeginTransaction(write_options, txn_options);
-        EXPECT_TRUE(txn1 != nullptr);
-
-        s = txn1->Delete("db|db1|10");
-        EXPECT_TRUE(s.ok());
-
-        s = txn1->Put("db|db1|20", "20");
-        EXPECT_TRUE(s.ok());
-
-        s = txn1->Commit();
-        EXPECT_TRUE(s.ok());
-        delete txn1;
+        status = kv_instance1->Commit();
+        EXPECT_TRUE(status.ok());
 
         const String prefix = "db|db1|";
-        read_options.snapshot = snapshot;
-        auto iter2 = txn2->GetIterator(read_options);
+        auto iter2 = kv_instance2->GetIterator();
         iter2->Seek(prefix);
         while (iter2->Valid() && iter2->key().starts_with(prefix)) {
             EXPECT_STREQ(iter2->key().ToString().c_str(), "db|db1|10");
             EXPECT_STREQ(iter2->value().ToString().c_str(), "10");
-//            std::cout << iter2->key().ToString() << ": " << iter2->value().ToString() << std::endl;
+            //            std::cout << iter2->key().ToString() << ": " << iter2->value().ToString() << std::endl;
             iter2->Next();
         }
         delete iter2;
-        txn2->Commit();
-        read_options.snapshot = nullptr;
 
-        delete txn2;
+        kv_instance2->Commit();
 
-        // Cleanup
-        delete txn_db;
-        DestroyDB(db_path, options);
+        status = kv_store->Uninit();
+        EXPECT_TRUE(status.ok());
+        status = kv_store->Destroy();
+        EXPECT_TRUE(status.ok());
     }
 }
 
