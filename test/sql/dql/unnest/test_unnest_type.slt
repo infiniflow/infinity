@@ -1,0 +1,82 @@
+statement ok
+DROP TABLE IF EXISTS test_unnest;
+
+statement ok
+CREATE TABLE test_unnest (c1 INT, c2 ARRAY(TINYINT));
+
+statement ok
+INSERT INTO test_unnest VALUES
+(1, {0, 1}),
+(2, {2, 3}),
+(3, {0, 1, 2}),
+(4, {0, 2, 3});
+
+query II rowsort
+SELECT c1, unnest(c2) FROM test_unnest;
+----
+1 0
+1 1
+2 2
+2 3
+3 0
+3 1
+3 2
+4 0
+4 2
+4 3
+
+statement ok
+DROP TABLE test_unnest;
+
+statement ok
+CREATE TABLE test_unnest (c1 INT, c2 ARRAY(DOUBLE));
+
+statement ok
+INSERT INTO test_unnest VALUES
+(1, {0.0, 1.0}),
+(2, {2.0, 3.0}),
+(3, {0.0, 1.0, 2.0}),
+(4, {0.0, 2.0, 3.0});
+
+query II rowsort
+SELECT c1, unnest(c2) FROM test_unnest;
+----
+1 0.000000
+1 1.000000
+2 2.000000
+2 3.000000
+3 0.000000
+3 1.000000
+3 2.000000
+4 0.000000
+4 2.000000
+4 3.000000
+
+statement ok
+DROP TABLE test_unnest;
+
+statement ok
+CREATE TABLE test_unnest (c1 INT, c2 ARRAY(VARCHAR));
+
+statement ok
+INSERT INTO test_unnest VALUES
+(1, {'Beijing', 'Shanghai'}),
+(2, {'Beijing', 'Guangzhou'}),
+(3, {'Shanghai', 'Guangzhou'}),
+(4, {'Beijing', 'Shanghai', 'Guangzhou'});
+
+query IT rowsort
+SELECT c1, unnest(c2) FROM test_unnest;
+----
+1 Beijing
+1 Shanghai
+2 Beijing
+2 Guangzhou
+3 Guangzhou
+3 Shanghai
+4 Beijing
+4 Guangzhou
+4 Shanghai
+
+statement ok
+DROP TABLE test_unnest;

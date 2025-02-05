@@ -46,20 +46,7 @@ namespace infinity {
 
 void PhysicalUnnest::Init() {}
 
-void AppendArrayToColumnVector(const char *array_data, SizeT size, SizeT offset, ColumnVector *column_vector, const DataType &data_type) {
-    switch (data_type.type()) {
-        case LogicalType::kInteger: {
-            auto *typed_data = reinterpret_cast<const i32 *>(array_data);
-            for (SizeT i = offset; i < size; ++i) {
-                column_vector->AppendByPtr(reinterpret_cast<const_ptr_t>(&typed_data[i]));
-            }
-            break;
-        }
-        default: {
-            UnrecoverableError("Not implemented.");
-        }
-    }
-}
+namespace {
 
 void AppendScaleToColumnVector(const ColumnVector &input_col, SizeT write_size, SizeT written, ColumnVector &cur_col) {
     for (SizeT i = 0; i < write_size; ++i) {
@@ -90,6 +77,7 @@ Vector<UniquePtr<DataBlock>> MakeDataBlocks(const Vector<Vector<SharedPtr<Column
     }
     return data_blocks;
 }
+}
 
 bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
     OperatorState *prev_op_state = operator_state->prev_op_state_;
@@ -119,8 +107,6 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
         Vector<SizeT> array_lengths;
         {
             const auto &unnest_col = input_data_block->column_vectors[unnest_idx];
-            auto *array_info = static_cast<ArrayInfo *>(unnest_col->data_type()->type_info().get());
-
             auto &output_cols = output_datas[unnest_idx];
             if (output_cols.empty()) {
                 auto col = ColumnVector::Make(output_types[unnest_idx]);
@@ -129,18 +115,14 @@ bool PhysicalUnnest::Execute(QueryContext *, OperatorState *operator_state) {
             }
             ColumnVector *cur_col = output_cols.back().get();
 
-            auto *data = reinterpret_cast<ArrayT *>(unnest_col->data());
             for (u16 row_idx = 0; row_idx < row_count; ++row_idx) {
-                Pair<Span<const char>, SizeT> array_raw = unnest_col->GetArray(data[row_idx], unnest_col->buffer_.get(), array_info);
-                const char *array_data = array_raw.first.data();
-                SizeT array_size = array_raw.second;
-                array_lengths.push_back(array_size);
-
                 SizeT written = 0;
-                while (written < array_size) {
-                    SizeT write_size = std::min(array_size - written, cur_col->capacity() - cur_col->Size());
-                    AppendArrayToColumnVector(array_data, write_size, written, cur_col, *output_types[unnest_idx]);
-                    written += write_size;
+                while (true) {
+                    bool complete = cur_col->AppendUnnestArray(*unnest_col, row_idx, written);
+                    if (complete) {
+                        array_lengths.push_back(written);
+                        break;
+                    }
 
                     if (cur_col->capacity() == cur_col->Size()) {
                         auto new_col = ColumnVector::Make(output_types[unnest_idx]);
