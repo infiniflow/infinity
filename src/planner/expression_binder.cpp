@@ -1045,6 +1045,18 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildUnnestExpr(const FunctionExpr &
         return nullptr;
     }
     String expr_name = expr.GetName();
+    if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
+        i64 group_index = bind_context_ptr->group_index_by_name_[expr_name];
+        const SharedPtr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[group_index];
+
+        SharedPtr<ColumnExpression> col_expr = ColumnExpression::Make(group_expr->Type(),
+                                                                      bind_context_ptr->group_by_table_name_,
+                                                                      bind_context_ptr->group_by_table_index_,
+                                                                      expr_name,
+                                                                      group_index,
+                                                                      depth);
+        return col_expr;
+    }
     if (bind_context_ptr->unnest_index_by_name_.contains(expr_name)) {
         i64 unnest_index = bind_context_ptr->unnest_index_by_name_[expr_name];
         const SharedPtr<BaseExpression> &unnest_expr = bind_context_ptr->unnest_exprs_[unnest_index];

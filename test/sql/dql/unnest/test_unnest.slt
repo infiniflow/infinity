@@ -59,13 +59,13 @@ SELECT c1, unnest(c2) as uc2 FROM test_unnest WHERE uc2 > 1;
 4 2
 4 3
 
-# select II rowsort
-# SELECT sum(c1), unnest(c2) as uc2 FROM test_unnest GROUP BY uc2;
-# ----
-# 4 0
-# 4 1
-# 9 2
-# 6 3
+query II rowsort
+SELECT unnest(c2) as uc2, sum(c1) FROM test_unnest GROUP BY uc2;
+----
+0 8
+1 4
+2 9
+3 6
 
 statement ok
 DROP TABLE test_unnest;
