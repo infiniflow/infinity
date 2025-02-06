@@ -75,14 +75,16 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
 
         slt_file.write("statement ok\n")
-        slt_file.write(f"CREATE TABLE {table_name} (id INTEGER, c1 INTEGER, c2 ARRAY(VARCHAR));\n")
+        slt_file.write(
+            f"CREATE TABLE {table_name} (id INTEGER, c1 INTEGER, c2 ARRAY(VARCHAR));\n"
+        )
         slt_file.write("\n")
 
         off = 0
         for i in range(0, row_n, batch_size):
             slt_file.write("statement ok\n")
             slt_file.write(f"INSERT INTO {table_name} VALUES\n")
-            batch_data = data[i:i + batch_size]
+            batch_data = data[i : i + batch_size]
             for i, (c1, c2) in enumerate(batch_data):
                 c2_str = "{" + ",".join(list(map(lambda x: f"'{x}'", c2))) + "}"
                 id = i + off
@@ -102,6 +104,19 @@ def generate(generate_if_exists: bool, copy_dir: str):
         for id, (c1, c2) in enumerate(data):
             for c2_item in c2:
                 select_res.append(f"{id} {c1} {c2_item}\n")
+        select_res.sort()
+        for res in select_res:
+            slt_file.write(res)
+        slt_file.write("\n")
+
+        slt_file.write("query TI rowsort\n")
+        slt_file.write(
+            f"SELECT UNNEST(c2) as uc2, SUM(c1) FROM {table_name} GROUP BY uc2;\n"
+        )
+        slt_file.write("----\n")
+        select_res = []
+        for c2, c1_list in varchar_to_int.items():
+            select_res.append(f"{c2} {sum(c1_list)}\n")
         select_res.sort()
         for res in select_res:
             slt_file.write(res)
