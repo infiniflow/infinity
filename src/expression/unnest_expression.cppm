@@ -31,9 +31,6 @@ public:
     DataType Type() const override;
 
     [[nodiscard]] String ToString() const override;
-
-public:
-    SharedPtr<ColumnExpression> column_expr() const;
 };
 
 } // namespace infinity
