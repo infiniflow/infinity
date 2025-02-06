@@ -109,6 +109,18 @@ def generate(generate_if_exists: bool, copy_dir: str):
             slt_file.write(res)
         slt_file.write("\n")
 
+        slt_file.write("query IIT rowsort\n")
+        slt_file.write(f"SELECT id, c1, UNNEST(c2) as uc2 FROM {table_name} WHERE uc2 = 'Shanghai';\n")
+        slt_file.write("----\n")
+        select_res = []
+        for id, (c1, c2) in enumerate(data):
+            if "Shanghai" in c2:
+                select_res.append(f"{id} {c1} Shanghai\n")
+        select_res.sort()
+        for res in select_res:
+            slt_file.write(res)
+        slt_file.write("\n")
+
         slt_file.write("query TI rowsort\n")
         slt_file.write(
             f"SELECT UNNEST(c2) as uc2, SUM(c1) FROM {table_name} GROUP BY uc2;\n"
