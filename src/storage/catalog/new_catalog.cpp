@@ -14,6 +14,8 @@
 
 module;
 
+#include <string>
+
 module new_catalog;
 
 import stl;
@@ -22,6 +24,9 @@ import status;
 import extra_ddl_info;
 import kv_store;
 import kv_code;
+import third_party;
+import logger;
+import infinity_exception;
 
 namespace infinity {
 
@@ -29,27 +34,88 @@ NewCatalog::NewCatalog(KVStore *kv_store) : kv_store_(kv_store) {}
 
 Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const SharedPtr<String> &comment, NewTxn *new_txn, ConflictType conflict_type) {
     KVInstance *kv_instance = new_txn->kv_instance();
-    switch (conflict_type) {
-        case ConflictType::kError:
-            //            if (CheckDatabaseExists(db_name, new_txn)) {
-            //                return {ErrorCode::kDatabaseAlreadyExists, "Database already exists"};
-            //            }
-            kv_instance->Put("abc", "abc");
-            break;
-        case ConflictType::kIgnore:
-            //            if (CheckDatabaseExists(db_name, new_txn)) {
-            //                return Status::OK();
-            //            }
-            break;
-        case ConflictType::kReplace:
-            break;
-        default:
-            return {ErrorCode::kInvalidConflictType, "Invalid conflict type"};
+
+    if (conflict_type == ConflictType::kReplace) {
+        return Status::NotSupport("ConflictType::kReplace");
+    }
+
+    if (conflict_type == ConflictType::kInvalid) {
+        return Status::UnexpectedError("Unknown ConflictType");
+    }
+
+    bool db_exist = CheckDatabaseExists(db_name, new_txn);
+    if (db_exist and conflict_type == ConflictType::kError) {
+        return Status(ErrorCode::kDuplicateDatabaseName, MakeUnique<String>(fmt::format("Database: {} already exists", *db_name)));
+    }
+
+    if (db_exist and conflict_type == ConflictType::kIgnore) {
+        return Status::OK();
+    }
+
+    // Get the latest database id of system
+    String db_string_id;
+    Status status = kv_instance->GetForUpdate("latest_database_id", db_string_id);
+    SizeT db_id = 0;
+    if (status.ok()) {
+        db_id = std::stoull(db_string_id);
+    } else {
+        LOG_DEBUG(fmt::format("Failed to get latest_database_id: {}", status.message()));
+    }
+
+    ++db_id;
+    String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS(), new_txn->TxnID());
+    String db_value = fmt::format("{}", db_id);
+    kv_instance->Put(db_key, db_value);
+    kv_instance->Put("latest_database_id", db_value);
+    if (comment != nullptr) {
+        String db_comment_key = KeyEncode::CatalogDbCommentKey(db_value, new_txn->BeginTS(), new_txn->TxnID());
+        kv_instance->Put(db_comment_key, *comment);
     }
     return Status::OK();
 }
 
-Status NewCatalog::DropDatabase(const SharedPtr<String> &db_name, NewTxn *new_txn, ConflictType conflict_type) { return Status::OK(); }
+Status NewCatalog::DropDatabase(const SharedPtr<String> &db_name, NewTxn *new_txn, ConflictType conflict_type) {
+    if (conflict_type == ConflictType::kReplace) {
+        return Status::NotSupport("ConflictType::kReplace");
+    }
+    if (conflict_type == ConflictType::kInvalid) {
+        return Status::UnexpectedError("Unknown ConflictType");
+    }
+
+    KVInstance *kv_instance = new_txn->kv_instance();
+    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(*db_name);
+    String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS(), new_txn->TxnID());
+    auto iter2 = kv_instance->GetIterator();
+    iter2->Seek(db_key_prefix);
+    SizeT found_count = 0;
+
+    Vector<String> error_db_keys;
+    while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+        if (found_count == 0) {
+            kv_instance->Delete(iter2->Key().ToString());
+        } else {
+            // Error branch
+            error_db_keys.push_back(iter2->Key().ToString());
+        }
+        iter2->Next();
+        ++found_count;
+    }
+
+    if (!error_db_keys.empty()) {
+        // join error_db_keys
+        String error_db_keys_str =
+            std::accumulate(std::next(error_db_keys.begin()), error_db_keys.end(), error_db_keys.front(), [](String a, String b) {
+                return a + ", " + b;
+            });
+        UnrecoverableError(fmt::format("Found multiple database keys: {}", error_db_keys_str));
+    }
+
+    if (found_count == 0 && conflict_type == ConflictType::kError) {
+        return Status::DBNotExist(*db_name);
+    }
+
+    return Status::OK();
+}
 
 bool NewCatalog::CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *new_txn) {
     KVInstance *kv_instance = new_txn->kv_instance();

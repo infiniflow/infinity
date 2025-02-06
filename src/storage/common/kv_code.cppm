@@ -23,12 +23,12 @@ namespace infinity {
 export class KeyEncode {
 public:
     static String CatalogDbKey(const String &db_name, TxnTimeStamp ts, TransactionID txn_id);
+    static String CatalogDbCommentKey(const String &db_id, TxnTimeStamp ts, TransactionID txn_id);
     static String CatalogDbKeyPrefix(const String &db_name);
     static String CatalogTableKey(const String &db_id, const String &table_name, TxnTimeStamp ts, TransactionID txn_id);
     static String
     CatalogTableColumnKey(const String &db_id, const String &table_id, const String &column_name, TxnTimeStamp ts, TransactionID txn_id);
-    static String
-    CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id, TxnTimeStamp ts, TransactionID txn_id);
+    static String CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id, TxnTimeStamp ts, TransactionID txn_id);
     static String CatalogTableSegmentBlockKey(const String &db_id,
                                               const String &table_id,
                                               SegmentID segment_id,
