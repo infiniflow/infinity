@@ -21,6 +21,7 @@ import new_txn;
 import status;
 import extra_ddl_info;
 import kv_store;
+import kv_code;
 
 namespace infinity {
 
@@ -50,7 +51,23 @@ Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const Shared
 
 Status NewCatalog::DropDatabase(const SharedPtr<String> &db_name, NewTxn *new_txn, ConflictType conflict_type) { return Status::OK(); }
 
-bool NewCatalog::CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *new_txn) { return true; }
+bool NewCatalog::CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *new_txn) {
+    KVInstance *kv_instance = new_txn->kv_instance();
+    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(*db_name);
+    String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS(), new_txn->TxnID());
+    auto iter2 = kv_instance->GetIterator();
+    iter2->Seek(db_key_prefix);
+    SizeT found_count = 0;
+    while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+        iter2->Next();
+        ++found_count;
+    }
+    if (found_count == 0) {
+        // Not found
+        return false;
+    }
+    return true;
+}
 
 Tuple<SharedPtr<DatabaseInfo>, Status> NewCatalog::GetDatabaseInfo(const String &db_name, NewTxn *new_txn) { return {nullptr, Status::OK()}; }
 

@@ -21,6 +21,40 @@ import third_party;
 
 namespace infinity {
 
+String KeyEncode::CatalogDbKey(const String &db_name, TxnTimeStamp ts, TransactionID txn_id) {
+    return fmt::format("catalog|db|{}|{}|{}", db_name, ts, txn_id);
+}
+
+String KeyEncode::CatalogDbKeyPrefix(const String &db_name) { return fmt::format("catalog|db|{}|", db_name); }
+
+String KeyEncode::CatalogTableKey(const String &db_id, const String &table_name, TxnTimeStamp ts, TransactionID txn_id) {
+    return fmt::format("catalog|tbl|{}|{}|{}|{}", db_id, table_name, ts, txn_id);
+}
+String
+KeyEncode::CatalogTableColumnKey(const String &db_id, const String &table_id, const String &column_name, TxnTimeStamp ts, TransactionID txn_id) {
+    return fmt::format("catalog|col|{}|{}|{}|{}|{}", db_id, table_id, column_name, ts, txn_id);
+}
+String KeyEncode::CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id, TxnTimeStamp ts, TransactionID txn_id) {
+    return fmt::format("catalog|seg|{}|{}|{}|{}|{}", db_id, table_id, segment_id, ts, txn_id);
+}
+String KeyEncode::CatalogTableSegmentBlockKey(const String &db_id,
+                                              const String &table_id,
+                                              SegmentID segment_id,
+                                              BlockID block_id,
+                                              TxnTimeStamp ts,
+                                              TransactionID txn_id) {
+    return fmt::format("catalog|blk|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, ts, txn_id);
+}
+String KeyEncode::CatalogTableSegmentBlockColumnKey(const String &db_id,
+                                                    const String &table_id,
+                                                    SegmentID segment_id,
+                                                    BlockID block_id,
+                                                    ColumnID column_id,
+                                                    TxnTimeStamp ts,
+                                                    TransactionID txn_id) {
+    return fmt::format("catalog|blk_col|{}|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, column_id, ts, txn_id);
+}
+
 String KeyEncode::DatabaseKey(const String &db_name, TxnTimeStamp ts, TransactionID txn_id) {
     return fmt::format("db|{}|{}|{}", db_name, ts, txn_id);
 }

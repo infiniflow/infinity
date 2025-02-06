@@ -362,6 +362,7 @@ using BackupEngineReadOnly = ::ROCKSDB_NAMESPACE::BackupEngineReadOnly;
 using BackupEngineOptions = ::ROCKSDB_NAMESPACE::BackupEngineOptions;
 using Env = ::ROCKSDB_NAMESPACE::Env;
 using IOStatus = ::ROCKSDB_NAMESPACE::IOStatus;
+using Slice = ::ROCKSDB_NAMESPACE::Slice;
 } // namespace rocksdb
 
 } // namespace infinity

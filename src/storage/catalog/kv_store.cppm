@@ -23,20 +23,40 @@ import status;
 namespace infinity {
 
 export class KVStore;
+export class KVInstance;
 
-export class KVInstance {
+export class KVIterator {
+public:
+    KVIterator(rocksdb::Iterator *iterator_);
+    KVIterator(rocksdb::Transaction *transaction, rocksdb::ReadOptions &read_options, const String &upper_bound);
+    ~KVIterator();
+
+    void Seek(const String &key);
+    bool Valid();
+    void Next();
+    rocksdb::Slice Key();
+    rocksdb::Slice Value();
+
+private:
+    rocksdb::Iterator *iterator_{};
+    UniquePtr<rocksdb::Slice> lower_bound_{};
+    UniquePtr<rocksdb::Slice> upper_bound_{};
+};
+
+class KVInstance {
 
     friend class KVStore;
 
 public:
     KVInstance() = default;
-    ~KVInstance() = default;
+    ~KVInstance();
 
     Status Put(const String &key, const String &value);
     Status Delete(const String &key);
     Status Get(const String &key, String &value);
     Status GetForUpdate(const String &key, String &value);
-    rocksdb::Iterator* GetIterator();
+    UniquePtr<KVIterator> GetIterator();
+    UniquePtr<KVIterator> GetIterator(const char *lower_bound_key, const char *upper_bound_key);
 
     Status Commit();
     Status Rollback();
@@ -54,8 +74,8 @@ public:
     Status Init(const String &db_path);
     Status Uninit();
     Status Flush();
-    Status CreateBackup(const String& backup_path, Vector<rocksdb::BackupInfo>& backup_info_list);
-    static Status RestoreFromBackup(const String& backup_path, const String& db_path);
+    Status CreateBackup(const String &backup_path, Vector<rocksdb::BackupInfo> &backup_info_list);
+    static Status RestoreFromBackup(const String &backup_path, const String &db_path);
 
     UniquePtr<KVInstance> GetInstance();
 

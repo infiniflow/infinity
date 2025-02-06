@@ -54,6 +54,38 @@ class KVCodeTest : public BaseTest {};
 TEST_F(KVCodeTest, kv_code1) {
     // Test code here
     String db_name = "db1";
+    String db_id = "3";
+    String table_name = "tbl1";
+    String table_id = "10";
+    String column_name = "col1";
+    TxnTimeStamp ts = 123;
+    TransactionID txn_id = 23;
+    SegmentID segment_id = 2;
+//    BlockID block_id = 3;
+//    ColumnID column_id = 4;
+//    String index_name = "idx1";
+//    ChunkID chunk_id = 5;
+    {
+        String key = KeyEncode::CatalogDbKey(db_name, ts, txn_id);
+        EXPECT_STREQ(key.c_str(), "catalog|db|db1|123|23");
+    }
+    {
+        String key = KeyEncode::CatalogTableKey(db_id, table_name, ts, txn_id);
+        EXPECT_STREQ(key.c_str(), "catalog|tbl|3|tbl1|123|23");
+    }
+    {
+        String key = KeyEncode::CatalogTableColumnKey(db_id, table_id, column_name, ts, txn_id);
+        EXPECT_STREQ(key.c_str(), "catalog|col|3|10|col1|123|23");
+    }
+    {
+        String key = KeyEncode::CatalogTableSegmentKey(db_id, table_id, segment_id, ts, txn_id);
+        EXPECT_STREQ(key.c_str(), "catalog|seg|3|10|2|123|23");
+    }
+}
+
+TEST_F(KVCodeTest, kv_code2) {
+    // Test code here
+    String db_name = "db1";
     String table_name = "tbl1";
     TxnTimeStamp ts = 123;
     TransactionID txn_id = 23;

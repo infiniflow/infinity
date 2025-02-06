@@ -28,6 +28,43 @@ import third_party;
 
 namespace infinity {
 
+KVIterator::KVIterator(rocksdb::Iterator *iterator_) : iterator_(iterator_) {}
+
+KVIterator::KVIterator(rocksdb::Transaction *transaction, rocksdb::ReadOptions &read_options, const String &upper_bound) {
+    if (!upper_bound.empty()) {
+        upper_bound_ = MakeUnique<rocksdb::Slice>(upper_bound);
+        read_options.iterate_upper_bound = upper_bound_.get();
+    }
+
+    iterator_ = transaction->GetIterator(read_options);
+}
+
+KVIterator::~KVIterator() { delete iterator_; }
+
+void KVIterator::Seek(const String &key) {
+    if (key.empty()) {
+        iterator_->SeekToFirst();
+    } else {
+        iterator_->Seek(key);
+    }
+}
+
+bool KVIterator::Valid() { return iterator_->Valid(); }
+void KVIterator::Next() { iterator_->Next(); }
+rocksdb::Slice KVIterator::Key() { return iterator_->key(); }
+rocksdb::Slice KVIterator::Value() { return iterator_->value(); }
+
+KVInstance::~KVInstance() {
+    if (read_options_.iterate_lower_bound != nullptr) {
+        delete read_options_.iterate_lower_bound;
+        read_options_.iterate_lower_bound = nullptr;
+    }
+    if (read_options_.iterate_upper_bound != nullptr) {
+        delete read_options_.iterate_upper_bound;
+        read_options_.iterate_upper_bound = nullptr;
+    }
+}
+
 Status KVInstance::Put(const String &key, const String &value) {
     rocksdb::Status s = transaction_->Put(key, value);
     if (!s.ok()) {
@@ -60,7 +97,17 @@ Status KVInstance::GetForUpdate(const String &key, String &value) {
     return Status::OK();
 }
 
-rocksdb::Iterator *KVInstance::GetIterator() { return transaction_->GetIterator(read_options_); }
+UniquePtr<KVIterator> KVInstance::GetIterator() { return MakeUnique<KVIterator>(transaction_->GetIterator(read_options_)); }
+
+UniquePtr<KVIterator> KVInstance::GetIterator(const char *lower_bound_key, const char *upper_bound_key) {
+    if (lower_bound_key != nullptr) {
+        read_options_.iterate_lower_bound = new rocksdb::Slice(lower_bound_key);
+    }
+    if (upper_bound_key != nullptr) {
+        read_options_.iterate_upper_bound = new rocksdb::Slice(upper_bound_key);
+    }
+    return MakeUnique<KVIterator>(transaction_->GetIterator(read_options_));
+}
 
 Status KVInstance::Commit() {
     rocksdb::Status s = transaction_->Commit();
