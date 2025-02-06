@@ -9,7 +9,8 @@ INSERT INTO test_unnest VALUES
 (1, {0, 1}),
 (2, {2, 3}),
 (3, {0, 1, 2}),
-(4, {0, 2, 3});
+(4, {0, 2, 3}),
+(5, {});
 
 
 query I rowsort
@@ -39,6 +40,20 @@ SELECT c1, unnest(c2) FROM test_unnest;
 4 0
 4 2
 4 3
+
+query ITI rowsort
+SELECT c1, c2, unnest(c2) FROM test_unnest;
+----
+1 {0,1} 0
+1 {0,1} 1
+2 {2,3} 2
+2 {2,3} 3
+3 {0,1,2} 0
+3 {0,1,2} 1
+3 {0,1,2} 2
+4 {0,2,3} 0
+4 {0,2,3} 2
+4 {0,2,3} 3
 
 query II rowsort
 SELECT c1, unnest(c2) as uc2 FROM test_unnest WHERE c1 > 2;

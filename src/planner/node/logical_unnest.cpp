@@ -26,6 +26,7 @@ import expression_type;
 import column_expression;
 import unnest_expression;
 import reference_expression;
+import column_expression;
 
 namespace infinity {
 
@@ -40,12 +41,24 @@ Vector<ColumnBinding> LogicalUnnest::GetColumnBindings() const {
     return result;
 }
 
+Vector<ColumnBinding> LogicalUnnest::RemoveColumnBindings() const {
+    SizeT unnest_count = expression_list_.size();
+    Vector<ColumnBinding> result;
+    for (SizeT i = 0; i < unnest_count; ++i) {
+        auto *unnest_expr = static_cast<UnnestExpression *>(expression_list_[i].get());
+        auto *col_expr = static_cast<ColumnExpression *>(unnest_expr->arguments()[0].get());
+        result.push_back(col_expr->binding());
+    }
+    return result;
+}
+
 SharedPtr<Vector<String>> LogicalUnnest::GetOutputNames() const {
     SharedPtr<Vector<String>> result = LogicalCommonFunctionUsingLoadMeta::GetOutputNames(*this);
     SizeT unnest_count = expression_list_.size();
-    result->reserve(unnest_count);
     for (SizeT i = 0; i < unnest_count; ++i) {
-        result->emplace_back(expression_list_[i]->Name());
+        auto *unnest_expr = static_cast<UnnestExpression *>(expression_list_[i].get());
+        auto *unnest_ref_expr = static_cast<ReferenceExpression *>(unnest_expr->arguments()[0].get());
+        (*result)[unnest_ref_expr->column_index()] = unnest_expr->Name();
     }
     return result;
 }
@@ -53,7 +66,6 @@ SharedPtr<Vector<String>> LogicalUnnest::GetOutputNames() const {
 SharedPtr<Vector<SharedPtr<DataType>>> LogicalUnnest::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result = LogicalCommonFunctionUsingLoadMeta::GetOutputTypes(*this);
     SizeT unnest_count = expression_list_.size();
-    result->reserve(unnest_count);
     for (SizeT i = 0; i < unnest_count; ++i) {
         auto *unnest_expr = static_cast<UnnestExpression *>(expression_list_[i].get());
         auto *unnest_ref_expr = static_cast<ReferenceExpression *>(unnest_expr->arguments()[0].get());
