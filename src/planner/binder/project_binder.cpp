@@ -14,6 +14,8 @@
 
 module;
 
+#include <string>
+
 module project_binder;
 
 import stl;
