@@ -1718,6 +1718,7 @@ A non-empty list of strings specifying the columns to include in the output. Eac
   - `sum`
   - `avg`
 - An arithmetic function: Apply an arithmetic operation on specified columns (e.g., `c1+5`).
+- An unnest function: Unnest an array column to multiple rows (e.g., `unnest(c1)`).
 
 :::tip NOTE
 The list must contain at least one element. Empty lists are not allowed.
