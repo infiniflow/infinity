@@ -86,6 +86,11 @@ TEST_P(KVStoreTest, kv_store1) {
     status = kv_instance3->Commit();
     EXPECT_TRUE(status.ok());
 
+    kv_instance1.reset();
+    kv_instance2.reset();
+    kv_instance3.reset();
+    kv_instance4.reset();
+
     status = kv_store->Uninit();
     EXPECT_TRUE(status.ok());
     status = kv_store->Destroy("/tmp/rocksdb_transaction_example");
@@ -112,6 +117,8 @@ TEST_P(KVStoreTest, kv_store2) {
         status = kv_instance1->Commit();
         EXPECT_TRUE(status.ok());
 
+        kv_instance1.reset();
+
         status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());
 
@@ -124,6 +131,8 @@ TEST_P(KVStoreTest, kv_store2) {
 
         status = kv_instance1->Commit();
         EXPECT_TRUE(status.ok());
+
+        kv_instance1.reset();
 
         status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());
@@ -152,6 +161,8 @@ TEST_P(KVStoreTest, kv_store2) {
             status = kv_store->Flush();
             EXPECT_TRUE(status.ok());
 
+            kv_instance1.reset();
+
             status = kv_store->Uninit();
             EXPECT_TRUE(status.ok());
         }
@@ -168,6 +179,8 @@ TEST_P(KVStoreTest, kv_store2) {
 
             status = kv_instance1->Commit();
             EXPECT_TRUE(status.ok());
+
+            kv_instance1.reset();
 
             status = kv_store->Uninit();
             EXPECT_TRUE(status.ok());
@@ -259,6 +272,8 @@ TEST_P(KVStoreTest, kv_store4) {
         for (const auto &backup_info : backup_info_list) {
             std::cout << backup_info.number_files << std::endl;
         }
+
+        kv_instance1.reset();
 
         status = kv_store->Uninit();
         EXPECT_TRUE(status.ok());

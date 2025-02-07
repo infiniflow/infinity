@@ -63,6 +63,9 @@ KVInstance::~KVInstance() {
         delete read_options_.iterate_upper_bound;
         read_options_.iterate_upper_bound = nullptr;
     }
+    if (transaction_) {
+        delete transaction_;
+    }
 }
 
 Status KVInstance::Put(const String &key, const String &value) {
