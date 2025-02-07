@@ -93,6 +93,10 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
         result->source_position_ = SourcePosition(bind_context_ptr->binding_context_id_, ExprSourceType::kAggregate);
         return result;
     }
+    if (!bind_context_ptr->aggregate_index_by_name_.empty() || !bind_context_ptr->group_index_by_name_.empty()) {
+        String error_message = fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregate function", expr_name);
+        RecoverableError(Status::SyntaxError(error_message));
+    }
 
     if (expr.type_ == ParsedExprType::kFunction or expr.type_ == ParsedExprType::kColumn) {
         return ExpressionBinder::BuildExpression(expr, bind_context_ptr, depth, root);
