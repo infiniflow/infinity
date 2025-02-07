@@ -35,6 +35,7 @@ import value;
 import snapshot_info;
 import txn_context;
 import kv_store;
+import new_catalog;
 
 namespace infinity {
 
@@ -95,11 +96,13 @@ public:
 
     //    void SetBeginTS(TxnTimeStamp begin_ts);
 
-    TxnTimeStamp Commit();
+    Status Commit();
 
     bool CheckConflict();
 
     Optional<String> CheckConflict(NewTxn *txn);
+
+    Status PrepareCommit();
 
     void CommitBottom();
 
@@ -268,6 +271,7 @@ private:
     NewTxnManager *txn_mgr_{};
     BufferManager *buffer_mgr_{}; // This BufferManager ptr Only for replaying wal
     Catalog *catalog_{};
+    NewCatalog *new_catalog_{};
 
     TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
 

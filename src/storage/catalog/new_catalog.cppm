@@ -61,6 +61,8 @@ public:
     //
     //    DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    static String GetPathNameTail(const String &path);
+
 private:
     KVStore *kv_store_{};
 };

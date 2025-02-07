@@ -297,9 +297,9 @@ Status Storage::AdminToWriter() {
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
-    if (system_start_ts == 0) {
-        CreateDefaultDB();
-    }
+//    if (system_start_ts == 0) {
+//        CreateDefaultDB();
+//    }
 
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
@@ -344,13 +344,13 @@ Status Storage::AdminToWriter() {
         MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
     bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
-    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
-    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
-    bg_processor_->Submit(force_ckp_task);
-    force_ckp_task->Wait();
-    txn->AddOperation(MakeShared<String>("ForceCheckpointTask"));
-    txn->SetReaderAllowed(true);
-    txn_mgr_->CommitTxn(txn);
+//    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
+//    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
+//    bg_processor_->Submit(force_ckp_task);
+//    force_ckp_task->Wait();
+//    txn->AddOperation(MakeShared<String>("ForceCheckpointTask"));
+//    txn->SetReaderAllowed(true);
+//    txn_mgr_->CommitTxn(txn);
 
     periodic_trigger_thread_->Start();
     return Status::OK();

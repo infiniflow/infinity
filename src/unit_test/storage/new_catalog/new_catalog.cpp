@@ -22,6 +22,8 @@ import new_catalog;
 import new_txn_manager;
 import infinity_context;
 import txn_state;
+import extra_ddl_info;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -35,27 +37,57 @@ TEST_P(NewCatalogTest, db_test) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    //    NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
 
-    // start txn1
-    auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+    {
+        // start txn1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
-    // start txn2
-    auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
+        // start txn2
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
 
-    Status status = new_catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn1);
-    EXPECT_TRUE(status.ok());
-    bool db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn1);
-    EXPECT_TRUE(db1_exist);
-    db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
-    EXPECT_FALSE(db1_exist);
+        Status status = txn1->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = txn2->CreateDatabase(MakeShared<String>("db1"), ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
 
-    new_catalog->DropDatabase(MakeShared<String>("db1"), txn1);
-    db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn1);
-    EXPECT_FALSE(db1_exist);
-    db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
-    EXPECT_FALSE(db1_exist);
+        //        Status status = new_catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn1);
+        //        EXPECT_TRUE(status.ok());
+        //        bool db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn1);
+        //        EXPECT_TRUE(db1_exist);
+        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
+        //        EXPECT_FALSE(db1_exist);
+        //
+        //        status = new_catalog->DropDatabase(MakeShared<String>("db1"), txn1);
+        //        EXPECT_TRUE(status.ok());
+        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn1);
+        //        EXPECT_FALSE(db1_exist);
+        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
+        //        EXPECT_FALSE(db1_exist);
 
-    new_txn_mgr->CommitTxn(txn1);
-    //    new_txn_mgr->CommitTxn(txn2);
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_FALSE(status.ok());
+        std::cout << status.message() << std::endl;
+    }
+
+    {
+        //        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        //
+        //        Status status = new_catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn1);
+        //        EXPECT_TRUE(status.ok());
+        //        bool db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn1);
+        //        EXPECT_TRUE(db1_exist);
+        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
+        //        EXPECT_FALSE(db1_exist);
+        //
+        //        new_txn_mgr->CommitTxn(txn1);
+        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
+        //        EXPECT_FALSE(db1_exist);
+        //        status = new_catalog->CreateDatabase(MakeShared<String>("db1"), MakeShared<String>(), txn2);
+        //        EXPECT_FALSE(status.ok());
+        //        new_txn_mgr->RollBackTxn(txn2);
+    }
 }

@@ -172,6 +172,7 @@ private:
     // WalManager state
     Atomic<bool> running_{};
     Thread flush_thread_{};
+    Thread new_flush_thread_{};
 
     // TxnManager and Flush thread access following members
     BlockingQueue<Txn *> wait_flush_{"WalManager"};

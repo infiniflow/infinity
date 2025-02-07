@@ -25,6 +25,7 @@ import default_values;
 import txn_context;
 import txn_manager;
 import kv_store;
+import status;
 
 namespace infinity {
 
@@ -66,7 +67,7 @@ public:
 
     bool Stopped();
 
-    TxnTimeStamp CommitTxn(NewTxn *txn);
+    Status CommitTxn(NewTxn *txn);
 
     void RollBackTxn(NewTxn *txn);
 

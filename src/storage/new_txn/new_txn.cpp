@@ -58,6 +58,8 @@ import wal_manager;
 import defer_op;
 import snapshot_info;
 import kv_store;
+import random;
+import kv_code;
 
 namespace infinity {
 
@@ -71,6 +73,7 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
     : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(nullptr), wal_entry_(MakeShared<WalEntry>()),
       txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), kv_instance_(std::move(kv_instance)), txn_text_(std::move(txn_text)) {
     catalog_ = InfinityContext::instance().storage()->catalog();
+    new_catalog_ = InfinityContext::instance().storage()->new_catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");
 #endif
@@ -90,6 +93,7 @@ NewTxn::NewTxn(BufferManager *buffer_mgr,
     : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(nullptr), wal_entry_(MakeShared<WalEntry>()),
       txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), kv_instance_(std::move(kv_instance)) {
     catalog_ = InfinityContext::instance().storage()->catalog();
+    new_catalog_ = InfinityContext::instance().storage()->new_catalog();
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxn");
 #endif
@@ -219,16 +223,29 @@ void NewTxn::CheckTxn(const String &db_name) {
 
 // Database OPs
 Status NewTxn::CreateDatabase(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment) {
-    this->CheckTxnStatus();
-    TxnTimeStamp begin_ts = this->BeginTS();
-
-    auto [db_entry, status] = catalog_->CreateDatabase(db_name, comment, txn_context_ptr_->txn_id_, begin_ts, nullptr, conflict_type);
-    if (db_entry == nullptr) { // nullptr means some exception happened
-        return status;
+    if (conflict_type == ConflictType::kReplace) {
+        return Status::NotSupport("ConflictType::kReplace");
     }
-    txn_store_.AddDBStore(db_entry);
 
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabase>(*db_name, db_entry->GetPathNameTail(), *comment);
+    if (conflict_type == ConflictType::kInvalid) {
+        return Status::UnexpectedError("Unknown ConflictType");
+    }
+
+    this->CheckTxnStatus();
+
+    bool db_exist = new_catalog_->CheckDatabaseExists(db_name, this);
+    if (db_exist and conflict_type == ConflictType::kError) {
+        return Status(ErrorCode::kDuplicateDatabaseName, MakeUnique<String>(fmt::format("Database: {} already exists", *db_name)));
+    }
+
+    if (db_exist and conflict_type == ConflictType::kIgnore) {
+        return Status::OK();
+    }
+
+    SharedPtr<String> db_dir = DetermineRandomString(InfinityContext::instance().config()->DataDir(), fmt::format("db_{}", *db_name));
+    String path_tail = NewCatalog::GetPathNameTail(*db_dir);
+
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabase>(*db_name, path_tail, *comment);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
@@ -611,21 +628,20 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 //     this->SetTxnBegin(begin_ts);
 // }
 
-TxnTimeStamp NewTxn::Commit() {
+Status NewTxn::Commit() {
     DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
     if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly()) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
-        return commit_ts;
+        return Status::OK();
     }
 
     StorageMode current_storage_mode = InfinityContext::instance().storage()->GetStorageMode();
     if (current_storage_mode != StorageMode::kWritable) {
         if (!IsReaderAllowed()) {
-            RecoverableError(
-                Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_storage_mode))));
+            return Status::InvalidNodeRole(fmt::format("This node is: {}, only read-only transaction is allowed.", ToString(current_storage_mode)));
         }
     }
 
@@ -634,6 +650,13 @@ TxnTimeStamp NewTxn::Commit() {
     LOG_TRACE(fmt::format("NewTxn: {} is committing, begin_ts:{} committing ts: {}", txn_context_ptr_->txn_id_, BeginTS(), commit_ts));
 
     this->SetTxnCommitting(commit_ts);
+
+    Status status = this->PrepareCommit();
+    if (!status.ok()) {
+        wal_entry_ = nullptr;
+        txn_mgr_->SendToWAL(this);
+        return status;
+    }
 
     txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("NewTxn {} commit ts: {}", txn_context_ptr_->txn_id_, commit_ts));
@@ -645,7 +668,7 @@ TxnTimeStamp NewTxn::Commit() {
                               *conflict_reason));
         wal_entry_ = nullptr;
         txn_mgr_->SendToWAL(this);
-        RecoverableError(Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", *conflict_reason)));
+        return Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", *conflict_reason));
     }
 
     // Put wal entry to the manager in the same order as commit_ts.
@@ -658,7 +681,59 @@ TxnTimeStamp NewTxn::Commit() {
 
     PostCommit();
 
-    return commit_ts;
+    return Status::OK();
+}
+
+Status NewTxn::PrepareCommit() {
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    for (auto &command : wal_entry_->cmds_) {
+        WalCommandType command_type = command->GetType();
+        switch (command_type) {
+            case WalCommandType::CREATE_DATABASE: {
+                auto *create_db_cmd = static_cast<WalCmdCreateDatabase *>(command.get());
+                // Get the latest database id of system
+                String db_string_id;
+                Status status = kv_instance_->GetForUpdate("latest_database_id", db_string_id);
+                SizeT db_id = 0;
+                if (status.ok()) {
+                    db_id = std::stoull(db_string_id);
+                } else {
+                    LOG_DEBUG(fmt::format("Failed to get latest_database_id: {}", status.message()));
+                }
+
+                ++db_id;
+                String db_key = KeyEncode::CatalogDbKey(create_db_cmd->db_name_, commit_ts, this->TxnID());
+                String db_id_str = fmt::format("{}", db_id);
+                status = kv_instance_->Put(db_key, db_id_str);
+                if (!status.ok()) {
+                    return status;
+                }
+                status = kv_instance_->Put("latest_database_id", db_id_str);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                String db_storage_dir = KeyEncode::CatalogDbDirKey(db_id_str, commit_ts, this->TxnID());
+                status = kv_instance_->Put(db_storage_dir, create_db_cmd->db_dir_tail_);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                if (!create_db_cmd->db_comment_.empty()) {
+                    String db_comment_key = KeyEncode::CatalogDbCommentKey(db_id_str, commit_ts, this->TxnID());
+                    status = kv_instance_->Put(db_comment_key, create_db_cmd->db_comment_);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+    return Status::OK();
 }
 
 bool NewTxn::CheckConflict() { return txn_store_.CheckConflict(catalog_); }
@@ -672,18 +747,23 @@ Optional<String> NewTxn::CheckConflict(NewTxn *other_txn) {
 void NewTxn::CommitBottom() {
     LOG_TRACE(fmt::format("NewTxn bottom: {} is started.", txn_context_ptr_->txn_id_));
     // prepare to commit txn local data into table
-    TxnTimeStamp commit_ts = this->CommitTS();
+//    TxnTimeStamp commit_ts = this->CommitTS();
 
-    txn_store_.PrepareCommit(txn_context_ptr_->txn_id_, commit_ts, buffer_mgr_);
+    Status status = kv_instance_->Commit();
+    if (!status.ok()) {
+        UnrecoverableError("KV instance commit failed");
+    }
 
-    txn_store_.CommitBottom(txn_context_ptr_->txn_id_, commit_ts);
-
-    txn_store_.AddDeltaOp(txn_delta_ops_entry_.get(), nullptr);
+//    txn_store_.PrepareCommit(txn_context_ptr_->txn_id_, commit_ts, buffer_mgr_);
+//
+//    txn_store_.CommitBottom(txn_context_ptr_->txn_id_, commit_ts);
+//
+//    txn_store_.AddDeltaOp(txn_delta_ops_entry_.get(), nullptr);
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
-    if (!txn_delta_ops_entry_->operations().empty()) {
-        txn_delta_ops_entry_->SaveState(txn_context_ptr_->txn_id_, this->CommitTS(), txn_mgr_->NextSequence());
-    }
+//    if (!txn_delta_ops_entry_->operations().empty()) {
+//        txn_delta_ops_entry_->SaveState(txn_context_ptr_->txn_id_, this->CommitTS(), txn_mgr_->NextSequence());
+//    }
 
     // Notify the top half
     std::unique_lock<std::mutex> lk(commit_lock_);
@@ -733,6 +813,10 @@ void NewTxn::Rollback() {
     }
     this->SetTxnRollbacking(abort_ts);
 
+    Status status = kv_instance_->Rollback();
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
 
     LOG_TRACE(fmt::format("NewTxn: {} is dropped.", txn_context_ptr_->txn_id_));

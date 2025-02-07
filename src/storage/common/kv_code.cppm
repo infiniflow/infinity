@@ -24,7 +24,9 @@ export class KeyEncode {
 public:
     static String CatalogDbKey(const String &db_name, TxnTimeStamp ts, TransactionID txn_id);
     static String CatalogDbCommentKey(const String &db_id, TxnTimeStamp ts, TransactionID txn_id);
+    static String CatalogDbDirKey(const String &db_id, TxnTimeStamp ts, TransactionID txn_id);
     static String CatalogDbKeyPrefix(const String &db_name);
+
     static String CatalogTableKey(const String &db_id, const String &table_name, TxnTimeStamp ts, TransactionID txn_id);
     static String
     CatalogTableColumnKey(const String &db_id, const String &table_id, const String &column_name, TxnTimeStamp ts, TransactionID txn_id);

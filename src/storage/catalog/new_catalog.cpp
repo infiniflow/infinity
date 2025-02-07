@@ -65,11 +65,20 @@ Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const Shared
     ++db_id;
     String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS(), new_txn->TxnID());
     String db_value = fmt::format("{}", db_id);
-    kv_instance->Put(db_key, db_value);
-    kv_instance->Put("latest_database_id", db_value);
+    status = kv_instance->Put(db_key, db_value);
+    if (!status.ok()) {
+        return status;
+    }
+    status = kv_instance->Put("latest_database_id", db_value);
+    if (!status.ok()) {
+        return status;
+    }
     if (comment != nullptr) {
         String db_comment_key = KeyEncode::CatalogDbCommentKey(db_value, new_txn->BeginTS(), new_txn->TxnID());
-        kv_instance->Put(db_comment_key, *comment);
+        status = kv_instance->Put(db_comment_key, *comment);
+        if (!status.ok()) {
+            return status;
+        }
     }
     return Status::OK();
 }
@@ -92,7 +101,10 @@ Status NewCatalog::DropDatabase(const SharedPtr<String> &db_name, NewTxn *new_tx
     Vector<String> error_db_keys;
     while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
         if (found_count == 0) {
-            kv_instance->Delete(iter2->Key().ToString());
+            Status status = kv_instance->Delete(iter2->Key().ToString());
+            if (!status.ok()) {
+                return status;
+            }
         } else {
             // Error branch
             error_db_keys.push_back(iter2->Key().ToString());
@@ -136,5 +148,13 @@ bool NewCatalog::CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *n
 }
 
 Tuple<SharedPtr<DatabaseInfo>, Status> NewCatalog::GetDatabaseInfo(const String &db_name, NewTxn *new_txn) { return {nullptr, Status::OK()}; }
+
+String NewCatalog::GetPathNameTail(const String &path) {
+    SizeT delimiter_i = path.rfind('/');
+    if (delimiter_i == String::npos) {
+        return path;
+    }
+    return path.substr(delimiter_i + 1);
+}
 
 } // namespace infinity

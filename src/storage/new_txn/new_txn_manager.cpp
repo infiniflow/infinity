@@ -211,12 +211,12 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
         wait_conflict_ck_.erase(commit_ts); // rollback
     }
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
-        //        Vector<NewTxn *> txn_array;
-        //        do {
-        //            txn_array.push_back(wait_conflict_ck_.begin()->second);
-        //            wait_conflict_ck_.erase(wait_conflict_ck_.begin());
-        //        } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
-        //        wal_mgr_->SubmitTxn(txn_array);
+        Vector<NewTxn *> txn_array;
+        do {
+            txn_array.push_back(wait_conflict_ck_.begin()->second);
+            wait_conflict_ck_.erase(wait_conflict_ck_.begin());
+        } while (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr);
+        wal_mgr_->SubmitTxn(txn_array);
     }
 }
 
@@ -250,14 +250,16 @@ void NewTxnManager::Stop() {
 
 bool NewTxnManager::Stopped() { return !is_running_.load(); }
 
-TxnTimeStamp NewTxnManager::CommitTxn(NewTxn *txn) {
-    TxnTimeStamp commit_ts = txn->Commit();
-    if (txn->GetTxnType() == TransactionType::kCheckpoint) {
-        std::lock_guard guard(locker_);
-        ckp_begin_ts_ = UNCOMMIT_TS;
+Status NewTxnManager::CommitTxn(NewTxn *txn) {
+    Status status = txn->Commit();
+    if(status.ok()) {
+        if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+            std::lock_guard guard(locker_);
+            ckp_begin_ts_ = UNCOMMIT_TS;
+        }
+        this->CleanupTxn(txn, true);
     }
-    this->CleanupTxn(txn, true);
-    return commit_ts;
+    return status;
 }
 
 void NewTxnManager::RollBackTxn(NewTxn *txn) {

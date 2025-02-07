@@ -26,7 +26,11 @@ String KeyEncode::CatalogDbKey(const String &db_name, TxnTimeStamp ts, Transacti
 }
 
 String KeyEncode::CatalogDbCommentKey(const String &db_id, TxnTimeStamp ts, TransactionID txn_id) {
-    return fmt::format("db|{}|{}|{}", db_id, ts, txn_id);
+    return fmt::format("db|{}|comment|{}|{}", db_id, ts, txn_id);
+}
+
+String KeyEncode::CatalogDbDirKey(const String &db_id, TxnTimeStamp ts, TransactionID txn_id) {
+    return fmt::format("db|{}|dir|{}|{}", db_id, ts, txn_id);
 }
 
 String KeyEncode::CatalogDbKeyPrefix(const String &db_name) { return fmt::format("catalog|db|{}|", db_name); }
