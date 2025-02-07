@@ -258,24 +258,24 @@ Status Storage::AdminToWriter() {
     if (system_start_ts == 0) {
         // Init database, need to create default_db
         LOG_INFO(fmt::format("Init a new catalog"));
-        new_catalog_ = Catalog::NewCatalog();
+        catalog_ = Catalog::NewCatalog();
     }
 
     i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
     if (compact_interval > 0) {
         LOG_INFO(fmt::format("Init compaction alg"));
-        new_catalog_->InitCompactionAlg(system_start_ts);
+        catalog_->InitCompactionAlg(system_start_ts);
     } else {
         LOG_INFO(fmt::format("Skip init compaction alg"));
     }
 
-    BuiltinFunctions builtin_functions(new_catalog_);
+    BuiltinFunctions builtin_functions(catalog_);
     builtin_functions.Init();
     // Catalog finish init here.
     if (bg_processor_ != nullptr) {
         UnrecoverableError("Background processor was initialized before.");
     }
-    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
 
     // Construct txn manager
     if (txn_mgr_ != nullptr) {
@@ -294,7 +294,7 @@ Status Storage::AdminToWriter() {
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
-    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), catalog_.get(), txn_mgr_.get());
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
     bg_processor_->Start();
@@ -308,12 +308,12 @@ Status Storage::AdminToWriter() {
         UnrecoverableError("compact processor was initialized before.");
     }
 
-    compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
+    compact_processor_ = MakeUnique<CompactionProcessor>(catalog_.get(), txn_mgr_.get());
     compact_processor_->Start();
 
     // recover index after start compact process
-    new_catalog_->StartMemoryIndexCommit();
-    new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
+    catalog_->StartMemoryIndexCommit();
+    catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
     if (periodic_trigger_thread_ != nullptr) {
         UnrecoverableError("periodic trigger was initialized before.");
@@ -331,7 +331,7 @@ Status Storage::AdminToWriter() {
     periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
 
     periodic_trigger_thread_->cleanup_trigger_ =
-        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
     bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
     auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
@@ -366,7 +366,7 @@ Status Storage::UnInitFromReader() {
             bg_processor_.reset();
         }
 
-        new_catalog_.reset();
+        catalog_.reset();
 
         if (memory_index_tracer_ != nullptr) {
             memory_index_tracer_.reset();
@@ -448,7 +448,7 @@ Status Storage::ReaderToWriter() {
         UnrecoverableError("compact processor was initialized before.");
     }
 
-    compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
+    compact_processor_ = MakeUnique<CompactionProcessor>(catalog_.get(), txn_mgr_.get());
     compact_processor_->Start();
 
     periodic_trigger_thread_->Stop();
@@ -484,7 +484,7 @@ Status Storage::WriterToAdmin() {
         bg_processor_.reset();
     }
 
-    new_catalog_.reset();
+    catalog_.reset();
 
     memory_index_tracer_.reset();
 
@@ -538,7 +538,7 @@ Status Storage::WriterToReader() {
 
     periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
     periodic_trigger_thread_->cleanup_trigger_ =
-        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
     bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
     periodic_trigger_thread_->Start();
 
@@ -563,7 +563,7 @@ Status Storage::UnInitFromWriter() {
         bg_processor_.reset();
     }
 
-    new_catalog_.reset();
+    catalog_.reset();
 
     memory_index_tracer_.reset();
 
@@ -712,13 +712,13 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
         UnrecoverableError(fmt::format("Expect current storage mode is READER with Phase1"));
     }
 
-    BuiltinFunctions builtin_functions(new_catalog_);
+    BuiltinFunctions builtin_functions(catalog_);
     builtin_functions.Init();
     // Catalog finish init here.
     if (bg_processor_ != nullptr) {
         UnrecoverableError("Background processor was initialized before.");
     }
-    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
 
     // Construct txn manager
     if (txn_mgr_ != nullptr) {
@@ -733,11 +733,11 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
     }
-    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), new_catalog_.get(), txn_mgr_.get());
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), catalog_.get(), txn_mgr_.get());
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
-    new_catalog_->StartMemoryIndexCommit();
-    new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
+    catalog_->StartMemoryIndexCommit();
+    catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
     bg_processor_->Start();
 
@@ -748,7 +748,7 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
 
     i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
     periodic_trigger_thread_->cleanup_trigger_ =
-        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
     bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
     periodic_trigger_thread_->Start();
@@ -759,16 +759,16 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
 }
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
-    new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
+    catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
 void Storage::LoadFullCheckpoint(const String &checkpoint_path) {
-    if (new_catalog_.get() != nullptr) {
+    if (catalog_.get() != nullptr) {
         UnrecoverableError("Catalog was already initialized before.");
     }
-    new_catalog_ = Catalog::LoadFullCheckpoint(checkpoint_path);
+    catalog_ = Catalog::LoadFullCheckpoint(checkpoint_path);
 }
-void Storage::AttachDeltaCheckpoint(const String &checkpoint_path) { new_catalog_->AttachDeltaCheckpoint(checkpoint_path); }
+void Storage::AttachDeltaCheckpoint(const String &checkpoint_path) { catalog_->AttachDeltaCheckpoint(checkpoint_path); }
 
 void Storage::CreateDefaultDB() {
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);

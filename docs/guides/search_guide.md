@@ -91,7 +91,7 @@ Infinity supports the following syntax or full-text search expressions:
 - AND multiple terms
 - OR multiple terms
 - Phrase search
-- CARAT opertor
+- CARAT operator
 - Sloppy phrase search
 - Field-specific search
 - Escape character
@@ -164,7 +164,7 @@ Infinity supports real-time sparse vector search, which is based on a sparse vec
 
 Tensors work in scenarios where embeddings of all tokens of each document need to be preserved. Tensor is another form of multi-vector, but *not* the multi-vector mentioned in dense vector search. They share similarities but are different in several aspects:
 
-Multi-vectors are mainly used for dense vector search, while tensors are mainly used for tensor reranking. Tensor search is *not* recommended due to the potential for significant storage overhead when converting raw documents to tensors; tensors are more appropriate for reranking in a [hyprid search](#hybrid-search).
+Multi-vectors are mainly used for dense vector search, while tensors are mainly used for tensor reranking. Tensor search is *not* recommended due to the potential for significant storage overhead when converting raw documents to tensors; tensors are more appropriate for reranking in a [hybrid search](#hybrid-search).
 
 A multi-vector search remains a KNN search, where search results are aggregated using vector identifiers. In contrast, a tensor search uses 'Colxxx' models, such as ColBERT, ColPali, and ColQwen2. In this context, 'Col' denotes 'contextualized late interaction' and 'xxx' refers to specific models that can be added using a 'Col adapter'. Additionally, a tensor search uses the MaxSim method for similarity operations, which accumulates similarities of all embedding pairs between a query tensor and a document tensor.
 
@@ -209,4 +209,4 @@ Filters based on secondary index can have arbitrary logical combinations. Suppor
 
 ### Full-text index filters
 
-Infinity's full-text index supports conditional filtering through the `filter_fulltext` parameter. Full-text index filters are keyword-based and do not support the expressions available for secondary index filters. They use the `minimum_should_match` parameter to specify the minimum number of keywords that must be satisfied during fitlering.
+Infinity's full-text index supports conditional filtering through the `filter_fulltext` parameter. Full-text index filters are keyword-based and do not support the expressions available for secondary index filters. They use the `minimum_should_match` parameter to specify the minimum number of keywords that must be satisfied during filtering.

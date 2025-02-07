@@ -49,7 +49,7 @@ public:
 
     ~Storage();
 
-    [[nodiscard]] inline Catalog *catalog() noexcept { return new_catalog_.get(); }
+    [[nodiscard]] inline Catalog *catalog() noexcept { return catalog_.get(); }
 
     [[nodiscard]] inline BufferManager *buffer_manager() noexcept { return buffer_mgr_.get(); }
 
@@ -112,7 +112,7 @@ private:
     UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<ResultCacheManager> result_cache_manager_{};
     UniquePtr<BufferManager> buffer_mgr_{};
-    UniquePtr<Catalog> new_catalog_{};
+    UniquePtr<Catalog> catalog_{};
     UniquePtr<BGMemIndexTracer> memory_index_tracer_{};
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
