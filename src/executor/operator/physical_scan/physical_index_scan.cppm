@@ -64,7 +64,7 @@ public:
 
     ~PhysicalIndexScan() final = default;
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -84,8 +84,6 @@ public:
     inline String table_alias() const { return base_table_ref_->alias_; }
 
     inline u64 TableIndex() const { return base_table_ref_->table_index_; }
-
-    inline auto *TableEntry() const { return base_table_ref_->table_entry_ptr_; }
 
     inline auto &FilterExpression() const { return index_filter_; }
 

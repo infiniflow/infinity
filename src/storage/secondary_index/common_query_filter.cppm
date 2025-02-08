@@ -30,7 +30,7 @@ class Txn;
 struct TableIndexEntry;
 
 export struct CommonQueryFilter {
-    TxnTimeStamp begin_ts_;
+    Txn* txn_ptr_;
     SharedPtr<BaseExpression> original_filter_;
     SharedPtr<BaseTableRef> base_table_ref_;
     // input filter
@@ -62,13 +62,13 @@ export struct CommonQueryFilter {
     atomic_u32 end_task_num_ = 0;
 
 public:
-    CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, TxnTimeStamp begin_ts);
+    CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, Txn* txn);
 
     // 1. try to finish building the filter
     // 2. return true if the filter is available for query
     // if other threads are building the filter, the filter is not available for query
     // in this case, physical operator should return early and wait for next scheduling
-    bool TryFinishBuild(Txn *txn) {
+    bool TryFinishBuild() {
         if (finish_build_.test(std::memory_order_acquire)) {
             return true;
         }
@@ -81,7 +81,7 @@ public:
                 }
                 task_id = begin_task_num_++;
             }
-            BuildFilter(task_id, txn);
+            BuildFilter(task_id);
             if (++end_task_num_ == total_task_num_) {
                 finish_build_.test_and_set(std::memory_order_release);
                 break;
@@ -104,7 +104,7 @@ public:
 private:
     RowID EqualOrLarger(RowID doc_id);
 
-    void BuildFilter(u32 task_id, Txn *txn);
+    void BuildFilter(u32 task_id);
 
     // for PassFilter
     SegmentID current_segment_id_ = INVALID_SEGMENT_ID;

@@ -88,12 +88,10 @@ protected:
         for (SizeT segment_size : segment_sizes) {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"), TransactionType::kNormal);
 
-            auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
-            // table_entry->SetCompactionAlg(nullptr); // close auto compaction to test manual compaction
-            auto column_count = table_entry->ColumnCount();
+            auto [table_info, status] = txn->GetTableInfo("default_db", table_name);
+            auto column_count = table_info->column_count_;
 
-            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            auto [segment_entry, segment_status] = txn->MakeNewSegment("default_db", table_name);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
 
             while (segment_size > 0) {
@@ -113,7 +111,7 @@ protected:
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, 1, txn);
             }
-            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
+            PhysicalImport::SaveSegmentData(table_info.get(), txn, segment_entry);
             txn_mgr->CommitTxn(txn);
         }
     }
@@ -255,7 +253,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+        auto table_ref = BaseTableRef::FakeTableRef(txn, *db_name, *table_name);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
         auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
@@ -299,7 +297,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+        auto table_ref = BaseTableRef::FakeTableRef(txn, *db_name, *table_name);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
         auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
@@ -369,7 +367,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+        auto table_ref = BaseTableRef::FakeTableRef(txn, *db_name, *table_name);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
         auto [_, status3] = txn->CreateIndexPrepare(table_index_entry, table_ref.get(), false);
@@ -402,7 +400,7 @@ TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
 
-            auto append_status = txn->Append(table_entry, data_block);
+            auto append_status = txn->Append(*db_name, *table_name, data_block);
             ASSERT_TRUE(append_status.ok());
 
             txn_mgr->CommitTxn(txn);
@@ -482,7 +480,7 @@ TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
             }
             input_block->Finalize();
 
-            auto append_status = txn->Append(table_entry, input_block);
+            auto append_status = txn->Append(*db_name, *table_name, input_block);
             EXPECT_TRUE(append_status.ok());
             txn_mgr->CommitTxn(txn);
         };

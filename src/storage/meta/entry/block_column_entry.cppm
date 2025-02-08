@@ -30,6 +30,7 @@ import column_def;
 import value;
 import cleanup_scanner;
 import snapshot_info;
+import meta_info;
 
 namespace infinity {
 
@@ -69,6 +70,8 @@ public:
                                                                 BlockColumnSnapshotInfo *block_column_snapshot_info,
                                                                 TransactionID txn_id,
                                                                 TxnTimeStamp begin_ts);
+
+    SharedPtr<BlockColumnInfo> GetColumnInfo() const;
 
     SharedPtr<BlockColumnSnapshotInfo> GetSnapshotInfo() const;
 
@@ -134,7 +137,7 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+    Vector<String> GetFilePath(Txn* txn) const final;
 
     void DropColumn();
 

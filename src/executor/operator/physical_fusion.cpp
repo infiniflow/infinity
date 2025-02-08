@@ -46,7 +46,7 @@ import knn_expr;
 import match_tensor_expr;
 import txn;
 import buffer_manager;
-import table_entry;
+import meta_info;
 import column_def;
 import embedding_info;
 import block_index;
@@ -81,7 +81,7 @@ PhysicalFusion::PhysicalFusion(const u64 id,
 
 PhysicalFusion::~PhysicalFusion() {}
 
-void PhysicalFusion::Init() {
+void PhysicalFusion::Init(QueryContext* query_context) {
     {
         String &method = fusion_expr_->method_;
         String to_lower_method;
@@ -316,9 +316,9 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
                                         const Map<u64, Vector<UniquePtr<DataBlock>>> &input_data_blocks,
                                         Vector<UniquePtr<DataBlock>> &output_data_block_array) const {
     const BlockIndex *block_index = base_table_ref_->block_index_.get();
-    const TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+    const TableInfo *table_info = base_table_ref_->table_info_.get();
     const ColumnID column_id = fusion_expr_->match_tensor_expr_->column_expr_->binding().column_idx;
-    const ColumnDef *column_def = table_entry->GetColumnDefByIdx(column_id);
+    const ColumnDef *column_def = table_info->GetColumnDefByIdx(column_id);
     const DataType *column_data_type = column_def->type().get();
     switch (column_data_type->type()) {
         case LogicalType::kTensor:

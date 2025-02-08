@@ -43,6 +43,7 @@ import match_expression;
 import match_tensor_expression;
 import match_sparse_expression;
 import filter_fulltext_expression;
+import unnest_expression;
 import function;
 import aggregate_function;
 import aggregate_function_set;
@@ -83,7 +84,7 @@ import fusion_expr;
 import data_type;
 import expression_type;
 import catalog;
-import table_entry;
+import meta_info;
 import column_vector;
 
 namespace infinity {
@@ -120,7 +121,11 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &ex
             return BuildColExpr(static_cast<const ColumnExpr &>(expr), bind_context_ptr, depth, root);
         }
         case ParsedExprType::kFunction: {
-            return BuildFuncExpr(static_cast<const FunctionExpr &>(expr), bind_context_ptr, depth, root);
+            auto &func_expr = static_cast<const FunctionExpr &>(expr);
+            if (IsUnnestedFunction(func_expr.func_name_)) {
+                return BuildUnnestExpr(func_expr, bind_context_ptr, depth, root);
+            }
+            return BuildFuncExpr(func_expr, bind_context_ptr, depth, root);
         }
         case ParsedExprType::kSubquery: {
             // subquery expression
@@ -458,9 +463,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
                 ColumnExpr *col_expr = (ColumnExpr *)(*expr.arguments_)[0];
                 if (col_expr->star_) {
                     String &table_name = bind_context_ptr->table_names_[0];
-                    TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+                    TableInfo *table_info = bind_context_ptr->binding_by_name_[table_name]->table_info_.get();
                     col_expr->names_.clear();
-                    col_expr->names_.emplace_back(table_entry->GetColumnDefByID(0)->name_);
+                    col_expr->names_.emplace_back(table_info->GetColumnDefByID(0)->name_);
                 }
             }
         }
@@ -1025,6 +1030,74 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
     return nullptr;
 }
 
+SharedPtr<BaseExpression> ExpressionBinder::BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    if (depth > 0) {
+        RecoverableError(Status::SyntaxError("UNNEST() for correlated expression is not supported."));
+        return nullptr;
+    }
+
+    if (expr.arguments_->size() != 1) {
+        RecoverableError(Status::SyntaxError("UNNEST() requires a single argument."));
+        return nullptr;
+    }
+    if (expr.distinct_) {
+        RecoverableError(Status::SyntaxError("DISTINCT is not applicable to UNNEST()."));
+        return nullptr;
+    }
+    String expr_name = expr.GetName();
+    if (bind_context_ptr->group_index_by_name_.contains(expr_name)) {
+        i64 group_index = bind_context_ptr->group_index_by_name_[expr_name];
+        const SharedPtr<BaseExpression> &group_expr = bind_context_ptr->group_exprs_[group_index];
+
+        SharedPtr<ColumnExpression> col_expr = ColumnExpression::Make(group_expr->Type(),
+                                                                      bind_context_ptr->group_by_table_name_,
+                                                                      bind_context_ptr->group_by_table_index_,
+                                                                      expr_name,
+                                                                      group_index,
+                                                                      depth);
+        return col_expr;
+    }
+    if (bind_context_ptr->unnest_index_by_name_.contains(expr_name)) {
+        i64 unnest_index = bind_context_ptr->unnest_index_by_name_[expr_name];
+        const SharedPtr<BaseExpression> &unnest_expr = bind_context_ptr->unnest_exprs_[unnest_index];
+
+        SharedPtr<ColumnExpression> col_expr = ColumnExpression::Make(unnest_expr->Type(),
+                                                                      bind_context_ptr->unnest_table_name_,
+                                                                      bind_context_ptr->unnest_table_index_,
+                                                                      expr_name,
+                                                                      unnest_index,
+                                                                      depth);
+        return col_expr;
+    }
+
+    SharedPtr<BaseExpression> child_expr = ExpressionBinder::BuildExpression(*(*expr.arguments_)[0], bind_context_ptr, depth, root);
+    DataType return_type(LogicalType::kInvalid);
+    switch (child_expr->Type().type()) {
+        case LogicalType::kArray: {
+            auto *array_info = static_cast<ArrayInfo *>(child_expr->Type().type_info().get());
+            return_type = DataType(array_info->ElemType().type());
+            break;
+        }
+        default: {
+            RecoverableError(Status::SyntaxError("UNNEST() requires an array argument."));
+            return nullptr;
+        }
+    }
+
+    SharedPtr<BaseExpression> unnest_expr = MakeShared<UnnestExpression>(child_expr);
+
+    u64 table_index = bind_context_ptr->GenerateTableIndex();
+    String table_name = fmt::format("unnest{:d}", table_index);
+    bind_context_ptr->unnest_table_index_ = table_index;
+    bind_context_ptr->unnest_table_name_ = table_name;
+
+    bind_context_ptr->unnest_index_by_name_[expr_name] = bind_context_ptr->unnest_exprs_.size();
+    bind_context_ptr->unnest_exprs_.emplace_back(unnest_expr);
+
+    SharedPtr<ColumnExpression> col_expr = ColumnExpression::Make(return_type, table_name, table_index, expr_name, 0, depth);
+    return col_expr;
+}
+
 Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth) {
     auto [special_function_ptr, status] = Catalog::GetSpecialFunctionByNameNoExcept(query_context_->storage()->catalog(), expr.func_name_);
     if (status.ok()) {
@@ -1065,7 +1138,7 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         String &table_name = bind_context_ptr->table_names_[0];
         String column_name = special_function_ptr->name();
 
-        TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
+        TableInfo *table_info = bind_context_ptr->binding_by_name_[table_name]->table_info_.get();
         switch (special_function_ptr->special_type()) {
             case SpecialType::kCreateTs: {
                 return ColumnExpression::Make(special_function_ptr->data_type(),
@@ -1090,7 +1163,7 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
                                               table_name,
                                               bind_context_ptr->table_name2table_index_[table_name],
                                               column_name,
-                                              table_entry->ColumnCount() + special_function_ptr->extra_idx(),
+                                              table_info->column_count_ + special_function_ptr->extra_idx(),
                                               depth,
                                               special_function_ptr->special_type());
             }
@@ -1099,6 +1172,8 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         return None;
     }
 }
+
+bool ExpressionBinder::IsUnnestedFunction(const String &function_name) { return function_name == String("unnest"); }
 
 template <typename T, typename U>
 void FillConcatenatedTensorData(T *output_ptr, const Vector<U> &data_array, const u32 expect_dim) {

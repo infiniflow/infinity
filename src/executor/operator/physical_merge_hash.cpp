@@ -21,7 +21,7 @@ module physical_merge_hash;
 
 namespace infinity {
 
-void PhysicalMergeHash::Init() {}
+void PhysicalMergeHash::Init(QueryContext* query_context) {}
 
 bool PhysicalMergeHash::Execute(QueryContext *, OperatorState *) { return true; }
 

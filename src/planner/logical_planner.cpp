@@ -272,16 +272,17 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     }
     // Check schema and table in the catalog
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, status] = txn->GetTableByName(schema_name, table_name);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-    status = table_entry->AddWriteTxnNum(txn);
+    Status status = txn->AddWriteTxnNum(schema_name, table_name);
     if (!status.ok()) {
         RecoverableError(status);
     }
 
-    if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
+    auto [table_info, info_status] = txn->GetTableInfo(schema_name, table_name);
+    if (!info_status.ok()) {
+        RecoverableError(info_status);
+    }
+
+    if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {
         RecoverableError(Status::NotSupport("Currently, collection isn't supported."));
     }
 
@@ -323,14 +324,17 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             // use column names
             assert(insert_row.columns_.size() == src_value_list.size());
             const auto column_count = src_value_list.size();
-            SizeT table_column_count = table_entry->ColumnCount();
+            SizeT table_column_count = table_info->column_count_;
             // Create value list with table column size and null value
             Vector<SharedPtr<BaseExpression>> rewrite_value_list(table_column_count);
             Vector<bool> has_value(table_column_count, false);
             for (SizeT column_idx = 0; column_idx < column_count; ++column_idx) {
                 const auto &column_name = insert_row.columns_[column_idx];
-                const SharedPtr<ColumnDef> &column_def = table_entry->GetColumnDefByName(column_name);
-                SizeT table_column_idx = table_entry->GetColumnIdxByID(column_def->id());
+                const ColumnDef *column_def = table_info->GetColumnDefByName(column_name);
+                if (column_def == nullptr) {
+                    RecoverableError(Status::SyntaxError(fmt::format("INSERT: Column {} not found in table {}.", column_name, table_name)));
+                }
+                SizeT table_column_idx = table_info->GetColumnIdxByID(column_def->id());
                 const SharedPtr<DataType> &table_column_type = column_def->column_type_;
                 auto &src_value = src_value_list[column_idx];
                 auto &dst_value = rewrite_value_list[table_column_idx];
@@ -352,7 +356,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                 if (has_value[column_idx]) {
                     continue;
                 }
-                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
+                const ColumnDef *column_def = table_info->GetColumnDefByIdx(column_idx);
                 if (!column_def->has_default_value()) {
                     RecoverableError(Status::SyntaxError(fmt::format("INSERT: No default value found for column {}.", column_def->ToString())));
                 }
@@ -373,11 +377,11 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             dst_value_list = std::move(rewrite_value_list);
         } else {
             // append default values
-            const auto table_column_count = table_entry->ColumnCount();
+            SizeT table_column_count = table_info->column_count_;
             dst_value_list = std::move(src_value_list);
             dst_value_list.reserve(table_column_count);
             for (SizeT column_idx = dst_value_list.size(); column_idx < table_column_count; ++column_idx) {
-                auto column_def = table_entry->GetColumnDefByIdx(column_idx);
+                const ColumnDef *column_def = table_info->GetColumnDefByIdx(column_idx);
                 if (column_def->has_default_value()) {
                     auto value_expr =
                         bind_context_ptr->expression_binder_->BuildExpression(*column_def->default_expr_.get(), bind_context_ptr.get(), 0, true);
@@ -389,7 +393,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
             assert(dst_value_list.size() == table_column_count);
             for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
                 auto &dst_value = dst_value_list[column_idx];
-                const SharedPtr<DataType> &table_column_type = table_entry->GetColumnDefByIdx(column_idx)->column_type_;
+                const SharedPtr<DataType> &table_column_type = table_info->GetColumnDefByIdx(column_idx)->column_type_;
                 DataType value_type = dst_value->Type();
                 if (*table_column_type != value_type && LogicalInsert::NeedCastInInsert(value_type, *table_column_type)) {
                     // need cast
@@ -403,7 +407,7 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
 
     // Create logical insert node.
     auto logical_insert = MakeShared<LogicalInsert>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                    table_entry,
+                                                    table_info,
                                                     bind_context_ptr->GenerateTableIndex(),
                                                     std::move(value_list_array));
 
@@ -748,14 +752,20 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     SharedPtr<String> index_name = MakeShared<String>(std::move(create_index_info->index_name_));
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
-    TableEntry *table_entry = base_table_ref->table_entry_ptr_;
+
+    auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
     {
-        TableEntry::TableStatus status;
-        if (!table_entry->SetCreatingIndex(status, txn)) {
-            RecoverableError(Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(status))));
+        TableEntry::TableStatus table_status;
+        if (!table_entry->SetCreatingIndex(table_status, txn)) {
+            RecoverableError(
+                Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(table_status))));
         }
     }
-    auto status = table_entry->AddWriteTxnNum(txn);
+    status = table_entry->AddWriteTxnNum(txn);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1012,9 +1022,9 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
     Txn *txn = query_context_ptr_->GetTxn();
 
-    auto [table_entry, stat] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (!stat.ok()) {
-        RecoverableError(stat);
+    auto [table_info, info_status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
+    if (!info_status.ok()) {
+        RecoverableError(info_status);
     }
 
     Vector<u64> column_idx_array;
@@ -1039,7 +1049,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                     SizeT name_count = column_expr->names_.size();
                     switch (name_count) {
                         case 1: {
-                            u64 column_idx = table_entry->GetColumnIdByName(column_expr->names_[0]);
+                            u64 column_idx = table_info->GetColumnIdByName(column_expr->names_[0]);
                             column_idx_array.emplace_back(column_idx);
                             break;
                         }
@@ -1048,7 +1058,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                                 Status status = Status::InvalidTableName(column_expr->names_[0]);
                                 RecoverableError(status);
                             }
-                            u64 column_idx = table_entry->GetColumnIdByName(column_expr->names_[1]);
+                            u64 column_idx = table_info->GetColumnIdByName(column_expr->names_[1]);
                             column_idx_array.emplace_back(column_idx);
                             break;
                         }
@@ -1061,7 +1071,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                                 Status status = Status::InvalidTableName(column_expr->names_[1]);
                                 RecoverableError(status);
                             }
-                            u64 column_idx = table_entry->GetColumnIdByName(column_expr->names_[2]);
+                            u64 column_idx = table_info->GetColumnIdByName(column_expr->names_[2]);
                             column_idx_array.emplace_back(column_idx);
                             break;
                         }
@@ -1122,7 +1132,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                 RecoverableError(status);
             }
 
-            const ColumnDef *column_def = table_entry->GetColumnDefByIdx(column_idx_array[0]);
+            const ColumnDef *column_def = table_info->GetColumnDefByIdx(column_idx_array[0]);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 Status status = Status::NotSupport(
                     fmt::format("Attempt to export column: {} with type: {} as FVECS file", column_def->name(), column_def->type()->ToString()));
@@ -1131,10 +1141,10 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
         }
     }
 
-    SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn);
+    SharedPtr<BlockIndex> block_index = txn->GetBlockIndexFromTable(statement->schema_name_, statement->table_name_);
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                      table_entry,
+                                                                      table_info,
                                                                       statement->schema_name_,
                                                                       statement->table_name_,
                                                                       statement->file_path_,
@@ -1154,11 +1164,11 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Check the table existence
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    auto [table_info, status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
     if (!status.ok()) {
         RecoverableError(status);
     }
-    status = table_entry->AddWriteTxnNum(txn);
+    status = txn->AddWriteTxnNum(statement->schema_name_, statement->table_name_);
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -1170,7 +1180,7 @@ Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<Bin
     }
 
     SharedPtr<LogicalNode> logical_import = MakeShared<LogicalImport>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                      table_entry,
+                                                                      table_info,
                                                                       statement->file_path_,
                                                                       statement->header_,
                                                                       statement->delimiter_,
@@ -1185,16 +1195,21 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
         statement->schema_name_ = query_context_ptr_->schema_name();
     }
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
+    auto [table_entry, entry_status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+    if (!entry_status.ok()) {
+        RecoverableError(entry_status);
+    }
+
+    auto [table_info, info_status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
+    if (!info_status.ok()) {
+        RecoverableError(info_status);
     }
 
     switch (statement->type_) {
         case AlterStatementType::kRenameTable: {
             auto *rename_table_statement = static_cast<RenameTableStatement *>(statement);
             this->logical_plan_ = MakeShared<LogicalRenameTable>(bind_context_ptr->GetNewLogicalNodeId(),
-                                                                 table_entry,
+                                                                 table_info,
                                                                  std::move(rename_table_statement->new_table_name_));
             break;
         }
@@ -1218,7 +1233,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                     RecoverableError(Status::DuplicateColumnName(column_def->name()));
                 }
             }
-            this->logical_plan_ = MakeShared<LogicalAddColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_entry, std::move(column_defs));
+            this->logical_plan_ = MakeShared<LogicalAddColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_info, std::move(column_defs));
             break;
         }
         case AlterStatementType::kDropColumns: {
@@ -1230,7 +1245,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                     RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
                 }
             }
-            this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_entry, std::move(column_names));
+            this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_info, std::move(column_names));
             break;
         }
         default: {
@@ -1245,7 +1260,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
-            auto [db_entry, status] = txn->GetDatabase(use_command_info->db_name());
+            Status status = txn->GetDatabase(use_command_info->db_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
                     MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
@@ -1317,7 +1332,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, S
             if (unlock_table->db_name().empty()) {
                 unlock_table->SetDBName(query_context_ptr_->schema_name());
             }
-            auto [table_entry, status] = txn->GetTableByName(unlock_table->db_name(), unlock_table->table_name());
+            Status status = txn->CheckTableExist(unlock_table->db_name(), unlock_table->table_name());
             if (!status.ok()) {
                 return status;
             }

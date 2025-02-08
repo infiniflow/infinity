@@ -255,7 +255,7 @@ QueryResult Infinity::Compact(const String &db_name, const String &table_name) {
     GET_QUERY_CONTEXT(GetQueryContext(), query_context_ptr);
     auto compact_statement = MakeUnique<ManualCompactStatement>(db_name, table_name);
 
-    ToLower(compact_statement->schema_name_);
+    ToLower(compact_statement->db_name_);
     ToLower(compact_statement->table_name_);
 
     QueryResult result = query_context_ptr->QueryStatement(compact_statement.get());

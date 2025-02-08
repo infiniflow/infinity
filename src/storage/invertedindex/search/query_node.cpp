@@ -6,7 +6,7 @@
 import stl;
 import third_party;
 import status;
-import table_entry;
+import meta_info;
 import column_index_reader;
 import posting_iterator;
 import index_defines;
@@ -412,7 +412,7 @@ std::unique_ptr<QueryNode> KeywordQueryNode::InnerGetNewOptimizedQueryTree() {
 
 // create search iterator
 std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
-    ColumnID column_id = params.table_entry->GetColumnIdByName(column_);
+    ColumnID column_id = params.table_info->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
     if (!column_index_reader) {
         RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
@@ -437,7 +437,7 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const CreateSearchParam
 }
 
 std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
-    ColumnID column_id = params.table_entry->GetColumnIdByName(column_);
+    ColumnID column_id = params.table_info->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
     if (!column_index_reader) {
         RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));
@@ -456,7 +456,7 @@ std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSear
 }
 
 std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const CreateSearchParams params, bool) const {
-    ColumnID column_id = params.table_entry->GetColumnIdByName(column_);
+    ColumnID column_id = params.table_info->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = params.index_reader->GetColumnIndexReader(column_id, params.index_names_);
     if (!column_index_reader) {
         RecoverableError(Status::SyntaxError(fmt::format(R"(Invalid query statement: Column "{}" has no fulltext index)", column_)));

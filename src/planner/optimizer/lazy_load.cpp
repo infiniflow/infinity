@@ -84,6 +84,17 @@ void RefencecColumnCollection::VisitNode(LogicalNode &op) {
     }
     VisitNodeChildren(op);
     VisitNodeExpression(op);
+    switch (op.operator_type()) {
+        case LogicalNodeType::kUnnest: {
+            auto &unnest = static_cast<LogicalUnnest &>(op);
+            auto removed_bindings = unnest.RemoveColumnBindings();
+            unloaded_bindings_.insert(removed_bindings.begin(), removed_bindings.end());
+            break;
+        }
+        default: {
+            break;
+        }
+    }
 
     op.set_load_metas(MakeShared<Vector<LoadMeta>>(std::move(load_metas_)));
     load_metas_.clear();

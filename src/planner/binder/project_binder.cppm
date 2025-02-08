@@ -44,10 +44,7 @@ public:
 
     [[nodiscard]] const String &BoundColumn() const { return bound_column_name_; }
 
-private:
-    SharedPtr<BaseExpression> BindUnnest(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
-
-    static bool IsUnnestedFunction(const String &function_name);
+    SharedPtr<BaseExpression> BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) final;
 
 private:
     bool binding_agg_func_ = false;

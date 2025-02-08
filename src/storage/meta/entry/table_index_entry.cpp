@@ -379,7 +379,7 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *seg
 
 Tuple<Vector<SegmentIndexEntry *>, Status>
 TableIndexEntry::CreateIndexPrepare(BaseTableRef *table_ref, Txn *txn, bool prepare, bool is_replay, bool check_ts) {
-    TableEntry *table_entry = table_ref->table_entry_ptr_;
+    TableEntry *table_entry = table_index_meta()->GetTableEntry();
     TxnStore *txn_store = txn->txn_store();
     TxnTableStore *txn_table_store = txn_store->GetTxnTableStore(table_entry);
 
@@ -472,13 +472,13 @@ void TableIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> TableIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+Vector<String> TableIndexEntry::GetFilePath(Txn* txn) const {
     std::shared_lock lock(rw_locker_);
     Vector<String> res;
     res.reserve(index_by_segment_.size());
     for (const auto &index_pair : index_by_segment_) {
         const SegmentIndexEntry *segment_index_entry = index_pair.second.get();
-        Vector<String> segment_files = segment_index_entry->GetFilePath(txn_id, begin_ts);
+        Vector<String> segment_files = segment_index_entry->GetFilePath(txn);
         res.insert(res.end(), segment_files.begin(), segment_files.end());
     }
     return res;
@@ -594,6 +594,21 @@ SharedPtr<TableIndexSnapshotInfo> TableIndexEntry::GetSnapshotInfo(Txn *txn_ptr)
         snapshot_info->index_by_segment_.emplace(segment_id, segment_index_entry->GetSnapshotInfo(txn_ptr));
     }
     return snapshot_info;
+}
+
+SharedPtr<TableIndexInfo> TableIndexEntry::GetTableIndexInfo(Txn *txn_ptr) {
+    std::shared_lock lock(rw_locker_);
+    SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
+    table_index_info->index_name_ = index_base_->index_name_;
+    table_index_info->index_entry_dir_ = index_dir_;
+    table_index_info->segment_index_count_ = index_by_segment_.size();
+
+    table_index_info->index_comment_ = MakeShared<String>(*index_base_->index_comment_);
+    table_index_info->index_type_ = MakeShared<String>(IndexInfo::IndexTypeToString(index_base_->index_type_));
+    table_index_info->index_other_params_ = MakeShared<String>(index_base_->BuildOtherParamsString());
+    table_index_info->index_column_names_ = MakeShared<String>(column_def_->name_);
+    table_index_info->index_column_ids_ = MakeShared<String>(std::to_string(column_def_->id_));
+    return table_index_info;
 }
 
 } // namespace infinity

@@ -362,7 +362,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
     //        query_context_ptr_->set_max_node_id(logical_operator->node_id());
     //    }
     // Initialize the physical plan node
-    result->Init();
+    result->Init(query_context_ptr_);
 
     return result;
 }
@@ -381,8 +381,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateTable(const SharedPtr<Lo
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildCreateIndex(const SharedPtr<LogicalNode> &logical_operator) const {
     auto logical_create_index = static_pointer_cast<LogicalCreateIndex>(logical_operator);
-    SharedPtr<String> schema_name = logical_create_index->base_table_ref()->schema_name();
-    SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_name();
+    SharedPtr<String> schema_name = logical_create_index->base_table_ref()->table_info_->db_name_;
+    SharedPtr<String> table_name = logical_create_index->base_table_ref()->table_info_->table_name_;
     const auto &index_def_ptr = logical_create_index->index_definition();
     if (index_def_ptr->index_type_ != IndexType::kHnsw) {
         // TODO: support other index types build in parallel.
@@ -517,7 +517,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildInsert(const SharedPtr<Logical
 
     SharedPtr<LogicalInsert> logical_insert_ptr = dynamic_pointer_cast<LogicalInsert>(logical_operator);
     return MakeUnique<PhysicalInsert>(logical_operator->node_id(),
-                                      logical_insert_ptr->table_entry(),
+                                      logical_insert_ptr->table_info(),
                                       logical_insert_ptr->table_index(),
                                       logical_insert_ptr->value_list(),
                                       logical_operator->load_metas());
@@ -537,7 +537,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildDelete(const SharedPtr<Logical
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
     auto physical_delete = MakeUnique<PhysicalDelete>(logical_operator->node_id(),
                                                       std::move(input_physical_operator),
-                                                      logical_delete->table_entry_ptr_,
+                                                      logical_delete->table_info_,
                                                       logical_operator->load_metas());
     return physical_delete;
 }
@@ -556,7 +556,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<Logical
     auto input_physical_operator = BuildPhysicalOperator(input_logical_node);
     auto physical_update = MakeUnique<PhysicalUpdate>(logical_operator->node_id(),
                                                       std::move(input_physical_operator),
-                                                      logical_update->table_entry_ptr_,
+                                                      logical_update->table_info_,
                                                       logical_update->update_columns_,
                                                       logical_update->all_columns_in_table_,
                                                       logical_update->final_result_columns_,
@@ -567,7 +567,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildUpdate(const SharedPtr<Logical
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildImport(const SharedPtr<LogicalNode> &logical_operator) const {
     LogicalImport *logical_import = (LogicalImport *)(logical_operator.get());
     return MakeUnique<PhysicalImport>(logical_operator->node_id(),
-                                      logical_import->table_entry(),
+                                      logical_import->table_info(),
                                       logical_import->file_path(),
                                       logical_import->header(),
                                       logical_import->delimiter(),
@@ -578,7 +578,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildImport(const SharedPtr<Logical
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExport(const SharedPtr<LogicalNode> &logical_operator) const {
     LogicalExport *logical_export = (LogicalExport *)(logical_operator.get());
     return MakeUnique<PhysicalExport>(logical_export->node_id(),
-                                      logical_export->table_entry(),
+                                      logical_export->table_info(),
                                       logical_export->schema_name(),
                                       logical_export->table_name(),
                                       logical_export->file_path(),
@@ -598,7 +598,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
     switch (logical_alter->type_) {
         case AlterStatementType::kRenameTable: {
             auto *logical_rename_table = static_cast<LogicalRenameTable *>(logical_alter);
-            return MakeUnique<PhysicalRenameTable>(logical_rename_table->table_entry_,
+            return MakeUnique<PhysicalRenameTable>(logical_rename_table->table_info_,
                                                    std::move(logical_rename_table->new_table_name_),
                                                    logical_operator->GetOutputNames(),
                                                    logical_operator->GetOutputTypes(),
@@ -607,7 +607,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
         }
         case AlterStatementType::kAddColumns: {
             auto *logical_add_columns = static_cast<LogicalAddColumns *>(logical_alter);
-            return MakeUnique<PhysicalAddColumns>(logical_add_columns->table_entry_,
+            return MakeUnique<PhysicalAddColumns>(logical_add_columns->table_info_,
                                                   logical_add_columns->column_defs_,
                                                   logical_operator->GetOutputNames(),
                                                   logical_operator->GetOutputTypes(),
@@ -616,7 +616,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildAlter(const SharedPtr<LogicalN
         }
         case AlterStatementType::kDropColumns: {
             auto *logical_drop_columns = static_cast<LogicalDropColumns *>(logical_alter);
-            return MakeUnique<PhysicalDropColumns>(logical_drop_columns->table_entry_,
+            return MakeUnique<PhysicalDropColumns>(logical_drop_columns->table_info_,
                                                    logical_drop_columns->column_names_,
                                                    logical_operator->GetOutputNames(),
                                                    logical_operator->GetOutputTypes(),

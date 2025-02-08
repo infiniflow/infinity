@@ -24,7 +24,7 @@ import logical_node;
 import base_expression;
 import match_expression;
 import base_table_ref;
-import table_entry;
+import meta_info;
 import internal_types;
 import data_type;
 import common_query_filter;
@@ -45,7 +45,7 @@ public:
 
     [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
-    [[nodiscard]] TableEntry *table_collection_ptr() const;
+    [[nodiscard]] TableInfo *table_info() const;
 
     [[nodiscard]] String TableAlias() const;
 
@@ -58,7 +58,7 @@ public:
     SharedPtr<BaseTableRef> base_table_ref_{};
     SharedPtr<MatchExpression> match_expr_{};
     SharedPtr<BaseExpression> filter_expression_{};
-    IndexReader index_reader_;
+    SharedPtr<IndexReader> index_reader_;
     UniquePtr<QueryNode> query_tree_;
     float begin_threshold_;
     EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kAuto};

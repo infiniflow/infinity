@@ -2468,6 +2468,85 @@ void ColumnVector::SetArrayValue(ArrayT &target, const Value &value) {
     SetArrayValueRecursively(value, reinterpret_cast<char *>(&target));
 }
 
+bool ColumnVector::AppendUnnestArray(const ColumnVector &other, SizeT offset, SizeT &array_offset) {
+    if(other.data_type_->type() != LogicalType::kArray) {
+        UnrecoverableError("Attempt to unnest non-array column vector");
+    }
+    auto *array_info = static_cast<ArrayInfo *>(other.data_type_->type_info().get());
+    if (array_info->ElemType() != *data_type_) {
+        UnrecoverableError("Attempt to unnest array with different element type");
+    }
+
+    ArrayT &array_val = reinterpret_cast<ArrayT *>(other.data_ptr_)[offset];
+    const auto &[span_data, array_size] = other.GetArray(array_val, other.buffer_.get(), array_info);
+    const auto *raw_data = span_data.data();
+
+    SizeT array_off = array_offset;
+    SizeT available_space = capacity_ - tail_index_;
+    array_offset = std::min(array_size, available_space);
+    bool complete = false;
+    if (array_offset == array_val.element_num_) {
+        complete = true;
+    }
+    switch (array_info->ElemType().type()) {
+        case LogicalType::kTinyInt: {
+            auto *array_data = reinterpret_cast<const TinyIntT *>(raw_data);
+            for (SizeT i = array_off; i < array_offset; ++i) {
+                AppendByPtr(reinterpret_cast<const_ptr_t>(&array_data[i]));
+            }
+            break;
+        }
+        case LogicalType::kSmallInt: {
+            auto *array_data = reinterpret_cast<const SmallIntT *>(raw_data);
+            for (SizeT i = array_off; i < array_offset; ++i) {
+                AppendByPtr(reinterpret_cast<const_ptr_t>(&array_data[i]));
+            }
+            break;
+        }
+        case LogicalType::kInteger: {
+            auto *array_data = reinterpret_cast<const IntegerT *>(raw_data);
+            for (SizeT i = array_off; i < array_offset; ++i) {
+                AppendByPtr(reinterpret_cast<const_ptr_t>(&array_data[i]));
+            }
+            break;
+        }
+        case LogicalType::kBigInt: {
+            auto *array_data = reinterpret_cast<const BigIntT *>(raw_data);
+            for (SizeT i = array_off; i < array_offset; ++i) {
+                AppendByPtr(reinterpret_cast<const_ptr_t>(&array_data[i]));
+            }
+            break;
+        }
+        case LogicalType::kFloat: {
+            auto *array_data = reinterpret_cast<const FloatT *>(raw_data);
+            for (SizeT i = array_off; i < array_offset; ++i) {
+                AppendByPtr(reinterpret_cast<const_ptr_t>(&array_data[i]));
+            }
+            break;
+        }
+        case LogicalType::kDouble: {
+            auto *array_data = reinterpret_cast<const DoubleT *>(raw_data);
+            for (SizeT i = array_off; i < array_offset; ++i) {
+                AppendByPtr(reinterpret_cast<const_ptr_t>(&array_data[i]));
+            }
+            break;
+        }
+        case LogicalType::kVarchar: {
+            auto *array_data = reinterpret_cast<const VarcharT *>(raw_data);
+            for (SizeT i = array_off; i < array_offset; ++i) {
+                const auto &data = GetVarcharInner(array_data[i]);
+                AppendVarchar(data);
+            }
+            break;
+        }
+        default: {
+            RecoverableError(Status::NotSupport("Not implemented"));
+        }
+    }
+    return complete;
+}
+
+
 //////////////////////////////tensor end////////////////////////////////////
 
 void ColumnVector::AppendSparseRaw(const char *raw_data_ptr, const char *raw_index_ptr, SizeT nnz, SizeT dst_off) {

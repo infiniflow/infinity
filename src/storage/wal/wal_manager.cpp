@@ -62,6 +62,7 @@ import admin_statement;
 import cleanup_scanner;
 import global_resource_usage;
 import txn_state;
+import meta_info;
 
 module wal_manager;
 
@@ -1317,7 +1318,9 @@ void WalManager::WalCmdCreateIndexReplay(const WalCmdCreateIndex &cmd, Transacti
         begin_ts);
 
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), txn_id, commit_ts, TransactionType::kNormal);
-    auto base_table_ref = MakeShared<BaseTableRef>(table_entry, table_entry->GetBlockIndex(fake_txn.get()));
+
+    SharedPtr<TableInfo> table_info = table_entry->GetTableInfo(fake_txn.get());
+    auto base_table_ref = MakeShared<BaseTableRef>(table_info, table_entry->GetBlockIndex(fake_txn.get()));
     table_index_entry->CreateIndexPrepare(base_table_ref.get(), fake_txn.get(), false, true);
 
     auto *txn_store = fake_txn->GetTxnTableStore(table_entry);

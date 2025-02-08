@@ -5432,13 +5432,12 @@ class ShowIndexResponse(object):
      - index_column_ids
      - other_parameters
      - store_dir
-     - store_size
      - segment_index_count
 
     """
 
 
-    def __init__(self, error_code=None, error_msg=None, db_name=None, table_name=None, index_name=None, index_comment=None, index_type=None, index_column_names=None, index_column_ids=None, other_parameters=None, store_dir=None, store_size=None, segment_index_count=None,):
+    def __init__(self, error_code=None, error_msg=None, db_name=None, table_name=None, index_name=None, index_comment=None, index_type=None, index_column_names=None, index_column_ids=None, other_parameters=None, store_dir=None, segment_index_count=None,):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_name = db_name
@@ -5450,7 +5449,6 @@ class ShowIndexResponse(object):
         self.index_column_ids = index_column_ids
         self.other_parameters = other_parameters
         self.store_dir = store_dir
-        self.store_size = store_size
         self.segment_index_count = segment_index_count
 
     def read(self, iprot):
@@ -5519,11 +5517,6 @@ class ShowIndexResponse(object):
                     iprot.skip(ftype)
             elif fid == 12:
                 if ftype == TType.STRING:
-                    self.store_size = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 13:
-                if ftype == TType.STRING:
                     self.segment_index_count = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
                 else:
                     iprot.skip(ftype)
@@ -5581,12 +5574,8 @@ class ShowIndexResponse(object):
             oprot.writeFieldBegin('store_dir', TType.STRING, 11)
             oprot.writeString(self.store_dir.encode('utf-8') if sys.version_info[0] == 2 else self.store_dir)
             oprot.writeFieldEnd()
-        if self.store_size is not None:
-            oprot.writeFieldBegin('store_size', TType.STRING, 12)
-            oprot.writeString(self.store_size.encode('utf-8') if sys.version_info[0] == 2 else self.store_size)
-            oprot.writeFieldEnd()
         if self.segment_index_count is not None:
-            oprot.writeFieldBegin('segment_index_count', TType.STRING, 13)
+            oprot.writeFieldBegin('segment_index_count', TType.STRING, 12)
             oprot.writeString(self.segment_index_count.encode('utf-8') if sys.version_info[0] == 2 else self.segment_index_count)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -9469,8 +9458,7 @@ ShowIndexResponse.thrift_spec = (
     (9, TType.STRING, 'index_column_ids', 'UTF8', None, ),  # 9
     (10, TType.STRING, 'other_parameters', 'UTF8', None, ),  # 10
     (11, TType.STRING, 'store_dir', 'UTF8', None, ),  # 11
-    (12, TType.STRING, 'store_size', 'UTF8', None, ),  # 12
-    (13, TType.STRING, 'segment_index_count', 'UTF8', None, ),  # 13
+    (12, TType.STRING, 'segment_index_count', 'UTF8', None, ),  # 12
 )
 all_structs.append(OptimizeRequest)
 OptimizeRequest.thrift_spec = (

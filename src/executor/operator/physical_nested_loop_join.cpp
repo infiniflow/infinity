@@ -24,7 +24,7 @@ module physical_nested_loop_join;
 
 namespace infinity {
 
-void PhysicalNestedLoopJoin::Init() {}
+void PhysicalNestedLoopJoin::Init(QueryContext* query_context) {}
 
 bool PhysicalNestedLoopJoin::Execute(QueryContext *, OperatorState *) { return true; }
 

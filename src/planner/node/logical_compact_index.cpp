@@ -48,8 +48,8 @@ String LogicalCompactIndex::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
     ss << String(space, ' ') << arrow_str << "COMPACT INDEX";
-    auto *table_entry = base_table_ref_->table_entry_ptr_;
-    ss << *table_entry->GetDBName() << "." << *table_entry->GetTableName();
+    auto *table_info = base_table_ref_->table_info_.get();
+    ss << *table_info->db_name_ << "." << *table_info->table_name_;
     space += arrow_str.size();
     return ss.str();
 }

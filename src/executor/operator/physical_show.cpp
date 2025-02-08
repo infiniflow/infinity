@@ -90,7 +90,7 @@ import command_statement;
 
 namespace infinity {
 
-void PhysicalShow::Init() {
+void PhysicalShow::Init(QueryContext *query_context) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
@@ -794,6 +794,7 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     auto [database_info, status] = txn->GetDatabaseInfo(db_name_);
 
     if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
         RecoverableError(status);
         return;
     }
@@ -1022,12 +1023,7 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
 
     auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, *object_name_, index_name_.value());
     if (!status.ok()) {
-        RecoverableError(status);
-        return;
-    }
-
-    auto [table_index_entry, index_status] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
-    if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
         RecoverableError(status);
         return;
     }
@@ -1179,37 +1175,37 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("storage_size");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
-            String index_size_str;
-            if (query_context->persistence_manager() == nullptr) {
-                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
-            } else {
-                Vector<String> paths = table_index_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
-                SizeT index_size = 0;
-                for (const String &path : paths) {
-                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
-                    if (!status.ok()) {
-                        RecoverableError(status);
-                    }
-                    index_size += file_size;
-                }
-                index_size_str = Utility::FormatByteSize(index_size);
-            }
-            Value value = Value::MakeVarchar(index_size_str);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
+//    {
+//        SizeT column_id = 0;
+//        {
+//            Value value = Value::MakeVarchar("storage_size");
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//        }
+//
+//        ++column_id;
+//        {
+//            const String table_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *table_index_info->index_entry_dir_);
+//            String index_size_str;
+//            if (query_context->persistence_manager() == nullptr) {
+//                index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(table_dir));
+//            } else {
+//                const Vector<String> &paths = table_index_info->files_;
+//                SizeT index_size = 0;
+//                for (const String &path : paths) {
+//                    auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
+//                    if (!status.ok()) {
+//                        RecoverableError(status);
+//                    }
+//                    index_size += file_size;
+//                }
+//                index_size_str = Utility::FormatByteSize(index_size);
+//            }
+//            Value value = Value::MakeVarchar(index_size_str);
+//            ValueExpression value_expr(value);
+//            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+//        }
+//    }
 
     {
         SizeT column_id = 0;
@@ -1238,26 +1234,13 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     // Get tables from catalog
     Txn *txn = query_context->GetTxn();
 
-    auto [table_entry, status1] = txn->GetTableByName(db_name_, *object_name_);
-    if (!status1.ok()) {
-        RecoverableError(status1);
+    auto [segment_index_info, status] = txn->GetSegmentIndexInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value());
+    if (!status.ok()) {
+        show_operator_state->status_ = status.clone();
+        RecoverableError(status);
         return;
     }
 
-    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
-    if (!status2.ok()) {
-        RecoverableError(status2);
-        return;
-    }
-
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> segment_map = table_index_entry->GetIndexBySegmentSnapshot(table_entry, txn);
-    auto iter = segment_map.find(segment_id_.value());
-    if (iter == segment_map.end()) {
-        show_operator_state->status_ = Status::SegmentNotExist(segment_id_.value());
-        RecoverableError(show_operator_state->status_);
-    }
-
-    SegmentIndexEntry *segment_index_entry = iter->second.get();
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
@@ -1280,7 +1263,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         }
     }
 
-    String full_segment_index_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_index_entry->index_dir();
+    String full_segment_index_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_index_info->index_dir_;
     {
         SizeT column_id = 0;
         {
@@ -1311,7 +1294,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
             if (query_context->persistence_manager() == nullptr) {
                 index_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_index_dir));
             } else {
-                Vector<String> paths = segment_index_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                Vector<String> &paths = segment_index_info->files_;
                 SizeT index_segment_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -1339,44 +1322,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
         ++column_id;
         {
-            IndexBase *index_base = table_index_entry->table_index_def().get();
-            String index_type_name = IndexInfo::IndexTypeToString(index_base->index_type_);
-
-            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            switch (index_base->index_type_) {
-                case IndexType::kIVF: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetIVFIndexSnapshot());
-                    break;
-                }
-                case IndexType::kHnsw: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetHnswIndexSnapshot());
-                    break;
-                }
-                case IndexType::kFullText: {
-                    SharedPtr<MemoryIndexer> memory_indexer;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, memory_indexer, query_context->GetTxn());
-                    break;
-                }
-                case IndexType::kSecondary: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetSecondaryIndexSnapshot());
-                    break;
-                }
-                case IndexType::kEMVB: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetEMVBIndexSnapshot());
-                    break;
-                }
-                case IndexType::kBMP: {
-                    chunk_index_entries = std::get<0>(segment_index_entry->GetBMPIndexSnapshot());
-                    break;
-                }
-                case IndexType::kDiskAnn:
-                case IndexType::kInvalid: {
-                    Status status3 = Status::InvalidIndexName(index_type_name);
-                    RecoverableError(status3);
-                    break;
-                }
-            }
-            Value value = Value::MakeVarchar(std::to_string(chunk_index_entries.size()));
+            Value value = Value::MakeVarchar(std::to_string(segment_index_info->chunk_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1914,7 +1860,7 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [table_info, status] = txn->GetTableInfo(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -1934,14 +1880,14 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
-    SizeT column_count = table_entry->ColumnCount();
+    SizeT column_count = table_info->column_count_;
     for (SizeT input_column_id = 0; input_column_id < column_count; ++input_column_id) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
         }
 
-        const ColumnDef *column = table_entry->GetColumnDefByIdx(input_column_id);
+        const ColumnDef *column = table_info->GetColumnDefByIdx(input_column_id);
 
         SizeT output_column_idx = 0;
         {
@@ -1994,7 +1940,7 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
 
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [segment_info_list, status] = txn->GetSegmentsInfo(db_name_, *object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2012,7 +1958,7 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
-    for (auto &[_, segment_entry] : table_entry->segment_map()) {
+    for (auto &segment_info : segment_info_list) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -2020,14 +1966,14 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         SizeT column_id = 0;
         {
-            Value value = Value::MakeBigInt(segment_entry->segment_id());
+            Value value = Value::MakeBigInt(segment_info->segment_id_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_entry->status()));
+            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_info->status_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2035,11 +1981,11 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
         ++column_id;
         {
             String segment_size_str;
-            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_entry->segment_dir();
+            String full_segment_dir = Path(InfinityContext::instance().config()->DataDir()) / *segment_info->segment_dir_;
             if (query_context->persistence_manager() == nullptr) {
                 segment_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_segment_dir));
             } else {
-                Vector<String> paths = segment_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                const Vector<String> &paths = segment_info->files_;
                 SizeT segment_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -2071,11 +2017,9 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
 void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts = txn->BeginTS();
-
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [segment_info, status] = txn->GetSegmentInfo(db_name_, *object_name_, *segment_id_);
     if (!status.ok()) {
-        show_operator_state->status_ = status.clone();
+        Status status = Status::SegmentNotExist(*segment_id_);
         RecoverableError(status);
         return;
     }
@@ -2084,13 +2028,6 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
-
-    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
-    if (segment_entry == nullptr) {
-        Status status = Status::SegmentNotExist(*segment_id_);
-        RecoverableError(status);
-        return;
-    }
 
     {
         SizeT column_id = 0;
@@ -2102,7 +2039,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->segment_id()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->segment_id_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2118,7 +2055,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_entry->status()));
+            Value value = Value::MakeVarchar(SegmentEntry::SegmentStatusToString(segment_info->status_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2134,7 +2071,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(*segment_entry->segment_dir());
+            Value value = Value::MakeVarchar(*segment_info->segment_dir_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2151,7 +2088,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
         ++column_id;
         {
             String segment_size_str;
-            segment_size_str = Utility::FormatByteSize(segment_entry->GetStorageSize());
+            segment_size_str = Utility::FormatByteSize(segment_info->storage_size_);
             Value value = Value::MakeVarchar(segment_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2168,7 +2105,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->block_entries().size()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->block_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2184,7 +2121,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->row_capacity()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->row_capacity_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2200,7 +2137,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->row_count()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->row_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2216,7 +2153,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->actual_row_count()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->actual_row_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2232,7 +2169,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->Room()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->row_capacity_ - segment_info->row_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2248,7 +2185,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(segment_entry->column_count()));
+            Value value = Value::MakeVarchar(std::to_string(segment_info->column_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2260,9 +2197,7 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
 void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts = txn->BeginTS();
-
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [block_info_array, status] = txn->GetBlocksInfo(db_name_, *object_name_, *segment_id_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2280,14 +2215,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
-    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
-    if (!segment_entry) {
-        Status status = Status::SegmentNotExist(*segment_id_);
-        RecoverableError(status);
-        return;
-    }
-    auto block_entry_iter = BlockEntryIter(segment_entry.get());
-    for (auto *block_entry = block_entry_iter.Next(); block_entry != nullptr; block_entry = block_entry_iter.Next()) {
+    for (const auto &block_info : block_info_array) {
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -2295,19 +2223,18 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
         SizeT column_id = 0;
         {
-            Value value = Value::MakeBigInt(block_entry->block_id());
+            Value value = Value::MakeBigInt(block_info->block_id_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
-
         ++column_id;
         {
             String block_size_str;
             if (query_context->persistence_manager() == nullptr) {
-                String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
+                String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
                 block_size_str = Utility::FormatByteSize(VirtualStore::GetDirectorySize(full_block_dir));
             } else {
-                Vector<String> paths = block_entry->GetFilePath(txn->TxnID(), txn->BeginTS());
+                Vector<String> &paths = block_info->files_;
                 SizeT block_size = 0;
                 for (const String &path : paths) {
                     auto [file_size, status] = query_context->persistence_manager()->GetFileSize(path);
@@ -2325,7 +2252,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            Value value = Value::MakeBigInt(block_entry->row_count());
+            Value value = Value::MakeBigInt(block_info->row_count_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2346,9 +2273,7 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
 void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts = txn->BeginTS();
-
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [block_info, status] = txn->GetBlockInfo(db_name_, *object_name_, *segment_id_, *block_id_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2360,20 +2285,6 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
     output_block_ptr->Init(column_types);
 
-    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
-    if (!segment_entry) {
-        Status status = Status::SegmentNotExist(*segment_id_);
-        RecoverableError(status);
-        return;
-    }
-
-    auto block_entry = segment_entry->GetBlockEntryByID(*block_id_);
-    if (!block_entry) {
-        Status status = Status::BlockNotExist(*block_id_);
-        RecoverableError(status);
-        return;
-    }
-
     {
         SizeT column_id = 0;
         {
@@ -2384,7 +2295,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(block_entry->block_id()));
+            Value value = Value::MakeVarchar(std::to_string(block_info->block_id_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2400,7 +2311,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_entry->block_dir();
+            String full_block_dir = Path(InfinityContext::instance().config()->DataDir()) / *block_info->block_dir_;
             Value value = Value::MakeVarchar(full_block_dir);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2417,7 +2328,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT block_storage_size = block_entry->GetStorageSize();
+            SizeT block_storage_size = block_info->storage_size_;
             String block_storage_size_str = Utility::FormatByteSize(block_storage_size);
             Value value = Value::MakeVarchar(block_storage_size_str);
             ValueExpression value_expr(value);
@@ -2435,7 +2346,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT row_capacity = block_entry->row_capacity();
+            SizeT row_capacity = block_info->row_capacity_;
             Value value = Value::MakeVarchar(std::to_string(row_capacity));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2452,7 +2363,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT row_count = block_entry->row_count();
+            SizeT row_count = block_info->row_count_;
             Value value = Value::MakeVarchar(std::to_string(row_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2469,7 +2380,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT checkpoint_row_count = block_entry->checkpoint_row_count();
+            SizeT checkpoint_row_count = block_info->checkpoint_row_count_;
             Value value = Value::MakeVarchar(std::to_string(checkpoint_row_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2486,7 +2397,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT column_count = block_entry->columns().size();
+            SizeT column_count = block_info->column_count_;
             Value value = Value::MakeVarchar(std::to_string(column_count));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2503,7 +2414,7 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT checkpoint_ts = block_entry->checkpoint_ts();
+            SizeT checkpoint_ts = block_info->checkpoint_ts_;
             Value value = Value::MakeVarchar(std::to_string(checkpoint_ts));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2516,47 +2427,10 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 
 void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     auto txn = query_context->GetTxn();
-    TxnTimeStamp begin_ts = txn->BeginTS();
-
-    auto [table_entry, status] = txn->GetTableByName(db_name_, *object_name_);
+    auto [block_column_info, status] = txn->GetBlockColumnInfo(db_name_, *object_name_, *segment_id_, *block_id_, *column_id_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
-        return;
-    }
-
-    SizeT column_count = table_entry->ColumnCount();
-    if (!column_id_.has_value()) {
-        String error_message = "No column id is given.";
-        UnrecoverableError(error_message);
-        return;
-    }
-    SizeT table_column_id = *column_id_;
-
-    if (table_column_id >= column_count) {
-        Status status = Status::ColumnNotExist(fmt::format("index {}", table_column_id));
-        RecoverableError(status);
-        return;
-    }
-
-    auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
-    if (!segment_entry) {
-        Status status = Status::SegmentNotExist(*segment_id_);
-        RecoverableError(status);
-        return;
-    }
-
-    auto block_entry = segment_entry->GetBlockEntryByID(*block_id_);
-    if (!block_entry) {
-        Status status = Status::BlockNotExist(*block_id_);
-        RecoverableError(status);
-        return;
-    }
-
-    auto column_block_entry = block_entry->GetColumnBlockEntry(table_column_id);
-    if (!column_block_entry) {
-        String error_message = fmt::format("Attempt to get column {} from block {}", table_column_id, *block_id_);
-        UnrecoverableError(error_message);
         return;
     }
 
@@ -2571,23 +2445,6 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("column_name");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            const ColumnDef *column_def = table_entry->GetColumnDefByID(table_column_id);
-            Value value = Value::MakeVarchar(column_def->name_);
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    {
-        SizeT column_id = 0;
-        {
             Value value = Value::MakeVarchar("column_id");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2595,7 +2452,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(table_column_id));
+            Value value = Value::MakeVarchar(std::to_string(block_column_info->column_id_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2611,7 +2468,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(column_block_entry->column_type()->ToString());
+            Value value = Value::MakeVarchar(block_column_info->data_type_->ToString());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2627,13 +2484,12 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(column_block_entry->FilePath());
+            Value value = Value::MakeVarchar(*block_column_info->filename_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
 
-    SizeT outline_count = column_block_entry->OutlineBufferCount();
     {
         SizeT column_id = 0;
         {
@@ -2644,7 +2500,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(outline_count));
+            Value value = Value::MakeVarchar(std::to_string(block_column_info->extra_file_count_));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -2660,8 +2516,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
         ++column_id;
         {
-            SizeT storage_size = column_block_entry->GetStorageSize();
-            String storage_size_str = Utility::FormatByteSize(storage_size);
+            String storage_size_str = Utility::FormatByteSize(block_column_info->storage_size_);
             Value value = Value::MakeVarchar(storage_size_str);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2679,8 +2534,8 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
         ++column_id;
         {
             String outline_storage;
-            for (SizeT idx = 0; idx < outline_count; ++idx) {
-                outline_storage += *(column_block_entry->OutlineFilename(idx));
+            for (SizeT idx = 0; idx < block_column_info->extra_file_count_; ++idx) {
+                outline_storage += *block_column_info->extra_file_names_[idx];
                 outline_storage += ";";
             }
 
@@ -3669,8 +3524,8 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 
     auto [table_entry, table_status] = txn->GetTableByName(db_name_, *object_name_);
     if (!table_status.ok()) {
-        show_operator_state->status_ = table_status;
-        //        Error<UnrecoverableException>(table_status.message());
+        show_operator_state->status_ = table_status.clone();
+        RecoverableError(table_status);
         return;
     }
 
@@ -5956,7 +5811,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
         {
             // txn id
             String txn_text;
-            if(txn_context->text_.get() != nullptr) {
+            if (txn_context->text_.get() != nullptr) {
                 txn_text = *txn_context->text_;
             }
             Value value = Value::MakeVarchar(txn_text);
@@ -5988,7 +5843,7 @@ void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, Sh
         {
             // txn type
             String transaction_type_str = "read";
-            if(txn_context->is_write_transaction_) {
+            if (txn_context->is_write_transaction_) {
                 transaction_type_str = "write";
             }
             Value value = Value::MakeVarchar(transaction_type_str);

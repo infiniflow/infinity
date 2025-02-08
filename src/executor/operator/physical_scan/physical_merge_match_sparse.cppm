@@ -42,7 +42,7 @@ public:
                              SharedPtr<Vector<LoadMeta>> load_metas,
                              bool cache_result);
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
