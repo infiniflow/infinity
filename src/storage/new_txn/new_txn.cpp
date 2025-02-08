@@ -222,7 +222,7 @@ void NewTxn::CheckTxn(const String &db_name) {
 }
 
 // Database OPs
-Status NewTxn::CreateDatabase(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment) {
+Status NewTxn::CreateDatabase(const String &db_name, ConflictType conflict_type, const SharedPtr<String> &comment) {
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
     }
@@ -233,33 +233,42 @@ Status NewTxn::CreateDatabase(const SharedPtr<String> &db_name, ConflictType con
 
     this->CheckTxnStatus();
 
-    bool db_exist = new_catalog_->CheckDatabaseExists(db_name, this);
+    bool db_exist = this->CheckDatabaseExists(db_name);
     if (db_exist and conflict_type == ConflictType::kError) {
-        return Status(ErrorCode::kDuplicateDatabaseName, MakeUnique<String>(fmt::format("Database: {} already exists", *db_name)));
+        return Status(ErrorCode::kDuplicateDatabaseName, MakeUnique<String>(fmt::format("Database: {} already exists", db_name)));
     }
 
     if (db_exist and conflict_type == ConflictType::kIgnore) {
         return Status::OK();
     }
 
-    SharedPtr<String> db_dir = DetermineRandomString(InfinityContext::instance().config()->DataDir(), fmt::format("db_{}", *db_name));
+    SharedPtr<String> db_dir = DetermineRandomString(InfinityContext::instance().config()->DataDir(), fmt::format("db_{}", db_name));
     String path_tail = NewCatalog::GetPathNameTail(*db_dir);
 
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabase>(*db_name, path_tail, *comment);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateDatabase>(db_name, path_tail, *comment);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
     return Status::OK();
 }
 
 Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
-    this->CheckTxnStatus();
-    TxnTimeStamp begin_ts = this->BeginTS();
-
-    auto [dropped_db_entry, status] = catalog_->DropDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts, nullptr, conflict_type);
-    if (dropped_db_entry.get() == nullptr) {
-        return status;
+    if (conflict_type == ConflictType::kReplace) {
+        return Status::NotSupport("ConflictType::kReplace");
     }
-    txn_store_.DropDBStore(dropped_db_entry.get());
+    if (conflict_type == ConflictType::kInvalid) {
+        return Status::UnexpectedError("Unknown ConflictType");
+    }
+
+    this->CheckTxnStatus();
+
+//    bool db_exist = this->CheckDatabaseExists(db_name);
+//    if (!db_exist and conflict_type == ConflictType::kError) {
+//        return Status::DBNotExist(db_name);
+//    }
+//
+//    if (!db_exist and conflict_type == ConflictType::kIgnore) {
+//        return Status::OK();
+//    }
 
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropDatabase>(db_name);
     wal_entry_->cmds_.push_back(wal_command);
@@ -274,11 +283,48 @@ Tuple<DBEntry *, Status> NewTxn::GetDatabase(const String &db_name) {
     return catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
 }
 
-Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_name) {
-    this->CheckTxnStatus();
-    TxnTimeStamp begin_ts = this->BeginTS();
+bool NewTxn::CheckDatabaseExists(const String &db_name) {
+    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(db_name);
+    String db_key = KeyEncode::CatalogDbKey(db_name, this->BeginTS(), this->TxnID());
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(db_key_prefix);
+    SizeT found_count = 0;
+    while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+        iter2->Next();
+        ++found_count;
+    }
+    if (found_count == 0) {
+        // Not found
+        return false;
+    }
+    return true;
+}
 
-    return catalog_->GetDatabaseInfo(db_name, txn_context_ptr_->txn_id_, begin_ts);
+Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const SharedPtr<String> &db_name) {
+    this->CheckTxnStatus();
+
+    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(*db_name);
+    String db_key = KeyEncode::CatalogDbKey(*db_name, this->BeginTS(), this->TxnID());
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(db_key_prefix);
+    SizeT found_count = 0;
+    while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+        iter2->Next();
+        ++found_count;
+    }
+
+    if (found_count == 0) {
+        return {nullptr, Status::DBNotExist(*db_name)};
+    }
+
+    SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
+    db_info->db_name_ = db_name;
+    //    db_info->db_entry_dir_ = db_entry->db_entry_dir();
+    //    db_info->absolute_db_path_ = db_entry->AbsoluteDir();
+    //    db_info->table_count_ = db_entry->TableCollections(txn_id, begin_ts).size();
+    //    db_info->db_comment_ = db_entry->db_comment_ptr();
+
+    return {db_info, Status::OK()};
 }
 
 Vector<DatabaseDetail> NewTxn::ListDatabases() {
@@ -426,8 +472,11 @@ Tuple<TableIndexEntry *, Status> NewTxn::GetIndexByName(const String &db_name, c
 }
 
 Tuple<SharedPtr<TableIndexInfo>, Status> NewTxn::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name) {
-    TxnTimeStamp begin_ts = this->BeginTS();
-    return catalog_->GetTableIndexInfo(db_name, table_name, index_name, txn_context_ptr_->txn_id_, begin_ts);
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+    return table_entry->GetTableIndexInfo(index_name, nullptr);
 }
 
 Pair<Vector<SegmentIndexEntry *>, Status>
@@ -442,13 +491,17 @@ NewTxn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *tab
 
 // TODO: use table ref instead of table entry
 Status NewTxn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
-    auto *table_entry = table_ref->table_entry_ptr_;
+    auto [table_entry, table_status] = this->GetTableByName(*table_ref->table_info_->db_name_, *table_ref->table_info_->table_name_);
+    if (!table_status.ok()) {
+        return table_status;
+    }
+
     const auto &db_name = *table_entry->GetDBName();
     const auto &table_name = *table_entry->GetTableName();
 
-    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
-    if (!status.ok()) {
-        return status;
+    auto [table_index_entry, index_status] = this->GetIndexByName(db_name, table_name, index_name);
+    if (!index_status.ok()) {
+        return index_status;
     }
 
     return table_index_entry->CreateIndexDo(table_ref, create_index_idxes, nullptr);
@@ -728,6 +781,38 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::DROP_DATABASE: {
+                auto *drop_db_cmd = static_cast<WalCmdDropDatabase *>(command.get());
+                String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(drop_db_cmd->db_name_);
+                auto iter2 = kv_instance_->GetIterator();
+                iter2->Seek(db_key_prefix);
+                SizeT found_count = 0;
+
+                Vector<String> error_db_keys;
+                while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+                    if (found_count == 0) {
+                        Status status = kv_instance_->Delete(iter2->Key().ToString());
+                        if (!status.ok()) {
+                            return status;
+                        }
+                    } else {
+                        // Error branch
+                        error_db_keys.push_back(iter2->Key().ToString());
+                    }
+                    iter2->Next();
+                    ++found_count;
+                }
+
+                if (!error_db_keys.empty()) {
+                    // join error_db_keys
+                    String error_db_keys_str =
+                        std::accumulate(std::next(error_db_keys.begin()), error_db_keys.end(), error_db_keys.front(), [](String a, String b) {
+                            return a + ", " + b;
+                        });
+                    UnrecoverableError(fmt::format("Found multiple database keys: {}", error_db_keys_str));
+                }
+                break;
+            }
             default: {
                 break;
             }
@@ -747,23 +832,23 @@ Optional<String> NewTxn::CheckConflict(NewTxn *other_txn) {
 void NewTxn::CommitBottom() {
     LOG_TRACE(fmt::format("NewTxn bottom: {} is started.", txn_context_ptr_->txn_id_));
     // prepare to commit txn local data into table
-//    TxnTimeStamp commit_ts = this->CommitTS();
+    //    TxnTimeStamp commit_ts = this->CommitTS();
 
     Status status = kv_instance_->Commit();
     if (!status.ok()) {
         UnrecoverableError("KV instance commit failed");
     }
 
-//    txn_store_.PrepareCommit(txn_context_ptr_->txn_id_, commit_ts, buffer_mgr_);
-//
-//    txn_store_.CommitBottom(txn_context_ptr_->txn_id_, commit_ts);
-//
-//    txn_store_.AddDeltaOp(txn_delta_ops_entry_.get(), nullptr);
+    //    txn_store_.PrepareCommit(txn_context_ptr_->txn_id_, commit_ts, buffer_mgr_);
+    //
+    //    txn_store_.CommitBottom(txn_context_ptr_->txn_id_, commit_ts);
+    //
+    //    txn_store_.AddDeltaOp(txn_delta_ops_entry_.get(), nullptr);
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
-//    if (!txn_delta_ops_entry_->operations().empty()) {
-//        txn_delta_ops_entry_->SaveState(txn_context_ptr_->txn_id_, this->CommitTS(), txn_mgr_->NextSequence());
-//    }
+    //    if (!txn_delta_ops_entry_->operations().empty()) {
+    //        txn_delta_ops_entry_->SaveState(txn_context_ptr_->txn_id_, this->CommitTS(), txn_mgr_->NextSequence());
+    //    }
 
     // Notify the top half
     std::unique_lock<std::mutex> lk(commit_lock_);

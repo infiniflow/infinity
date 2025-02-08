@@ -115,13 +115,15 @@ public:
     SharedPtr<AddDeltaEntryTask> MakeAddDeltaEntryTask();
 
     // Database OPs
-    Status CreateDatabase(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
+    Status CreateDatabase(const String &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
 
     Status DropDatabase(const String &db_name, ConflictType conflict_type);
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name);
 
-    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name);
+    bool CheckDatabaseExists(const String &db_name);
+
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const SharedPtr<String> &db_name);
 
     Vector<DatabaseDetail> ListDatabases();
 

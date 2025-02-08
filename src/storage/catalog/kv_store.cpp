@@ -63,9 +63,7 @@ KVInstance::~KVInstance() {
         delete read_options_.iterate_upper_bound;
         read_options_.iterate_upper_bound = nullptr;
     }
-    if (transaction_) {
-        delete transaction_;
-    }
+
 }
 
 Status KVInstance::Put(const String &key, const String &value) {
@@ -117,12 +115,20 @@ Status KVInstance::Commit() {
     if (!s.ok()) {
         return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
     }
+    if (transaction_) {
+        delete transaction_;
+        transaction_ = nullptr;
+    }
     return Status::OK();
 }
 Status KVInstance::Rollback() {
     rocksdb::Status s = transaction_->Rollback();
     if (!s.ok()) {
         return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    if (transaction_) {
+        delete transaction_;
+        transaction_ = nullptr;
     }
     return Status::OK();
 }
