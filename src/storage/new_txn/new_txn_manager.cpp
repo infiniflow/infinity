@@ -252,7 +252,7 @@ bool NewTxnManager::Stopped() { return !is_running_.load(); }
 
 Status NewTxnManager::CommitTxn(NewTxn *txn) {
     Status status = txn->Commit();
-    if(status.ok()) {
+    if (status.ok()) {
         if (txn->GetTxnType() == TransactionType::kCheckpoint) {
             std::lock_guard guard(locker_);
             ckp_begin_ts_ = UNCOMMIT_TS;
@@ -262,13 +262,16 @@ Status NewTxnManager::CommitTxn(NewTxn *txn) {
     return status;
 }
 
-void NewTxnManager::RollBackTxn(NewTxn *txn) {
-    txn->Rollback();
-    if (txn->GetTxnType() == TransactionType::kCheckpoint) {
-        std::lock_guard guard(locker_);
-        ckp_begin_ts_ = UNCOMMIT_TS;
+Status NewTxnManager::RollBackTxn(NewTxn *txn) {
+    Status status = txn->Rollback();
+    if (status.ok()) {
+        if (txn->GetTxnType() == TransactionType::kCheckpoint) {
+            std::lock_guard guard(locker_);
+            ckp_begin_ts_ = UNCOMMIT_TS;
+        }
+        this->CleanupTxn(txn, false);
     }
-    this->CleanupTxn(txn, false);
+    return status;
 }
 
 SizeT NewTxnManager::ActiveTxnCount() {

@@ -110,7 +110,7 @@ public:
 
     void CancelCommitBottom();
 
-    void Rollback();
+    Status Rollback();
 
     SharedPtr<AddDeltaEntryTask> MakeAddDeltaEntryTask();
 

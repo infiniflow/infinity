@@ -69,7 +69,7 @@ public:
 
     Status CommitTxn(NewTxn *txn);
 
-    void RollBackTxn(NewTxn *txn);
+    Status RollBackTxn(NewTxn *txn);
 
     SizeT ActiveTxnCount();
 

@@ -261,6 +261,15 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
 
     this->CheckTxnStatus();
 
+    bool db_exist = this->CheckDatabaseExists(db_name);
+    if (!db_exist and conflict_type == ConflictType::kError) {
+        return Status::DBNotExist(db_name);
+    }
+
+    if (!db_exist and conflict_type == ConflictType::kIgnore) {
+        return Status::OK();
+    }
+
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropDatabase>(db_name);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
@@ -771,13 +780,13 @@ Status NewTxn::PrepareCommit() {
                     }
                 }
 
-//                auto iter2 = kv_instance_->GetIterator();
-//                String prefix = "";
-//                iter2->Seek(prefix);
-//                while (iter2->Valid() && iter2->Key().starts_with(prefix)) {
-//                    std::cout << iter2->Key().ToString() << String(" : ") << iter2->Value().ToString() << std::endl;
-//                    iter2->Next();
-//                }
+                //                auto iter2 = kv_instance_->GetIterator();
+                //                String prefix = "";
+                //                iter2->Seek(prefix);
+                //                while (iter2->Valid() && iter2->Key().starts_with(prefix)) {
+                //                    std::cout << iter2->Key().ToString() << String(" : ") << iter2->Value().ToString() << std::endl;
+                //                    iter2->Next();
+                //                }
                 break;
             }
             case WalCommandType::DROP_DATABASE: {
@@ -800,6 +809,11 @@ Status NewTxn::PrepareCommit() {
                     }
                     iter2->Next();
                     ++found_count;
+                }
+
+                if (found_count == 0) {
+                    // No db, ignore it.
+                    return Status::OK();
                 }
 
                 if (!error_db_keys.empty()) {
@@ -883,12 +897,12 @@ void NewTxn::CancelCommitBottom() {
     commit_cv_.notify_one();
 }
 
-void NewTxn::Rollback() {
+Status NewTxn::Rollback() {
     DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
     auto state = this->GetTxnState();
     TxnTimeStamp abort_ts = 0;
     if (state == TxnState::kStarted) {
-        abort_ts = txn_mgr_->GetReadCommitTS(nullptr);
+        abort_ts = txn_mgr_->GetReadCommitTS(this);
     } else if (state == TxnState::kCommitting) {
         abort_ts = this->CommitTS();
     } else {
@@ -899,11 +913,13 @@ void NewTxn::Rollback() {
 
     Status status = kv_instance_->Rollback();
     if (!status.ok()) {
-        RecoverableError(status);
+        return status;
     }
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
 
     LOG_TRACE(fmt::format("NewTxn: {} is dropped.", txn_context_ptr_->txn_id_));
+
+    return Status::OK();
 }
 
 SharedPtr<AddDeltaEntryTask> NewTxn::MakeAddDeltaEntryTask() {
