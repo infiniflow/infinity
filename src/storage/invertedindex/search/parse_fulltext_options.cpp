@@ -167,9 +167,6 @@ void ParseRankFeatureOption(std::string_view input_str, RankFeatureOption &featu
     Vector<String> feature_strs;
     RE2 split_pattern{"(\\^)"};
     Split(input_str, split_pattern, feature_strs);
-    for (auto &feature_str : feature_strs) {
-        std::cout << "feature_str: " << feature_str << std::endl;
-    }
 
     if (feature_strs.size() == 2) {
         feature_option.field_ = feature_strs[0];
