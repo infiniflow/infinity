@@ -1751,6 +1751,13 @@ table_object.output(["num", "body"]).to_df()
 table_object.output(["_row_id"]).to_pl()
 ```
 
+##### Select unnest columns to 
+
+```python
+# Select column "c1" and unnest its cells
+table_object.output(["unnest(c1)"]).to_pl()
+```
+
 ##### Perform aggregation or arithmetic operations on selected columns
 
 ```python

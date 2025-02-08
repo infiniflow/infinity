@@ -59,6 +59,8 @@ def setup_class(request, local_infinity, http):
 class TestInfinity:
 
     # test/sql/dql/unnest/test_unnest.slt
+    @pytest.mark.usefixtures("skip_if_http")
+    @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_unnest(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
 
