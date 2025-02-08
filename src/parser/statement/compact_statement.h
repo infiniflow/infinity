@@ -20,39 +20,38 @@
 
 namespace infinity {
 
-struct TableEntry;
 struct SegmentEntry;
 
 enum class CompactStatementType { kManual, kAuto, kInvalid };
 
 class CompactStatement : public BaseStatement {
 public:
-    CompactStatement(CompactStatementType compact_type) : BaseStatement(StatementType::kCompact), compact_type_(compact_type) {}
+    CompactStatement(CompactStatementType compact_type, const std::string &db_name, const std::string &table_name)
+        : BaseStatement(StatementType::kCompact), compact_type_(compact_type), db_name_(db_name), table_name_(table_name) {}
 
     [[nodiscard]] std::string ToString() const final { return "Compact Table {}.{}"; }
 
 public:
     CompactStatementType compact_type_;
+    std::string db_name_{};
+    std::string table_name_{};
 };
 
 class ManualCompactStatement : public CompactStatement {
 public:
-    ManualCompactStatement(std::string schema_name, std::string table_name)
-        : CompactStatement{CompactStatementType::kManual}, schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
+    ManualCompactStatement(const std::string &db_name, const std::string &table_name)
+        : CompactStatement{CompactStatementType::kManual, db_name, table_name} {}
 
 public:
-    std::string schema_name_{};
-    std::string table_name_{};
 };
 
 struct AutoCompactStatement : public CompactStatement {
 public:
-    AutoCompactStatement(TableEntry *table_entry, std::vector<SegmentEntry *> compactible_segments)
-        : CompactStatement{CompactStatementType::kAuto}, table_entry_(table_entry), compactible_segments_(std::move(compactible_segments)) {}
+    AutoCompactStatement(const std::string &db_name, const std::string &table_name, std::vector<SegmentEntry *> segments_to_compact)
+        : CompactStatement{CompactStatementType::kAuto, db_name, table_name}, segments_to_compact_(std::move(segments_to_compact)) {}
 
 public:
-    TableEntry *table_entry_;
-    std::vector<SegmentEntry *> compactible_segments_;
+    std::vector<SegmentEntry *> segments_to_compact_;
 };
 
 } // namespace infinity

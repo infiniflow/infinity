@@ -34,7 +34,7 @@ import infinity_exception;
 
 namespace infinity {
 
-void PhysicalUnnestAggregate::Init() {}
+void PhysicalUnnestAggregate::Init(QueryContext* query_context) {}
 
 bool PhysicalUnnestAggregate::Execute(QueryContext *, OperatorState *operator_state) {
     OperatorState *prev_op_state = operator_state->prev_op_state_;

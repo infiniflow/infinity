@@ -448,7 +448,7 @@ void ChunkIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> ChunkIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+Vector<String> ChunkIndexEntry::GetFilePath(Txn* txn) const {
     Vector<String> res;
     res.emplace_back(buffer_obj_->GetFilename());
     return res;

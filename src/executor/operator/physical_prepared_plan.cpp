@@ -21,7 +21,7 @@ module physical_prepared_plan;
 
 namespace infinity {
 
-void PhysicalPreparedPlan::Init() {}
+void PhysicalPreparedPlan::Init(QueryContext* query_context) {}
 
 bool PhysicalPreparedPlan::Execute(QueryContext *, OperatorState *) { return true; }
 

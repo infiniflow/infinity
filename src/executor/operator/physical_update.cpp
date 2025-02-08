@@ -40,10 +40,11 @@ import value;
 import wal_manager;
 import infinity_context;
 import status;
+import txn;
 
 namespace infinity {
 
-void PhysicalUpdate::Init() {}
+void PhysicalUpdate::Init(QueryContext* query_context) {}
 
 bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -57,12 +58,11 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
         return true;
     }
 
+    auto txn = query_context->GetTxn();
     OperatorState *prev_op_state = operator_state->prev_op_state_;
     SizeT input_data_block_count = prev_op_state->data_block_array_.size();
     for (SizeT block_idx = 0; block_idx < input_data_block_count; ++block_idx) {
         DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
-
-        auto txn = query_context->GetTxn();
         Vector<RowID> row_ids;
         for (SizeT i = 0; i < input_data_block_ptr->column_count(); i++) {
             if (auto &column_vector = input_data_block_ptr->column_vectors[i]; column_vector->data_type()->type() == LogicalType::kRowID) {
@@ -104,8 +104,8 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
             }
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_column_vectors);
-            txn->Append(table_entry_ptr_, output_data_block);
-            txn->Delete(table_entry_ptr_, row_ids);
+            txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_data_block);
+            txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids);
 
             UpdateOperatorState *update_operator_state = static_cast<UpdateOperatorState *>(operator_state);
             ++update_operator_state->count_;

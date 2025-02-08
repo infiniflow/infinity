@@ -454,6 +454,10 @@ Status Status::InvalidQueryOption(const String &detail) {
 
 Status Status::FailToStartTxn(const String &detail) { return Status(ErrorCode::kFailToStartTxn, MakeUnique<String>(detail)); }
 
+Status Status::AlreadyLocked(const String &detail) { return Status(ErrorCode::kAlreadyLocked, MakeUnique<String>(detail)); }
+
+Status Status::NotLocked(const String &detail) { return Status(ErrorCode::kNotLocked, MakeUnique<String>(detail)); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));

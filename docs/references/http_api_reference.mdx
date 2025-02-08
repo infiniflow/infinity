@@ -1534,7 +1534,7 @@ curl --request POST \
   Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `object[]`. Each JSON object corresponds to a row to insert, and each key-value pair it corresponds to a column name and the table cell value.
 
 :::tip NOTE
-- When inserting incomplete rows of data, ensure that all uninserted columns have default values when creating the table. Otherwise, an error will occur.  
+- When inserting incomplete rows of data, ensure that all un-inserted columns have default values when creating the table. Otherwise, an error will occur.
 - You are not allowed to insert both complete and incomplete rows of data in one request. 
 :::
 
@@ -1866,7 +1866,7 @@ curl --request GET \
     - `_score`: A BM25 score used in full-text search.
     - `_similarity`: Used by IP and cosine metrics in dense or sparse vector search.
     - `_distance`: Used by L2 metric in dense vector search.
-  - An aggregation function: Apply an aggregation operation on specified columns. Supported aggragation functions include:
+  - An aggregation function: Apply an aggregation operation on specified columns. Supported aggregation functions include:
     - `count`
     - `min`
     - `max`
@@ -2012,7 +2012,7 @@ curl --request GET \
     - If you set `"fusion_method"` to `"rrf"`, use a separate JSON to set the following parameter:  
       - `"rank_constant"`: The smoothing constant for RRF reranking, e.g., `{"rank_constant": 60}`. Defaults to `60`.  
     - If you set `"fusion_method"` to `"weighted_sum"`, use a separate JSON to set the following parameter:  
-      - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
+      - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assigned the default weight of `1.0`.
     - If you set `"fusion_method"` to `"match_tensor"`, use a separate JSON to set the following parameters:  
       - `"fields"`: The name of the tensor column for reranking.
       - `"query_tensor"`: The tensor data to compare against. This should be provided as a list of lists of numerical values.

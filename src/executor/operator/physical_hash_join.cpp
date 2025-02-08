@@ -23,7 +23,7 @@ module physical_hash_join;
 
 namespace infinity {
 
-void PhysicalHashJoin::Init() {}
+void PhysicalHashJoin::Init(QueryContext* query_context) {}
 
 bool PhysicalHashJoin::Execute(QueryContext *, OperatorState *) { return true; }
 

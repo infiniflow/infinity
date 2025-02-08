@@ -384,7 +384,7 @@ TEST_P(WalReplayTest, wal_replay_append) {
             EXPECT_EQ(input_block->Finalized(), true);
             auto [table_entry, status] = txn5->GetTableByName("default_db", "tbl4");
             EXPECT_TRUE(status.ok());
-            txn5->Append(table_entry, input_block);
+            txn5->Append("default_db", "tbl4", input_block);
             txn_mgr->CommitTxn(txn5);
         }
         {
@@ -548,11 +548,10 @@ TEST_P(WalReplayTest, wal_replay_import) {
         {
             auto txn4 = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
 
-            auto [table_entry, status] = txn4->GetTableByName("default_db", "tbl1");
-            EXPECT_NE(table_entry, nullptr);
-            u64 segment_id = Catalog::GetNextSegmentID(table_entry);
-            EXPECT_EQ(segment_id, 0u);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn4);
+            auto [table_info, status] = txn4->GetTableInfo("default_db", "tbl1");
+            EXPECT_NE(table_info, nullptr);
+            auto [segment_entry, segment_status] = txn4->MakeNewSegment("default_db", "tbl1");
+            EXPECT_TRUE(segment_status.ok());
             EXPECT_EQ(segment_entry->segment_id(), 0u);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn4);
             // auto last_block_entry = segment_entry->GetLastEntry();
@@ -608,7 +607,7 @@ TEST_P(WalReplayTest, wal_replay_import) {
             block_entry->IncreaseRowCount(1);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            PhysicalImport::SaveSegmentData(table_entry, txn4, segment_entry);
+            PhysicalImport::SaveSegmentData(table_info.get(), txn4, segment_entry);
             txn_mgr->CommitTxn(txn4);
         }
 
@@ -716,11 +715,10 @@ TEST_F(WalReplayTest, wal_replay_compact) {
         for (u64 i = 0; i < test_segment_n; ++i) { // add 2 segments
             auto txn2 = txn_mgr->BeginTxn(MakeUnique<String>("insert table"), TransactionType::kNormal);
 
-            auto [table_entry, status] = txn2->GetTableByName("default_db", "tbl1");
-            EXPECT_NE(table_entry, nullptr);
+            auto [table_info, status] = txn2->GetTableInfo("default_db", "tbl1");
+            EXPECT_NE(table_info, nullptr);
 
-            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn2);
+            auto [segment_entry, segment_status] = txn2->MakeNewSegment("default_db", "tbl1");
             EXPECT_EQ(segment_entry->segment_id(), i);
 
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn2);
@@ -745,7 +743,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
             }
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            PhysicalImport::SaveSegmentData(table_entry, txn2, segment_entry);
+            PhysicalImport::SaveSegmentData(table_info.get(), txn2, segment_entry);
             txn_mgr->CommitTxn(txn2);
         }
 
@@ -851,7 +849,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+                auto table_ref = BaseTableRef::FakeTableRef(txn, db_name, table_name);
                 auto result = txn->CreateIndexDef(table_entry, index_base_ivf, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);
@@ -959,7 +957,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             auto [table_entry, table_status] = txn->GetTableByName(db_name, table_name);
             EXPECT_EQ(table_status.ok(), true);
             {
-                auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+                auto table_ref = BaseTableRef::FakeTableRef(txn, db_name, table_name);
                 auto result = txn->CreateIndexDef(table_entry, index_base_hnsw, conflict_type);
                 auto *table_index_entry = std::get<0>(result);
                 auto status = std::get<1>(result);

@@ -38,12 +38,12 @@ import third_party;
 import logger;
 import column_vector;
 import logical_type;
-
+import meta_info;
 import block_entry;
 
 namespace infinity {
 
-void PhysicalTableScan::Init() {}
+void PhysicalTableScan::Init(QueryContext* query_context) {}
 
 bool PhysicalTableScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *table_scan_operator_state = static_cast<TableScanOperatorState *>(operator_state);
@@ -76,8 +76,6 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalTableScan::GetOutputTypes() const
 String PhysicalTableScan::table_alias() const { return base_table_ref_->alias_; }
 
 u64 PhysicalTableScan::TableIndex() const { return base_table_ref_->table_index_; }
-
-TableEntry *PhysicalTableScan::TableEntry() const { return base_table_ref_->table_entry_ptr_; }
 
 SizeT PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 

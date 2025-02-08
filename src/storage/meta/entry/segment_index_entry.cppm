@@ -34,6 +34,7 @@ import default_values;
 import statement_common;
 import txn;
 import snapshot_info;
+import meta_info;
 
 namespace infinity {
 
@@ -101,7 +102,7 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) final;
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+    Vector<String> GetFilePath(Txn* txn) const final;
 
     void PickCleanup(CleanupScanner *scanner) final;
 
@@ -240,6 +241,8 @@ public:
         TxnTimeStamp deprecate_ts = deprecate_ts_.load();
         return ts >= deprecate_ts;
     }
+
+    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo(Txn* txn_ptr) const;
 
     SharedPtr<SegmentIndexSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
 private:

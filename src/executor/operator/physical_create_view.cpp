@@ -30,7 +30,7 @@ module physical_create_view;
 
 namespace infinity {
 
-void PhysicalCreateView::Init() {}
+void PhysicalCreateView::Init(QueryContext* query_context) {}
 
 bool PhysicalCreateView::Execute(QueryContext *, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();

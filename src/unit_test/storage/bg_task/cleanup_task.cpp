@@ -91,8 +91,8 @@ TEST_P(CleanupTaskTest, test_delete_db_simple) {
     WaitCleanup(storage);
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
-        auto [db_entry, status] = txn->GetDatabase(*db_name);
-        EXPECT_EQ(db_entry, nullptr);
+        Status status = txn->GetDatabase(*db_name);
+        EXPECT_FALSE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
 }
@@ -135,8 +135,8 @@ TEST_P(CleanupTaskTest, test_delete_db_complex) {
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get db1"), TransactionType::kRead);
-        auto [db_entry, status] = txn->GetDatabase(*db_name);
-        EXPECT_EQ(db_entry, nullptr);
+        Status status = txn->GetDatabase(*db_name);
+        EXPECT_FALSE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
 }
@@ -277,8 +277,8 @@ TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"), TransactionType::kRead);
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-        EXPECT_TRUE(table_entry != nullptr);
+        auto [table_info, status] = txn->GetTableInfo("default_db", *table_name);
+        EXPECT_TRUE(table_info != nullptr);
         // table_entry->SetCompactionAlg(nullptr);
 
         for (int i = 0; i < kImportN; ++i) {
@@ -294,8 +294,7 @@ TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
             }
             SizeT column_count = column_vectors.size();
 
-            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            auto [segment_entry, segment_status] = txn->MakeNewSegment(*table_info->db_name_, *table_info->table_name_);
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
             SizeT row_count = std::numeric_limits<SizeT>::max();
             for (SizeT i = 0; i < column_count; ++i) {
@@ -312,7 +311,7 @@ TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
+            PhysicalImport::SaveSegmentData(table_info.get(), txn, segment_entry);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -355,8 +354,8 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     }
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table1"), TransactionType::kRead);
-        auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
-        EXPECT_TRUE(table_entry != nullptr);
+        auto [table_info, status] = txn->GetTableInfo(*db_name, *table_name);
+        EXPECT_TRUE(table_info != nullptr);
         // table_entry->SetCompactionAlg(nullptr);
 
         for (int i = 0; i < kImportN; ++i) {
@@ -372,8 +371,10 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
             }
             SizeT column_count = column_vectors.size();
 
-            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            auto [segment_entry, segment_status] = txn->MakeNewSegment(*db_name, *table_name);
+            if (!segment_status.ok()) {
+                RecoverableError(segment_status);
+            }
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
             SizeT row_count = std::numeric_limits<SizeT>::max();
             for (SizeT i = 0; i < column_count; ++i) {
@@ -389,7 +390,7 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
             block_entry->IncreaseRowCount(row_count);
             segment_entry->AppendBlockEntry(std::move(block_entry));
 
-            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
+            PhysicalImport::SaveSegmentData(table_info.get(), txn, segment_entry);
         }
         txn_mgr->CommitTxn(txn);
     }
@@ -402,7 +403,7 @@ TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
         auto [table_entry, status1] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status1.ok());
 
-        auto table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
+        auto table_ref = BaseTableRef::FakeTableRef(txn, *db_name, *table_name);
         auto [table_index_entry, status2] = txn->CreateIndexDef(table_entry, index_base, ConflictType::kError);
         EXPECT_TRUE(status2.ok());
 
