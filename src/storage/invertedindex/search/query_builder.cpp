@@ -62,18 +62,6 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
                                     context.minimum_should_match_,
                                     context.topn_,
                                     context.index_names_};
-#ifdef INFINITY_DEBUG
-    {
-        OStringStream oss;
-        oss << "DocIterator:\n";
-        if (result) {
-            result->PrintTree(oss);
-        } else {
-            oss << "Empty tree!\n";
-        }
-        LOG_DEBUG(std::move(oss).str());
-    }
-#endif
     if (!context.rank_features_option_.empty()) {
         auto rank_features_node = std::make_unique<RankFeaturesQueryNode>();
         for (auto rank_feature : context.rank_features_option_) {
@@ -90,6 +78,18 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
         return result;
     } else {
         auto result = context.optimized_query_tree_->CreateSearch(params);
+#ifdef INFINITY_DEBUG
+        {
+            OStringStream oss;
+            oss << "DocIterator:\n";
+            if (result) {
+                result->PrintTree(oss);
+            } else {
+                oss << "Empty tree!\n";
+            }
+            LOG_DEBUG(std::move(oss).str());
+        }
+#endif
         return result;
     }
 }
