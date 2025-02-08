@@ -33,6 +33,8 @@ public:
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const;
 
+    [[nodiscard]] Vector<ColumnBinding> RemoveColumnBindings() const;
+
     [[nodiscard]] SharedPtr<Vector<String>> GetOutputNames() const;
 
     [[nodiscard]] SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const;

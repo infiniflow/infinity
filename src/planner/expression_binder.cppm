@@ -93,8 +93,13 @@ public:
     //    BuildWindow(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr);
 
     //    SharedPtr<PlanBuilder> plan_builder_ptr_;
+
+    virtual SharedPtr<BaseExpression> BuildUnnestExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+
 protected:
     Optional<SharedPtr<BaseExpression>> TryBuildSpecialFuncExpr(const FunctionExpr &expr, BindContext *bind_context_ptr, i64 depth);
+
+    static bool IsUnnestedFunction(const String &function_name);
 
     QueryContext *query_context_{};
 };

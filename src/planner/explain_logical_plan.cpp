@@ -2287,7 +2287,8 @@ Status ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String
             expr_str += ")";
             break;
         }
-        case ExpressionType::kFilterFullText: {
+        case ExpressionType::kFilterFullText:
+        case ExpressionType::kUnnest: {
             expr_str += base_expression->ToString();
             break;
         }

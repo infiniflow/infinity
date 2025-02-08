@@ -94,10 +94,7 @@ void RemoveUnusedColumns::VisitNode(LogicalNode &op) {
             break;
         }
         case LogicalNodeType::kUnnest: {
-            RemoveUnusedColumns remove;
-            remove.VisitNodeExpression(op);
-            remove.VisitNodeChildren(op);
-            return;
+            break;
         }
         case LogicalNodeType::kUnnestAggregate: {
             break;
