@@ -1718,6 +1718,7 @@ A non-empty list of strings specifying the columns to include in the output. Eac
   - `sum`
   - `avg`
 - An arithmetic function: Apply an arithmetic operation on specified columns (e.g., `c1+5`).
+- An unnest function: Unnest an array column to multiple rows (e.g., `unnest(c1)`).
 
 :::tip NOTE
 The list must contain at least one element. Empty lists are not allowed.
@@ -1748,6 +1749,13 @@ table_object.output(["num", "body"]).to_df()
 ```python
 # Select a system-generated column "_row_id"
 table_object.output(["_row_id"]).to_pl()
+```
+
+##### Select unnest columns to 
+
+```python
+# Select column "c1" and unnest its cells
+table_object.output(["unnest(c1)"]).to_pl()
 ```
 
 ##### Perform aggregation or arithmetic operations on selected columns

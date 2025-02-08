@@ -97,16 +97,17 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
     const SharedPtr<BindContext> &bind_context = this->bind_context_;
     if (search_expr_.get() == nullptr) {
         SharedPtr<LogicalNode> root = BuildFrom(table_ref_ptr_, query_context, bind_context);
-        if (!where_conditions_.empty()) {
-            SharedPtr<LogicalNode> filter = BuildFilter(root, where_conditions_, query_context, bind_context);
-            filter->set_left_node(root);
-            root = filter;
-        }
 
         if (!unnest_expressions_.empty()) {
             SharedPtr<LogicalNode> unnest = BuildUnnest(root, unnest_expressions_, query_context, bind_context);
             unnest->set_left_node(root);
             root = unnest;
+        }
+
+        if (!where_conditions_.empty()) {
+            SharedPtr<LogicalNode> filter = BuildFilter(root, where_conditions_, query_context, bind_context);
+            filter->set_left_node(root);
+            root = filter;
         }
 
         if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {

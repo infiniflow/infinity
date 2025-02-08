@@ -31,8 +31,8 @@ namespace infinity {
 UnnestExpression::UnnestExpression(SharedPtr<BaseExpression> column_expression) : BaseExpression(ExpressionType::kUnnest, {column_expression}) {}
 
 DataType UnnestExpression::Type() const {
-    const auto &column_expression = column_expr();
-    const DataType &column_type = column_expression->Type();
+    const auto &expr = arguments_[0];
+    const DataType &column_type = expr->Type();
     if (column_type.type() != LogicalType::kArray) {
         UnrecoverableError("Unnest expression must be applied to an array column.");
     }
@@ -41,12 +41,10 @@ DataType UnnestExpression::Type() const {
 }
 
 String UnnestExpression::ToString() const {
-    const auto &column_expression = column_expr();
+    const auto &expr = arguments_[0];
     std::stringstream ss;
-    ss << "Unnest(" << column_expression->ToString() << ")";
-    return ss.str();
+    ss << "Unnest(" << expr->ToString() << ")";
+    return std::move(ss).str();
 }
-
-SharedPtr<ColumnExpression> UnnestExpression::column_expr() const { return std::static_pointer_cast<ColumnExpression>(arguments_[0]); }
 
 } // namespace infinity
