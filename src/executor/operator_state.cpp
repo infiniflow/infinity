@@ -88,35 +88,45 @@ bool QueueSourceState::GetData() {
         case PhysicalOperatorType::kMergeKnn: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeKnnOperatorState *merge_knn_op_state = (MergeKnnOperatorState *)next_op_state;
-            merge_knn_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+            if (fragment_data->data_block_) {
+                merge_knn_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+            }
             merge_knn_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kMergeMatchSparse: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             auto *merge_match_sparse_op_state = static_cast<MergeMatchSparseOperatorState *>(next_op_state);
-            merge_match_sparse_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+            if (fragment_data->data_block_) {
+                merge_match_sparse_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+            }
             merge_match_sparse_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kMergeMatchTensor: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeMatchTensorOperatorState *merge_match_tensor_op_state = (MergeMatchTensorOperatorState *)next_op_state;
-            merge_match_tensor_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            if (fragment_data->data_block_) {
+                merge_match_tensor_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            }
             merge_match_tensor_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kFusion: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             FusionOperatorState *fusion_op_state = (FusionOperatorState *)next_op_state;
-            fusion_op_state->input_data_blocks_[fragment_data->fragment_id_].push_back(std::move(fragment_data->data_block_));
+            if (fragment_data->data_block_) {
+                fusion_op_state->input_data_blocks_[fragment_data->fragment_id_].push_back(std::move(fragment_data->data_block_));
+            }
             fusion_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kMergeLimit: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeLimitOperatorState *limit_op_state = (MergeLimitOperatorState *)next_op_state;
-            limit_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            if (fragment_data->data_block_) {
+                limit_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            }
             if (fragment_data->total_hits_count_flag_) {
                 limit_op_state->total_hits_count_flag_ = true;
                 limit_op_state->total_hits_count_ += fragment_data->total_hits_count_;
@@ -132,7 +142,9 @@ bool QueueSourceState::GetData() {
         case PhysicalOperatorType::kMergeTop: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             auto top_op_state = (MergeTopOperatorState *)next_op_state;
-            top_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            if (fragment_data->data_block_) {
+                top_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
+            }
 
             if (fragment_data->total_hits_count_flag_) {
                 top_op_state->total_hits_count_flag_ = true;
@@ -150,8 +162,9 @@ bool QueueSourceState::GetData() {
         case PhysicalOperatorType::kMergeAggregate: {
             auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
             MergeAggregateOperatorState *merge_aggregate_op_state = (MergeAggregateOperatorState *)next_op_state;
-            // merge_aggregate_op_state->input_data_blocks_.push_back(std::move(fragment_data->data_block_));
-            merge_aggregate_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+            if (fragment_data->data_block_) {
+                merge_aggregate_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+            }
 
             // {
             //     auto row = merge_aggregate_op_state->input_data_block_->row_count();

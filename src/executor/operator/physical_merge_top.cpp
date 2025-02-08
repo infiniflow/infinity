@@ -77,9 +77,10 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto merge_top_op_state = static_cast<MergeTopOperatorState *>(operator_state);
     auto &input_data_block_array = merge_top_op_state->input_data_blocks_;
     if (input_data_block_array.empty()) {
-        String error_message = "MergeTop: empty input";
-        UnrecoverableError(error_message);
-        return false;
+        if (merge_top_op_state->input_complete_) {
+            operator_state->SetComplete();
+        }
+        return true;
     }
     auto &middle_data_block_array = merge_top_op_state->middle_sorted_data_blocks_;
     auto &middle_result_count = merge_top_op_state->middle_result_count_;
