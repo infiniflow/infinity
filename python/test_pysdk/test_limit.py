@@ -120,7 +120,7 @@ class TestInfinity:
                 "create_timestamp_flt": {"type": "float"},
             },
         )
-        for j in range(2):
+        for j in range(20):
             row_count = 8192
             batch_size = 128
             for i in range(0, row_count, batch_size):
@@ -130,7 +130,7 @@ class TestInfinity:
                             "doc_id": "f294ba5cd48711efaaa610ffe02aa993",
                             "knowledge_graph_kwd": (
                                 ""
-                                if j == 0
+                                if j != 9
                                 else ("graph" if i % 2 == 0 else "mind_map")
                             ),
                             "page_num_int": i,

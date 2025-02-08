@@ -75,15 +75,18 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
         UnrecoverableError(error_message);
     }
     auto merge_top_op_state = static_cast<MergeTopOperatorState *>(operator_state);
+    auto &middle_data_block_array = merge_top_op_state->middle_sorted_data_blocks_;
+    auto &middle_result_count = merge_top_op_state->middle_result_count_;
     auto &input_data_block_array = merge_top_op_state->input_data_blocks_;
     if (input_data_block_array.empty()) {
         if (merge_top_op_state->input_complete_) {
+            output_data_block_array = std::move(middle_data_block_array);
+            PhysicalTop::HandleOutputOffset(middle_result_count, offset_, output_data_block_array);
             operator_state->SetComplete();
+            return true;
         }
-        return true;
+        return false;
     }
-    auto &middle_data_block_array = merge_top_op_state->middle_sorted_data_blocks_;
-    auto &middle_result_count = merge_top_op_state->middle_result_count_;
     u32 input_result_count =
         std::accumulate(input_data_block_array.begin(), input_data_block_array.end(), 0, [](u32 sum, const auto &data_block) -> u32 {
             return sum + data_block->row_count();
