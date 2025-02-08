@@ -105,6 +105,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_limit" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_limit_2block(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
 
