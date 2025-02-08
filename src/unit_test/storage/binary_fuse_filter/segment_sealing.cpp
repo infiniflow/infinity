@@ -70,7 +70,7 @@ protected:
             }
             SharedPtr<DataBlock> block = DataBlock::Make();
             block->Init(column_vectors);
-            txn->Append(table_entry, block);
+            txn->Append("default_db", table_name, block);
         }
         txn_mgr->CommitTxn(txn);
     }

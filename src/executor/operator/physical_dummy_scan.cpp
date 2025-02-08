@@ -21,7 +21,7 @@ module physical_dummy_scan;
 
 namespace infinity {
 
-void PhysicalDummyScan::Init() {}
+void PhysicalDummyScan::Init(QueryContext* query_context) {}
 
 bool PhysicalDummyScan::Execute(QueryContext *, OperatorState *) { return true; }
 

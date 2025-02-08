@@ -33,6 +33,7 @@ class TxnManager;
 class BufferManager;
 struct TableEntry;
 struct SegmentEntry;
+class Txn;
 
 export class TableIndexMeta : public BaseMeta {
     friend struct TableEntry;
@@ -70,7 +71,7 @@ public:
                                                                   TxnManager *txn_mgr);
 
     Tuple<SharedPtr<TableIndexInfo>, Status>
-    GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts);
+    GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, Txn *txn_ptr);
 
     Tuple<TableIndexEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
         return index_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);

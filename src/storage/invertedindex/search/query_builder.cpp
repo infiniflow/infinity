@@ -40,7 +40,7 @@ import parse_fulltext_options;
 
 namespace infinity {
 
-void QueryBuilder::Init(IndexReader index_reader) { index_reader_ = std::move(index_reader); }
+void QueryBuilder::Init(SharedPtr<IndexReader> index_reader) { index_reader_ = std::move(index_reader); }
 
 QueryBuilder::~QueryBuilder() {}
 
@@ -54,8 +54,8 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
         }
     }
     // Create the iterator from the query tree.
-    const CreateSearchParams params{table_entry_,
-                                    &index_reader_,
+    const CreateSearchParams params{table_info_.get(),
+                                    index_reader_.get(),
                                     context.early_term_algo_,
                                     context.ft_similarity_,
                                     context.bm25_params_,

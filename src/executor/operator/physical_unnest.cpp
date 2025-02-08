@@ -44,7 +44,7 @@ import expression_type;
 
 namespace infinity {
 
-void PhysicalUnnest::Init() {}
+void PhysicalUnnest::Init(QueryContext* query_context) {}
 
 namespace {
 

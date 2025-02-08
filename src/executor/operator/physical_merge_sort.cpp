@@ -21,7 +21,7 @@ module physical_merge_sort;
 
 namespace infinity {
 
-void PhysicalMergeSort::Init() {}
+void PhysicalMergeSort::Init(QueryContext* query_context) {}
 
 bool PhysicalMergeSort::Execute(QueryContext *query_context, OperatorState *operator_state) { return true; }
 

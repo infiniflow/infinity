@@ -21,7 +21,7 @@ module physical_union_all;
 
 namespace infinity {
 
-void PhysicalUnionAll::Init() {}
+void PhysicalUnionAll::Init(QueryContext* query_context) {}
 
 bool PhysicalUnionAll::Execute(QueryContext *, OperatorState *) { return true; }
 

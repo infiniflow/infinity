@@ -80,7 +80,7 @@ void InsertData(const String &db_name, const String &table_name) {
         }
     }
     segment_entry->FlushNewData();
-    txn->Import(table_entry, segment_entry);
+    txn->Import(db_name, table_name, segment_entry);
 
     txn_mgr->CommitTxn(txn);
 }
@@ -519,7 +519,7 @@ TEST_P(TableEntryTest, roll_back_committed_write_test) {
             }
         }
         segment_entry->FlushNewData();
-        txn->Import(table_entry, segment_entry);
+        txn->Import(db_name, table_name, segment_entry);
         auto txn_store = txn->GetTxnTableStore(table_entry);
         txn_store->SetAppendState(MakeUnique<AppendState>(txn_store->GetBlocks()));
         Vector<TxnSegmentStore> segment_stores;
@@ -599,7 +599,7 @@ TEST_P(TableEntryTest, roll_back_uncommitted_write_test) {
             }
         }
         segment_entry->FlushNewData();
-        txn->Import(table_entry, segment_entry);
+        txn->Import(db_name, table_name, segment_entry);
         auto txn_store = txn->GetTxnTableStore(table_entry);
         txn_store->SetAppendState(MakeUnique<AppendState>(txn_store->GetBlocks()));
         Vector<TxnSegmentStore> segment_stores;
@@ -699,7 +699,7 @@ TEST_P(TableEntryTest, check_any_delete_test) {
         EXPECT_FALSE(table_entry->CheckAnyDelete(txn1->BeginTS()));
         Vector<RowID> delete_row_ids;
         delete_row_ids.emplace_back(0, 0);
-        txn1->Delete(table_entry, delete_row_ids);
+        txn1->Delete(db_name, table_name, delete_row_ids);
         txn_mgr->CommitTxn(txn1);
 
         auto *txn2 = txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);

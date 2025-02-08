@@ -496,8 +496,7 @@ struct ShowIndexResponse {
 9: string index_column_ids,
 10: string other_parameters,
 11: string store_dir,
-12: string store_size,
-13: string segment_index_count,
+12: string segment_index_count,
 }
 
 struct OptimizeRequest {

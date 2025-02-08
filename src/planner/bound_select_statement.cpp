@@ -89,6 +89,7 @@ import parse_fulltext_options;
 import highlighter;
 import data_type;
 import internal_types;
+import txn;
 
 namespace infinity {
 
@@ -196,9 +197,10 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         if (default_filter_expr && search_expr_->have_filter_in_subsearch_) {
             RecoverableError(Status::SyntaxError("Cannot have filter in subsearch and where clause at the same time."));
         }
-        auto default_common_query_filter = MakeShared<CommonQueryFilter>(default_filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+        auto default_common_query_filter = MakeShared<CommonQueryFilter>(default_filter_expr, base_table_ref, query_context->GetTxn());
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
         match_knn_nodes.reserve(num_children);
+        Txn *txn_ptr = query_context->GetTxn();
         for (auto &match_expr : search_expr_->match_exprs_) {
             auto filter_expr = default_filter_expr;
             auto common_query_filter = default_common_query_filter;
@@ -207,15 +209,16 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     auto match_text_expr = std::dynamic_pointer_cast<MatchExpression>(match_expr);
                     if (match_text_expr->optional_filter_) {
                         filter_expr = match_text_expr->optional_filter_;
-                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
                     }
                     SharedPtr<LogicalMatch> match_node =
                         MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_text_expr));
                     match_node->filter_expression_ = std::move(filter_expr);
                     match_node->common_query_filter_ = std::move(common_query_filter);
-                    match_node->index_reader_ = base_table_ref->table_entry_ptr_->GetFullTextIndexReader(query_context->GetTxn());
+                    match_node->index_reader_ =
+                        txn_ptr->GetFullTextIndexReader(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
 
-                    Map<String, String> column2analyzer = match_node->index_reader_.GetColumn2Analyzer(match_node->match_expr_->index_names_);
+                    Map<String, String> column2analyzer = match_node->index_reader_->GetColumn2Analyzer(match_node->match_expr_->index_names_);
                     SearchOptions search_ops(match_node->match_expr_->options_text_);
 
                     // option: begin_threshold
@@ -376,7 +379,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     auto match_dense_expr = std::dynamic_pointer_cast<KnnExpression>(match_expr);
                     if (match_dense_expr->optional_filter_) {
                         filter_expr = match_dense_expr->optional_filter_;
-                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
                     }
                     auto knn_scan = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(),
                                                                base_table_ref,
@@ -391,7 +394,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     auto match_tensor_expr = std::dynamic_pointer_cast<MatchTensorExpression>(match_expr);
                     if (match_tensor_expr->optional_filter_) {
                         filter_expr = match_tensor_expr->optional_filter_;
-                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
                     }
                     auto match_tensor_node =
                         MakeShared<LogicalMatchTensorScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_tensor_expr));
@@ -405,7 +408,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                     auto match_sparse_expr = std::dynamic_pointer_cast<MatchSparseExpression>(match_expr);
                     if (match_sparse_expr->optional_filter_) {
                         filter_expr = match_sparse_expr->optional_filter_;
-                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
+                        common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn());
                     }
                     auto match_sparse_node =
                         MakeShared<LogicalMatchSparseScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_sparse_expr));

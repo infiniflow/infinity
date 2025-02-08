@@ -31,11 +31,11 @@ import meta_map;
 import random;
 import cleanup_scanner;
 import snapshot_info;
+import txn;
 
 namespace infinity {
 
 class TxnManager;
-class Txn;
 class DBMeta;
 
 export struct DBEntry final : public BaseEntry {
@@ -162,7 +162,7 @@ private: // TODO: remote it
 public:
     void PickCleanup(CleanupScanner *scanner) override;
 
-    Vector<String> GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const final;
+    Vector<String> GetFilePath(Txn* txn) const final;
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) override;
 

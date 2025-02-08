@@ -347,6 +347,95 @@ Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name,
     return db_entry->GetTableInfo(table_name, txn);
 }
 
+Tuple<SharedPtr<SegmentInfo>, Status> Catalog::GetSegmentInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+
+    SharedPtr<SegmentInfo> segment_info = table_entry->GetSegmentInfo(segment_id, txn_ptr);
+    if (segment_info == nullptr) {
+        return {nullptr, Status::SegmentNotExist(segment_id)};
+    }
+
+    return {segment_info, Status::OK()};
+}
+
+Tuple<Vector<SharedPtr<SegmentInfo>>, Status> Catalog::GetSegmentsInfo(const String &db_name, const String &table_name, Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {Vector<SharedPtr<SegmentInfo>>(), table_status};
+    }
+
+    return {table_entry->GetSegmentsInfo(txn_ptr), Status::OK()};
+}
+
+Tuple<SharedPtr<BlockInfo>, Status>
+Catalog::GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+
+    auto segment_entry = table_entry->GetSegmentByID(segment_id, txn_ptr->BeginTS());
+    if (!segment_entry) {
+        return {nullptr, Status::SegmentNotExist(segment_id)};
+    }
+
+    auto block_info = segment_entry->GetBlockInfo(block_id, txn_ptr);
+    if (!block_info) {
+        return {nullptr, Status::BlockNotExist(block_id)};
+    }
+
+    return {block_info, Status::OK()};
+}
+
+Tuple<Vector<SharedPtr<BlockInfo>>, Status>
+Catalog::GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn_ptr) {
+
+    Vector<SharedPtr<BlockInfo>> null_result;
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {null_result, table_status};
+    }
+
+    auto segment_entry = table_entry->GetSegmentByID(segment_id, txn_ptr->BeginTS());
+    if (!segment_entry) {
+        return {null_result, Status::SegmentNotExist(segment_id)};
+    }
+
+    return {segment_entry->GetBlocksInfo(txn_ptr), Status::OK()};
+}
+
+Tuple<SharedPtr<BlockColumnInfo>, Status> Catalog::GetBlockColumnInfo(const String &db_name,
+                                                                      const String &table_name,
+                                                                      SegmentID segment_id,
+                                                                      BlockID block_id,
+                                                                      ColumnID column_id,
+                                                                      Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+
+    auto segment_entry = table_entry->GetSegmentByID(segment_id, txn_ptr->BeginTS());
+    if (!segment_entry) {
+        return {nullptr, Status::SegmentNotExist(segment_id)};
+    }
+
+    return segment_entry->GetBlockColumnInfo(block_id, column_id, txn_ptr);
+}
+
 Status Catalog::RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id) {
     TableMeta *table_meta = table_entry->GetTableMeta();
     LOG_TRACE(fmt::format("Remove a table/collection entry: {}", *table_entry->GetTableName()));
@@ -390,15 +479,6 @@ Catalog::GetIndexByName(const String &db_name, const String &table_name, const S
         return {nullptr, table_status};
     }
     return table_entry->GetIndex(index_name, txn_id, begin_ts);
-}
-
-Tuple<SharedPtr<TableIndexInfo>, Status>
-Catalog::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name, txn_id, begin_ts);
-    if (!table_status.ok()) {
-        return {nullptr, table_status};
-    }
-    return table_entry->GetTableIndexInfo(index_name, txn_id, begin_ts);
 }
 
 Status Catalog::RemoveIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id) {

@@ -265,7 +265,7 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateSchema *create_node, Share
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *create_node->schema_name());
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *create_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
@@ -298,7 +298,7 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, Shared
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *create_node->schema_name());
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *create_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
@@ -354,7 +354,7 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateIndex *create_node, Shared
     }
 
     {
-        String schema_name_str = String(intent_size, ' ') + " - schema name: " + *create_node->base_table_ref()->schema_name();
+        String schema_name_str = String(intent_size, ' ') + " - database name: " + *create_node->base_table_ref()->db_name();
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
@@ -396,7 +396,7 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateCollection *create_node, S
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *create_node->schema_name());
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *create_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
@@ -434,7 +434,7 @@ Status ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedP
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), create_node->create_view_info()->schema_name_);
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), create_node->create_view_info()->schema_name_);
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
@@ -498,7 +498,7 @@ Status ExplainLogicalPlan::Explain(const LogicalDropSchema *drop_node, SharedPtr
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *drop_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
@@ -531,7 +531,7 @@ Status ExplainLogicalPlan::Explain(const LogicalDropTable *drop_node, SharedPtr<
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *drop_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
@@ -570,7 +570,7 @@ Status ExplainLogicalPlan::Explain(const LogicalDropCollection *drop_node, Share
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *drop_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
@@ -611,7 +611,7 @@ Status ExplainLogicalPlan::Explain(const LogicalDropView *drop_node, SharedPtr<V
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *drop_node->schema_name());
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *drop_node->schema_name());
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
@@ -650,14 +650,14 @@ Status ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<V
 
     // Schema name
     {
-        String schema_name_str = fmt::format("{} - schema name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetDBName());
+        String schema_name_str = fmt::format("{} - database name: {}", String(intent_size, ' '), *(insert_node->table_info()->db_name_));
 
         result->emplace_back(MakeShared<String>(schema_name_str));
     }
 
     // Table name
     {
-        String table_name_str = fmt::format("{} - table name: {}", String(intent_size, ' '), *insert_node->table_entry()->GetTableName());
+        String table_name_str = fmt::format("{} - table name: {}", String(intent_size, ' '), *(insert_node->table_info()->table_name_));
         result->emplace_back(MakeShared<String>(table_name_str));
     }
 
@@ -915,9 +915,9 @@ Status ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shar
     table_name += table_scan_node->TableAlias();
     table_name += "(";
 
-    table_name += *table_scan_node->table_collection_ptr()->GetDBName();
+    table_name += *table_scan_node->table_info()->db_name_;
     table_name += ".";
-    table_name += *table_scan_node->table_collection_ptr()->GetTableName();
+    table_name += *table_scan_node->table_info()->table_name_;
     table_name += ")";
     result->emplace_back(MakeShared<String>(table_name));
 
@@ -963,9 +963,9 @@ Status ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, Shar
     table_name += index_scan_node->TableAlias();
     table_name += "(";
 
-    table_name += *index_scan_node->table_collection_ptr()->GetDBName();
+    table_name += *index_scan_node->table_info()->db_name_;
     table_name += ".";
-    table_name += *index_scan_node->table_collection_ptr()->GetTableName();
+    table_name += *index_scan_node->table_info()->table_name_;
     table_name += ")";
     result->emplace_back(MakeShared<String>(table_name));
 
@@ -1019,9 +1019,9 @@ Status ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPt
     table_name += knn_scan_node->TableAlias();
     table_name += "(";
 
-    table_name += *knn_scan_node->table_collection_ptr()->GetDBName();
+    table_name += *knn_scan_node->table_info()->db_name_;
     table_name += ".";
-    table_name += *knn_scan_node->table_collection_ptr()->GetTableName();
+    table_name += *knn_scan_node->table_info()->table_name_;
     table_name += ")";
     result->emplace_back(MakeShared<String>(table_name));
 
@@ -2320,13 +2320,13 @@ Status ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<V
 
     {
         SharedPtr<String> schema_name =
-            MakeShared<String>(fmt::format("{} - schema name: {}", String(intent_size, ' '), *import_node->table_entry()->GetDBName()));
+            MakeShared<String>(fmt::format("{} - database name: {}", String(intent_size, ' '), *(import_node->table_info()->db_name_)));
         result->emplace_back(schema_name);
     }
 
     {
         SharedPtr<String> table_name =
-            MakeShared<String>(fmt::format("{} - table name: {}", String(intent_size, ' '), *import_node->table_entry()->GetTableName()));
+            MakeShared<String>(fmt::format("{} - table name: {}", String(intent_size, ' '), *(import_node->table_info()->table_name_)));
         result->emplace_back(table_name);
     }
 
@@ -2409,7 +2409,7 @@ Status ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<V
     }
 
     {
-        SharedPtr<String> schema_name = MakeShared<String>(fmt::format("{} - schema name: {}", String(intent_size, ' '), export_node->schema_name()));
+        SharedPtr<String> schema_name = MakeShared<String>(fmt::format("{} - database name: {}", String(intent_size, ' '), export_node->schema_name()));
         result->emplace_back(schema_name);
     }
 

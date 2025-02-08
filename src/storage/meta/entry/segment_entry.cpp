@@ -44,6 +44,7 @@ import background_process;
 import wal_entry;
 import infinity_context;
 import roaring_bitmap;
+import meta_info;
 
 namespace infinity {
 
@@ -561,6 +562,32 @@ SharedPtr<BlockEntry> SegmentEntry::GetBlockEntryByID(BlockID block_id) const {
     return block_entries_[block_id];
 }
 
+Tuple<SharedPtr<BlockColumnInfo>, Status> SegmentEntry::GetBlockColumnInfo(BlockID block_id, ColumnID column_id, Txn *txn) const {
+    std::shared_lock lock(rw_locker_);
+    if (block_id >= block_entries_.size()) {
+        return {nullptr, Status::BlockNotExist(block_id)};
+    }
+    BlockEntry *block_entry = block_entries_[block_id].get();
+    return block_entry->GetBlockColumnInfo(column_id);
+}
+
+SharedPtr<BlockInfo> SegmentEntry::GetBlockInfo(BlockID block_id, Txn *txn_ptr) const {
+    std::shared_lock lock(rw_locker_);
+    if (block_id >= block_entries_.size()) {
+        return nullptr;
+    }
+    return block_entries_[block_id]->GetBlockInfo(txn_ptr);
+}
+
+Vector<SharedPtr<BlockInfo>> SegmentEntry::GetBlocksInfo(Txn *txn) const {
+    Vector<SharedPtr<BlockInfo>> blocks_info;
+    std::shared_lock lock(rw_locker_);
+    for (const auto &block_entry : block_entries_) {
+        blocks_info.emplace_back(block_entry->GetBlockInfo(txn));
+    }
+    return blocks_info;
+}
+
 SegmentStatus SegmentEntry::GetSaveStatus(TxnTimeStamp ts) const {
     switch (status_) {
         case SegmentStatus::kUnsealed:
@@ -689,12 +716,12 @@ void SegmentEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> SegmentEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+Vector<String> SegmentEntry::GetFilePath(Txn *txn) const {
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     Vector<String> res;
     res.reserve(block_entries_.size());
     for (const auto &block_entry : block_entries_) {
-        Vector<String> files = block_entry->GetFilePath(txn_id, begin_ts);
+        Vector<String> files = block_entry->GetFilePath(txn);
         res.insert(res.end(), files.begin(), files.end());
     }
     return res;
@@ -750,6 +777,27 @@ void SegmentEntry::DropColumns(const Vector<ColumnID> &column_ids, TxnTableStore
     for (auto &block : block_entries_) {
         block->DropColumns(column_ids, table_store);
     }
+}
+
+SharedPtr<SegmentInfo> SegmentEntry::GetSegmentInfo(Txn *txn_ptr) const {
+    SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
+    std::shared_lock lock(rw_locker_);
+    segment_info->segment_id_ = segment_id_;
+    segment_info->status_ = status_;
+    segment_info->segment_dir_ = segment_dir_;
+    segment_info->block_count_ = block_entries_.size();
+    segment_info->row_count_ = row_count_;
+    segment_info->actual_row_count_ = actual_row_count_;
+    segment_info->row_capacity_ = row_capacity_;
+    segment_info->column_count_ = column_count_;
+    segment_info->storage_size_ = GetStorageSize();
+    segment_info->files_.reserve(block_entries_.size());
+    for (const auto &block_entry : block_entries_) {
+        Vector<String> files = block_entry->GetFilePath(txn_ptr);
+        segment_info->files_.insert(segment_info->files_.end(), files.begin(), files.end());
+    }
+
+    return segment_info;
 }
 
 SharedPtr<SegmentSnapshotInfo> SegmentEntry::GetSnapshotInfo() const {

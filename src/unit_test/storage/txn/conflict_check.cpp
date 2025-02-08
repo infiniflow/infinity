@@ -62,7 +62,7 @@ protected:
 
         auto [table_entry, status] = txn->GetTableByName(db_name, table_name);
         EXPECT_TRUE(status.ok());
-        status = txn->Delete(table_entry, row_ids, true);
+        status = txn->Delete(db_name, table_name, row_ids, true);
         EXPECT_TRUE(status.ok());
         return txn;
     };
@@ -98,7 +98,7 @@ protected:
         auto data_block = DataBlock::Make();
         data_block->Init(column_vectors);
 
-        status = txn->Append(table_entry, data_block);
+        status = txn->Append(db_name, table_name, data_block);
         EXPECT_TRUE(status.ok());
 
         txn_mgr_->CommitTxn(txn);

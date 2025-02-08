@@ -21,7 +21,7 @@ import infinity_exception;
 import global_block_id;
 import internal_types;
 import default_values;
-import table_entry;
+import meta_info;
 import table_index_entry;
 import segment_entry;
 import segment_index_entry;
@@ -60,7 +60,7 @@ public:
 
 export class CompactStateData {
 public:
-    CompactStateData(TableEntry *table_entry) : new_table_ref_(MakeShared<BaseTableRef>(table_entry, MakeShared<BlockIndex>())) {
+    CompactStateData(SharedPtr<TableInfo> table_info) : new_table_ref_(MakeShared<BaseTableRef>(std::move(table_info), MakeShared<BlockIndex>())) {
         // src/executor/operator/physical_create_index_prepare.cpp: Note1
         new_table_ref_->index_index_ = MakeShared<IndexIndex>();
     };
