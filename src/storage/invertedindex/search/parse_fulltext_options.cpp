@@ -14,7 +14,6 @@
 
 module;
 
-#include <iostream>
 #include <re2/re2.h>
 #include <vector>
 module parse_fulltext_options;
