@@ -30,6 +30,7 @@ import internal_types;
 import logger;
 import infinity_exception;
 import simd_functions;
+import smallfloat;
 
 namespace infinity {
 
@@ -122,7 +123,8 @@ void RankFeaturesDocIterator::DecodeFrom(const RowID buffer_start_doc_id) {
             if (payload == 0) {
                 continue;
             }
-            score_sum += static_cast<f32>(payload) * reinterpret_cast<RankFeatureDocIterator *>(children_[j].get())->GetWeight();
+            float w = SmallFloat::UInt16ToFloat122(payload);
+            score_sum += w * reinterpret_cast<RankFeatureDocIterator *>(children_[j].get())->GetWeight();
             ++match_cnt;
         }
         match_cnt_ptr_[i] = match_cnt;
