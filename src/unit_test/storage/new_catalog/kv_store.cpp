@@ -420,9 +420,10 @@ TEST_P(KVStoreTest, kv_store6) {
         status = kv_instance1->Put("loop", "value5");
         EXPECT_TRUE(status.ok());
 
-        auto iter2 = kv_instance1->GetIterator("key2", "key4");
+//        auto iter2 = kv_instance1->GetIterator("key2", "key4");
+        auto iter2 = kv_instance1->GetIterator();
 
-        String prefix = "key";
+        String prefix = "";
         iter2->Seek(prefix);
         while (iter2->Valid() && iter2->Key().starts_with(prefix)) {
             std::cout << iter2->Key().ToString() << ": " << iter2->Value().ToString() << std::endl;

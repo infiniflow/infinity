@@ -261,15 +261,6 @@ Status NewTxn::DropDatabase(const String &db_name, ConflictType conflict_type) {
 
     this->CheckTxnStatus();
 
-//    bool db_exist = this->CheckDatabaseExists(db_name);
-//    if (!db_exist and conflict_type == ConflictType::kError) {
-//        return Status::DBNotExist(db_name);
-//    }
-//
-//    if (!db_exist and conflict_type == ConflictType::kIgnore) {
-//        return Status::OK();
-//    }
-
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropDatabase>(db_name);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
@@ -300,12 +291,12 @@ bool NewTxn::CheckDatabaseExists(const String &db_name) {
     return true;
 }
 
-Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const SharedPtr<String> &db_name) {
+Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_name) {
     this->CheckTxnStatus();
 
-    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(*db_name);
-    String db_key = KeyEncode::CatalogDbKey(*db_name, this->BeginTS(), this->TxnID());
+    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(db_name);
     auto iter2 = kv_instance_->GetIterator();
+
     iter2->Seek(db_key_prefix);
     SizeT found_count = 0;
     while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
@@ -314,11 +305,11 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const SharedPtr<S
     }
 
     if (found_count == 0) {
-        return {nullptr, Status::DBNotExist(*db_name)};
+        return {nullptr, Status::DBNotExist(db_name)};
     }
 
     SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
-    db_info->db_name_ = db_name;
+    db_info->db_name_ = MakeShared<String>(db_name);
     //    db_info->db_entry_dir_ = db_entry->db_entry_dir();
     //    db_info->absolute_db_path_ = db_entry->AbsoluteDir();
     //    db_info->table_count_ = db_entry->TableCollections(txn_id, begin_ts).size();
@@ -779,6 +770,14 @@ Status NewTxn::PrepareCommit() {
                         return status;
                     }
                 }
+
+//                auto iter2 = kv_instance_->GetIterator();
+//                String prefix = "";
+//                iter2->Seek(prefix);
+//                while (iter2->Valid() && iter2->Key().starts_with(prefix)) {
+//                    std::cout << iter2->Key().ToString() << String(" : ") << iter2->Value().ToString() << std::endl;
+//                    iter2->Next();
+//                }
                 break;
             }
             case WalCommandType::DROP_DATABASE: {

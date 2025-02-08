@@ -123,7 +123,7 @@ public:
 
     bool CheckDatabaseExists(const String &db_name);
 
-    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const SharedPtr<String> &db_name);
+    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name);
 
     Vector<DatabaseDetail> ListDatabases();
 

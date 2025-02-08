@@ -37,63 +37,43 @@ TEST_P(NewCatalogTest, db_test) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    //    NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-
     {
         // start txn1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-
         // start txn2
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kRead);
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kRead);
 
         Status status = txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
         status = txn2->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
 
-//        status = txn1->DropDatabase("db1", ConflictType::kError);
-//        EXPECT_TRUE(status.ok());
-//
-//        status = txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
-//        EXPECT_TRUE(status.ok());
-
-        //        Status status = new_catalog->CreateDatabase("db1", MakeShared<String>(), txn1);
-        //        EXPECT_TRUE(status.ok());
-        //        bool db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn1);
-        //        EXPECT_TRUE(db1_exist);
-        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
-        //        EXPECT_FALSE(db1_exist);
-        //
-        //        status = new_catalog->DropDatabase(MakeShared<String>("db1"), txn1);
-        //        EXPECT_TRUE(status.ok());
-        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn1);
-        //        EXPECT_FALSE(db1_exist);
-        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
-        //        EXPECT_FALSE(db1_exist);
-
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
         std::cout << status.message() << std::endl;
-    }
 
-    {
-        //        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        //
-        //        Status status = new_catalog->CreateDatabase("db1", MakeShared<String>(), txn1);
-        //        EXPECT_TRUE(status.ok());
-        //        bool db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn1);
-        //        EXPECT_TRUE(db1_exist);
-        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
-        //        EXPECT_FALSE(db1_exist);
-        //
-        //        new_txn_mgr->CommitTxn(txn1);
-        //        db1_exist = new_catalog->CheckDatabaseExists(MakeShared<String>("db1"), txn2);
-        //        EXPECT_FALSE(db1_exist);
-        //        status = new_catalog->CreateDatabase("db1", MakeShared<String>(), txn2);
-        //        EXPECT_FALSE(status.ok());
-        //        new_txn_mgr->RollBackTxn(txn2);
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto [db_info, db_status] = txn3->GetDatabaseInfo("db1");
+        EXPECT_TRUE(db_status.ok());
+        EXPECT_STREQ(db_info->db_name_->c_str(), "db1");
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop db1
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        status = txn4->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // get db1
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        auto [db_info2, db_status1] = txn5->GetDatabaseInfo("db1");
+        EXPECT_TRUE(db_info2 == nullptr);
+        EXPECT_FALSE(db_status1.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
     }
 }
