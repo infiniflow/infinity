@@ -37,6 +37,7 @@ import internal_types;
 import data_type;
 import logical_type;
 import infinity_context;
+import meta_info;
 
 namespace infinity {
 
@@ -173,6 +174,28 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::ApplyBlockColumnSnapshot(BlockEntr
 
     block_column_entry->last_chunk_offset_ = block_column_snapshot_info->last_chunk_offset_;
     return block_column_entry;
+}
+
+SharedPtr<BlockColumnInfo> BlockColumnEntry::GetColumnInfo() const {
+    SharedPtr<BlockColumnInfo> block_column_info = MakeShared<BlockColumnInfo>();
+    block_column_info->column_id_ = column_id_;
+    block_column_info->data_type_ = column_type_;
+    block_column_info->filename_ = filename_;
+
+    SizeT storage_size = 0;
+    storage_size += buffer_->GetBufferSize();
+    for (BufferObj *outline_buffer : outline_buffers_) {
+        storage_size += outline_buffer->GetBufferSize();
+    }
+
+    block_column_info->storage_size_ = storage_size;
+    SizeT outline_count = outline_buffers_.size();
+    block_column_info->extra_file_count_ = outline_count;
+    block_column_info->extra_file_names_.reserve(outline_count);
+    for (SizeT file_idx = 0; file_idx < outline_count; ++file_idx) {
+        block_column_info->extra_file_names_.emplace_back(OutlineFilename(file_idx));
+    }
+    return block_column_info;
 }
 
 SharedPtr<BlockColumnSnapshotInfo> BlockColumnEntry::GetSnapshotInfo() const {
@@ -353,7 +376,7 @@ void BlockColumnEntry::Cleanup(CleanupInfoTracer *info_tracer, [[maybe_unused]] 
     }
 }
 
-Vector<String> BlockColumnEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const { return FilePaths(); }
+Vector<String> BlockColumnEntry::GetFilePath(Txn *txn) const { return FilePaths(); }
 
 nlohmann::json BlockColumnEntry::Serialize() {
     nlohmann::json json_res;

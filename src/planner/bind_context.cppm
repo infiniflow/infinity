@@ -27,7 +27,7 @@ import column_identifer;
 import binding;
 import base_expression;
 import block_index;
-import table_entry;
+import meta_info;
 import internal_types;
 import select_statement;
 import parsed_expr;
@@ -198,7 +198,7 @@ public:
 
     void AddTableBinding(const String &name,
                          u64 table_index,
-                         TableEntry *table_collection_entry_ptr,
+                         SharedPtr<TableInfo> table_info,
                          SharedPtr<Vector<SharedPtr<DataType>>> column_types,
                          SharedPtr<Vector<String>> column_names,
                          SharedPtr<BlockIndex> block_index);

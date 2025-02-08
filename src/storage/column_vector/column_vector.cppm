@@ -295,6 +295,8 @@ public:
 
     void SetArrayValue(ArrayT &target, const Value &value);
 
+    bool AppendUnnestArray(const ColumnVector &other, SizeT offset, SizeT &array_offset);
+
 private:
     Value GetArrayValueRecursively(const DataType &data_type, const char *data_ptr) const;
 

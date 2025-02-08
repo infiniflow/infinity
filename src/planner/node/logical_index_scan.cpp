@@ -70,7 +70,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> LogicalIndexScan::GetOutputTypes() const 
     return result_types;
 }
 
-TableEntry *LogicalIndexScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+TableInfo *LogicalIndexScan::table_info() const { return base_table_ref_->table_info_.get(); }
 
 String LogicalIndexScan::TableAlias() const { return base_table_ref_->alias_; }
 
@@ -83,7 +83,7 @@ String LogicalIndexScan::ToString(i64 &space) const {
         space -= 4;
         arrow_str = "->  ";
     }
-    ss << String(space, ' ') << arrow_str << "IndexScan: " << *base_table_ref_->table_entry_ptr_->GetTableName();
+    ss << String(space, ' ') << arrow_str << "IndexScan: " << *base_table_ref_->table_info_->table_name_;
     ss << ", filter expression: " << index_filter_->Name();
     space += arrow_str.size();
 

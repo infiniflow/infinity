@@ -77,7 +77,7 @@ String LogicalImport::ToString(i64 &space) const {
         }
     }
 
-    ss << "to " << *table_entry_->GetDBName() << '.' << *table_entry_->GetTableName();
+    ss << "to " << *table_info_->db_name_ << '.' << *table_info_->table_name_;
 
     space += arrow_str.size();
 

@@ -107,9 +107,11 @@ Txn::~Txn() {
 }
 
 // DML
-Status Txn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry) {
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
+Status Txn::Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
 
     this->CheckTxn(db_name);
 
@@ -126,9 +128,11 @@ Status Txn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entr
     return Status::OK();
 }
 
-Status Txn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block) {
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
+Status Txn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
 
     this->CheckTxn(db_name);
     TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
@@ -141,9 +145,11 @@ Status Txn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_bl
     return append_status;
 }
 
-Status Txn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict) {
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
+Status Txn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
 
     this->CheckTxn(db_name);
 
@@ -167,6 +173,38 @@ Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vecto
 
     auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
     return compact_status;
+}
+
+void Txn::OptimizeIndexes() {
+    TransactionID txn_id = this->TxnID();
+    TxnTimeStamp begin_ts = this->BeginTS();
+
+    Vector<DBEntry *> db_entries = catalog_->Databases(txn_id, begin_ts);
+    for (auto *db_entry : db_entries) {
+        Vector<TableEntry *> table_entries = db_entry->TableCollections(txn_id, begin_ts);
+        for (auto *table_entry : table_entries) {
+            table_entry->OptimizeIndex(this);
+        }
+    }
+}
+
+Status Txn::OptimizeTableIndexes(const String &db_name, const String &table_name) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return table_status;
+    }
+    table_entry->OptimizeIndex(this);
+    return Status::OK();
+}
+
+Status
+Txn::OptimizeIndexByName(const String &db_name, const String &table_name, const String &index_name, Vector<UniquePtr<InitParameter>> init_params) {
+    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
+    if (!status.ok()) {
+        return status;
+    }
+    this->OptIndex(table_index_entry, std::move(init_params));
+    return Status::OK();
 }
 
 Status Txn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
@@ -239,11 +277,11 @@ Status Txn::DropDatabase(const String &db_name, ConflictType conflict_type) {
     return Status::OK();
 }
 
-Tuple<DBEntry *, Status> Txn::GetDatabase(const String &db_name) {
+Status Txn::GetDatabase(const String &db_name) {
     this->CheckTxnStatus();
     TxnTimeStamp begin_ts = this->BeginTS();
-
-    return catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
+    auto [db_entry, status] = catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
+    return status;
 }
 
 Tuple<SharedPtr<DatabaseInfo>, Status> Txn::GetDatabaseInfo(const String &db_name) {
@@ -295,18 +333,23 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     return Status::OK();
 }
 
-Status Txn::RenameTable(TableEntry *old_table_entry, const String &new_table_name) {
+Status Txn::RenameTable(const String &old_table_name, const String &new_table_name) {
     UnrecoverableError("Not implemented yet");
     return Status::OK();
 }
 
-Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs) {
-    TxnTimeStamp begin_ts = this->BeginTS();
+Status Txn::AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs) {
+    auto [table_entry, table_status] = GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return table_status;
+    }
 
-    auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_context_ptr_->txn_id_, begin_ts);
+    TxnTimeStamp begin_ts = this->BeginTS();
+    auto [db_entry, db_status] = catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
     if (!db_status.ok()) {
         return db_status;
     }
+
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     new_table_entry->InitCompactionAlg(begin_ts);
     TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
@@ -323,13 +366,18 @@ Status Txn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef
     return Status::OK();
 }
 
-Status Txn::DropColumns(TableEntry *table_entry, const Vector<String> &column_names) {
-    TxnTimeStamp begin_ts = this->BeginTS();
+Status Txn::DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names) {
+    auto [table_entry, table_status] = GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return table_status;
+    }
 
-    auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_context_ptr_->txn_id_, begin_ts);
+    TxnTimeStamp begin_ts = this->BeginTS();
+    auto [db_entry, db_status] = catalog_->GetDatabase(db_name, txn_context_ptr_->txn_id_, begin_ts);
     if (!db_status.ok()) {
         return db_status;
     }
+
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     new_table_entry->InitCompactionAlg(begin_ts);
     TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
@@ -398,8 +446,19 @@ Tuple<TableIndexEntry *, Status> Txn::GetIndexByName(const String &db_name, cons
 }
 
 Tuple<SharedPtr<TableIndexInfo>, Status> Txn::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name) {
-    TxnTimeStamp begin_ts = this->BeginTS();
-    return catalog_->GetTableIndexInfo(db_name, table_name, index_name, txn_context_ptr_->txn_id_, begin_ts);
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+    return table_entry->GetTableIndexInfo(index_name, this);
+}
+
+Tuple<Vector<SharedPtr<TableIndexInfo>>, Status> Txn::GetTableIndexesInfo(const String &db_name, const String &table_name) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return {Vector<SharedPtr<TableIndexInfo>>(), table_status};
+    }
+    return table_entry->GetTableIndexesInfo(this);
 }
 
 Pair<Vector<SegmentIndexEntry *>, Status>
@@ -414,13 +473,17 @@ Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_
 
 // TODO: use table ref instead of table entry
 Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
-    auto *table_entry = table_ref->table_entry_ptr_;
+    auto [table_entry, table_status] = this->GetTableByName(*table_ref->table_info_->db_name_, *table_ref->table_info_->table_name_);
+    if (!table_status.ok()) {
+        return table_status;
+    }
+
     const auto &db_name = *table_entry->GetDBName();
     const auto &table_name = *table_entry->GetTableName();
 
-    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
-    if (!status.ok()) {
-        return status;
+    auto [table_index_entry, index_status] = this->GetIndexByName(db_name, table_name, index_name);
+    if (!index_status.ok()) {
+        return index_status;
     }
 
     return table_index_entry->CreateIndexDo(table_ref, create_index_idxes, this);
@@ -483,6 +546,40 @@ Status Txn::DropIndexByName(const String &db_name, const String &table_name, con
     return index_status;
 }
 
+SharedPtr<IndexReader> Txn::GetFullTextIndexReader(const String &db_name, const String &table_name) {
+    this->CheckTxn(db_name);
+
+    TxnTimeStamp begin_ts = this->BeginTS();
+    auto [table_entry, status] = catalog_->GetTableByName(db_name, table_name, txn_context_ptr_->txn_id_, begin_ts);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    return table_entry->GetFullTextIndexReader(this);
+}
+
+Tuple<SharedPtr<SegmentIndexInfo>, Status>
+Txn::GetSegmentIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
+    if (!table_status.ok()) {
+        return {nullptr, table_status};
+    }
+
+    auto [table_index_entry, index_status] = this->GetIndexByName(db_name, table_name, index_name);
+    if (!index_status.ok()) {
+        return {nullptr, index_status};
+    }
+
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> segment_map = table_index_entry->GetIndexBySegmentSnapshot(table_entry, this);
+    auto iter = segment_map.find(segment_id);
+    if (iter == segment_map.end()) {
+        return {nullptr, Status::SegmentNotExist(segment_id)};
+    }
+    SegmentIndexEntry *segment_index_entry = iter->second.get();
+
+    return {segment_index_entry->GetSegmentIndexInfo(this), Status::OK()};
+}
+
 Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const String &table_name) {
     this->CheckTxn(db_name);
 
@@ -491,8 +588,56 @@ Tuple<TableEntry *, Status> Txn::GetTableByName(const String &db_name, const Str
     return catalog_->GetTableByName(db_name, table_name, txn_context_ptr_->txn_id_, begin_ts);
 }
 
+SharedPtr<BlockIndex> Txn::GetBlockIndexFromTable(const String &db_name, const String &table_name) {
+    this->CheckTxn(db_name);
+    TxnTimeStamp begin_ts = this->BeginTS();
+    auto [table_entry, status] = catalog_->GetTableByName(db_name, table_name, txn_context_ptr_->txn_id_, begin_ts);
+    if (!status.ok()) {
+        return nullptr;
+    }
+    return table_entry->GetBlockIndex(this);
+}
+
 Tuple<SharedPtr<TableInfo>, Status> Txn::GetTableInfo(const String &db_name, const String &table_name) {
     return catalog_->GetTableInfo(db_name, table_name, this);
+}
+
+Tuple<SharedPtr<SegmentInfo>, Status> Txn::GetSegmentInfo(const String &db_name, const String &table_name, SegmentID segment_id) {
+    return catalog_->GetSegmentInfo(db_name, table_name, segment_id, this);
+}
+
+Tuple<Vector<SharedPtr<SegmentInfo>>, Status> Txn::GetSegmentsInfo(const String &db_name, const String &table_name) {
+    return catalog_->GetSegmentsInfo(db_name, table_name, this);
+}
+
+Tuple<SharedPtr<BlockInfo>, Status> Txn::GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id) {
+    return catalog_->GetBlockInfo(db_name, table_name, segment_id, block_id, this);
+}
+
+Tuple<Vector<SharedPtr<BlockInfo>>, Status> Txn::GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id) {
+    return catalog_->GetBlocksInfo(db_name, table_name, segment_id, this);
+}
+
+Tuple<SharedPtr<BlockColumnInfo>, Status>
+Txn::GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id) {
+    return catalog_->GetBlockColumnInfo(db_name, table_name, segment_id, block_id, column_id, this);
+}
+
+Status Txn::CheckTableExist(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+bool Txn::CheckTableHasDelete(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+
+    return table_entry->CheckAnyDelete(this->BeginTS());
 }
 
 Tuple<SharedPtr<TableSnapshotInfo>, Status> Txn::GetTableSnapshot(const String &db_name, const String &table_name) {
@@ -510,6 +655,44 @@ Status Txn::CreateCollection(const String &, const String &, ConflictType, BaseE
 
 Status Txn::GetCollectionByName(const String &, const String &, BaseEntry *&) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetCollectionByName"};
+}
+
+Status Txn::LockTable(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    status = table_entry->SetLocked();
+    LOG_INFO(fmt::format("Table {}.{} is locked", db_name, table_name));
+    return status;
+}
+
+Status Txn::UnLockTable(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    status = table_entry->SetUnlock();
+    LOG_INFO(fmt::format("Table {}.{} is unlocked", db_name, table_name));
+    return status;
+}
+
+Status Txn::AddWriteTxnNum(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return status;
+    }
+    return table_entry->AddWriteTxnNum(this);
+}
+
+Tuple<SharedPtr<SegmentEntry>, Status> Txn::MakeNewSegment(const String &db_name, const String &table_name) {
+    auto [table_entry, status] = this->GetTableByName(db_name, table_name);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    u64 segment_id = Catalog::GetNextSegmentID(table_entry);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, this);
+    return {segment_entry, Status::OK()};
 }
 
 Status Txn::CreateView(const String &, const String &, ConflictType, BaseEntry *&) {

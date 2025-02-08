@@ -56,11 +56,14 @@ protected:
         for (SizeT segment_size : segment_sizes) {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("import table"), TransactionType::kNormal);
 
-            auto [table_entry, status] = txn->GetTableByName("default_db", table_name);
-            auto column_count = table_entry->ColumnCount();
+            auto [table_info, status] = txn->GetTableInfo("default_db", table_name);
+            auto column_count = table_info->column_count_;
 
-            SegmentID segment_id = Catalog::GetNextSegmentID(table_entry);
-            auto segment_entry = SegmentEntry::NewSegmentEntry(table_entry, segment_id, txn);
+            auto [segment_entry, segment_status] = txn->MakeNewSegment("default_db", table_name);
+            if (!segment_status.ok()) {
+                RecoverableError(segment_status);
+            }
+
             auto block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, column_count, txn);
 
             while (segment_size > 0) {
@@ -80,7 +83,7 @@ protected:
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, 1, txn);
             }
-            PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
+            PhysicalImport::SaveSegmentData(table_info.get(), txn, segment_entry);
             txn_mgr->CommitTxn(txn);
         }
     }
@@ -295,7 +298,7 @@ TEST_P(CompactTaskTest, compact_with_delete) {
 
             auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
             EXPECT_TRUE(status.ok());
-            txn3->Delete(table_entry, delete_row_ids);
+            txn3->Delete("default_db", table_name, delete_row_ids);
 
             txn_mgr->CommitTxn(txn3);
         }
@@ -381,7 +384,7 @@ TEST_P(SilentLogTestCompactTaskTest, delete_in_compact_process) {
 
             auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
             EXPECT_TRUE(status.ok());
-            txn3->Delete(table_entry, delete_row_ids);
+            txn3->Delete("default_db", table_name, delete_row_ids);
 
             txn_mgr->CommitTxn(txn3);
         }
@@ -406,7 +409,7 @@ TEST_P(SilentLogTestCompactTaskTest, delete_in_compact_process) {
 
             auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
             EXPECT_TRUE(status.ok());
-            txn5->Delete(table_entry, delete_row_ids);
+            txn5->Delete("default_db", table_name, delete_row_ids);
 
             Thread t([&]() {
                 auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, false);
@@ -497,7 +500,7 @@ TEST_P(CompactTaskTest, uncommit_delete_in_compact_process) {
             int total_row_n = table_entry->row_count();
             EXPECT_EQ(total_row_n, row_count);
             EXPECT_TRUE(status.ok());
-            txn3->Delete(table_entry, delete_row_ids);
+            txn3->Delete("default_db", table_name, delete_row_ids);
 
             txn_mgr->CommitTxn(txn3);
         }
@@ -541,7 +544,7 @@ TEST_P(CompactTaskTest, uncommit_delete_in_compact_process) {
                 EXPECT_TRUE(status.ok());
 
                 try {
-                    delete_txn1->Delete(table_entry, delete_row_ids);
+                    delete_txn1->Delete("default_db", table_name, delete_row_ids);
                     txn_mgr->CommitTxn(delete_txn1);
                     LOG_INFO(fmt::format("Delete 1 is committed, {}", delete_row_n1));
                     delete_n += delete_row_n1;
@@ -555,7 +558,7 @@ TEST_P(CompactTaskTest, uncommit_delete_in_compact_process) {
                 try {
                     auto [table_entry, status] = txn5->GetTableByName("default_db", table_name);
                     EXPECT_TRUE(status.ok());
-                    txn5->Delete(table_entry, delete_row_ids2);
+                    txn5->Delete("default_db", table_name, delete_row_ids2);
                     ASSERT_EQ(0, 1);
                 } catch (const RecoverableException &e) {
                     EXPECT_EQ(e.ErrorCode(), ErrorCode::kTxnRollback);

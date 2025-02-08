@@ -152,11 +152,23 @@ public:
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name, Txn* txn_ptr);
+    Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name, Txn *txn_ptr);
 
-    Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn* txn_ptr);
+    Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn *txn_ptr);
 
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name, Txn *txn);
+
+    Tuple<SharedPtr<SegmentInfo>, Status> GetSegmentInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn_ptr);
+
+    Tuple<Vector<SharedPtr<SegmentInfo>>, Status> GetSegmentsInfo(const String &db_name, const String &table_name, Txn *txn_ptr);
+
+    Tuple<SharedPtr<BlockInfo>, Status>
+    GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, Txn *txn);
+
+    Tuple<Vector<SharedPtr<BlockInfo>>, Status> GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id, Txn *txn);
+
+    Tuple<SharedPtr<BlockColumnInfo>, Status>
+    GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id, Txn *txn);
 
     static Status RemoveTableEntry(TableEntry *table_entry, TransactionID txn_id);
 
@@ -178,9 +190,6 @@ public:
 
     Tuple<TableIndexEntry *, Status>
     GetIndexByName(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
-
-    Tuple<SharedPtr<TableIndexInfo>, Status>
-    GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     static Status RemoveIndexEntry(TableIndexEntry *table_index_entry, TransactionID txn_id);
 

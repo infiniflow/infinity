@@ -41,17 +41,20 @@ public:
 
     ~PhysicalUnnest() override = default;
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    inline SharedPtr<Vector<String>> GetOutputNames() const final { return PhysicalCommonFunctionUsingLoadMeta::GetOutputNames(*this); }
+    SharedPtr<Vector<String>> GetOutputNames() const final;
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
     SizeT TaskletCount() override { return left_->TaskletCount(); }
 
     Vector<SharedPtr<BaseExpression>> expression_list() const { return expression_list_; }
+
+private:
+    SizeT GetUnnestIdx() const;
 
 private:
     Vector<SharedPtr<BaseExpression>> expression_list_;

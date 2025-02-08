@@ -180,7 +180,7 @@ TEST_P(TableEntryTest, test2) {
         input_block->Finalize();
         EXPECT_EQ(input_block->Finalized(), true);
 
-        Status append_status = new_txn->Append(table_entry, input_block);
+        Status append_status = new_txn->Append("db1", "tbl1", input_block);
         EXPECT_TRUE(append_status.ok());
         // Txn2: Commit, OK
         txn_mgr->CommitTxn(new_txn);
@@ -268,7 +268,7 @@ TEST_P(TableEntryTest, test2) {
 
             auto [table_entry, status] = new_txn->GetTableByName("db1", "tbl1");
             ASSERT_TRUE(status.ok());
-            new_txn->Append(table_entry, input_block);
+            new_txn->Append("db1", "tbl1", input_block);
         }
 
         //        {

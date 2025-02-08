@@ -34,6 +34,7 @@ import column_def;
 import value;
 import snapshot_info;
 import txn_context;
+import block_index;
 
 namespace infinity {
 
@@ -64,6 +65,7 @@ class BaseTableRef;
 enum class CompactStatementType;
 struct SegmentIndexEntry;
 struct AddDeltaEntryTask;
+struct IndexReader;
 
 export class Txn : public EnableSharedFromThis<Txn> {
 public:
@@ -117,7 +119,7 @@ public:
 
     Status DropDatabase(const String &db_name, ConflictType conflict_type);
 
-    Tuple<DBEntry *, Status> GetDatabase(const String &db_name);
+    Status GetDatabase(const String &db_name);
 
     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name);
 
@@ -128,11 +130,11 @@ public:
 
     Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
-    Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);
+    Status RenameTable(const String &old_table_name, const String &new_table_name);
 
-    Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs);
+    Status AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs);
 
-    Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
+    Status DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names);
 
     Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
@@ -140,13 +142,38 @@ public:
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
+    SharedPtr<BlockIndex> GetBlockIndexFromTable(const String &db_name, const String &table_name);
+
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
 
+    Tuple<SharedPtr<SegmentInfo>, Status> GetSegmentInfo(const String &db_name, const String &table_name, SegmentID segment_id);
+
+    Tuple<Vector<SharedPtr<SegmentInfo>>, Status> GetSegmentsInfo(const String &db_name, const String &table_name);
+
+    Tuple<SharedPtr<BlockInfo>, Status> GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id);
+
+    Tuple<Vector<SharedPtr<BlockInfo>>, Status> GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id);
+
+    Tuple<SharedPtr<BlockColumnInfo>, Status>
+    GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id);
+
+    Status CheckTableExist(const String &db_name, const String &table_name);
+
+    bool CheckTableHasDelete(const String &db_name, const String &table_name);
+
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
+
+    // Lock table related
+    Status LockTable(const String &db_name, const String &table_name);
+    Status UnLockTable(const String &db_name, const String &table_name);
+    Status AddWriteTxnNum(const String &db_name, const String &table_name);
 
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
 
     Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
+
+    // Meta operation
+    Tuple<SharedPtr<SegmentEntry>, Status> MakeNewSegment(const String &db_name, const String &table_name);
 
     // Index OPs
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
@@ -157,6 +184,8 @@ public:
     Tuple<TableIndexEntry *, Status> GetIndexByName(const String &db_name, const String &table_name, const String &index_name);
 
     Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name);
+
+    Tuple<Vector<SharedPtr<TableIndexInfo>>, Status> GetTableIndexesInfo(const String &db_name, const String &table_name);
 
     Pair<Vector<SegmentIndexEntry *>, Status>
     CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
@@ -174,6 +203,11 @@ public:
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
+    SharedPtr<IndexReader> GetFullTextIndexReader(const String &db_name, const String &table_name);
+
+    Tuple<SharedPtr<SegmentIndexInfo>, Status>
+    GetSegmentIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
     // View Ops
     // Fixme: view definition should be given
     Status CreateView(const String &db_name, const String &view_name, ConflictType conflict_type, BaseEntry *&view_entry);
@@ -185,14 +219,19 @@ public:
     Status GetViews(const String &db_name, Vector<ViewDetail> &output_view_array);
 
     // DML
-    Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
+    Status Import(const String &db_name, const String &table_name, SharedPtr<SegmentEntry> segment_entry);
 
-    Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
+    Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
-    Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
+    Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool check_conflict = true);
 
     Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
+    // Internal operation
+    void OptimizeIndexes();
+    Status OptimizeTableIndexes(const String &db_name, const String &table_name);
+    Status
+    OptimizeIndexByName(const String &db_name, const String &table_name, const String &index_name, Vector<UniquePtr<InitParameter>> init_params);
     Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
 
     // Getter
@@ -261,6 +300,22 @@ private:
     void CheckTxnStatus();
 
     void CheckTxn(const String &db_name);
+
+    // private:
+    //     // Legacy ops
+    //     Status CreateDatabaseInternalLegacy(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
+    //     Status DropDatabaseInternalLegacy(const String &db_name, ConflictType conflict_type);
+    //     Tuple<DBEntry *, Status> GetDatabaseInternalLegacy(const String &db_name);
+    //     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfoInternalLegacy(const String &db_name);
+    //     Vector<DatabaseDetail> ListDatabasesInternalLegacy();
+    //
+    // private:
+    //     // New ops
+    //     Status CreateDatabaseInternal(const SharedPtr<String> &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
+    //     Status DropDatabaseInternal(const String &db_name, ConflictType conflict_type);
+    //     Tuple<DBEntry *, Status> GetDatabaseInternal(const String &db_name);
+    //     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfoInternal(const String &db_name);
+    //     Vector<DatabaseDetail> ListDatabasesInternal();
 
 private:
     // Reference to external class

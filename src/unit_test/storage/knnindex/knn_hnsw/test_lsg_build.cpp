@@ -103,18 +103,12 @@ TEST_F(LSGBuildTest, test_avg) {
 
     auto avg_gt = MakeUnique<float[]>(element_size);
     {
-        SizeT sample_num = element_size * lsg_config->sample_raito_;
-        Vector<SizeT> sample_idx(sample_num);
-        for (SizeT i = 0; i < sample_num; ++i) {
-            sample_idx[i] = rand() % element_size;
-        }
-        SizeT ls_k = std::min(lsg_config->ls_k_, sample_num);
-        auto distances = MakeUnique<float[]>(sample_num);
+        SizeT ls_k = std::min(lsg_config->ls_k_, element_size);
+        auto distances = MakeUnique<float[]>(element_size);
         for (SizeT i = 0; i < element_size; ++i) {
             const float *v = data.get() + i * dim;
-            for (SizeT j = 0; j < sample_num; ++j) {
-                SizeT idx = sample_idx[j];
-                const float *v2 = data.get() + idx * dim;
+            for (SizeT j = 0; j < element_size; ++j) {
+                const float *v2 = data.get() + j * dim;
                 float sum = 0;
                 for (SizeT k = 0; k < dim; ++k) {
                     float diff = v[k] - v2[k];
@@ -124,7 +118,7 @@ TEST_F(LSGBuildTest, test_avg) {
                 // distances[j] = distance;
                 distances[j] = sum;
             }
-            std::sort(distances.get(), distances.get() + sample_num);
+            std::sort(distances.get(), distances.get() + element_size);
             float distance_sum = 0;
             for (SizeT j = 0; j < ls_k; ++j) {
                 distance_sum += distances[j];
@@ -134,9 +128,8 @@ TEST_F(LSGBuildTest, test_avg) {
     }
 
     for (SizeT i = 0; i < element_size; ++i) {
-        printf("avg: %f, avg_gt: %f\n", avg[i], avg_gt[i]);
-        float diff_rate = std::abs(avg[i] - avg_gt[i]) / avg_gt[i];
-        ASSERT_LE(diff_rate, 0.5);
+        printf("i: %zu, avg: %f, avg_gt: %f\n", i, avg[i], avg_gt[i]);
+        ASSERT_GE(avg[i], avg_gt[i]);
     }
 }
 

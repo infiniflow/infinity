@@ -140,7 +140,7 @@ TEST_P(OptimizeKnnTest, test1) {
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
 
-        status = txn->Append(table_entry, data_block);
+        status = txn->Append(*db_name, *table_name, data_block);
         ASSERT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     };
@@ -245,7 +245,7 @@ TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
         data_block->Init(column_vectors);
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         ASSERT_TRUE(status.ok());
-        status = txn->Append(table_entry, data_block);
+        status = txn->Append(*db_name, *table_name, data_block);
         ASSERT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     };

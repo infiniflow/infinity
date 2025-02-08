@@ -252,6 +252,23 @@ SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
     return table_entry;
 }
 
+SharedPtr<TableInfo> TableEntry::GetTableInfo(Txn *txn) {
+    SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
+    table_info->db_name_ = this->GetDBName();
+    table_info->table_name_ = this->table_name_;
+    table_info->table_full_dir_ = MakeShared<String>(Path(InfinityContext::instance().config()->DataDir()) / *this->TableEntryDir());
+    table_info->column_count_ = this->ColumnCount();
+    table_info->row_count_ = this->row_count();
+    table_info->table_comment_ = this->GetTableComment();
+    table_info->table_entry_type_ = this->EntryType();
+    table_info->max_commit_ts_ = this->max_commit_ts();
+    table_info->column_defs_ = this->column_defs();
+
+    SharedPtr<BlockIndex> segment_index = this->GetBlockIndex(txn);
+    table_info->segment_count_ = segment_index->SegmentCount();
+    return table_info;
+}
+
 Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBase> &index_base,
                                                          ConflictType conflict_type,
                                                          TransactionID txn_id,
@@ -289,12 +306,33 @@ Tuple<TableIndexEntry *, Status> TableEntry::GetIndex(const String &index_name, 
     return index_meta->GetEntry(std::move(r_lock), txn_id, begin_ts);
 }
 
-Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
+Tuple<Vector<SharedPtr<TableIndexInfo>>, Status> TableEntry::GetTableIndexesInfo(Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
+
+    Vector<SharedPtr<TableIndexInfo>> indexes_info;
+    auto map_guard = index_meta_map_.GetMetaMap();
+    indexes_info.reserve((*map_guard).size());
+
+    for (auto &[index_name, index_meta] : *map_guard) {
+        auto [index_entry, meta_status] = index_meta->GetEntryNolock(txn_id, begin_ts);
+        if (!meta_status.ok()) {
+            LOG_TRACE(fmt::format("error when get table index entry: {} index name: {}", meta_status.message(), *index_meta->index_name()));
+        } else {
+            auto table_index_info = index_entry->GetTableIndexInfo(txn_ptr);
+            indexes_info.emplace_back(table_index_info);
+        }
+    }
+
+    return {indexes_info, Status::OK()};
+}
+
+Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const String &index_name, Txn *txn_ptr) {
     auto [index_meta, status, r_lock] = index_meta_map_.GetExistMeta(index_name, ConflictType::kError);
     if (!status.ok()) {
         return {nullptr, status};
     }
-    return index_meta->GetTableIndexInfo(std::move(r_lock), txn_id, begin_ts);
+    return index_meta->GetTableIndexInfo(std::move(r_lock), txn_ptr);
 }
 
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
@@ -407,6 +445,32 @@ void TableEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> new_segment, String
         UnrecoverableError(error_message);
     }
     iter->second->UpdateSegmentReplay(new_segment, std::move(segment_filter_binary_data));
+}
+
+SharedPtr<SegmentInfo> TableEntry::GetSegmentInfo(SegmentID segment_id, Txn *txn_ptr) {
+    std::shared_lock lock(this->rw_locker_);
+    auto iter = segment_map_.find(segment_id);
+    if (iter == segment_map_.end()) {
+        return nullptr;
+    }
+    const auto &segment = iter->second;
+    if (segment->min_row_ts() > txn_ptr->BeginTS()) {
+        return nullptr;
+    }
+    return segment->GetSegmentInfo(txn_ptr);
+}
+
+Vector<SharedPtr<SegmentInfo>> TableEntry::GetSegmentsInfo(Txn *txn_ptr) {
+    Vector<SharedPtr<SegmentInfo>> result;
+    std::shared_lock lock(this->rw_locker_);
+    result.reserve(segment_map_.size());
+    for (const auto &[segment_id, segment] : segment_map_) {
+        if (segment->min_row_ts() > txn_ptr->BeginTS()) {
+            continue;
+        }
+        result.emplace_back(segment->GetSegmentInfo(txn_ptr));
+    }
+    return result;
 }
 
 void TableEntry::GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer) {
@@ -1121,9 +1185,8 @@ const ColumnDef *TableEntry::GetColumnDefByID(ColumnID column_id) const {
 }
 
 SharedPtr<ColumnDef> TableEntry::GetColumnDefByName(const String &column_name) const {
-    ColumnID column_id = GetColumnIdByName(column_name);
-    auto iter = std::find_if(columns_.begin(), columns_.end(), [column_id](const SharedPtr<ColumnDef> &column_def) {
-        return static_cast<ColumnID>(column_def->id()) == column_id;
+    auto iter = std::find_if(columns_.begin(), columns_.end(), [column_name](const SharedPtr<ColumnDef> &column_def) {
+        return column_def->name() == column_name;
     });
     if (iter == columns_.end()) {
         return nullptr;
@@ -1455,7 +1518,7 @@ void TableEntry::PickCleanup(CleanupScanner *scanner) {
             // If segment can be cleaned up, segment.deprecate_ts > visible_ts, and visible_ts must > txn.begin_ts
             // So the used segment will not be cleaned up.
             bool deprecate = segment->CheckDeprecate(visible_ts);
-            LOG_INFO(fmt::format("Check deprecate of segment {} in table {}. check_ts: {}, drepcate_ts: {}. result: {}",
+            LOG_INFO(fmt::format("Check deprecate of segment {} in table {}. check_ts: {}, deprecate_ts: {}. result: {}",
                                  segment->segment_id(),
                                  *table_name_,
                                  visible_ts,
@@ -1499,12 +1562,12 @@ void TableEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
-    Vector<TableIndexEntry *> table_index_entries = TableIndexes(txn_id, begin_ts);
+Vector<String> TableEntry::GetFilePath(Txn *txn) const {
+    Vector<TableIndexEntry *> table_index_entries = TableIndexes(txn->TxnID(), txn->BeginTS());
     Vector<String> res;
     res.reserve(table_index_entries.size());
     for (const auto &table_index_entry : table_index_entries) {
-        Vector<String> index_files = table_index_entry->GetFilePath(txn_id, begin_ts);
+        Vector<String> index_files = table_index_entry->GetFilePath(txn);
         res.insert(res.end(), index_files.begin(), index_files.end());
     }
 
@@ -1512,13 +1575,13 @@ Vector<String> TableEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_
     res.reserve(res.size() + segment_map_.size());
     for (const auto &segment_pair : segment_map_) {
         const SegmentEntry *segment_entry = segment_pair.second.get();
-        Vector<String> segment_files = segment_entry->GetFilePath(txn_id, begin_ts);
+        Vector<String> segment_files = segment_entry->GetFilePath(txn);
         res.insert(res.end(), segment_files.begin(), segment_files.end());
     }
     return res;
 }
 
-IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
+SharedPtr<IndexReader> TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn); }
 
 void TableEntry::InvalidateFullTextIndexCache() {
     LOG_DEBUG(fmt::format("Invalidate fulltext index cache: table_name: {}", *table_name_));
@@ -1606,11 +1669,12 @@ void TableEntry::DecWriteTxnNum() {
     }
 }
 
-void TableEntry::SetLocked() {
+Status TableEntry::SetLocked() {
     std::unique_lock lock(mtx_);
     if (locked_) {
-        LOG_WARN(fmt::format("Table {} has already been locked", *GetTableName()));
-        return;
+        String error_message = fmt::format("Table {} has already been locked", *GetTableName());
+        LOG_WARN(error_message);
+        return Status::AlreadyLocked(error_message);
     }
     if (write_txn_num_ > 0) {
         wait_lock_ = true;
@@ -1618,15 +1682,18 @@ void TableEntry::SetLocked() {
         wait_lock_ = false;
     }
     locked_ = true;
+    return Status::OK();
 }
 
-void TableEntry::SetUnlock() {
+Status TableEntry::SetUnlock() {
     std::lock_guard lock(mtx_);
     if (!locked_) {
-        LOG_WARN(fmt::format("Table {} is not locked", *GetTableName()));
-        return;
+        String error_message = fmt::format("Table {} is not locked", *GetTableName());
+        LOG_WARN(error_message);
+        return Status::NotLocked(error_message);
     }
     locked_ = false;
+    return Status::OK();
 }
 
 bool TableEntry::SetCompact(TableStatus &status, Txn *txn) {

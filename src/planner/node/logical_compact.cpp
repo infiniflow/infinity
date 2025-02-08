@@ -48,7 +48,7 @@ String LogicalCompact::ToString(i64 &space) const {
         arrow_str = "->  ";
     }
     ss << String(space, ' ') << arrow_str << "COMPACT ";
-    ss << *base_table_ref_->schema_name() << "." << *base_table_ref_->table_name();
+    ss << *base_table_ref_->db_name() << "." << *base_table_ref_->table_name();
     space += arrow_str.size();
     return ss.str();
 }

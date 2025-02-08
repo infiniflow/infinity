@@ -98,17 +98,7 @@ Tuple<SharedPtr<TableInfo>, Status> TableMeta::GetTableInfo(std::shared_lock<std
         return {nullptr, status};
     }
 
-    SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
-    table_info->table_name_ = table_name_;
-    table_info->table_full_dir_ = MakeShared<String>(Path(InfinityContext::instance().config()->DataDir()) / *table_entry->TableEntryDir());
-    table_info->column_count_ = table_entry->ColumnCount();
-    table_info->row_count_ = table_entry->row_count();
-    table_info->table_comment_ = table_entry->GetTableComment();
-
-    SharedPtr<BlockIndex> segment_index = table_entry->GetBlockIndex(txn);
-    table_info->segment_count_ = segment_index->SegmentCount();
-
-    return {table_info, status};
+    return {table_entry->GetTableInfo(txn), status};
 }
 
 Status TableMeta::AddEntry(std::shared_lock<std::shared_mutex> &&r_lock,

@@ -876,12 +876,12 @@ void SegmentIndexEntry::Cleanup(CleanupInfoTracer *info_tracer, bool dropped) {
     }
 }
 
-Vector<String> SegmentIndexEntry::GetFilePath(TransactionID txn_id, TxnTimeStamp begin_ts) const {
+Vector<String> SegmentIndexEntry::GetFilePath(Txn *txn) const {
     std::shared_lock lock(rw_locker_);
     Vector<String> res;
     res.reserve(chunk_index_entries_.size());
     for (const auto &chunk_index_entry : chunk_index_entries_) {
-        Vector<String> chunk_files = chunk_index_entry->GetFilePath(txn_id, begin_ts);
+        Vector<String> chunk_files = chunk_index_entry->GetFilePath(txn);
         res.insert(res.end(), chunk_files.begin(), chunk_files.end());
     }
     return res;
@@ -1329,6 +1329,18 @@ void SegmentIndexEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
     }
     this->deleted_ = true;
     this->deprecate_ts_ = deprecate_ts;
+}
+
+SharedPtr<SegmentIndexInfo> SegmentIndexEntry::GetSegmentIndexInfo(Txn *txn_ptr) const {
+    SharedPtr<SegmentIndexInfo> segment_index_info = MakeShared<SegmentIndexInfo>();
+
+    std::shared_lock lock(rw_locker_);
+    segment_index_info->segment_id_ = segment_id_;
+    segment_index_info->index_type_ = table_index_entry_->index_base()->index_type_;
+    segment_index_info->index_dir_ = index_dir_;
+    segment_index_info->chunk_count_ = chunk_index_entries_.size();
+    segment_index_info->files_ = this->GetFilePath(txn_ptr);
+    return segment_index_info;
 }
 
 SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexEntry::GetSnapshotInfo(Txn *txn_ptr) const {

@@ -22,7 +22,7 @@ import query_context;
 import operator_state;
 import physical_operator;
 import physical_operator_type;
-import table_entry;
+import meta_info;
 import base_expression;
 import match_expression;
 import base_table_ref;
@@ -47,7 +47,7 @@ public:
     explicit PhysicalMatch(u64 id,
                            SharedPtr<BaseTableRef> base_table_ref,
                            SharedPtr<MatchExpression> match_expr,
-                           IndexReader index_reader,
+                           SharedPtr<IndexReader> index_reader,
                            UniquePtr<QueryNode> &&query_tree,
                            float begin_threshold,
                            EarlyTermAlgo early_term_algo,
@@ -64,7 +64,7 @@ public:
 
     ~PhysicalMatch() override;
 
-    void Init() override;
+    void Init(QueryContext* query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
@@ -82,7 +82,7 @@ public:
 
     [[nodiscard]] inline String TableAlias() const { return base_table_ref_->alias_; }
 
-    [[nodiscard]] inline TableEntry *table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+    [[nodiscard]] inline TableInfo *table_info() const { return base_table_ref_->table_info_.get(); }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
@@ -103,7 +103,7 @@ private:
     u64 table_index_ = 0;
     SharedPtr<BaseTableRef> base_table_ref_;
     SharedPtr<MatchExpression> match_expr_;
-    IndexReader index_reader_;
+    SharedPtr<IndexReader> index_reader_;
     UniquePtr<QueryNode> query_tree_;
     float begin_threshold_;
     EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kAuto};
