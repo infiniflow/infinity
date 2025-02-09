@@ -59,27 +59,33 @@ TEST_F(KVCodeTest, kv_code1) {
     String table_id = "10";
     String column_name = "col1";
     TxnTimeStamp ts = 123;
-    TransactionID txn_id = 23;
     SegmentID segment_id = 2;
-//    BlockID block_id = 3;
-//    ColumnID column_id = 4;
-//    String index_name = "idx1";
-//    ChunkID chunk_id = 5;
+    //    BlockID block_id = 3;
+    //    ColumnID column_id = 4;
+    //    String index_name = "idx1";
+    //    ChunkID chunk_id = 5;
     {
-        String key = KeyEncode::CatalogDbKey(db_name, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "catalog|db|db1|123|23");
+        String key = KeyEncode::CatalogDbKey(db_name, ts);
+        EXPECT_STREQ(key.c_str(), "catalog|db|db1|123");
+        key = KeyEncode::CatalogDbPrefix(db_name);
+        EXPECT_STREQ(key.c_str(), "catalog|db|db1|");
+
+        key = KeyEncode::CatalogDbTagPrefix(db_id, "comment");
+        EXPECT_STREQ(key.c_str(), "db|3|comment|");
+        key = KeyEncode::CatalogDbTagPrefix(db_id, "dir");
+        EXPECT_STREQ(key.c_str(), "db|3|dir|");
     }
     {
-        String key = KeyEncode::CatalogTableKey(db_id, table_name, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "catalog|tbl|3|tbl1|123|23");
+        String key = KeyEncode::CatalogTableKey(db_id, table_name, ts);
+        EXPECT_STREQ(key.c_str(), "catalog|tbl|3|tbl1|123");
     }
     {
-        String key = KeyEncode::CatalogTableColumnKey(db_id, table_id, column_name, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "catalog|col|3|10|col1|123|23");
+        String key = KeyEncode::CatalogTableColumnKey(db_id, table_id, column_name, ts);
+        EXPECT_STREQ(key.c_str(), "catalog|col|3|10|col1|123");
     }
     {
-        String key = KeyEncode::CatalogTableSegmentKey(db_id, table_id, segment_id, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "catalog|seg|3|10|2|123|23");
+        String key = KeyEncode::CatalogTableSegmentKey(db_id, table_id, segment_id, ts);
+        EXPECT_STREQ(key.c_str(), "catalog|seg|3|10|2|123");
     }
 }
 
@@ -88,57 +94,56 @@ TEST_F(KVCodeTest, kv_code2) {
     String db_name = "db1";
     String table_name = "tbl1";
     TxnTimeStamp ts = 123;
-    TransactionID txn_id = 23;
     SegmentID segment_id = 2;
     BlockID block_id = 3;
     ColumnID column_id = 4;
     String index_name = "idx1";
     ChunkID chunk_id = 5;
     {
-        String key = KeyEncode::DatabaseKey(db_name, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "db|db1|123|23");
+        String key = KeyEncode::DatabaseKey(db_name, ts);
+        EXPECT_STREQ(key.c_str(), "db|db1|123");
         String key_prefix = KeyEncode::DatabasePrefix(db_name);
         EXPECT_STREQ(key_prefix.c_str(), "db|db1|");
     }
     {
-        String key = KeyEncode::TableKey(db_name, table_name, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "tbl|db1|tbl1|123|23");
+        String key = KeyEncode::TableKey(db_name, table_name, ts);
+        EXPECT_STREQ(key.c_str(), "tbl|db1|tbl1|123");
         String key_prefix = KeyEncode::TableKeyPrefix(db_name, table_name);
         EXPECT_STREQ(key_prefix.c_str(), "tbl|db1|tbl1|");
     }
     {
-        String key = KeyEncode::TableSegmentKey(db_name, table_name, segment_id, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "seg|db1|tbl1|2|123|23");
+        String key = KeyEncode::TableSegmentKey(db_name, table_name, segment_id, ts);
+        EXPECT_STREQ(key.c_str(), "seg|db1|tbl1|2|123");
         String key_prefix = KeyEncode::TableSegmentKeyPrefix(db_name, table_name, segment_id);
         EXPECT_STREQ(key_prefix.c_str(), "seg|db1|tbl1|2|");
     }
     {
-        String key = KeyEncode::TableSegmentBlockKey(db_name, table_name, segment_id, block_id, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "blk|db1|tbl1|2|3|123|23");
+        String key = KeyEncode::TableSegmentBlockKey(db_name, table_name, segment_id, block_id, ts);
+        EXPECT_STREQ(key.c_str(), "blk|db1|tbl1|2|3|123");
         String key_prefix = KeyEncode::TableSegmentBlockKeyPrefix(db_name, table_name, segment_id, block_id);
         EXPECT_STREQ(key_prefix.c_str(), "blk|db1|tbl1|2|3|");
     }
     {
-        String key = KeyEncode::TableSegmentBlockColumnKey(db_name, table_name, segment_id, block_id, column_id, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "col|db1|tbl1|2|3|4|123|23");
+        String key = KeyEncode::TableSegmentBlockColumnKey(db_name, table_name, segment_id, block_id, column_id, ts);
+        EXPECT_STREQ(key.c_str(), "col|db1|tbl1|2|3|4|123");
         String key_prefix = KeyEncode::TableSegmentBlockColumnKeyPrefix(db_name, table_name, segment_id, block_id, column_id);
         EXPECT_STREQ(key_prefix.c_str(), "col|db1|tbl1|2|3|4|");
     }
     {
-        String key = KeyEncode::TableIndexKey(db_name, table_name, index_name, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "idx|db1|tbl1|idx1|123|23");
+        String key = KeyEncode::TableIndexKey(db_name, table_name, index_name, ts);
+        EXPECT_STREQ(key.c_str(), "idx|db1|tbl1|idx1|123");
         String key_prefix = KeyEncode::TableIndexKeyPrefix(db_name, table_name, index_name);
         EXPECT_STREQ(key_prefix.c_str(), "idx|db1|tbl1|idx1|");
     }
     {
-        String key = KeyEncode::TableIndexSegmentKey(db_name, table_name, index_name, segment_id, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "idx_seg|db1|tbl1|idx1|2|123|23");
+        String key = KeyEncode::TableIndexSegmentKey(db_name, table_name, index_name, segment_id, ts);
+        EXPECT_STREQ(key.c_str(), "idx_seg|db1|tbl1|idx1|2|123");
         String key_prefix = KeyEncode::TableIndexSegmentKeyPrefix(db_name, table_name, index_name);
         EXPECT_STREQ(key_prefix.c_str(), "idx_seg|db1|tbl1|idx1|");
     }
     {
-        String key = KeyEncode::TableIndexChunkKey(db_name, table_name, index_name, segment_id, chunk_id, ts, txn_id);
-        EXPECT_STREQ(key.c_str(), "idx_chunk|db1|tbl1|idx1|2|5|123|23");
+        String key = KeyEncode::TableIndexChunkKey(db_name, table_name, index_name, segment_id, chunk_id, ts);
+        EXPECT_STREQ(key.c_str(), "idx_chunk|db1|tbl1|idx1|2|5|123");
         String key_prefix = KeyEncode::TableIndexChunkKeyPrefix(db_name, table_name, index_name);
         EXPECT_STREQ(key_prefix.c_str(), "idx_chunk|db1|tbl1|idx1|");
     }

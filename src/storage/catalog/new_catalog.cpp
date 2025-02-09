@@ -63,7 +63,7 @@ Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const Shared
     }
 
     ++db_id;
-    String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS(), new_txn->TxnID());
+    String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS());
     String db_value = fmt::format("{}", db_id);
     status = kv_instance->Put(db_key, db_value);
     if (!status.ok()) {
@@ -74,7 +74,7 @@ Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const Shared
         return status;
     }
     if (comment != nullptr) {
-        String db_comment_key = KeyEncode::CatalogDbCommentKey(db_value, new_txn->BeginTS(), new_txn->TxnID());
+        String db_comment_key = KeyEncode::CatalogDbTagPrefix(db_value, "comment");
         status = kv_instance->Put(db_comment_key, *comment);
         if (!status.ok()) {
             return status;
@@ -92,8 +92,8 @@ Status NewCatalog::DropDatabase(const SharedPtr<String> &db_name, NewTxn *new_tx
     }
 
     KVInstance *kv_instance = new_txn->kv_instance();
-    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(*db_name);
-    String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS(), new_txn->TxnID());
+    String db_key_prefix = KeyEncode::CatalogDbPrefix(*db_name);
+    String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS());
     auto iter2 = kv_instance->GetIterator();
     iter2->Seek(db_key_prefix);
     SizeT found_count = 0;
@@ -131,8 +131,8 @@ Status NewCatalog::DropDatabase(const SharedPtr<String> &db_name, NewTxn *new_tx
 
 bool NewCatalog::CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *new_txn) {
     KVInstance *kv_instance = new_txn->kv_instance();
-    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(*db_name);
-    String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS(), new_txn->TxnID());
+    String db_key_prefix = KeyEncode::CatalogDbPrefix(*db_name);
+    String db_key = KeyEncode::CatalogDbKey(*db_name, new_txn->BeginTS());
     auto iter2 = kv_instance->GetIterator();
     iter2->Seek(db_key_prefix);
     SizeT found_count = 0;

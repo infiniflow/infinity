@@ -284,8 +284,8 @@ Tuple<DBEntry *, Status> NewTxn::GetDatabase(const String &db_name) {
 }
 
 bool NewTxn::CheckDatabaseExists(const String &db_name) {
-    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(db_name);
-    String db_key = KeyEncode::CatalogDbKey(db_name, this->BeginTS(), this->TxnID());
+    String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
+    String db_key = KeyEncode::CatalogDbKey(db_name, this->BeginTS());
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_key_prefix);
     SizeT found_count = 0;
@@ -303,7 +303,7 @@ bool NewTxn::CheckDatabaseExists(const String &db_name) {
 Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_name) {
     this->CheckTxnStatus();
 
-    String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(db_name);
+    String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
     auto iter2 = kv_instance_->GetIterator();
 
     iter2->Seek(db_key_prefix);
@@ -755,7 +755,7 @@ Status NewTxn::PrepareCommit() {
                 }
 
                 ++db_id;
-                String db_key = KeyEncode::CatalogDbKey(create_db_cmd->db_name_, commit_ts, this->TxnID());
+                String db_key = KeyEncode::CatalogDbKey(create_db_cmd->db_name_, commit_ts);
                 String db_id_str = fmt::format("{}", db_id);
                 status = kv_instance_->Put(db_key, db_id_str);
                 if (!status.ok()) {
@@ -766,14 +766,14 @@ Status NewTxn::PrepareCommit() {
                     return status;
                 }
 
-                String db_storage_dir = KeyEncode::CatalogDbDirKey(db_id_str, commit_ts, this->TxnID());
+                String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id_str, "dir", commit_ts);
                 status = kv_instance_->Put(db_storage_dir, create_db_cmd->db_dir_tail_);
                 if (!status.ok()) {
                     return status;
                 }
 
                 if (!create_db_cmd->db_comment_.empty()) {
-                    String db_comment_key = KeyEncode::CatalogDbCommentKey(db_id_str, commit_ts, this->TxnID());
+                    String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment", commit_ts);
                     status = kv_instance_->Put(db_comment_key, create_db_cmd->db_comment_);
                     if (!status.ok()) {
                         return status;
@@ -791,7 +791,7 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::DROP_DATABASE: {
                 auto *drop_db_cmd = static_cast<WalCmdDropDatabase *>(command.get());
-                String db_key_prefix = KeyEncode::CatalogDbKeyPrefix(drop_db_cmd->db_name_);
+                String db_key_prefix = KeyEncode::CatalogDbPrefix(drop_db_cmd->db_name_);
                 auto iter2 = kv_instance_->GetIterator();
                 iter2->Seek(db_key_prefix);
                 SizeT found_count = 0;
