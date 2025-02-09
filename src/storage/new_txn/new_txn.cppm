@@ -125,6 +125,8 @@ public:
 
     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name);
 
+    Vector<String> ListDatabase();
+
     Vector<DatabaseDetail> ListDatabases();
 
     // Table and Collection OPs

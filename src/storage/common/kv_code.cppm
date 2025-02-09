@@ -24,6 +24,7 @@ export class KeyEncode {
 public:
     static String CatalogDbKey(const String &db_name, TxnTimeStamp ts);
     static String CatalogDbPrefix(const String &db_name);
+    static constexpr String kCatalogDbHeader = "catalog|db|";
 
     static String CatalogDbTagKey(const String &db_id, const String &tag_name, TxnTimeStamp ts);
     static String CatalogDbTagPrefix(const String &db_id, const String &tag_name);

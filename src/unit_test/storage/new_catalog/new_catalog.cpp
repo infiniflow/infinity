@@ -146,6 +146,13 @@ TEST_P(NewCatalogTest, db_test) {
         EXPECT_TRUE(db_status2.ok());
         std::cout << *db_info2->db_entry_dir_ << std::endl;
         EXPECT_STREQ(db_info2->db_comment_->c_str(), "db_comment");
+
+        auto db_list = txn3->ListDatabase();
+        EXPECT_EQ(db_list.size(), 2);
+        for (auto &db : db_list) {
+            std::cout << db << std::endl;
+        }
+
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 

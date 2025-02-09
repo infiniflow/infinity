@@ -310,8 +310,8 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
     SizeT found_count = 0;
     String db_id{};
     while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
-//        std::cout << String("Key: ") << iter2->Key().ToString() << std::endl;
-//        std::cout << String("Value: ") << iter2->Value().ToString() << std::endl;
+        //        std::cout << String("Key: ") << iter2->Key().ToString() << std::endl;
+        //        std::cout << String("Value: ") << iter2->Value().ToString() << std::endl;
         db_id = iter2->Value().ToString();
         iter2->Next();
         ++found_count;
@@ -342,6 +342,18 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
     }
 
     return {db_info, Status::OK()};
+}
+
+Vector<String> NewTxn::ListDatabase() {
+    this->CheckTxnStatus();
+    Vector<String> res;
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(KeyEncode::kCatalogDbHeader);
+    while (iter2->Valid() && iter2->Key().starts_with(KeyEncode::kCatalogDbHeader)) {
+        res.emplace_back(iter2->Value().ToString());
+        iter2->Next();
+    }
+    return res;
 }
 
 Vector<DatabaseDetail> NewTxn::ListDatabases() {
