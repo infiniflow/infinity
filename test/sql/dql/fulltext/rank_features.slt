@@ -8,16 +8,22 @@ DROP TABLE IF EXISTS sqllogic_test_rankfeatures;
 statement ok
 CREATE TABLE sqllogic_test_rankfeatures(id varchar DEFAULT '', content varchar DEFAULT '', tag varchar DEFAULT '');
 
-# insert data
+query I
 INSERT INTO sqllogic_test_rankfeatures VALUES ('2024','hello world','[{"Tag1":0.1},{"Tag2":0.2}]');
+----
+
+query I
 INSERT INTO sqllogic_test_rankfeatures VALUES ('2025','hello world','[{"Tag1":0.2},{"Tag2":0.1}]');
+----
+
+query I
 INSERT INTO sqllogic_test_rankfeatures VALUES ('2026','hello world','[{"Tag2":0.3},{"Tag3":0.4}]');
 ----
 
-statement error
+statement ok
 CREATE INDEX index1 ON sqllogic_test_rankfeatures(content) USING FULLTEXT;
 
-statement error
+statement ok
 CREATE INDEX index2 ON sqllogic_test_rankfeatures(tag) USING FULLTEXT WITH (analyzer=rankfeatures);
 
 query TTI
@@ -30,3 +36,4 @@ SELECT id, SCORE() FROM sqllogic_test_rankfeatures SEARCH MATCH TEXT ('content',
 # Clean up
 statement ok
 DROP TABLE sqllogic_test_rankfeatures;
+
