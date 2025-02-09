@@ -308,9 +308,16 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
 
     iter2->Seek(db_key_prefix);
     SizeT found_count = 0;
+    String db_id{};
     while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+//        std::cout << String("Key: ") << iter2->Key().ToString() << std::endl;
+//        std::cout << String("Value: ") << iter2->Value().ToString() << std::endl;
+        db_id = iter2->Value().ToString();
         iter2->Next();
         ++found_count;
+        if (found_count > 1) {
+            UnrecoverableError("Found multiple database keys");
+        }
     }
 
     if (found_count == 0) {
@@ -319,10 +326,20 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
 
     SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
     db_info->db_name_ = MakeShared<String>(db_name);
-    //    db_info->db_entry_dir_ = db_entry->db_entry_dir();
-    //    db_info->absolute_db_path_ = db_entry->AbsoluteDir();
-    //    db_info->table_count_ = db_entry->TableCollections(txn_id, begin_ts).size();
-    //    db_info->db_comment_ = db_entry->db_comment_ptr();
+
+    String db_dir_prefix = KeyEncode::CatalogDbTagPrefix(db_id, "dir");
+    iter2->Seek(db_dir_prefix);
+    if (iter2->Valid() && iter2->Key().starts_with(db_dir_prefix)) {
+        db_info->db_entry_dir_ = MakeShared<String>(iter2->Value().ToString());
+    } else {
+        UnrecoverableError("Database dir not found");
+    }
+
+    String db_comment_prefix = KeyEncode::CatalogDbTagPrefix(db_id, "comment");
+    iter2->Seek(db_comment_prefix);
+    if (iter2->Valid() && iter2->Key().starts_with(db_comment_prefix)) {
+        db_info->db_comment_ = MakeShared<String>(iter2->Value().ToString());
+    }
 
     return {db_info, Status::OK()};
 }
