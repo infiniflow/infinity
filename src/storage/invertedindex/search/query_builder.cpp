@@ -74,24 +74,22 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
         auto query_tree = std::make_unique<OrQueryNode>();
         query_tree->Add(std::move(context.optimized_query_tree_));
         query_tree->Add(std::move(rank_features_node));
-        auto result = query_tree->CreateSearch(params, true);
-        return result;
-    } else {
-        auto result = context.optimized_query_tree_->CreateSearch(params);
-#ifdef INFINITY_DEBUG
-        {
-            OStringStream oss;
-            oss << "DocIterator:\n";
-            if (result) {
-                result->PrintTree(oss);
-            } else {
-                oss << "Empty tree!\n";
-            }
-            LOG_DEBUG(std::move(oss).str());
-        }
-#endif
-        return result;
+        context.optimized_query_tree_ = std::move(query_tree);
     }
+    auto result = context.optimized_query_tree_->CreateSearch(params);
+#ifdef INFINITY_DEBUG
+    {
+        OStringStream oss;
+        oss << "DocIterator:\n";
+        if (result) {
+            result->PrintTree(oss);
+        } else {
+            oss << "Empty tree!\n";
+        }
+        LOG_DEBUG(std::move(oss).str());
+    }
+#endif
+    return result;
 }
 
 } // namespace infinity
