@@ -444,7 +444,7 @@ std::unique_ptr<DocIterator> RankFeatureQueryNode::CreateSearch(const CreateSear
         return nullptr;
     }
 
-    bool fetch_position = false;
+    bool fetch_position = true;
     auto posting_iterator = column_index_reader->Lookup(term_, fetch_position);
     if (!posting_iterator) {
         return nullptr;

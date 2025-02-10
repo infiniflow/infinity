@@ -20,6 +20,7 @@ module rank_feature_doc_iterator;
 
 import stl;
 import logger;
+import smallfloat;
 
 namespace infinity {
 
@@ -40,7 +41,7 @@ bool RankFeatureDocIterator::Next(RowID doc_id) {
 
 float RankFeatureDocIterator::Score() {
     u16 payload = iter_->GetCurrentDocPayload();
-    float weight = static_cast<float>(payload);
+    float weight = SmallFloat::UInt16ToFloat122(payload);
     return weight * boost_;
 }
 

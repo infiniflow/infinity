@@ -30,6 +30,7 @@ import internal_types;
 import logger;
 import infinity_exception;
 import simd_functions;
+import smallfloat;
 
 namespace infinity {
 
@@ -53,6 +54,7 @@ RankFeaturesDocIterator::RankFeaturesDocIterator(Vector<UniquePtr<DocIterator>> 
     }
     match_cnt_ptr_ = static_cast<u32 *>(aligned_buffer_);
     payload_ptr_ = reinterpret_cast<u16 *>(match_cnt_ptr_ + BATCH_OR_LEN * num_iterators);
+    score_sum_ptr_ = reinterpret_cast<f32 *>(payload_ptr_ + BATCH_OR_LEN * num_iterators);
 }
 
 RankFeaturesDocIterator::~RankFeaturesDocIterator() { std::free(aligned_buffer_); }
@@ -95,6 +97,8 @@ bool RankFeaturesDocIterator::Next(RowID doc_id) {
 
 u32 RankFeaturesDocIterator::MatchCount() const { return match_cnt_ptr_[doc_id_ - buffer_start_doc_id_]; }
 
+float RankFeaturesDocIterator::Score() { return score_sum_ptr_[doc_id_ - buffer_start_doc_id_]; }
+
 void RankFeaturesDocIterator::DecodeFrom(const RowID buffer_start_doc_id) {
     buffer_start_doc_id_ = buffer_start_doc_id;
     std::memset(aligned_buffer_, 0, memset_bytes_);
@@ -113,14 +117,18 @@ void RankFeaturesDocIterator::DecodeFrom(const RowID buffer_start_doc_id) {
     }
     for (u32 i = 0; i < BATCH_OR_LEN; ++i) {
         u32 match_cnt = 0;
+        f32 score_sum = 0.0f;
         for (u32 j = 0; j < children_.size(); ++j) {
             const auto payload = payload_ptr_[j * BATCH_OR_LEN + i];
             if (payload == 0) {
                 continue;
             }
+            float w = SmallFloat::UInt16ToFloat122(payload);
+            score_sum += w * reinterpret_cast<RankFeatureDocIterator *>(children_[j].get())->GetWeight();
             ++match_cnt;
         }
         match_cnt_ptr_[i] = match_cnt;
+        score_sum_ptr_[i] = score_sum;
     }
 }
 
