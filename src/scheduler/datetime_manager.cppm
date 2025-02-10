@@ -13,9 +13,11 @@
 // limitations under the License.
 
 module;
+
 #include <chrono>
 #include <string>
-export module DatetimeManager;
+
+export module datetime_manager;
 
 import config;
 import stl;
@@ -27,7 +29,15 @@ namespace infinity {
 
 export class DatetimeManager {
 public:
-    DatetimeManager() = default;
+    DatetimeManager() {
+        const char* env_tz = std::getenv("TZ");
+        if (env_tz) {
+            SystemTimeZone = env_tz;
+        } else {
+            SystemTimeZone = "UTC";
+        }
+        tz_offset = 0;
+    }
 
     DatetimeManager(const DatetimeManager& other) = default;
 
@@ -43,7 +53,7 @@ public:
     const std::string& getUserTimeZone() const { return UserTimeZone; }
     const std::string& getUserDate() const { return UserDate; }
 
-    void setSystemTimeZone(const std::string& timezone) { SystemTimeZone = timezone; }
+    void setSystemTimeZone();
     void setSystemDate(const std::string& date) { SystemDate = date; }
     void setUserTimeZone(const std::string& timezone) { UserTimeZone = timezone; }
     void setUserDate(const std::string& date) { UserDate = date; }
@@ -53,6 +63,7 @@ private:
     std::string SystemDate;
     std::string UserTimeZone;
     std::string UserDate;
+    i64 tz_offset;
 };
 
 

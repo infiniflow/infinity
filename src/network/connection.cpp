@@ -112,6 +112,7 @@ void Connection::HandleRequest() {
     // FIXME
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().datetime_manager(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),

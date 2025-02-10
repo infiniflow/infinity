@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "type/logical_type.h"
 module;
 #include <chrono>
 module convert_timezone;
@@ -51,7 +52,7 @@ void RegisterConvertTimeZoneFunction(const UniquePtr<Catalog> &catalog_ptr) {
 
     ScalarFunction convert_timezone_function(func_name,
                                   {DataType(LogicalType::kVarchar)},
-                                  DataType(LogicalType::kDate),
+                                  DataType(LogicalType::kVarchar),
                                   &ScalarFunction::UnaryFunction<VarcharT, DateT, ConvertTimeZoneFunction>);
     function_set_ptr->AddFunction(convert_timezone_function);
 

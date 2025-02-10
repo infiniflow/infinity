@@ -20,6 +20,7 @@ module infinity;
 import stl;
 import logger;
 import config;
+import datetime_manager;
 import resource_manager;
 import task_scheduler;
 import storage;
@@ -84,6 +85,7 @@ std::variant<UniquePtr<QueryContext>, QueryResult> Infinity::GetQueryContext(boo
     }
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().datetime_manager(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
@@ -504,6 +506,7 @@ QueryResult Infinity::GetTable(const String &db_name, const String &table_name) 
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->set_current_schema(db_name);
     query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().datetime_manager(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),

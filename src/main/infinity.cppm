@@ -18,6 +18,7 @@ export module infinity;
 import stl;
 import config;
 import resource_manager;
+import datetime_manager;
 import task_scheduler;
 import storage;
 import status;
