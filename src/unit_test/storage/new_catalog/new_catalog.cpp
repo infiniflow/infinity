@@ -37,7 +37,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          NewCatalogTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-TEST_P(NewCatalogTest, db_test) {
+TEST_P(NewCatalogTest, db_test1) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -84,6 +84,13 @@ TEST_P(NewCatalogTest, db_test) {
         EXPECT_TRUE(status.ok());
     }
 
+    new_txn_mgr->PrintAllKeyValue();
+}
+
+TEST_P(NewCatalogTest, db_test2) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     {
         // drop with error
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -99,7 +106,13 @@ TEST_P(NewCatalogTest, db_test) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
     }
+    new_txn_mgr->PrintAllKeyValue();
+}
 
+TEST_P(NewCatalogTest, db_test3) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     {
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -129,7 +142,13 @@ TEST_P(NewCatalogTest, db_test) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
     }
+    new_txn_mgr->PrintAllKeyValue();
+}
 
+TEST_P(NewCatalogTest, db_test4) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     {
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -205,6 +224,12 @@ TEST_P(NewCatalogTest, table_test) {
         //        EXPECT_TRUE(status.ok());
         //        status = new_txn_mgr->CommitTxn(txn4);
         //        EXPECT_TRUE(status.ok());
+
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        status = txn4->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
     }
 
     new_txn_mgr->PrintAllKeyValue();

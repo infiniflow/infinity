@@ -878,72 +878,42 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::DROP_DATABASE: {
                 auto *drop_db_cmd = static_cast<WalCmdDropDatabase *>(command.get());
                 String db_key_prefix = KeyEncode::CatalogDbPrefix(drop_db_cmd->db_name_);
-                auto iter2 = kv_instance_->GetIterator();
-                iter2->Seek(db_key_prefix);
-                SizeT found_count = 0;
 
-                Vector<String> error_db_keys;
-                Vector<String> db_id_list;
-                while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
-                    db_id_list.push_back(iter2->Value().ToString());
-                    if (found_count == 0) {
-                        Status status = kv_instance_->Delete(iter2->Key().ToString());
-                        if (!status.ok()) {
-                            return status;
-                        }
-                    } else {
-                        // Error branch
-                        error_db_keys.push_back(iter2->Key().ToString());
-                    }
-                    iter2->Next();
-                    ++found_count;
-                }
-
-                if (found_count == 0) {
-                    // No db, ignore it.
-                    return Status::OK();
-                }
-
-                if (!error_db_keys.empty()) {
-                    // join error_db_keys
-                    String error_db_keys_str =
-                        std::accumulate(std::next(error_db_keys.begin()), error_db_keys.end(), error_db_keys.front(), [](String a, String b) {
-                            return a + ", " + b;
-                        });
-                    UnrecoverableError(fmt::format("Found multiple database keys: {}", error_db_keys_str));
+                String db_id;
+                Status status = GetDBId(drop_db_cmd->db_name_, db_id);
+                if (!status.ok()) {
+                    return status;
                 }
 
                 // Delete db_dir, db_comment and latest_table_id
-                for (const String &dropped_db_id : db_id_list) {
-                    String db_storage_dir = KeyEncode::CatalogDbTagKey(dropped_db_id, "dir");
-                    Status status = kv_instance_->Delete(db_storage_dir);
-                    if (!status.ok()) {
-                        return status;
-                    }
+                String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id, "dir");
+                status = kv_instance_->Delete(db_storage_dir);
+                if (!status.ok()) {
+                    return status;
+                }
 
-                    String db_comment_key = KeyEncode::CatalogDbTagKey(dropped_db_id, "comment");
-                    status = kv_instance_->Delete(db_comment_key);
-                    if (!status.ok()) {
-                        return status;
-                    }
+                String db_comment_key = KeyEncode::CatalogDbTagKey(db_id, "comment");
+                status = kv_instance_->Delete(db_comment_key);
+                if (!status.ok()) {
+                    return status;
+                }
 
-                    String db_latest_table_id = KeyEncode::CatalogDbTagKey(dropped_db_id, "latest_table_id");
-                    status = kv_instance_->Delete(db_latest_table_id);
-                    if (!status.ok()) {
-                        return status;
-                    }
+                String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id, "latest_table_id");
+                status = kv_instance_->Delete(db_latest_table_id);
+                if (!status.ok()) {
+                    return status;
+                }
 
-                    String db_latest_index_id = KeyEncode::CatalogDbTagKey(dropped_db_id, "latest_index_id");
-                    status = kv_instance_->Delete(db_latest_index_id);
-                    if (!status.ok()) {
-                        return status;
-                    }
+                String db_latest_index_id = KeyEncode::CatalogDbTagKey(db_id, "latest_index_id");
+                status = kv_instance_->Delete(db_latest_index_id);
+                if (!status.ok()) {
+                    return status;
+                }
 
-                    String db_latest_segment_id = KeyEncode::CatalogDbTagKey(dropped_db_id, "latest_segment_id");
-                    status = kv_instance_->Delete(db_latest_segment_id);
-                    if (!status.ok()) {
-                        return status;
-                    }
+                String db_latest_segment_id = KeyEncode::CatalogDbTagKey(db_id, "latest_segment_id");
+                status = kv_instance_->Delete(db_latest_segment_id);
+                if (!status.ok()) {
+                    return status;
                 }
                 break;
             }
@@ -990,6 +960,45 @@ Status NewTxn::PrepareCommit() {
             }
         }
     }
+    return Status::OK();
+}
+
+Status NewTxn::GetDBId(const String &db_name, String &db_id) {
+    String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(db_key_prefix);
+    SizeT found_count = 0;
+
+    Vector<String> error_db_keys;
+    while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+        db_id = iter2->Value().ToString();
+        if (found_count == 0) {
+            Status status = kv_instance_->Delete(iter2->Key().ToString());
+            if (!status.ok()) {
+                return status;
+            }
+        } else {
+            // Error branch
+            error_db_keys.push_back(iter2->Key().ToString());
+        }
+        iter2->Next();
+        ++found_count;
+    }
+
+    if (found_count == 0) {
+        // No db, ignore it.
+        return Status::DBNotExist(db_name);
+    }
+
+    if (!error_db_keys.empty()) {
+        // join error_db_keys
+        String error_db_keys_str =
+            std::accumulate(std::next(error_db_keys.begin()), error_db_keys.end(), error_db_keys.front(), [](String a, String b) {
+                return a + ", " + b;
+            });
+        UnrecoverableError(fmt::format("Found multiple database keys: {}", error_db_keys_str));
+    }
+
     return Status::OK();
 }
 
