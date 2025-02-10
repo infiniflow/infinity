@@ -272,7 +272,7 @@ private:
 
     void CheckTxn(const String &db_name);
 
-    Status GetDBId(const String &db_name, String &db_id);
+    Status GetDBId(const String &db_name, String &db_key, String &db_id);
 
 private:
     // Reference to external class

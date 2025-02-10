@@ -225,6 +225,8 @@ TEST_P(NewCatalogTest, table_test) {
         //        status = new_txn_mgr->CommitTxn(txn4);
         //        EXPECT_TRUE(status.ok());
 
+        //        new_txn_mgr->PrintAllKeyValue();
+
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());

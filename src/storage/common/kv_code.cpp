@@ -35,6 +35,9 @@ String KeyEncode::CatalogTableKey(const String &db_id, const String &table_name,
 
 String KeyEncode::CatalogTablePrefix(const String &db_id, const String &table_name) { return fmt::format("catalog|tbl|{}|{}|", db_id, table_name); }
 
+String KeyEncode::CatalogTableTagKey(const String &table_id, const String &tag_name) { return fmt::format("tbl|{}|{}", table_id, tag_name); }
+String KeyEncode::CatalogTableTagPrefix(const String &table_id, const String &tag_name) { return fmt::format("tbl|{}|{}|", table_id, tag_name); }
+
 String KeyEncode::CatalogTableColumnKey(const String &db_id, const String &table_id, const String &column_name, TxnTimeStamp ts) {
     return fmt::format("catalog|col|{}|{}|{}|{}", db_id, table_id, column_name, ts);
 }

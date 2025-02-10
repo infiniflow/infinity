@@ -394,6 +394,7 @@ bool NewTxn::CheckTableExists(const String &db_name, const String &table_name) {
     }
 
     // Table exists
+    found_count = 0;
     String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id, table_name);
     iter2->Seek(table_key_prefix);
     while (iter2->Valid() && iter2->Key().starts_with(table_key_prefix)) {
@@ -846,17 +847,17 @@ Status NewTxn::PrepareCommit() {
                     return status;
                 }
 
-                String db_latest_index_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_index_id");
-                status = kv_instance_->Put(db_latest_index_id, "0");
-                if (!status.ok()) {
-                    return status;
-                }
-
-                String db_latest_segment_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_segment_id");
-                status = kv_instance_->Put(db_latest_segment_id, "0");
-                if (!status.ok()) {
-                    return status;
-                }
+                //                String db_latest_index_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_index_id");
+                //                status = kv_instance_->Put(db_latest_index_id, "0");
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+                //
+                //                String db_latest_segment_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_segment_id");
+                //                status = kv_instance_->Put(db_latest_segment_id, "0");
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
 
                 if (!create_db_cmd->db_comment_.empty()) {
                     String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment");
@@ -879,45 +880,113 @@ Status NewTxn::PrepareCommit() {
                 auto *drop_db_cmd = static_cast<WalCmdDropDatabase *>(command.get());
                 String db_key_prefix = KeyEncode::CatalogDbPrefix(drop_db_cmd->db_name_);
 
-                String db_id;
-                Status status = GetDBId(drop_db_cmd->db_name_, db_id);
+                String db_id_str;
+                String db_key;
+                Status status = GetDBId(drop_db_cmd->db_name_, db_key, db_id_str);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                status = kv_instance_->Delete(db_key);
                 if (!status.ok()) {
                     return status;
                 }
 
                 // Delete db_dir, db_comment and latest_table_id
-                String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id, "dir");
+                String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id_str, "dir");
                 status = kv_instance_->Delete(db_storage_dir);
                 if (!status.ok()) {
                     return status;
                 }
 
-                String db_comment_key = KeyEncode::CatalogDbTagKey(db_id, "comment");
+                String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment");
                 status = kv_instance_->Delete(db_comment_key);
                 if (!status.ok()) {
                     return status;
                 }
 
-                String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id, "latest_table_id");
+                String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_table_id");
                 status = kv_instance_->Delete(db_latest_table_id);
                 if (!status.ok()) {
                     return status;
                 }
 
-                String db_latest_index_id = KeyEncode::CatalogDbTagKey(db_id, "latest_index_id");
-                status = kv_instance_->Delete(db_latest_index_id);
+                //                String db_latest_index_id = KeyEncode::CatalogDbTagKey(db_id, "latest_index_id");
+                //                status = kv_instance_->Delete(db_latest_index_id);
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+                //
+                //                String db_latest_segment_id = KeyEncode::CatalogDbTagKey(db_id, "latest_segment_id");
+                //                status = kv_instance_->Delete(db_latest_segment_id);
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+                break;
+            }
+            case WalCommandType::CREATE_TABLE: {
+                auto *create_table_cmd = static_cast<WalCmdCreateTable *>(command.get());
+                String &db_name = create_table_cmd->db_name_;
+                String &table_name = *create_table_cmd->table_def_->table_name();
+
+                // Get database ID
+                String db_id_str;
+                String db_key;
+                Status status = GetDBId(db_name, db_key, db_id_str);
                 if (!status.ok()) {
                     return status;
                 }
 
-                String db_latest_segment_id = KeyEncode::CatalogDbTagKey(db_id, "latest_segment_id");
-                status = kv_instance_->Delete(db_latest_segment_id);
+                // Get latest table id and lock the id
+                String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_table_id");
+                String table_id_str;
+                status = kv_instance_->GetForUpdate(db_latest_table_id, table_id_str);
+                SizeT table_id = 0;
+                if (status.ok()) {
+                    table_id = std::stoull(table_id_str);
+                } else {
+                    LOG_DEBUG(fmt::format("Failed to get latest_table_id: {}", status.message()));
+                }
+
+                // Create table key value pair
+                ++table_id;
+                String table_key = KeyEncode::CatalogTableKey(db_name, table_name, commit_ts);
+                table_id_str = fmt::format("{}", table_id);
+                status = kv_instance_->Put(table_key, table_id_str);
                 if (!status.ok()) {
                     return status;
                 }
-                break;
-            }
-            case WalCommandType::CREATE_TABLE: {
+
+                // Update latest table id
+                status = kv_instance_->Put(db_latest_table_id, table_id_str);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                // Create table comment;
+                if (create_table_cmd->table_def_->table_comment() != nullptr and !create_table_cmd->table_def_->table_comment()->empty()) {
+                    String &table_comment = *create_table_cmd->table_def_->table_comment();
+                    String table_comment_key = KeyEncode::CatalogTableTagKey(table_id_str, "comment");
+                    status = kv_instance_->Put(table_comment_key, table_comment);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                }
+
+                // Create table index id;
+                String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(table_id_str, "latest_index_id");
+                status = kv_instance_->Put(table_latest_index_id_key, "0");
+                if (!status.ok()) {
+                    return status;
+                }
+
+                // Create table segment id;
+                String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(table_id_str, "latest_segment_id");
+                status = kv_instance_->Put(table_latest_segment_id_key, "0");
+                if (!status.ok()) {
+                    return status;
+                }
+
                 //                auto *create_table_cmd = static_cast<WalCmdCreateTable *>(command.get());
 
                 //                String db_string_id;
@@ -954,6 +1023,7 @@ Status NewTxn::PrepareCommit() {
                 //                        return status;
                 //                    }
                 //                }
+                break;
             }
             default: {
                 break;
@@ -963,7 +1033,7 @@ Status NewTxn::PrepareCommit() {
     return Status::OK();
 }
 
-Status NewTxn::GetDBId(const String &db_name, String &db_id) {
+Status NewTxn::GetDBId(const String &db_name, String &db_key, String &db_id) {
     String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_key_prefix);
@@ -971,13 +1041,9 @@ Status NewTxn::GetDBId(const String &db_name, String &db_id) {
 
     Vector<String> error_db_keys;
     while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+        db_key = iter2->Key().ToString();
         db_id = iter2->Value().ToString();
-        if (found_count == 0) {
-            Status status = kv_instance_->Delete(iter2->Key().ToString());
-            if (!status.ok()) {
-                return status;
-            }
-        } else {
+        if (found_count > 0) {
             // Error branch
             error_db_keys.push_back(iter2->Key().ToString());
         }

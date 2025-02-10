@@ -74,7 +74,7 @@ Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const Shared
         return status;
     }
     if (comment != nullptr) {
-        String db_comment_key = KeyEncode::CatalogDbTagPrefix(db_value, "comment");
+        String db_comment_key = KeyEncode::CatalogDbTagKey(db_value, "comment");
         status = kv_instance->Put(db_comment_key, *comment);
         if (!status.ok()) {
             return status;
