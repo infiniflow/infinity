@@ -132,6 +132,8 @@ public:
     // Table and Collection OPs
     Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array);
 
+    bool CheckTableExists(const String &db_name, const String &table_name);
+
     Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
     Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);

@@ -422,4 +422,10 @@ bool NewTxnManager::InCheckpointProcess(TxnTimeStamp commit_ts) {
     return false;
 }
 
+void NewTxnManager::PrintAllKeyValue() const {
+    std::cout << String("All store key and value: ") << std::endl;
+    std::cout << kv_store_->ToString() << std::endl;
+    std::cout << String(" -------------- ") << std::endl;
+}
+
 } // namespace infinity

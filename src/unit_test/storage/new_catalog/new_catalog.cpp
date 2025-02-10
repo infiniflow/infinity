@@ -24,6 +24,10 @@ import infinity_context;
 import txn_state;
 import extra_ddl_info;
 import infinity_exception;
+import column_def;
+import data_type;
+import logical_type;
+import table_def;
 
 using namespace infinity;
 
@@ -165,4 +169,43 @@ TEST_P(NewCatalogTest, db_test) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
     }
+
+    new_txn_mgr->PrintAllKeyValue();
+}
+
+TEST_P(NewCatalogTest, table_test) {
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+
+    {
+        // create db1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+        //
+        //        // drop db1
+        //        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        //        status = txn4->DropDatabase("db1", ConflictType::kError);
+        //        EXPECT_TRUE(status.ok());
+        //        status = txn4->DropDatabase("db2", ConflictType::kError);
+        //        EXPECT_TRUE(status.ok());
+        //        status = new_txn_mgr->CommitTxn(txn4);
+        //        EXPECT_TRUE(status.ok());
+    }
+
+    new_txn_mgr->PrintAllKeyValue();
 }

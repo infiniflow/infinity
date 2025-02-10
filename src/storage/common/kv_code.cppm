@@ -26,10 +26,11 @@ public:
     static String CatalogDbPrefix(const String &db_name);
     static constexpr String kCatalogDbHeader = "catalog|db|";
 
-    static String CatalogDbTagKey(const String &db_id, const String &tag_name, TxnTimeStamp ts);
+    static String CatalogDbTagKey(const String &db_id, const String &tag_name);
     static String CatalogDbTagPrefix(const String &db_id, const String &tag_name);
 
     static String CatalogTableKey(const String &db_id, const String &table_name, TxnTimeStamp ts);
+    static String CatalogTablePrefix(const String &db_id, const String &table_name);
     static String CatalogTableColumnKey(const String &db_id, const String &table_id, const String &column_name, TxnTimeStamp ts);
     static String CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id, TxnTimeStamp ts);
     static String CatalogTableSegmentBlockKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id, TxnTimeStamp ts);

@@ -285,7 +285,6 @@ Tuple<DBEntry *, Status> NewTxn::GetDatabase(const String &db_name) {
 
 bool NewTxn::CheckDatabaseExists(const String &db_name) {
     String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
-    String db_key = KeyEncode::CatalogDbKey(db_name, this->BeginTS());
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_key_prefix);
     SizeT found_count = 0;
@@ -327,18 +326,18 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
     SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
     db_info->db_name_ = MakeShared<String>(db_name);
 
-    String db_dir_prefix = KeyEncode::CatalogDbTagPrefix(db_id, "dir");
-    iter2->Seek(db_dir_prefix);
-    if (iter2->Valid() && iter2->Key().starts_with(db_dir_prefix)) {
-        db_info->db_entry_dir_ = MakeShared<String>(iter2->Value().ToString());
-    } else {
-        UnrecoverableError("Database dir not found");
+    String db_dir_prefix = KeyEncode::CatalogDbTagKey(db_id, "dir");
+    db_info->db_entry_dir_ = MakeShared<String>();
+    Status status = kv_instance_->Get(db_dir_prefix, *db_info->db_entry_dir_);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
     }
 
-    String db_comment_prefix = KeyEncode::CatalogDbTagPrefix(db_id, "comment");
-    iter2->Seek(db_comment_prefix);
-    if (iter2->Valid() && iter2->Key().starts_with(db_comment_prefix)) {
-        db_info->db_comment_ = MakeShared<String>(iter2->Value().ToString());
+    String db_comment_prefix = KeyEncode::CatalogDbTagKey(db_id, "comment");
+    String db_comment;
+    status = kv_instance_->Get(db_comment_prefix, db_comment);
+    if (status.ok()) {
+        db_info->db_comment_ = MakeShared<String>(db_comment);
     }
 
     return {db_info, Status::OK()};
@@ -376,21 +375,61 @@ Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_tabl
     return catalog_->GetTables(db_name, output_table_array, nullptr);
 }
 
-Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
-    this->CheckTxn(db_name);
-
-    TxnTimeStamp begin_ts = this->BeginTS();
-
-    LOG_TRACE("NewTxn::CreateTable try to insert a created table placeholder on catalog");
-
-    auto [table_entry, table_status] = catalog_->CreateTable(db_name, txn_context_ptr_->txn_id_, begin_ts, table_def, conflict_type, nullptr);
-
-    if (table_entry == nullptr) {
-        return table_status;
+bool NewTxn::CheckTableExists(const String &db_name, const String &table_name) {
+    // DB exists
+    String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
+    String db_key = KeyEncode::CatalogDbKey(db_name, this->BeginTS());
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(db_key_prefix);
+    SizeT found_count = 0;
+    String db_id{};
+    while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+        db_id = iter2->Value().ToString();
+        iter2->Next();
+        ++found_count;
+    }
+    if (found_count == 0) {
+        // Not found
+        return false;
     }
 
-    txn_store_.AddTableStore(table_entry);
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTable>(std::move(db_name), table_entry->GetPathNameTail(), table_def);
+    // Table exists
+    String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id, table_name);
+    iter2->Seek(table_key_prefix);
+    while (iter2->Valid() && iter2->Key().starts_with(table_key_prefix)) {
+        iter2->Next();
+        ++found_count;
+    }
+    if (found_count == 0) {
+        // Not found
+        return false;
+    }
+    return true;
+}
+
+Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
+
+    if (conflict_type == ConflictType::kReplace) {
+        return Status::NotSupport("ConflictType::kReplace");
+    }
+
+    if (conflict_type == ConflictType::kInvalid) {
+        return Status::UnexpectedError("Unknown ConflictType");
+    }
+
+    this->CheckTxn(db_name);
+
+    bool table_exist = this->CheckTableExists(db_name, *table_def->table_name());
+    if (table_exist and conflict_type == ConflictType::kError) {
+        return Status(ErrorCode::kDuplicateTableName, MakeUnique<String>(fmt::format("Table: {} already exists", *table_def->table_name())));
+    }
+
+    if (table_exist and conflict_type == ConflictType::kIgnore) {
+        return Status::OK();
+    }
+
+    SharedPtr<String> local_table_dir = DetermineRandomPath(*table_def->table_name());
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateTable>(db_name, *local_table_dir, table_def);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -795,14 +834,32 @@ Status NewTxn::PrepareCommit() {
                     return status;
                 }
 
-                String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id_str, "dir", commit_ts);
+                String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id_str, "dir");
                 status = kv_instance_->Put(db_storage_dir, create_db_cmd->db_dir_tail_);
                 if (!status.ok()) {
                     return status;
                 }
 
+                String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_table_id");
+                status = kv_instance_->Put(db_latest_table_id, "0");
+                if (!status.ok()) {
+                    return status;
+                }
+
+                String db_latest_index_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_index_id");
+                status = kv_instance_->Put(db_latest_index_id, "0");
+                if (!status.ok()) {
+                    return status;
+                }
+
+                String db_latest_segment_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_segment_id");
+                status = kv_instance_->Put(db_latest_segment_id, "0");
+                if (!status.ok()) {
+                    return status;
+                }
+
                 if (!create_db_cmd->db_comment_.empty()) {
-                    String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment", commit_ts);
+                    String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment");
                     status = kv_instance_->Put(db_comment_key, create_db_cmd->db_comment_);
                     if (!status.ok()) {
                         return status;
@@ -826,7 +883,9 @@ Status NewTxn::PrepareCommit() {
                 SizeT found_count = 0;
 
                 Vector<String> error_db_keys;
+                Vector<String> db_id_list;
                 while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
+                    db_id_list.push_back(iter2->Value().ToString());
                     if (found_count == 0) {
                         Status status = kv_instance_->Delete(iter2->Key().ToString());
                         if (!status.ok()) {
@@ -853,7 +912,78 @@ Status NewTxn::PrepareCommit() {
                         });
                     UnrecoverableError(fmt::format("Found multiple database keys: {}", error_db_keys_str));
                 }
+
+                // Delete db_dir, db_comment and latest_table_id
+                for (const String &dropped_db_id : db_id_list) {
+                    String db_storage_dir = KeyEncode::CatalogDbTagKey(dropped_db_id, "dir");
+                    Status status = kv_instance_->Delete(db_storage_dir);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    String db_comment_key = KeyEncode::CatalogDbTagKey(dropped_db_id, "comment");
+                    status = kv_instance_->Delete(db_comment_key);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    String db_latest_table_id = KeyEncode::CatalogDbTagKey(dropped_db_id, "latest_table_id");
+                    status = kv_instance_->Delete(db_latest_table_id);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    String db_latest_index_id = KeyEncode::CatalogDbTagKey(dropped_db_id, "latest_index_id");
+                    status = kv_instance_->Delete(db_latest_index_id);
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    String db_latest_segment_id = KeyEncode::CatalogDbTagKey(dropped_db_id, "latest_segment_id");
+                    status = kv_instance_->Delete(db_latest_segment_id);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                }
                 break;
+            }
+            case WalCommandType::CREATE_TABLE: {
+                //                auto *create_table_cmd = static_cast<WalCmdCreateTable *>(command.get());
+
+                //                String db_string_id;
+                //                Status status = kv_instance_->GetForUpdate("latest_database_id", db_string_id);
+                //                SizeT db_id = 0;
+                //                if (status.ok()) {
+                //                    db_id = std::stoull(db_string_id);
+                //                } else {
+                //                    LOG_DEBUG(fmt::format("Failed to get latest_database_id: {}", status.message()));
+                //                }
+                //
+                //                ++db_id;
+                //                String db_key = KeyEncode::CatalogDbKey(create_table_cmd->db_name_, commit_ts);
+                //                String db_id_str = fmt::format("{}", db_id);
+                //                status = kv_instance_->Put(db_key, db_id_str);
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+                //                status = kv_instance_->Put("latest_database_id", db_id_str);
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+                //
+                //                String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id_str, "dir", commit_ts);
+                //                status = kv_instance_->Put(db_storage_dir, create_db_cmd->db_dir_tail_);
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+                //
+                //                if (!create_db_cmd->db_comment_.empty()) {
+                //                    String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment", commit_ts);
+                //                    status = kv_instance_->Put(db_comment_key, create_db_cmd->db_comment_);
+                //                    if (!status.ok()) {
+                //                        return status;
+                //                    }
+                //                }
             }
             default: {
                 break;

@@ -108,6 +108,8 @@ public:
 
     TxnTimeStamp max_committed_ts() { return max_committed_ts_; }
 
+    void PrintAllKeyValue() const;
+
 private:
     mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};

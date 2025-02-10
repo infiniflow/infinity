@@ -206,8 +206,8 @@ export {
 
     // default persistence parameter
     constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "/var/infinity/persistence";
-    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "128MB";   // 128MB
-    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu;    // 128MB
+    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "128MB"; // 128MB
+    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 128 * 1024lu * 1024lu;  // 128MB
 
     constexpr std::string_view DEFAULT_STORAGE_TYPE = "local";
     constexpr std::string_view DEFAULT_OBJECT_STORAGE_BUCKET = "infinity";
@@ -327,6 +327,15 @@ export {
     constexpr std::string_view MEMORY_CACHE_MISS_VAR_NAME = "memory_cache_miss";             // global
     constexpr std::string_view DISK_CACHE_MISS_VAR_NAME = "disk_cache_miss";                 // global
     constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "profile";                          // global
+
+    // Use for meta key encoding
+    constexpr std::string_view LATEST_DATABASE_ID = "latest_database_id";
+    constexpr std::string_view LATEST_TABLE_ID = "latest_table_id";
+    constexpr std::string_view LATEST_COLUMN_ID = "latest_column_id";
+    constexpr std::string_view LATEST_INDEX_ID = "latest_index_id";
+    constexpr std::string_view LATEST_SEGMENT_ID = "latest_segment_id";
+    constexpr std::string_view LATEST_BLOCK_ID = "latest_block_id";
+    constexpr std::string_view LATEST_CHUNK_ID = "latest_chunk_id";
 
     // IO related
     constexpr SizeT DEFAULT_READ_BUFFER_SIZE = 4096;

@@ -63,7 +63,6 @@ KVInstance::~KVInstance() {
         delete read_options_.iterate_upper_bound;
         read_options_.iterate_upper_bound = nullptr;
     }
-
 }
 
 Status KVInstance::Put(const String &key, const String &value) {
@@ -203,6 +202,18 @@ UniquePtr<KVInstance> KVStore::GetInstance() {
     kv_instance->transaction_ = transaction_db_->BeginTransaction(write_options_, txn_options_);
     kv_instance->read_options_.snapshot = kv_instance->transaction_->GetSnapshot();
     return kv_instance;
+}
+
+String KVStore::ToString() const {
+    std::stringstream ss;
+    rocksdb::ReadOptions read_option;
+    auto iter = transaction_db_->NewIterator(read_option);
+    iter->SeekToFirst();
+    for (; iter->Valid(); iter->Next()) {
+        ss << iter->key().ToString() << " : " << iter->value().ToString() << std::endl;
+    }
+    delete iter;
+    return ss.str();
 }
 
 Status KVStore::Destroy(const String &db_path) {

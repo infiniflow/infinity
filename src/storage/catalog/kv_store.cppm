@@ -79,6 +79,8 @@ public:
 
     UniquePtr<KVInstance> GetInstance();
 
+    String ToString() const;
+
     // For UT
     static Status Destroy(const String &db_path);
 
