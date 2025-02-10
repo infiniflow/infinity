@@ -14,6 +14,7 @@
 
 module;
 #include <chrono>
+#include <string>
 export module DatetimeManager;
 
 import config;
@@ -26,55 +27,32 @@ namespace infinity {
 
 export class DatetimeManager {
 public:
-    DatetimeManager() : SystemTimeZone(nullptr), SystemDate(nullptr), UserTimeZone(nullptr), UserDate(nullptr) {}
+    DatetimeManager() = default;
 
-    ~DatetimeManager() {
-        delete[] UserTimeZone;
-        delete[] UserDate;
-    }
+    DatetimeManager(const DatetimeManager& other) = default;
 
-    DatetimeManager(const DatetimeManager& other) :
-        SystemTimeZone(other.SystemTimeZone),
-        SystemDate(other.SystemDate),
-        UserTimeZone(nullptr),
-        UserDate(nullptr) {
-        if (other.UserTimeZone) {
-            UserTimeZone = new char[strlen(other.UserTimeZone) + 1];
-            strcpy(UserTimeZone, other.UserTimeZone);
-        }
-        if (other.UserDate) {
-            UserDate = new char[strlen(other.UserDate) + 1];
-            strcpy(UserDate, other.UserDate);
-        }
-    }
+    DatetimeManager& operator=(const DatetimeManager& other) = default;
 
-    DatetimeManager& operator=(const DatetimeManager& other) {
-        if (this != &other) {
-            SystemTimeZone = other.SystemTimeZone;
-            SystemDate = other.SystemDate;
-            delete[] UserTimeZone;
-            UserTimeZone = nullptr;
-            delete[] UserDate;
-            UserDate = nullptr;
-            if (other.UserTimeZone) {
-                UserTimeZone = new char[strlen(other.UserTimeZone) + 1];
-                strcpy(UserTimeZone, other.UserTimeZone);
-            }
-            if (other.UserDate) {
-                UserDate = new char[strlen(other.UserDate) + 1];
-                strcpy(UserDate, other.UserDate);
-            }
-        }
-        return *this;
-    }
+    ~DatetimeManager() = default;
 
-    void update() {}
+    void updateTZ(const std::string& user_timezone);
+    void updateDate(const std::string& user_date);
 
-    const char* SystemTimeZone;
-    const char* SystemDate;
-    char* UserTimeZone;
-    char* UserDate;
+    const std::string& getSystemTimeZone() const { return SystemTimeZone; }
+    const std::string& getSystemDate() const { return SystemDate; }
+    const std::string& getUserTimeZone() const { return UserTimeZone; }
+    const std::string& getUserDate() const { return UserDate; }
 
+    void setSystemTimeZone(const std::string& timezone) { SystemTimeZone = timezone; }
+    void setSystemDate(const std::string& date) { SystemDate = date; }
+    void setUserTimeZone(const std::string& timezone) { UserTimeZone = timezone; }
+    void setUserDate(const std::string& date) { UserDate = date; }
+
+private:
+    std::string SystemTimeZone;
+    std::string SystemDate;
+    std::string UserTimeZone;
+    std::string UserDate;
 };
 
 
