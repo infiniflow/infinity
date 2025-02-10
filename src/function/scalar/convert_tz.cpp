@@ -46,7 +46,7 @@ inline void ConvertTimeZoneFunction::Run(VarcharT &left, VarcharT &result, Colum
 }
 
 void RegisterConvertTimeZoneFunction(const UniquePtr<Catalog> &catalog_ptr) {
-    String func_name = "convertTZ";
+    String func_name = "converttz";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
