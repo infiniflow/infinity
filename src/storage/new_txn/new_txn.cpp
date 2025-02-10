@@ -490,24 +490,30 @@ Status NewTxn::DropColumns(TableEntry *table_entry, const Vector<String> &column
 }
 
 Status NewTxn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
-    this->CheckTxn(db_name);
 
-    TxnTimeStamp begin_ts = this->BeginTS();
-
-    LOG_TRACE("NewTxn::DropTableCollectionByName try to insert a dropped table placeholder on catalog");
-    auto [table_entry, table_status] = catalog_->DropTableByName(db_name, table_name, conflict_type, txn_context_ptr_->txn_id_, begin_ts, nullptr);
-
-    if (table_entry.get() == nullptr) {
-        return table_status;
+    if (conflict_type == ConflictType::kReplace) {
+        return Status::NotSupport("ConflictType::kReplace");
+    }
+    if (conflict_type == ConflictType::kInvalid) {
+        return Status::UnexpectedError("Unknown ConflictType");
     }
 
-    txn_store_.DropTableStore(table_entry.get());
+    this->CheckTxnStatus();
+
+    bool table_exist = this->CheckTableExists(db_name, table_name);
+    if (!table_exist and conflict_type == ConflictType::kError) {
+        return Status::TableNotExist(table_name);
+    }
+
+    if (!table_exist and conflict_type == ConflictType::kIgnore) {
+        return Status::OK();
+    }
 
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropTable>(db_name, table_name);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
-    LOG_TRACE("NewTxn::DropTableCollectionByName dropped table entry is inserted.");
+    LOG_TRACE(fmt::format("NewTxn::DropTableCollectionByName dropped table: {}.{}", db_name, table_name));
     return Status::OK();
 }
 
@@ -882,7 +888,7 @@ Status NewTxn::PrepareCommit() {
 
                 String db_id_str;
                 String db_key;
-                Status status = GetDBId(drop_db_cmd->db_name_, db_key, db_id_str);
+                Status status = GetDbID(drop_db_cmd->db_name_, db_key, db_id_str);
                 if (!status.ok()) {
                     return status;
                 }
@@ -932,7 +938,7 @@ Status NewTxn::PrepareCommit() {
                 // Get database ID
                 String db_id_str;
                 String db_key;
-                Status status = GetDBId(db_name, db_key, db_id_str);
+                Status status = GetDbID(db_name, db_key, db_id_str);
                 if (!status.ok()) {
                     return status;
                 }
@@ -950,7 +956,7 @@ Status NewTxn::PrepareCommit() {
 
                 // Create table key value pair
                 ++table_id;
-                String table_key = KeyEncode::CatalogTableKey(db_name, table_name, commit_ts);
+                String table_key = KeyEncode::CatalogTableKey(db_id_str, table_name, commit_ts);
                 table_id_str = fmt::format("{}", table_id);
                 status = kv_instance_->Put(table_key, table_id_str);
                 if (!status.ok()) {
@@ -983,6 +989,12 @@ Status NewTxn::PrepareCommit() {
                 // Create table segment id;
                 String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(table_id_str, "latest_segment_id");
                 status = kv_instance_->Put(table_latest_segment_id_key, "0");
+                if (!status.ok()) {
+                    return status;
+                }
+
+                String table_storage_dir = KeyEncode::CatalogTableTagKey(table_id_str, "dir");
+                status = kv_instance_->Put(table_storage_dir, create_table_cmd->table_dir_tail_);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1025,6 +1037,69 @@ Status NewTxn::PrepareCommit() {
                 //                }
                 break;
             }
+            case WalCommandType::DROP_TABLE: {
+                auto *drop_table_cmd = static_cast<WalCmdDropTable *>(command.get());
+                //                String db_key_prefix = KeyEncode::CatalogDbPrefix(drop_table_cmd->db_name_);
+
+                String table_id_str;
+                String table_key;
+                Status status = GetTableID(drop_table_cmd->db_name_, drop_table_cmd->table_name_, table_key, table_id_str);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                // delete table key
+                status = kv_instance_->Delete(table_key);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                // delete table index id;
+                String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(table_id_str, "latest_index_id");
+                status = kv_instance_->Delete(table_latest_index_id_key);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                // delete table segment id;
+                String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(table_id_str, "latest_segment_id");
+                status = kv_instance_->Delete(table_latest_segment_id_key);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                // Delete table_dir
+                String table_storage_dir = KeyEncode::CatalogTableTagKey(table_id_str, "dir");
+                status = kv_instance_->Delete(table_storage_dir);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                //                String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment");
+                //                status = kv_instance_->Delete(db_comment_key);
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+                //
+                //                String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_table_id");
+                //                status = kv_instance_->Delete(db_latest_table_id);
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+
+                //                String db_latest_index_id = KeyEncode::CatalogDbTagKey(db_id, "latest_index_id");
+                //                status = kv_instance_->Delete(db_latest_index_id);
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+                //
+                //                String db_latest_segment_id = KeyEncode::CatalogDbTagKey(db_id, "latest_segment_id");
+                //                status = kv_instance_->Delete(db_latest_segment_id);
+                //                if (!status.ok()) {
+                //                    return status;
+                //                }
+                break;
+            }
             default: {
                 break;
             }
@@ -1033,7 +1108,7 @@ Status NewTxn::PrepareCommit() {
     return Status::OK();
 }
 
-Status NewTxn::GetDBId(const String &db_name, String &db_key, String &db_id) {
+Status NewTxn::GetDbID(const String &db_name, String &db_key, String &db_id) {
     String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(db_key_prefix);
@@ -1045,14 +1120,14 @@ Status NewTxn::GetDBId(const String &db_name, String &db_key, String &db_id) {
         db_id = iter2->Value().ToString();
         if (found_count > 0) {
             // Error branch
-            error_db_keys.push_back(iter2->Key().ToString());
+            error_db_keys.push_back(db_key);
         }
         iter2->Next();
         ++found_count;
     }
 
     if (found_count == 0) {
-        // No db, ignore it.
+        // No table, ignore it.
         return Status::DBNotExist(db_name);
     }
 
@@ -1063,6 +1138,50 @@ Status NewTxn::GetDBId(const String &db_name, String &db_key, String &db_id) {
                 return a + ", " + b;
             });
         UnrecoverableError(fmt::format("Found multiple database keys: {}", error_db_keys_str));
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id) {
+
+    // Get db_id
+    String db_id_str;
+    String db_key;
+    Status status = GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str, table_name);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(table_key_prefix);
+    SizeT found_count = 0;
+
+    Vector<String> error_table_keys;
+    while (iter2->Valid() && iter2->Key().starts_with(table_key_prefix)) {
+        table_key = iter2->Key().ToString();
+        table_id = iter2->Value().ToString();
+        if (found_count > 0) {
+            // Error branch
+            error_table_keys.push_back(table_key);
+        }
+        iter2->Next();
+        ++found_count;
+    }
+
+    if (found_count == 0) {
+        // No table, ignore it.
+        return Status::TableNotExist(table_name);
+    }
+
+    if (!error_table_keys.empty()) {
+        // join error_table_keys
+        String error_table_keys_str =
+            std::accumulate(std::next(error_table_keys.begin()), error_table_keys.end(), error_table_keys.front(), [](String a, String b) {
+                return a + ", " + b;
+            });
+        UnrecoverableError(fmt::format("Found multiple table keys: {}", error_table_keys_str));
     }
 
     return Status::OK();
