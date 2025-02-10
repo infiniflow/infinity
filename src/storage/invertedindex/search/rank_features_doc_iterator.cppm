@@ -38,7 +38,7 @@ public:
 
     bool Next(RowID doc_id) override;
 
-    float Score() override { return 1.0f; }
+    float Score() override;
 
     u32 MatchCount() const override;
 
@@ -50,6 +50,7 @@ private:
     void *aligned_buffer_ = nullptr;
     u32 *match_cnt_ptr_ = nullptr;
     u16 *payload_ptr_ = nullptr;
+    f32 *score_sum_ptr_ = nullptr;
 };
 
 } // namespace infinity

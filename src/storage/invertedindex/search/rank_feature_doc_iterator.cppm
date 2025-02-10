@@ -35,6 +35,8 @@ public:
 
     DocIteratorType GetType() const override { return DocIteratorType::kRankFeatureDocIterator; }
 
+    float GetWeight() const { return boost_; }
+
     String Name() const override { return "RankFeatureDocIterator"; }
 
     void UpdateScoreThreshold(float threshold) override {}
