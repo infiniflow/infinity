@@ -128,6 +128,8 @@ public:
     const std::shared_ptr<ConstantExpr> default_value() const { return std::dynamic_pointer_cast<ConstantExpr>(default_expr_); }
 
     nlohmann::json ToJson() const;
+    static std::shared_ptr<ColumnDef> FromJson(const nlohmann::json &json);
+
 public:
     int64_t id_{-1};
     const std::shared_ptr<DataType> column_type_{};

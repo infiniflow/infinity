@@ -229,6 +229,8 @@ TEST_P(NewCatalogTest, table_test) {
 
         for (const auto &table_name : tables) {
             std::cout << String("Table name: ") << table_name << std::endl;
+            auto [table_info, table_status] = txn3->GetTableInfo(*db_name, table_name);
+            std::cout << *table_info->table_name_ << std::endl;
         }
 
         status = txn3->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);

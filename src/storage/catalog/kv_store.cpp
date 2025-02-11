@@ -84,7 +84,14 @@ Status KVInstance::Delete(const String &key) {
 Status KVInstance::Get(const String &key, String &value) {
     rocksdb::Status s = transaction_->Get(read_options_, key, &value);
     if (!s.ok()) {
-        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+        switch (s.code()) {
+            case rocksdb::Status::Code::kNotFound: {
+                return Status::NotFound(fmt::format("Key not found: {}", key));
+            }
+            default: {
+                return Status::UnexpectedError(s.ToString());
+            }
+        }
     }
     return Status::OK();
 }

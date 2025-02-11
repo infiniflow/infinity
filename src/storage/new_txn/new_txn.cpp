@@ -673,7 +673,60 @@ Tuple<TableEntry *, Status> NewTxn::GetTableByName(const String &db_name, const 
 }
 
 Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, const String &table_name) {
-    return catalog_->GetTableInfo(db_name, table_name, nullptr);
+    this->CheckTxn(db_name);
+    SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();
+    table_info->db_name_ = MakeShared<String>(db_name);
+    table_info->table_name_ = MakeShared<String>(table_name);
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    // Create table comment;
+    String table_comment_key = KeyEncode::CatalogTableTagKey(table_id_str, "comment");
+    String table_comment;
+    status = kv_instance_->Get(table_comment_key, table_comment);
+    if (!status.ok() and status.code() != ErrorCode::kNotFound) {
+        return {nullptr, status};
+    }
+
+    String db_dir;
+    String db_dir_prefix = KeyEncode::CatalogDbTagKey(db_id_str, "dir");
+    status = kv_instance_->Get(db_dir_prefix, db_dir);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    String table_storage_dir = KeyEncode::CatalogTableTagKey(table_id_str, "dir");
+    String table_storage_tail;
+    status = kv_instance_->Get(table_storage_dir, table_storage_tail);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    table_info->table_full_dir_ =
+        MakeShared<String>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), db_dir, table_storage_tail));
+
+    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str, table_id_str);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(table_column_prefix);
+    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
+        String column_key = iter2->Key().ToString();
+        String column_value = iter2->Value().ToString();
+        auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value));
+        table_info->column_defs_.emplace_back(column_def);
+        iter2->Next();
+    }
+
+    // sort table_info->column_defs_ by column_id
+    std::sort(table_info->column_defs_.begin(), table_info->column_defs_.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) {
+        return a->id_ < b->id_;
+    });
+
+    return {table_info, Status::OK()};
 }
 
 Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const String &db_name, const String &table_name) {
