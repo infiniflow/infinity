@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "type/datetime/datetime_type.h"
 module;
 
 export module infinity_context;
 
 import stl;
 import config;
-import datetime_manager;
 import resource_manager;
 import task_scheduler;
 import storage;
@@ -37,8 +35,6 @@ namespace infinity {
 export class InfinityContext : public Singleton<InfinityContext> {
 public:
     [[nodiscard]] inline TaskScheduler *task_scheduler() noexcept { return task_scheduler_.get(); }
-
-    [[nodiscard]] inline TaskScheduler *datetime_manager() noexcept { return datetime_manager_.get(); }
 
     [[nodiscard]] inline Config *config() noexcept { return config_.get(); }
 
@@ -87,7 +83,6 @@ private:
     UniquePtr<Config> config_{};
     UniquePtr<ResourceManager> resource_manager_{};
     UniquePtr<TaskScheduler> task_scheduler_{};
-    UniquePtr<DatetimeManager> datetime_manager_{};
     UniquePtr<Storage> storage_{};
     UniquePtr<SessionManager> session_mgr_{};
     UniquePtr<ClusterManager> cluster_manager_{};

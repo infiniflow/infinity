@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "type/logical_type.h"
 module;
 #include <chrono>
 module convert_timezone;
@@ -20,6 +19,7 @@ import catalog;
 import status;
 import logical_type;
 import infinity_exception;
+import infinity_context;
 import scalar_function;
 import scalar_function_set;
 import third_party;
@@ -40,8 +40,8 @@ struct ConvertTimeZoneFunction {
 
 template <>
 inline void ConvertTimeZoneFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *result_ptr) {
-    std:string tz_str = left.ToString();
-    DatetimeManager.setUserTimeZone(tz_str);
+    std:String tz_str = left.ToString();
+    // *datetime_manager().setUserTimeZone(tz_str);
     result_ptr->AppendVarcharInner(tz_str, result);
 }
 
@@ -53,7 +53,7 @@ void RegisterConvertTimeZoneFunction(const UniquePtr<Catalog> &catalog_ptr) {
     ScalarFunction convert_timezone_function(func_name,
                                   {DataType(LogicalType::kVarchar)},
                                   DataType(LogicalType::kVarchar),
-                                  &ScalarFunction::UnaryFunction<VarcharT, DateT, ConvertTimeZoneFunction>);
+                                  &ScalarFunction::UnaryFunctionToVarlen<VarcharT, VarcharT, ConvertTimeZoneFunction>);
     function_set_ptr->AddFunction(convert_timezone_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

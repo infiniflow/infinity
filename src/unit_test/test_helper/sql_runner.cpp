@@ -66,7 +66,6 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
 
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
-                            InfinityContext::instance().datetime_manager(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
