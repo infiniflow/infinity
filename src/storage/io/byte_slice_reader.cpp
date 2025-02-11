@@ -128,12 +128,12 @@ SizeT ByteSliceReader::Seek(SizeT offset) {
     } else {
         // current byteslice is not long enough, seek to next byteslices
         i64 total_len = len;
-        i64 remainLen;
+        i64 remain_len;
         while (total_len > 0) {
-            remainLen = current_slice_->size_ - current_slice_offset_;
-            if (remainLen <= total_len) {
-                global_offset_ += remainLen;
-                total_len -= remainLen;
+            remain_len = current_slice_->size_ - current_slice_offset_;
+            if (remain_len <= total_len) {
+                global_offset_ += remain_len;
+                total_len -= remain_len;
                 current_slice_ = current_slice_->next_;
                 current_slice_offset_ = 0;
                 if (current_slice_ == nullptr) {
