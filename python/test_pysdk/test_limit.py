@@ -142,6 +142,8 @@ class TestInfinity:
                     ]
                 )
 
+        table_obj = db_obj.get_table(table_name)
+
         res, extra_result = (
             table_obj.output(["doc_id"])
             .option({"total_hits_count": True})
