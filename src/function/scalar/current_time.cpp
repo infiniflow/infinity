@@ -41,7 +41,7 @@ template <>
 inline void CurrentTimeFunction::Run(VarcharT &left, TimeT &result) {
     String tz_str = left.ToString();
 //    Config::SetUserTimeZone(tz_str);
-    auto offset = Config::TimeZoneBias();
+    auto offset = Config::GetTimeZoneBias();
     hours offset_hour(offset);
     auto now = system_clock::now() + offset_hour;
     auto sys_days = std::chrono::floor<std::chrono::days>(now);

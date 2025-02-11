@@ -48,9 +48,6 @@ Config::~Config() {
 #endif
 }
 
-String Config::UserTimezone = "UTC";
-i64 Config::UserTimezoneBias = 0;
-
 u64 Config::GetAvailableMem() {
     u64 pages = sysconf(_SC_PHYS_PAGES);
     u64 page_size = sysconf(_SC_PAGE_SIZE); // Byte
@@ -63,11 +60,6 @@ void Config::ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_z
     parsed_time_zone_bias = std::stoi(time_zone_str.substr(3, String::npos));
 }
 
-void Config::ParseTimeZoneStr(const String &time_zone_str) {
-    UserTimezone = time_zone_str.substr(0, 3);
-    ToUpper(UserTimezone);
-    UserTimezoneBias = std::stoi(time_zone_str.substr(3, String::npos));
-}
 
 Status Config::ParseByteSize(const String &byte_size_str, i64 &byte_size) {
 
@@ -2931,11 +2923,11 @@ Tuple<BaseOption *, Status> Config::GetConfigByName(const String &name) { return
 // }
 
 String Config::GetTimeZone() {
-
+    return global_options_.GetStringValue(GlobalOptionIndex::kTimeZone);
 }
 
 i64 Config::GetTimeZoneBias() {
-
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kTimeZoneBias);
 }
 
 

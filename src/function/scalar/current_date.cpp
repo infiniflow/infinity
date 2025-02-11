@@ -42,7 +42,7 @@ template <>
 inline void CurrentDateFunction::Run(VarcharT &left, DateT &result) {
     String tz_str = left.ToString();
 //    Config::SetUserTimeZone(tz_str);
-    auto offset = Config::TimeZoneBias();
+    auto offset = Config::GetTimeZoneBias();
     auto now = system_clock::now();
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
     result.value = sys_days.time_since_epoch().count() + offset * (60 * 60);

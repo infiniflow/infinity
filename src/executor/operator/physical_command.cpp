@@ -334,12 +334,16 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
                                 RecoverableError(status);
                             }
-                            if (set_command->value_str() == "UTC") {
-                                config->SetTimeZone(set_command->value_str());
-                                return true;
+                            String tz;
+                            i32 tz_bias = 0;
+                            Config::ParseTimeZoneStr(set_command->value_str(), tz, tz_bias);
+                            if (tz_bias < -12 || tz_bias > 12) {
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set time zone bias: {}", tz_bias));
+                                RecoverableError(status);
                             }
-                            if (set_command->value_str() == "GMT") {
+                            if (tz == "UTC" || tz == "GMT") {
                                 config->SetTimeZone(set_command->value_str());
+                                config->SetTimeZoneBias(tz_bias);
                                 return true;
                             }
                             break;

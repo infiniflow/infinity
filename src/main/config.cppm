@@ -52,8 +52,8 @@ public:
     // General
     String Version();
     String ServerMode();
-    static String TimeZone();
-    static i64 TimeZoneBias();
+    String TimeZone();
+    i64 TimeZoneBias();
 
     void SetCPULimit(i64 new_cpu_limit);
     i64 CPULimit();
@@ -167,8 +167,10 @@ public:
     //
     static i64 GetTimeZoneBias();
 
-private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
+
+private:
+
 
     // static void ParseTimeZoneStr(const String &time_zone_str);
 
@@ -185,7 +187,7 @@ private:
 
 private:
     std::mutex mutex_;
-    GlobalOptions global_options_;
+    static GlobalOptions global_options_;
 
     // record running query flag
     Atomic<bool> record_running_query_{false};
