@@ -63,7 +63,6 @@ import merge_knn_data;
 import create_index_data;
 import compact_state_data;
 import logger;
-import datetime_manager;
 import task_scheduler;
 import plan_fragment;
 import aggregate_expression;

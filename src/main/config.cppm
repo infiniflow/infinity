@@ -157,14 +157,27 @@ public:
 
     void SetOption(const String &var_name, const String &value);
 
+    static void SetUserTimeZone(const String &value);
+
+    String GetUserTimeZone() const { return UserTimezone; };
+
+    i64 GetUserTimeZoneBias() const { return UserTimezoneBias; };
+
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
+
+    static void ParseTimeZoneStr(const String &time_zone_str);
 
     static Status ParseByteSize(const String &byte_size_str, i64 &byte_size);
 
     static Status ParseTimeInfo(const String &time_info, i64 &time_seconds);
 
     static u64 GetAvailableMem();
+
+    static String UserTimezone;
+
+    static i64 UserTimezoneBias;
+
 
 private:
     std::mutex mutex_;

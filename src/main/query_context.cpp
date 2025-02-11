@@ -24,7 +24,6 @@ module query_context;
 import stl;
 import session;
 import config;
-import datetime_manager;
 import task_scheduler;
 import storage;
 import resource_manager;

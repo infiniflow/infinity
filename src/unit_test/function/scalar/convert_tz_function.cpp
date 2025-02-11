@@ -86,7 +86,7 @@ TEST_P(ConvertTimeZoneFunctionsTest, convert_tz_func) {
         data_block.Init(column_types);
 
         for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeVarchar("Asia/Shanghai"));
+            data_block.AppendValue(0, Value::MakeVarchar("UTC+8"));
         }
         data_block.Finalize();
 

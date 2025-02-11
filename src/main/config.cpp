@@ -14,6 +14,7 @@
 
 module;
 
+
 #include <string>
 #include <unistd.h>
 
@@ -47,6 +48,9 @@ Config::~Config() {
 #endif
 }
 
+String Config::UserTimezone = "UTC";
+i64 Config::UserTimezoneBias = 0;
+
 u64 Config::GetAvailableMem() {
     u64 pages = sysconf(_SC_PHYS_PAGES);
     u64 page_size = sysconf(_SC_PAGE_SIZE); // Byte
@@ -57,6 +61,12 @@ void Config::ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_z
     parsed_time_zone = time_zone_str.substr(0, 3);
     ToUpper(parsed_time_zone);
     parsed_time_zone_bias = std::stoi(time_zone_str.substr(3, String::npos));
+}
+
+void Config::ParseTimeZoneStr(const String &time_zone_str) {
+    UserTimezone = time_zone_str.substr(0, 3);
+    ToUpper(UserTimezone);
+    UserTimezoneBias = std::stoi(time_zone_str.substr(3, String::npos));
 }
 
 Status Config::ParseByteSize(const String &byte_size_str, i64 &byte_size) {
@@ -2887,6 +2897,10 @@ String Config::ResourcePath() {
 // SizeT profile_record_capacity() const { return system_option_.profile_record_capacity; }
 
 Tuple<BaseOption *, Status> Config::GetConfigByName(const String &name) { return global_options_.GetOptionByName(name); }
+
+void Config::SetUserTimeZone(const String &value) {
+    ParseTimeZoneStr(value);
+}
 
 void Config::PrintAll() {
     fmt::print("Infinity system configs: \n");

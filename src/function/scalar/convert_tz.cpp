@@ -15,6 +15,7 @@ module;
 #include <chrono>
 module convert_timezone;
 import stl;
+import config;
 import catalog;
 import status;
 import logical_type;
@@ -40,8 +41,8 @@ struct ConvertTimeZoneFunction {
 
 template <>
 inline void ConvertTimeZoneFunction::Run(VarcharT &left, VarcharT &result, ColumnVector *result_ptr) {
-    std:String tz_str = left.ToString();
-    // *datetime_manager().setUserTimeZone(tz_str);
+    String tz_str = left.ToString();
+    Config::SetUserTimeZone(tz_str);
     result_ptr->AppendVarcharInner(tz_str, result);
 }
 
