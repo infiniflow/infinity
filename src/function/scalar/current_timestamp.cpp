@@ -19,6 +19,7 @@ import config;
 import catalog;
 import status;
 import logical_type;
+import infinity_context;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -26,6 +27,7 @@ import third_party;
 import internal_types;
 import data_type;
 import column_vector;
+import query_context;
 
 namespace infinity {
 using namespace std::chrono;
@@ -40,7 +42,9 @@ struct CurrentTimestampFunction {
 template <>
 inline void CurrentTimestampFunction::Run(VarcharT &left, TimestampT &result) {
     String tz_str = left.ToString();
-    auto offset = Config::GetTimeZoneBias();
+    InfinityContext& infinityContext = InfinityContext::instance();
+    Config* config = infinityContext.config();
+    auto offset = config->TimeZoneBias();
     hours offset_hour(offset);
     auto now = system_clock::now() + offset_hour;
     auto sys_days = std::chrono::floor<std::chrono::days>(now);

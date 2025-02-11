@@ -19,6 +19,7 @@ import config;
 import catalog;
 import status;
 import logical_type;
+import infinity_context;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -40,8 +41,9 @@ struct CurrentTimeFunction {
 template <>
 inline void CurrentTimeFunction::Run(VarcharT &left, TimeT &result) {
     String tz_str = left.ToString();
-//    Config::SetUserTimeZone(tz_str);
-    auto offset = Config::GetTimeZoneBias();
+    InfinityContext& infinityContext = InfinityContext::instance();
+    Config* config = infinityContext.config();
+    auto offset = config->TimeZoneBias();
     hours offset_hour(offset);
     auto now = system_clock::now() + offset_hour;
     auto sys_days = std::chrono::floor<std::chrono::days>(now);

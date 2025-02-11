@@ -2922,15 +2922,6 @@ Tuple<BaseOption *, Status> Config::GetConfigByName(const String &name) { return
 //     ParseTimeZoneStr(value);
 // }
 
-String Config::GetTimeZone() {
-    return global_options_.GetStringValue(GlobalOptionIndex::kTimeZone);
-}
-
-i64 Config::GetTimeZoneBias() {
-    return global_options_.GetIntegerValue(GlobalOptionIndex::kTimeZoneBias);
-}
-
-
 void Config::PrintAll() {
     fmt::print("Infinity system configs: \n");
 

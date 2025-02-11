@@ -163,10 +163,6 @@ public:
 
     static void SetTimeZoneOuter(const String &value);
 
-    static String GetTimeZone();
-    //
-    static i64 GetTimeZoneBias();
-
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 
 private:
@@ -179,15 +175,11 @@ private:
     static Status ParseTimeInfo(const String &time_info, i64 &time_seconds);
 
     static u64 GetAvailableMem();
-    //
-    // static String UserTimezone;
-    //
-    // static i64 UserTimezoneBias;
 
 
 private:
     std::mutex mutex_;
-    static GlobalOptions global_options_;
+    GlobalOptions global_options_;
 
     // record running query flag
     Atomic<bool> record_running_query_{false};

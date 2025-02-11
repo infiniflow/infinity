@@ -19,6 +19,7 @@ import config;
 import catalog;
 import status;
 import logical_type;
+import infinity_context;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -26,6 +27,7 @@ import third_party;
 import internal_types;
 import data_type;
 import column_vector;
+import singleton;
 
 namespace infinity {
 using namespace std::chrono;
@@ -42,7 +44,9 @@ template <>
 inline void CurrentDateFunction::Run(VarcharT &left, DateT &result) {
     String tz_str = left.ToString();
 //    Config::SetUserTimeZone(tz_str);
-    auto offset = Config::GetTimeZoneBias();
+    InfinityContext& infinityContext = InfinityContext::instance();
+    Config* config = infinityContext.config();
+    auto offset = config->TimeZoneBias();
     auto now = system_clock::now();
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
     result.value = sys_days.time_since_epoch().count() + offset * (60 * 60);
