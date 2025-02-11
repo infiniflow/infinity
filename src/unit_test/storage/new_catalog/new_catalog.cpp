@@ -216,6 +216,8 @@ TEST_P(NewCatalogTest, table_test) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
+        new_txn_mgr->PrintAllKeyValue();
+
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         status = txn3->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());

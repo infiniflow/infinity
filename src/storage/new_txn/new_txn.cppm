@@ -48,6 +48,10 @@ struct TableIndexEntry;
 struct SegmentEntry;
 struct WalEntry;
 struct WalCmd;
+struct WalCmdCreateDatabase;
+struct WalCmdDropDatabase;
+struct WalCmdCreateTable;
+struct WalCmdDropTable;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
@@ -274,6 +278,11 @@ private:
 
     Status GetDbID(const String &db_name, String &db_key, String &db_id);
     Status GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id);
+
+    Status CommitCreateDB(const WalCmdCreateDatabase* create_db_cmd);
+    Status CommitDropDB(const WalCmdDropDatabase* drop_db_cmd);
+    Status CommitCreateTable(const WalCmdCreateTable* create_table_cmd);
+    Status CommitDropTable(const WalCmdDropTable* drop_table_cmd);
 
 private:
     // Reference to external class
