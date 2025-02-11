@@ -34,15 +34,23 @@ String KeyEncode::CatalogTableKey(const String &db_id, const String &table_name,
 }
 
 String KeyEncode::CatalogTablePrefix(const String &db_id, const String &table_name) { return fmt::format("catalog|tbl|{}|{}|", db_id, table_name); }
+String KeyEncode::CatalogDbTablePrefix(const String &db_id) { return fmt::format("catalog|tbl|{}|", db_id); }
 
 String KeyEncode::CatalogTableTagKey(const String &table_id, const String &tag_name) { return fmt::format("tbl|{}|{}", table_id, tag_name); }
 String KeyEncode::CatalogTableTagPrefix(const String &table_id, const String &tag_name) { return fmt::format("tbl|{}|{}|", table_id, tag_name); }
 
-String KeyEncode::CatalogTableColumnKey(const String &db_id, const String &table_id, const String &column_name, TxnTimeStamp ts) {
-    return fmt::format("catalog|col|{}|{}|{}|{}", db_id, table_id, column_name, ts);
+String KeyEncode::TableColumnKey(const String &db_id, const String &table_id, const String &column_name) {
+    return fmt::format("tbl|col|{}|{}|{}", db_id, table_id, column_name);
 }
-String KeyEncode::CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id, TxnTimeStamp ts) {
-    return fmt::format("catalog|seg|{}|{}|{}|{}", db_id, table_id, segment_id, ts);
+
+String KeyEncode::TableColumnPrefix(const String &db_id, const String &table_id) { return fmt::format("tbl|col|{}|{}|", db_id, table_id); }
+
+String KeyEncode::TableColumnTagKey(const String &db_id, const String &table_id, const String &column_id, const String &tag_name) {
+    return fmt::format("col|{}|{}|{}|{}", db_id, table_id, column_id, tag_name);
+}
+
+String KeyEncode::CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id) {
+    return fmt::format("catalog|seg|{}|{}|{}", db_id, table_id, segment_id);
 }
 String KeyEncode::CatalogTableSegmentBlockKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id, TxnTimeStamp ts) {
     return fmt::format("catalog|blk|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, ts);

@@ -31,12 +31,17 @@ public:
 
     static String CatalogTableKey(const String &db_id, const String &table_name, TxnTimeStamp ts);
     static String CatalogTablePrefix(const String &db_id, const String &table_name);
+    static String CatalogDbTablePrefix(const String &db_id);
 
     static String CatalogTableTagKey(const String &table_id, const String &tag_name);
     static String CatalogTableTagPrefix(const String &table_id, const String &tag_name);
 
-    static String CatalogTableColumnKey(const String &db_id, const String &table_id, const String &column_name, TxnTimeStamp ts);
-    static String CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id, TxnTimeStamp ts);
+    static String TableColumnKey(const String &db_id, const String &table_id, const String &column_name);
+    static String TableColumnPrefix(const String &db_id, const String &table_id);
+
+    static String TableColumnTagKey(const String &db_id, const String &table_id, const String &column_id, const String &tag_name);
+
+    static String CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id);
     static String CatalogTableSegmentBlockKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id, TxnTimeStamp ts);
     static String CatalogTableSegmentBlockColumnKey(const String &db_id,
                                                     const String &table_id,

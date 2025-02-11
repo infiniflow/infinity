@@ -217,4 +217,26 @@ std::string ColumnDef::ToString() const {
     return ss.str();
 }
 
+nlohmann::json ColumnDef::ToJson() const {
+    nlohmann::json column_def_json;
+    column_def_json["column_type"] = this->type()->Serialize();
+    column_def_json["column_id"] = this->id();
+    column_def_json["column_name"] = this->name();
+
+    for (const auto &column_constraint : this->constraints_) {
+        column_def_json["constraints"].emplace_back(column_constraint);
+    }
+
+    if (!(this->comment().empty())) {
+        column_def_json["column_comment"] = this->comment();
+    }
+
+    if (this->has_default_value()) {
+        auto default_expr = dynamic_pointer_cast<ConstantExpr>(this->default_expr_);
+        column_def_json["default"] = default_expr->Serialize();
+    }
+
+    return column_def_json;
+}
+
 } // namespace infinity

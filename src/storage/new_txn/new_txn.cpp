@@ -14,6 +14,7 @@
 
 module;
 
+#include "parser/type/serialize.h"
 #include <string>
 #include <tuple>
 #include <vector>
@@ -60,6 +61,7 @@ import snapshot_info;
 import kv_store;
 import random;
 import kv_code;
+import constant_expr;
 
 namespace infinity {
 
@@ -517,6 +519,29 @@ Status NewTxn::DropTableCollectionByName(const String &db_name, const String &ta
     return Status::OK();
 }
 
+Status NewTxn::ListTable(const String &db_name, Vector<String> &table_list) {
+    this->CheckTxnStatus();
+
+    String db_key;
+    String db_id;
+    Status status = GetDbID(db_name, db_key, db_id);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(db_table_prefix);
+    while (iter2->Valid() && iter2->Key().starts_with(db_table_prefix)) {
+        String key_str = iter2->Key().ToString();
+        size_t start = db_table_prefix.size();
+        size_t end = key_str.find('|', start);
+        table_list.emplace_back(key_str.substr(start, end - start));
+        iter2->Next();
+    }
+    return Status::OK();
+}
+
 // Index OPs
 Tuple<TableIndexEntry *, Status> NewTxn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
     TxnTimeStamp begin_ts = this->BeginTS();
@@ -813,7 +838,7 @@ Status NewTxn::Commit() {
 }
 
 Status NewTxn::PrepareCommit() {
-//    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
         switch (command_type) {
@@ -892,10 +917,9 @@ Status NewTxn::GetDbID(const String &db_name, String &db_key, String &db_id) {
     return Status::OK();
 }
 
-Status NewTxn::GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id) {
+Status NewTxn::GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id_str, String &db_id_str) {
 
     // Get db_id
-    String db_id_str;
     String db_key;
     Status status = GetDbID(db_name, db_key, db_id_str);
     if (!status.ok()) {
@@ -910,7 +934,7 @@ Status NewTxn::GetTableID(const String &db_name, const String &table_name, Strin
     Vector<String> error_table_keys;
     while (iter2->Valid() && iter2->Key().starts_with(table_key_prefix)) {
         table_key = iter2->Key().ToString();
-        table_id = iter2->Value().ToString();
+        table_id_str = iter2->Value().ToString();
         if (found_count > 0) {
             // Error branch
             error_table_keys.push_back(table_key);
@@ -1003,7 +1027,7 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd) {
     return Status::OK();
 }
 Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
-//    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     String db_key_prefix = KeyEncode::CatalogDbPrefix(drop_db_cmd->db_name_);
 
@@ -1122,6 +1146,11 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
         return status;
     }
 
+    status = CommitCreateTableDef(create_table_cmd->table_def_.get(), db_id_str, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
     //                auto *create_table_cmd = static_cast<WalCmdCreateTable *>(command.get());
 
     //                String db_string_id;
@@ -1160,12 +1189,25 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
     //                }
     return Status::OK();
 }
-Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
-//    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
+Status NewTxn::CommitCreateTableDef(const TableDef *table_def, const String &db_id, const String &table_id) {
+    for (const auto &column : table_def->columns()) {
+        String column_key = KeyEncode::TableColumnKey(db_id, table_id, column->name());
+        Status status = kv_instance_->Put(column_key, column->ToJson().dump());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
+    //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+    String db_id_str;
     String table_id_str;
     String table_key;
-    Status status = GetTableID(drop_table_cmd->db_name_, drop_table_cmd->table_name_, table_key, table_id_str);
+    Status status = GetTableID(drop_table_cmd->db_name_, drop_table_cmd->table_name_, table_key, table_id_str, db_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -1197,6 +1239,10 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
         return status;
     }
 
+    status = CommitDropTableDef(db_id_str, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
     //                String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment");
     //                status = kv_instance_->Delete(db_comment_key);
     //                if (!status.ok()) {
@@ -1220,6 +1266,23 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
     //                if (!status.ok()) {
     //                    return status;
     //                }
+    return Status::OK();
+}
+
+Status NewTxn::CommitDropTableDef(const String &db_id, const String &table_id) {
+    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id, table_id);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(table_column_prefix);
+
+    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
+        String table_column_key = iter2->Key().ToString();
+        Status status = kv_instance_->Delete(table_column_key);
+        if (!status.ok()) {
+            return status;
+        }
+        iter2->Next();
+    }
+
     return Status::OK();
 }
 

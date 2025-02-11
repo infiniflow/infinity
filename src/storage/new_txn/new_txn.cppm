@@ -150,6 +150,8 @@ public:
 
     Status DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type);
 
+    Status ListTable(const String &db_name, Vector<String> &table_list);
+
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
@@ -277,12 +279,14 @@ private:
     void CheckTxn(const String &db_name);
 
     Status GetDbID(const String &db_name, String &db_key, String &db_id);
-    Status GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id);
+    Status GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id, String &db_id);
 
-    Status CommitCreateDB(const WalCmdCreateDatabase* create_db_cmd);
-    Status CommitDropDB(const WalCmdDropDatabase* drop_db_cmd);
-    Status CommitCreateTable(const WalCmdCreateTable* create_table_cmd);
-    Status CommitDropTable(const WalCmdDropTable* drop_table_cmd);
+    Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
+    Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
+    Status CommitCreateTable(const WalCmdCreateTable *create_table_cmd);
+    Status CommitCreateTableDef(const TableDef *table_def, const String &db_id, const String &table_id);
+    Status CommitDropTable(const WalCmdDropTable *drop_table_cmd);
+    Status CommitDropTableDef(const String &db_id, const String &table_id);
 
 private:
     // Reference to external class

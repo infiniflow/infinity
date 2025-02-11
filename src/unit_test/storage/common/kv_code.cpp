@@ -80,23 +80,27 @@ TEST_F(KVCodeTest, kv_code1) {
         EXPECT_STREQ(key.c_str(), "catalog|tbl|3|tbl1|123");
     }
     {
-        String key = KeyEncode::CatalogTableColumnKey(db_id, table_id, column_name, ts);
-        EXPECT_STREQ(key.c_str(), "catalog|col|3|10|col1|123");
+        String key = KeyEncode::TableColumnKey(db_id, table_id, column_name);
+        EXPECT_STREQ(key.c_str(), "tbl|col|3|10|col1");
     }
     {
-        String key = KeyEncode::CatalogTableSegmentKey(db_id, table_id, segment_id, ts);
-        EXPECT_STREQ(key.c_str(), "catalog|seg|3|10|2|123");
+        String key = KeyEncode::CatalogTableSegmentKey(db_id, table_id, segment_id);
+        EXPECT_STREQ(key.c_str(), "catalog|seg|3|10|2");
     }
 }
 
 TEST_F(KVCodeTest, kv_code2) {
     // Test code here
     String db_name = "db1";
+    String db_id_str = "3";
+    String table_id_str = "10";
     String table_name = "tbl1";
+    String column_name = "col1";
     TxnTimeStamp ts = 123;
     SegmentID segment_id = 2;
     BlockID block_id = 3;
     ColumnID column_id = 4;
+    String column_id_str = "4";
     String index_name = "idx1";
     ChunkID chunk_id = 5;
     {
@@ -110,6 +114,16 @@ TEST_F(KVCodeTest, kv_code2) {
         EXPECT_STREQ(key.c_str(), "tbl|db1|tbl1|123");
         String key_prefix = KeyEncode::TableKeyPrefix(db_name, table_name);
         EXPECT_STREQ(key_prefix.c_str(), "tbl|db1|tbl1|");
+    }
+    {
+        String key = KeyEncode::TableColumnKey(db_id_str, table_id_str, column_name);
+        EXPECT_STREQ(key.c_str(), "tbl|col|3|10|col1");
+
+        String key_prefix = KeyEncode::TableColumnPrefix(db_id_str, table_id_str);
+        EXPECT_STREQ(key_prefix.c_str(), "tbl|col|3|10|");
+
+        String tag_prefix = KeyEncode::TableColumnTagKey(db_id_str, table_id_str, column_id_str, "tag1");
+        EXPECT_STREQ(tag_prefix.c_str(), "col|3|10|4|tag1");
     }
     {
         String key = KeyEncode::TableSegmentKey(db_name, table_name, segment_id, ts);

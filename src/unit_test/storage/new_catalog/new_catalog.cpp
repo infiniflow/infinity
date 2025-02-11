@@ -210,6 +210,7 @@ TEST_P(NewCatalogTest, table_test) {
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
+        // create table
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
         status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
@@ -218,12 +219,24 @@ TEST_P(NewCatalogTest, table_test) {
 
         new_txn_mgr->PrintAllKeyValue();
 
+        // drop table
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+
+        // - list tables
+        Vector<String> tables;
+        status = txn3->ListTable(*db_name, tables);
+        EXPECT_TRUE(status.ok());
+
+        for (const auto &table_name : tables) {
+            std::cout << String("Table name: ") << table_name << std::endl;
+        }
+
         status = txn3->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
+        // drop database
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         status = txn4->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
