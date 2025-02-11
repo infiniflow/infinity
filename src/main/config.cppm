@@ -52,8 +52,8 @@ public:
     // General
     String Version();
     String ServerMode();
-    String TimeZone();
-    i64 TimeZoneBias();
+    static String TimeZone();
+    static i64 TimeZoneBias();
 
     void SetCPULimit(i64 new_cpu_limit);
     i64 CPULimit();
@@ -148,7 +148,11 @@ public:
     // Resource
     String ResourcePath();
 
+    // Date and Time
 
+    void SetTimeZone(const String &value);
+
+    void SetTimeZoneBias(i64);
 public:
     // Get config by name
     Tuple<BaseOption *, Status> GetConfigByName(const String &name);
@@ -157,26 +161,26 @@ public:
 
     void SetOption(const String &var_name, const String &value);
 
-    static void SetUserTimeZone(const String &value);
+    static void SetTimeZoneOuter(const String &value);
 
-    String GetUserTimeZone() const { return UserTimezone; };
-
-    i64 GetUserTimeZoneBias() const { return UserTimezoneBias; };
+    static String GetTimeZone();
+    //
+    static i64 GetTimeZoneBias();
 
 private:
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
 
-    static void ParseTimeZoneStr(const String &time_zone_str);
+    // static void ParseTimeZoneStr(const String &time_zone_str);
 
     static Status ParseByteSize(const String &byte_size_str, i64 &byte_size);
 
     static Status ParseTimeInfo(const String &time_info, i64 &time_seconds);
 
     static u64 GetAvailableMem();
-
-    static String UserTimezone;
-
-    static i64 UserTimezoneBias;
+    //
+    // static String UserTimezone;
+    //
+    // static i64 UserTimezoneBias;
 
 
 private:
