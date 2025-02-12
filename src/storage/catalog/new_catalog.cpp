@@ -27,6 +27,7 @@ import kv_code;
 import third_party;
 import logger;
 import infinity_exception;
+import default_values;
 
 namespace infinity {
 
@@ -54,7 +55,7 @@ Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const Shared
 
     // Get the latest database id of system
     String db_string_id;
-    Status status = kv_instance->GetForUpdate("latest_database_id", db_string_id);
+    Status status = kv_instance->GetForUpdate(LATEST_DATABASE_ID.data(), db_string_id);
     SizeT db_id = 0;
     if (status.ok()) {
         db_id = std::stoull(db_string_id);
@@ -69,7 +70,7 @@ Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const Shared
     if (!status.ok()) {
         return status;
     }
-    status = kv_instance->Put("latest_database_id", db_value);
+    status = kv_instance->Put(LATEST_DATABASE_ID.data(), db_value);
     if (!status.ok()) {
         return status;
     }

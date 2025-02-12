@@ -1018,7 +1018,7 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd) {
 
     // Get the latest database id of system
     String db_string_id;
-    Status status = kv_instance_->GetForUpdate("latest_database_id", db_string_id);
+    Status status = kv_instance_->GetForUpdate(LATEST_DATABASE_ID.data(), db_string_id);
     SizeT db_id = 0;
     if (status.ok()) {
         db_id = std::stoull(db_string_id);
@@ -1033,7 +1033,7 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd) {
     if (!status.ok()) {
         return status;
     }
-    status = kv_instance_->Put("latest_database_id", db_id_str);
+    status = kv_instance_->Put(LATEST_DATABASE_ID.data(), db_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -1180,14 +1180,14 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
     }
 
     // Create table index id;
-    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(table_id_str, "latest_index_id");
+    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(table_id_str, LATEST_INDEX_ID.data());
     status = kv_instance_->Put(table_latest_index_id_key, "0");
     if (!status.ok()) {
         return status;
     }
 
     // Create table segment id;
-    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(table_id_str, "latest_segment_id");
+    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(table_id_str, LATEST_SEGMENT_ID.data());
     status = kv_instance_->Put(table_latest_segment_id_key, "0");
     if (!status.ok()) {
         return status;
@@ -1272,14 +1272,14 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
     }
 
     // delete table index id;
-    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(table_id_str, "latest_index_id");
+    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(table_id_str, LATEST_INDEX_ID.data());
     status = kv_instance_->Delete(table_latest_index_id_key);
     if (!status.ok()) {
         return status;
     }
 
     // delete table segment id;
-    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(table_id_str, "latest_segment_id");
+    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(table_id_str, LATEST_SEGMENT_ID.data());
     status = kv_instance_->Delete(table_latest_segment_id_key);
     if (!status.ok()) {
         return status;
