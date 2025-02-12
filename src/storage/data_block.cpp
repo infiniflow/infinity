@@ -368,6 +368,7 @@ void DataBlock::AppendWith(const DataBlock *other, SizeT from, SizeT count) {
 }
 
 void DataBlock::InsertVector(const SharedPtr<ColumnVector> &vector, SizeT index) {
+    LOG_INFO(fmt::format("0212- DataBlock::InsertVector: index: {}, column_count_: {}", index, column_count_));
     column_vectors.insert(column_vectors.begin() + index, vector);
     column_count_++;
 }

@@ -67,7 +67,10 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
         LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: Top load_metas size: {}", load_metas.size()));
         for (SizeT i = 0; i < load_metas.size(); ++i) {
             const auto &load_meta = load_metas[i];
-            LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: Top load_meta[{}] type: {}", i, load_meta.type_->ToString()));
+            LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: Top load_meta[{}] type: {}, index: {}",
+                                 i,
+                                 load_meta.type_->ToString(),
+                                 load_meta.index_));
         }
     }
 
@@ -102,6 +105,11 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
                 output_to_data_block_helper
                     .AddOutputJobInfo(segment_id, block_id, load_metas[k].binding_.column_idx, block_offset, i, load_metas[k].index_, j);
             }
+        }
+
+        SizeT input_col_cnt = input_block->column_count();
+        if (operator_type_ == PhysicalOperatorType::kTop) {
+            LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: Top input_col_cnt: {}", input_col_cnt));
         }
     }
     output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),
