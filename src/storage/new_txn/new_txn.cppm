@@ -142,6 +142,10 @@ public:
 
     Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);
 
+    Status AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs);
+
+    Status DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names);
+
     Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs);
 
     Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
@@ -285,7 +289,7 @@ private:
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
     Status CommitCreateTable(const WalCmdCreateTable *create_table_cmd);
     Status CommitCreateTableDef(const TableDef *table_def, const String &db_id, const String &table_id);
-    Status CommitDropTable(const WalCmdDropTable *drop_table_cmd);
+    Status CommitDropTable(const String &db_name, const String &table_name);
     Status CommitDropTableDef(const String &db_id, const String &table_id);
 
 private:
