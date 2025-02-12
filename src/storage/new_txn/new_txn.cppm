@@ -52,6 +52,8 @@ struct WalCmdCreateDatabase;
 struct WalCmdDropDatabase;
 struct WalCmdCreateTable;
 struct WalCmdDropTable;
+struct WalCmdAddColumns;
+struct WalCmdDropColumns;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
@@ -291,6 +293,8 @@ private:
     Status CommitCreateTableDef(const TableDef *table_def, const String &db_id, const String &table_id);
     Status CommitDropTable(const String &db_name, const String &table_name);
     Status CommitDropTableDef(const String &db_id, const String &table_id);
+    Status CommitAddColumns(const WalCmdAddColumns *add_columns_cmd);
+    Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
 
 private:
     // Reference to external class

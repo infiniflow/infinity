@@ -510,7 +510,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         String table_column_key = iter2->Key().ToString();
         // Check table name existence;
         if (column_map_to_added.find(table_column_key) == column_map_to_added.end()) {
-            return Status::DuplicateColumnName(column_map_to_added[table_column_key]);
+            return Status::ColumnNotExist(column_map_to_added[table_column_key]);
         }
         iter2->Next();
     }
@@ -1004,6 +1004,22 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::ADD_COLUMNS: {
+                auto *add_column_cmd = static_cast<WalCmdAddColumns *>(command.get());
+                Status status = CommitAddColumns(add_column_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case WalCommandType::DROP_COLUMNS: {
+                auto *drop_column_cmd = static_cast<WalCmdDropColumns *>(command.get());
+                Status status = CommitDropColumns(drop_column_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             default: {
                 break;
             }
@@ -1348,9 +1364,16 @@ Status NewTxn::CommitDropTable(const String &db_name, const String &table_name) 
         return status;
     }
 
-    // Delete table_dir
+    // Delete table dir
     String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
     status = kv_instance_->Delete(table_storage_dir);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Delete table comment
+    String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");
+    status = kv_instance_->Delete(table_comment_key);
     if (!status.ok()) {
         return status;
     }
@@ -1359,29 +1382,7 @@ Status NewTxn::CommitDropTable(const String &db_name, const String &table_name) 
     if (!status.ok()) {
         return status;
     }
-    //                String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment");
-    //                status = kv_instance_->Delete(db_comment_key);
-    //                if (!status.ok()) {
-    //                    return status;
-    //                }
-    //
-    //                String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_table_id");
-    //                status = kv_instance_->Delete(db_latest_table_id);
-    //                if (!status.ok()) {
-    //                    return status;
-    //                }
 
-    //                String db_latest_index_id = KeyEncode::CatalogDbTagKey(db_id, "latest_index_id");
-    //                status = kv_instance_->Delete(db_latest_index_id);
-    //                if (!status.ok()) {
-    //                    return status;
-    //                }
-    //
-    //                String db_latest_segment_id = KeyEncode::CatalogDbTagKey(db_id, "latest_segment_id");
-    //                status = kv_instance_->Delete(db_latest_segment_id);
-    //                if (!status.ok()) {
-    //                    return status;
-    //                }
     return Status::OK();
 }
 
@@ -1399,6 +1400,62 @@ Status NewTxn::CommitDropTableDef(const String &db_id, const String &table_id) {
         iter2->Next();
     }
 
+    return Status::OK();
+}
+
+Status NewTxn::CommitAddColumns(const WalCmdAddColumns *add_columns_cmd) {
+    const String &db_name = add_columns_cmd->db_name_;
+    const String &table_name = add_columns_cmd->table_name_;
+
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String column_name_value;
+    for (const auto &column : add_columns_cmd->column_defs_) {
+        String column_key = KeyEncode::TableColumnKey(db_id_str, table_id_str, column->name());
+        Status status = kv_instance_->Get(column_key, column_name_value);
+        if (status.code() == ErrorCode::kNotFound) {
+            Status status = kv_instance_->Put(column_key, column->ToJson().dump());
+            if (!status.ok()) {
+                return status;
+            }
+        } else {
+            return Status::DuplicateColumnName(column->name());
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
+    const String &db_name = drop_columns_cmd->db_name_;
+    const String &table_name = drop_columns_cmd->table_name_;
+
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String column_name_value;
+    for (const auto &column_name : drop_columns_cmd->column_names_) {
+        String column_key = KeyEncode::TableColumnKey(db_id_str, table_id_str, column_name);
+        Status status = kv_instance_->Get(column_key, column_name_value);
+        if (status.ok()) {
+            status = kv_instance_->Delete(column_key);
+            if (!status.ok()) {
+                return status;
+            }
+        } else {
+            return Status::ColumnNotExist(column_name);
+        }
+    }
     return Status::OK();
 }
 
