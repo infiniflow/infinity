@@ -33,6 +33,7 @@ import column_vector;
 import default_values;
 import physical_top;
 import logger;
+import third_party;
 
 namespace infinity {
 
@@ -93,6 +94,10 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
         });
     if (middle_data_block_array.empty()) {
         // first input
+        if (!input_data_block_array.empty()) {
+            SizeT col_cnt = input_data_block_array[0]->column_vectors.size();
+            LOG_INFO(fmt::format("0212- PhysicalMergeTop::Execute: col_cnt={}", col_cnt));
+        }
         middle_data_block_array = std::move(input_data_block_array);
         middle_result_count = input_result_count;
     } else {
@@ -139,8 +144,10 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
         middle_data_block_array.resize(result_block_cnt);
         auto get_block_ptr = [&](u32 block_id) -> DataBlock * {
             if (block_id < middle_block_cnt) {
+                LOG_INFO(fmt::format("0212- Get block {} from middle_data_block_array", block_id));
                 return middle_data_block_array[block_id].get();
             } else {
+                LOG_INFO(fmt::format("0212- Get block {} from input_data_block_array", block_id - middle_block_cnt));
                 return input_data_block_array[block_id - middle_block_cnt].get();
             }
         };
@@ -167,6 +174,7 @@ bool PhysicalMergeTop::Execute(QueryContext *, OperatorState *operator_state) {
             swap_block->Reset();
             for (u32 id = start_id; id < end_id; ++id) {
                 auto [_, block_idx, block_offset] = result_ids[id];
+                LOG_INFO(fmt::format("0212- PhysicalMergeTop::Execute: get_block_ptr({})", block_idx));
                 swap_block->AppendWith(get_block_ptr(block_idx), block_offset, 1);
             }
             swap_block->Finalize();

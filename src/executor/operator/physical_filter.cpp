@@ -88,6 +88,16 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
     if (prev_op_state->Complete()) {
         filter_operator_state->SetComplete();
     }
+
+    if (!operator_state->data_block_array_.empty()) {
+        const auto &first_block = operator_state->data_block_array_[0];
+        const auto &types = first_block->types();
+        LOG_INFO(fmt::format("0212- PhysicalFilter::Execute: types.size(): {}", types.size()));
+        for (SizeT i = 0; i < types.size(); ++i) {
+            auto &type = types[i];
+            LOG_INFO(fmt::format("0212- PhysicalFilter::Execute: types[{}]: {}", i, type->ToString()));
+        }
+    }
     return true;
 }
 

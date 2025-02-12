@@ -326,6 +326,7 @@ void DataBlock::AppendWith(const SharedPtr<DataBlock> &other) { AppendWith(other
 
 void DataBlock::AppendWith(const DataBlock *other) {
     if (other->column_count() != this->column_count()) {
+        LOG_INFO(fmt::format("0212- other column count: {}, this column count: {}", other->column_count(), this->column_count()));
         UnrecoverableError(
             fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
     }
@@ -347,6 +348,7 @@ void DataBlock::AppendWith(const DataBlock *other) {
 
 void DataBlock::AppendWith(const DataBlock *other, SizeT from, SizeT count) {
     if (other->column_count() != this->column_count()) {
+        LOG_INFO(fmt::format("0212- other column count: {}, this column count: {}", other->column_count(), this->column_count()));
         UnrecoverableError(
             fmt::format("Attempt merge block with column count {} into block with column count {}", other->column_count(), this->column_count()));
     }

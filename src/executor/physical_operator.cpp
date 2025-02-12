@@ -48,6 +48,9 @@ String PhysicalOperator::GetName() const { return PhysicalOperatorToString(opera
 
 void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *operator_state, HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) {
     if (load_metas_.get() == nullptr || load_metas_->empty()) {
+        if (operator_type_ == PhysicalOperatorType::kTop) {
+            LOG_INFO("0212- PhysicalOperator::InputLoad: Top load_metas is empty");
+        }
         return;
     }
     //    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
@@ -59,6 +62,14 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
         UnrecoverableError("TableRef not found");
     }
     const auto *table_ref = table_refs_it->second.get();
+
+    if (operator_type_ == PhysicalOperatorType::kTop) {
+        LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: Top load_metas size: {}", load_metas.size()));
+        for (SizeT i = 0; i < load_metas.size(); ++i) {
+            const auto &load_meta = load_metas[i];
+            LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: Top load_meta[{}] type: {}", i, load_meta.type_->ToString()));
+        }
+    }
 
     OutputToDataBlockHelper output_to_data_block_helper;
     for (SizeT i = 0; i < operator_state->prev_op_state_->data_block_array_.size(); ++i) {

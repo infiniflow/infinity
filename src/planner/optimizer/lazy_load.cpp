@@ -36,6 +36,7 @@ import load_meta;
 import special_function;
 import infinity_exception;
 import third_party;
+import logger;
 
 namespace infinity {
 
@@ -93,6 +94,14 @@ void RefencecColumnCollection::VisitNode(LogicalNode &op) {
         }
         default: {
             break;
+        }
+    }
+
+    if (op.operator_type() == LogicalNodeType::kTop) {
+        LOG_INFO(fmt::format("0212- RefencecColumnCollection::VisitNode: Top load_metas size: {}", load_metas_.size()));
+        for (SizeT i = 0; i < load_metas_.size(); ++i) {
+            const auto &load_meta = load_metas_[i];
+            LOG_INFO(fmt::format("0212- RefencecColumnCollection::VisitNode: Top load_meta[{}] type: {}", i, load_meta.type_->ToString()));
         }
     }
 

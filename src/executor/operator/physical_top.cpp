@@ -134,6 +134,11 @@ private:
     }
     void WriteToOutput(const Vector<UniquePtr<DataBlock>> &input_data_block_array, Vector<UniquePtr<DataBlock>> &output_data_block_array) {
         auto const &db_types = input_data_block_array[0]->types();
+        LOG_INFO(fmt::format("0212- WriteToOutput: db_types.size(): {}", db_types.size()));
+        for (SizeT i = 0; i < db_types.size(); ++i) {
+            auto &type = db_types[i];
+            LOG_INFO(fmt::format("0212- WriteToOutput: db_types[{}]: {}", i, type->ToString()));
+        }
         {
             // prepare output blocks
             i64 row_cnt = size_;
@@ -166,6 +171,7 @@ private:
                     output_block_ptr = output_data_block_array[output_block_id].get();
                     output_block_row_id = 0;
                 }
+                LOG_INFO(fmt::format("0212- AppendWith: {}, {}", block_id, row_id));
                 output_block_ptr->AppendWith(input_block_ptr, row_id, 1);
                 ++output_block_row_id;
                 ++next_candidate_id;
@@ -403,9 +409,11 @@ void PhysicalTop::HandleOutputOffset(u32 total_row_cnt, u32 offset, Vector<Uniqu
         u32 start_block_id = start_row_id / DEFAULT_BLOCK_CAPACITY;
         u32 start_block_offset = start_row_id % DEFAULT_BLOCK_CAPACITY;
         u32 start_block_copy_cnt = std::min(copy_row_cnt, u32(DEFAULT_BLOCK_CAPACITY - start_block_offset));
+        LOG_INFO(fmt::format("0212- PhysicalTop::HandleOutputOffset: AppendWith({}, {}, {})", start_block_id, start_block_offset, start_block_copy_cnt));
         swap_block->AppendWith(output_data_block_array[start_block_id].get(), start_block_offset, start_block_copy_cnt);
         u32 next_block_copy_cnt = copy_row_cnt - start_block_copy_cnt;
         if (next_block_copy_cnt > 0) {
+            LOG_INFO(fmt::format("0212- PhysicalTop::HandleOutputOffset: AppendWith({}, {}, {})", start_block_id + 1, 0, next_block_copy_cnt));
             swap_block->AppendWith(output_data_block_array[start_block_id + 1].get(), 0, next_block_copy_cnt);
         }
         swap_block->Finalize();
