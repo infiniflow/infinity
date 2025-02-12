@@ -686,7 +686,7 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
     }
 
     // Create table comment;
-    String table_comment_key = KeyEncode::CatalogTableTagKey(table_id_str, "comment");
+    String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");
     String table_comment;
     status = kv_instance_->Get(table_comment_key, table_comment);
     if (!status.ok() and status.code() != ErrorCode::kNotFound) {
@@ -700,7 +700,7 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
         UnrecoverableError(status.message());
     }
 
-    String table_storage_dir = KeyEncode::CatalogTableTagKey(table_id_str, "dir");
+    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
     String table_storage_tail;
     status = kv_instance_->Get(table_storage_dir, table_storage_tail);
     if (!status.ok()) {
@@ -1172,28 +1172,35 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
     // Create table comment;
     if (create_table_cmd->table_def_->table_comment() != nullptr and !create_table_cmd->table_def_->table_comment()->empty()) {
         String &table_comment = *create_table_cmd->table_def_->table_comment();
-        String table_comment_key = KeyEncode::CatalogTableTagKey(table_id_str, "comment");
+        String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");
         status = kv_instance_->Put(table_comment_key, table_comment);
         if (!status.ok()) {
             return status;
         }
     }
 
+    // Create table column id;
+    String table_latest_column_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_COLUMN_ID.data());
+    status = kv_instance_->Put(table_latest_column_id_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
     // Create table index id;
-    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(table_id_str, LATEST_INDEX_ID.data());
+    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_INDEX_ID.data());
     status = kv_instance_->Put(table_latest_index_id_key, "0");
     if (!status.ok()) {
         return status;
     }
 
     // Create table segment id;
-    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(table_id_str, LATEST_SEGMENT_ID.data());
+    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_SEGMENT_ID.data());
     status = kv_instance_->Put(table_latest_segment_id_key, "0");
     if (!status.ok()) {
         return status;
     }
 
-    String table_storage_dir = KeyEncode::CatalogTableTagKey(table_id_str, "dir");
+    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
     status = kv_instance_->Put(table_storage_dir, create_table_cmd->table_dir_tail_);
     if (!status.ok()) {
         return status;
@@ -1272,21 +1279,21 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
     }
 
     // delete table index id;
-    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(table_id_str, LATEST_INDEX_ID.data());
+    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_INDEX_ID.data());
     status = kv_instance_->Delete(table_latest_index_id_key);
     if (!status.ok()) {
         return status;
     }
 
     // delete table segment id;
-    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(table_id_str, LATEST_SEGMENT_ID.data());
+    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_SEGMENT_ID.data());
     status = kv_instance_->Delete(table_latest_segment_id_key);
     if (!status.ok()) {
         return status;
     }
 
     // Delete table_dir
-    String table_storage_dir = KeyEncode::CatalogTableTagKey(table_id_str, "dir");
+    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
     status = kv_instance_->Delete(table_storage_dir);
     if (!status.ok()) {
         return status;

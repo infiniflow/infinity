@@ -33,8 +33,8 @@ public:
     static String CatalogTablePrefix(const String &db_id, const String &table_name);
     static String CatalogDbTablePrefix(const String &db_id);
 
-    static String CatalogTableTagKey(const String &table_id, const String &tag_name);
-    static String CatalogTableTagPrefix(const String &table_id, const String &tag_name);
+    static String CatalogTableTagKey(const String &db_id, const String &table_id, const String &tag_name);
+    static String CatalogTableTagPrefix(const String &db_id, const String &table_id, const String &tag_name);
 
     static String TableColumnKey(const String &db_id, const String &table_id, const String &column_name);
     static String TableColumnPrefix(const String &db_id, const String &table_id);
