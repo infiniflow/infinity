@@ -30,7 +30,7 @@ import wal_entry;
 import third_party;
 import logger;
 import data_block;
-import txn_store;
+import new_txn_store;
 import txn_state;
 
 import meta_state;
@@ -137,7 +137,7 @@ Status NewTxn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_e
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
-    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
+    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
     table_store->Import(std::move(segment_entry), nullptr);
 
     return Status::OK();
@@ -148,7 +148,7 @@ Status NewTxn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input
     const String &table_name = *table_entry->GetTableName();
 
     this->CheckTxn(db_name);
-    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
+    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
 
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
     wal_entry_->cmds_.push_back(wal_command);
@@ -169,7 +169,7 @@ Status NewTxn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, boo
         RecoverableError(Status::TxnRollback(TxnID(), log_msg));
     }
 
-    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
+    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
 
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
     wal_entry_->cmds_.push_back(wal_command);
@@ -180,7 +180,8 @@ Status NewTxn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, boo
 
 Status
 NewTxn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type) {
-    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
+    const String &table_name = *table_entry->GetTableName();
+    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
 
     auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
     return compact_status;
@@ -188,11 +189,12 @@ NewTxn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Ve
 
 Status NewTxn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
     TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
-    TxnTableStore *txn_table_store = this->GetTxnTableStore(table_entry);
+    const String &table_name = *table_entry->GetTableName();
+//    NewTxnTableStore *txn_table_store = this->GetNewTxnTableStore(table_name);
 
     const String &index_name = *table_index_entry->GetIndexName();
-    const String &table_name = *table_entry->GetTableName();
-    table_index_entry->OptIndex(txn_table_store, init_params, false /*replay*/);
+    // FIXME: adapt nullptr
+    table_index_entry->OptIndex(nullptr, init_params, false /*replay*/);
 
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimize>(db_name_, table_name, index_name, std::move(init_params));
     wal_entry_->cmds_.push_back(wal_command);
@@ -201,9 +203,9 @@ Status NewTxn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<Ini
     return Status::OK();
 }
 
-TxnTableStore *NewTxn::GetTxnTableStore(TableEntry *table_entry) { return txn_store_.GetTxnTableStore(table_entry); }
+NewTxnTableStore *NewTxn::GetNewTxnTableStore(const String& table_name) { return txn_store_.GetNewTxnTableStore(table_name); }
 
-TxnTableStore *NewTxn::GetExistTxnTableStore(TableEntry *table_entry) const { return txn_store_.GetExistTxnTableStore(table_entry); }
+NewTxnTableStore *NewTxn::GetExistNewTxnTableStore(TableEntry *table_entry) const { return txn_store_.GetExistNewTxnTableStore(table_entry); }
 
 void NewTxn::CheckTxnStatus() {
     TxnState txn_state = this->GetTxnState();
@@ -508,8 +510,11 @@ Status NewTxn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<Column
     }
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     new_table_entry->InitCompactionAlg(begin_ts);
-    TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
-    new_table_entry->AddColumns(column_defs, txn_table_store);
+
+//    const String &table_name = *table_entry->GetTableName();
+//    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
+    // TODO: adapt nullptr
+    new_table_entry->AddColumns(column_defs, nullptr);
     auto add_status = db_entry->AddTable(std::move(new_table_entry), txn_context_ptr_->txn_id_, begin_ts, nullptr, true /*add_if_found*/);
     if (!add_status.ok()) {
         return add_status;
@@ -531,8 +536,10 @@ Status NewTxn::DropColumns(TableEntry *table_entry, const Vector<String> &column
     }
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     new_table_entry->InitCompactionAlg(begin_ts);
-    TxnTableStore *txn_table_store = txn_store_.GetTxnTableStore(new_table_entry.get());
-    new_table_entry->DropColumns(column_names, txn_table_store);
+    //    const String &table_name = *table_entry->GetTableName();
+    //    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
+    // TODO: adapt nullptr
+    new_table_entry->DropColumns(column_names, nullptr);
     auto drop_status = db_entry->AddTable(std::move(new_table_entry), txn_context_ptr_->txn_id_, begin_ts, nullptr, true /*add_if_found*/);
     if (!drop_status.ok()) {
         return drop_status;
@@ -690,7 +697,9 @@ Tuple<TableIndexEntry *, Status> NewTxn::CreateIndexDef(TableEntry *table_entry,
     if (table_index_entry == nullptr) { // nullptr means some exception happened
         return {nullptr, index_status};
     }
-    auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
+
+    const String &table_name = *table_entry->GetTableName();
+    auto *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
     txn_table_store->AddIndexStore(table_index_entry);
 
     String index_dir_tail = table_index_entry->GetPathNameTail();
@@ -1769,7 +1778,8 @@ void NewTxn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
 }
 
 void NewTxn::AddWriteTxnNum(TableEntry *table_entry) {
-    TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
+    const String &table_name = *table_entry->GetTableName();
+    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
     table_store->AddWriteTxnNum();
 }
 

@@ -25,7 +25,7 @@ import meta_state;
 import data_access_state;
 import buffer_manager;
 import txn_state;
-import txn_store;
+import new_txn_store;
 import database_detail;
 import status;
 import extra_ddl_info;
@@ -260,9 +260,9 @@ public:
     NewTxnManager *txn_mgr() const { return txn_mgr_; }
 
     // Create txn store if not exists
-    TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
+    NewTxnTableStore *GetNewTxnTableStore(const String& table_name);
 
-    TxnTableStore *GetExistTxnTableStore(TableEntry *table_entry) const;
+    NewTxnTableStore *GetExistNewTxnTableStore(TableEntry *table_entry) const;
 
     WalEntry *GetWALEntry() const;
 
@@ -279,7 +279,7 @@ public:
 
     bool IsReaderAllowed() const { return allowed_in_reader_; }
 
-    TxnStore *txn_store() { return &txn_store_; }
+    NewTxnStore *txn_store() { return &txn_store_; }
 
     SharedPtr<TxnContext> txn_context() const { return txn_context_ptr_; }
     void AddOperation(const SharedPtr<String> &operation_text) { txn_context_ptr_->AddOperation(operation_text); }
@@ -320,7 +320,7 @@ private:
     Catalog *catalog_{};
     NewCatalog *new_catalog_{};
 
-    TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
+    NewTxnStore txn_store_; // this has this ptr, so txn cannot be moved.
 
     // Use as txn context;
     mutable std::shared_mutex rw_locker_{};
