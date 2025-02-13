@@ -105,80 +105,80 @@ class TestInfinity:
         res = db_obj.drop_table("test_limit" + suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.usefixtures("skip_if_local_infinity")
-    # def test_limit_2block(self, suffix):
-    #     db_obj = self.infinity_obj.get_database("default_db")
+    @pytest.mark.usefixtures("skip_if_local_infinity")
+    def test_limit_2block(self, suffix):
+        db_obj = self.infinity_obj.get_database("default_db")
 
-    #     table_name = "ragspace_kb_bcc87f1cd48711ef8ed510ffe02aa993" + suffix
-    #     db_obj.drop_table(table_name, ConflictType.Ignore)
-    #     table_obj = db_obj.create_table(
-    #         table_name,
-    #         {
-    #             "doc_id": {"type": "varchar"},
-    #             "knowledge_graph_kwd": {"type": "varchar", "default": ""},
-    #             "page_num_int": {"type": "int"},
-    #             "top_int": {"type": "int"},
-    #             "create_timestamp_flt": {"type": "float"},
-    #         },
-    #     )
-    #     for j in range(20):
-    #         row_count = 8192
-    #         batch_size = 128
-    #         for i in range(0, row_count, batch_size):
-    #             table_obj.insert(
-    #                 [
-    #                     {
-    #                         "doc_id": "f294ba5cd48711efaaa610ffe02aa993",
-    #                         "knowledge_graph_kwd": (
-    #                             ""
-    #                             if j != 9
-    #                             else ("graph" if i % 2 == 0 else "mind_map")
-    #                         ),
-    #                         "page_num_int": i,
-    #                         "top_int": i,
-    #                         "create_timestamp_flt": 0.0,
-    #                     }
-    #                     for _ in range(batch_size)
-    #                 ]
-    #             )
+        table_name = "ragspace_kb_bcc87f1cd48711ef8ed510ffe02aa993" + suffix
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            table_name,
+            {
+                "doc_id": {"type": "varchar"},
+                "knowledge_graph_kwd": {"type": "varchar", "default": ""},
+                "page_num_int": {"type": "int"},
+                "top_int": {"type": "int"},
+                "create_timestamp_flt": {"type": "float"},
+            },
+        )
+        for j in range(20):
+            row_count = 8192
+            batch_size = 128
+            for i in range(0, row_count, batch_size):
+                table_obj.insert(
+                    [
+                        {
+                            "doc_id": "f294ba5cd48711efaaa610ffe02aa993",
+                            "knowledge_graph_kwd": (
+                                ""
+                                if j != 9
+                                else ("graph" if i % 2 == 0 else "mind_map")
+                            ),
+                            "page_num_int": i,
+                            "top_int": i,
+                            "create_timestamp_flt": 0.0,
+                        }
+                        for _ in range(batch_size)
+                    ]
+                )
 
-    #     table_obj = db_obj.get_table(table_name)
+        table_obj = db_obj.get_table(table_name)
 
-    #     res, extra_result = (
-    #         table_obj.output(["doc_id"])
-    #         .option({"total_hits_count": True})
-    #         .filter(
-    #             "(doc_id IN ('f294ba5cd48711efaaa610ffe02aa993')) AND (knowledge_graph_kwd IN ('graph', 'mind_map'))"
-    #         )
-    #         .offset(0)
-    #         .limit(30)
-    #         .to_df()
-    #     )
-    #     gt = pd.DataFrame(
-    #         {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
-    #     ).astype({"doc_id": dtype("object")})
-    #     pd.testing.assert_frame_equal(res, gt)
+        res, extra_result = (
+            table_obj.output(["doc_id"])
+            .option({"total_hits_count": True})
+            .filter(
+                "(doc_id IN ('f294ba5cd48711efaaa610ffe02aa993')) AND (knowledge_graph_kwd IN ('graph', 'mind_map'))"
+            )
+            .offset(0)
+            .limit(30)
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
+        ).astype({"doc_id": dtype("object")})
+        pd.testing.assert_frame_equal(res, gt)
 
-    #     res, extra_result = (
-    #         table_obj.output(["doc_id"])
-    #         .option({"total_hits_count": True})
-    #         .filter(
-    #             "(doc_id IN ('f294ba5cd48711efaaa610ffe02aa993')) AND (knowledge_graph_kwd IN ('graph', 'mind_map'))"
-    #         )
-    #         .offset(0)
-    #         .limit(30)
-    #         .sort(
-    #             [
-    #                 ["page_num_int", SortType.Asc],
-    #                 ["top_int", SortType.Asc],
-    #                 ["create_timestamp_flt", SortType.Desc],
-    #             ]
-    #         )
-    #         .to_df()
-    #     )
-    #     gt = pd.DataFrame(
-    #         {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
-    #     ).astype({"doc_id": dtype("object")})
-    #     pd.testing.assert_frame_equal(res, gt)
+        res, extra_result = (
+            table_obj.output(["doc_id"])
+            .option({"total_hits_count": True})
+            .filter(
+                "(doc_id IN ('f294ba5cd48711efaaa610ffe02aa993')) AND (knowledge_graph_kwd IN ('graph', 'mind_map'))"
+            )
+            .offset(0)
+            .limit(30)
+            .sort(
+                [
+                    ["page_num_int", SortType.Asc],
+                    ["top_int", SortType.Asc],
+                    ["create_timestamp_flt", SortType.Desc],
+                ]
+            )
+            .to_df()
+        )
+        gt = pd.DataFrame(
+            {"doc_id": ["f294ba5cd48711efaaa610ffe02aa993" for i in range(30)]}
+        ).astype({"doc_id": dtype("object")})
+        pd.testing.assert_frame_equal(res, gt)
 
-    #     db_obj.drop_table(table_name)
+        db_obj.drop_table(table_name)

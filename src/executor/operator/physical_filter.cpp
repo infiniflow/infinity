@@ -65,7 +65,6 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
     }
 
     SizeT input_block_count = prev_op_state->data_block_array_.size();
-    LOG_INFO(fmt::format("0212- PhysicalFilter::Execute: input_block_count: {}", input_block_count));
 
     for (SizeT block_idx = 0; block_idx < input_block_count; ++block_idx) {
 
@@ -76,9 +75,6 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
 
         SharedPtr<ExpressionState> condition_state = ExpressionState::CreateState(condition_);
         DataBlock *input_data_block = prev_op_state->data_block_array_[block_idx].get();
-
-        SizeT input_col_count = input_data_block->column_count();
-        LOG_INFO(fmt::format("0212- PhysicalFilter::Execute: input_col_count: {}", input_col_count));
 
         // selector contains a pointer to input data, which should not be shared by multiple tasks
         ExpressionSelector selector;
@@ -91,17 +87,6 @@ bool PhysicalFilter::Execute(QueryContext *, OperatorState *operator_state) {
     prev_op_state->data_block_array_.clear();
     if (prev_op_state->Complete()) {
         filter_operator_state->SetComplete();
-    }
-
-    if (!operator_state->data_block_array_.empty()) {
-        const auto &first_block = operator_state->data_block_array_[0];
-        const auto &types = first_block->types();
-        SizeT type_count = types.size();
-        LOG_INFO(fmt::format("0212- PhysicalFilter::Execute: types.size(): {}, data_block: {}", type_count, reinterpret_cast<u64>(first_block.get())));
-        for (SizeT i = 0; i < types.size(); ++i) {
-            auto &type = types[i];
-            LOG_INFO(fmt::format("0212- PhysicalFilter::Execute: types[{}]: {}", i, type->ToString()));
-        }
     }
     return true;
 }

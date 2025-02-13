@@ -47,13 +47,7 @@ SizeT PhysicalOperator::TaskletCount() { return 1; }
 String PhysicalOperator::GetName() const { return PhysicalOperatorToString(operator_type_); }
 
 void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *operator_state, HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) {
-    if (operator_type_ == PhysicalOperatorType::kTop) {
-        LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: this: {}", reinterpret_cast<u64>(this)));
-    }
     if (load_metas_.get() == nullptr || load_metas_->empty()) {
-        if (operator_type_ == PhysicalOperatorType::kTop) {
-            LOG_INFO("0212- PhysicalOperator::InputLoad: Top load_metas is empty");
-        }
         return;
     }
     //    TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
@@ -65,17 +59,6 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
         UnrecoverableError("TableRef not found");
     }
     const auto *table_ref = table_refs_it->second.get();
-
-    if (operator_type_ == PhysicalOperatorType::kTop) {
-        LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: Top load_metas size: {}", load_metas.size()));
-        for (SizeT i = 0; i < load_metas.size(); ++i) {
-            const auto &load_meta = load_metas[i];
-            LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: Top load_meta[{}] type: {}, index: {}",
-                                 i,
-                                 load_meta.type_->ToString(),
-                                 load_meta.index_));
-        }
-    }
 
     OutputToDataBlockHelper output_to_data_block_helper;
     for (SizeT i = 0; i < operator_state->prev_op_state_->data_block_array_.size(); ++i) {
@@ -93,9 +76,6 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
             column_vector->Initialize(column_vector_type, capacity);
             column_vector->Finalize(row_count);
             input_block->InsertVector(column_vector, load_metas[j].index_);
-            if (operator_type_ == PhysicalOperatorType::kTop) {
-                LOG_INFO(fmt::format("0211- Insert into data block {}", reinterpret_cast<u64>(input_block)));
-            }
         }
 
         auto row_column_id = input_block->column_count() - 1;
@@ -111,11 +91,6 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
                 output_to_data_block_helper
                     .AddOutputJobInfo(segment_id, block_id, load_metas[k].binding_.column_idx, block_offset, i, load_metas[k].index_, j);
             }
-        }
-
-        SizeT input_col_cnt = input_block->column_count();
-        if (operator_type_ == PhysicalOperatorType::kTop) {
-            LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: Top input_col_cnt: {}", input_col_cnt));
         }
     }
     output_to_data_block_helper.OutputToDataBlock(query_context->storage()->buffer_manager(),

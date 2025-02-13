@@ -99,11 +99,6 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
     DataBlock *output_ptr = table_scan_operator_state->data_block_array_.back().get();
     output_ptr->Init(*GetOutputTypes());
 
-    SizeT output_col_count = output_ptr->column_count();
-    LOG_INFO(fmt::format("0212- PhysicalTableScan::ExecuteInternal: output_col_count: {}, output_ptr: {}",
-                         output_col_count,
-                         reinterpret_cast<u64>(output_ptr)));
-
     TableScanFunctionData *table_scan_function_data_ptr = table_scan_operator_state->table_scan_function_data_.get();
     const BlockIndex *block_index = table_scan_function_data_ptr->block_index_;
     Vector<GlobalBlockID> *block_ids = table_scan_function_data_ptr->global_block_ids_.get();
