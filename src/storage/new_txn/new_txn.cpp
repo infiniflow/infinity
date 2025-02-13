@@ -286,16 +286,13 @@ Tuple<DBEntry *, Status> NewTxn::GetDatabase(const String &db_name) {
 }
 
 bool NewTxn::CheckDatabaseExists(const String &db_name) {
-    String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(db_key_prefix);
-    SizeT found_count = 0;
-    while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
-        iter2->Next();
-        ++found_count;
-    }
-    if (found_count == 0) {
-        // Not found
+    String db_key;
+    String db_id;
+    Status status = GetDbID(db_name, db_key, db_id);
+    if (!status.ok()) {
+        if (status.code() != ErrorCode::kDBNotExist) {
+            UnrecoverableError(status.message());
+        }
         return false;
     }
     return true;
@@ -378,33 +375,14 @@ Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_tabl
 }
 
 bool NewTxn::CheckTableExists(const String &db_name, const String &table_name) {
-    // DB exists
-    String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
-    String db_key = KeyEncode::CatalogDbKey(db_name, this->BeginTS());
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(db_key_prefix);
-    SizeT found_count = 0;
-    String db_id{};
-    while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
-        db_id = iter2->Value().ToString();
-        iter2->Next();
-        ++found_count;
-    }
-    if (found_count == 0) {
-        // Not found
-        return false;
-    }
-
-    // Table exists
-    found_count = 0;
-    String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id, table_name);
-    iter2->Seek(table_key_prefix);
-    while (iter2->Valid() && iter2->Key().starts_with(table_key_prefix)) {
-        iter2->Next();
-        ++found_count;
-    }
-    if (found_count == 0) {
-        // Not found
+    String table_key;
+    String table_id;
+    String db_id;
+    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    if (!status.ok()) {
+        if (status.code() != ErrorCode::kDBNotExist && status.code() != ErrorCode::kTableNotExist) {
+            UnrecoverableError(status.message());
+        }
         return false;
     }
     return true;
@@ -1233,7 +1211,7 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     const String &db_name = create_table_cmd->db_name_;
-    String &table_name = *create_table_cmd->table_def_->table_name();
+    const String &table_name = *create_table_cmd->table_def_->table_name();
 
     // Get database ID
     String db_id_str;
