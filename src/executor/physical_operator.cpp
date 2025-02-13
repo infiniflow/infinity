@@ -47,6 +47,9 @@ SizeT PhysicalOperator::TaskletCount() { return 1; }
 String PhysicalOperator::GetName() const { return PhysicalOperatorToString(operator_type_); }
 
 void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *operator_state, HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) {
+    if (operator_type_ == PhysicalOperatorType::kTop) {
+        LOG_INFO(fmt::format("0212- PhysicalOperator::InputLoad: this: {}", reinterpret_cast<u64>(this)));
+    }
     if (load_metas_.get() == nullptr || load_metas_->empty()) {
         if (operator_type_ == PhysicalOperatorType::kTop) {
             LOG_INFO("0212- PhysicalOperator::InputLoad: Top load_metas is empty");
@@ -90,6 +93,9 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
             column_vector->Initialize(column_vector_type, capacity);
             column_vector->Finalize(row_count);
             input_block->InsertVector(column_vector, load_metas[j].index_);
+            if (operator_type_ == PhysicalOperatorType::kTop) {
+                LOG_INFO(fmt::format("0211- Insert into data block {}", reinterpret_cast<u64>(input_block)));
+            }
         }
 
         auto row_column_id = input_block->column_count() - 1;

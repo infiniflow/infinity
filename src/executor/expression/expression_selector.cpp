@@ -49,7 +49,14 @@ SizeT ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
 
     // Shrink the input data block into output data block
     // this Init function will throw if output_data_block is already initialized before
+
+    SizeT input_col_count = input_data_block->column_count();
     output_data_block->Init(input_data_block, output_true_select);
+    SizeT output_col_count = output_data_block->column_count();
+    LOG_INFO(fmt::format("0212- ExpressionSelector::Select: input_col_count: {}, output_col_count: {}, output_data_block: {}",
+                         input_col_count,
+                         output_col_count,
+                         reinterpret_cast<u64>(output_data_block)));
     return output_true_select->Size();
 }
 

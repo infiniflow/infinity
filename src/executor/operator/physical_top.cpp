@@ -352,6 +352,7 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     });
     // sometimes the input_data_block_array is empty, but the operator is not complete
     if (total_hits_row_count == 0) {
+        input_data_block_array.clear();
         if (prev_op_state->Complete()) {
             if (total_hits_count_flag_) {
                 top_operator_state->total_hits_count_flag_ = true;
