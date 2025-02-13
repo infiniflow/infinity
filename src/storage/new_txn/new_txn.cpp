@@ -674,20 +674,29 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     return Status::OK();
 }
 
-// Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector<String> &index_list) {
-//     this->CheckTxnStatus();
+Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector<String> &index_list) {
+    this->CheckTxnStatus();
 
-//     String table_key;
-//     String table_id;
-//     String db_id;
-//     Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
-//     if (!status.ok()) {
-//         return status;
-//     } 
+    String table_key;
+    String table_id;
+    String db_id;
+    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    if (!status.ok()) {
+        return status;
+    } 
 
-//     String table_index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id, table_id);
-//     return Status::OK();
-// }
+    String table_index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id, table_id);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(table_index_prefix);
+    while (iter2->Valid() && iter2->Key().starts_with(table_index_prefix)) {
+        String key_str = iter2->Key().ToString();
+        size_t start = table_index_prefix.size();
+        size_t end = key_str.find('|', start);
+        index_list.emplace_back(key_str.substr(start, end - start));
+        iter2->Next();
+    }
+    return Status::OK();
+}
 
 Tuple<TableIndexEntry *, Status> NewTxn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
     TxnTimeStamp begin_ts = this->BeginTS();
@@ -1414,6 +1423,7 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
         return status;
     }
 
+    // Create table dir
     String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
     status = kv_instance_->Put(table_storage_dir, create_table_cmd->table_dir_tail_);
     if (!status.ok()) {
@@ -1610,8 +1620,28 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
         return status;
     }
 
+    // Update latest index id
+    status = kv_instance_->Put(table_latest_index_id, index_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Create index def;
+    String index_def_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_def");
+    status = kv_instance_->Put(index_def_key, create_index_cmd->index_base_->Serialize().dump());
+    if (!status.ok()) {
+        return status;
+    }
+
     // create tags
     // ...
+
+    // Create index dir
+    String index_storage_dir = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "dir");
+    status = kv_instance_->Put(index_storage_dir, create_index_cmd->index_dir_tail_);
+    if (!status.ok()) {
+        return status;
+    }
 
     return Status::OK();
 }
@@ -1638,8 +1668,22 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
         return status;
     }
 
+    // delete index index def
+    String index_comment_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_def");
+    status = kv_instance_->Delete(index_comment_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     // delete index tags
     // ...
+
+    // delete index dir
+    String index_storage_dir = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "dir");
+    status = kv_instance_->Delete(index_storage_dir);
+    if (!status.ok()) {
+        return status;
+    }
 
     return Status::OK();
 }
