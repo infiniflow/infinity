@@ -339,6 +339,17 @@ TEST_P(NewCatalogTest, alter_column) {
 
         new_txn_mgr->PrintAllKeyValue();
 
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        Vector<String> column_names;
+        column_names.push_back("col3");
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, table_name, column_names);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        new_txn_mgr->PrintAllKeyValue();
+
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         status = txn5->DropTableCollectionByName(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());

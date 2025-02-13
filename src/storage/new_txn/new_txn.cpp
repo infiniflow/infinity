@@ -500,19 +500,18 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     iter2->Seek(table_column_prefix);
 
     // Construct added columns name map
-    Map<String, String> column_map_to_added;
-    for (const auto &column_name : column_names) {
-        String column_key = KeyEncode::TableColumnKey(db_id_str, table_id_str, column_name);
-        column_map_to_added.emplace(column_key, column_name);
-    }
-
+    Set<String> exist_columns;
     while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
         String table_column_key = iter2->Key().ToString();
-        // Check table name existence;
-        if (column_map_to_added.find(table_column_key) == column_map_to_added.end()) {
-            return Status::ColumnNotExist(column_map_to_added[table_column_key]);
-        }
+        exist_columns.insert(table_column_key);
         iter2->Next();
+    }
+
+    for (const auto &column_name : column_names) {
+        String column_key = KeyEncode::TableColumnKey(db_id_str, table_id_str, column_name);
+        if (exist_columns.find(column_key) == exist_columns.end()) {
+            return Status::ColumnNotExist(column_name);
+        }
     }
 
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropColumns>(db_name, table_name, column_names);
@@ -1414,6 +1413,8 @@ Status NewTxn::CommitAddColumns(const WalCmdAddColumns *add_columns_cmd) {
     if (!status.ok()) {
         return status;
     }
+
+    // TODO: Check the column id conflict
 
     String column_name_value;
     for (const auto &column : add_columns_cmd->column_defs_) {
