@@ -56,6 +56,7 @@ struct WalCmdAddColumns;
 struct WalCmdDropColumns;
 struct WalCmdCreateIndex;
 struct WalCmdDropIndex;
+struct WalCmdAppend;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
@@ -217,6 +218,8 @@ public:
 
     Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
 
+    Status Append(const String& db_name, const String& table_name, const SharedPtr<DataBlock> &input_block);
+
     Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
     Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
@@ -260,7 +263,7 @@ public:
     NewTxnManager *txn_mgr() const { return txn_mgr_; }
 
     // Create txn store if not exists
-    NewTxnTableStore *GetNewTxnTableStore(const String& table_name);
+    NewTxnTableStore *GetNewTxnTableStore(const String &table_name);
 
     NewTxnTableStore *GetExistNewTxnTableStore(TableEntry *table_entry) const;
 
@@ -312,6 +315,7 @@ private:
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
+    Status CommitAppend(const WalCmdAppend *drop_index_cmd);
 
 private:
     // Reference to external class

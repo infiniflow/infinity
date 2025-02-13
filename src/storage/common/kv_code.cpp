@@ -50,6 +50,7 @@ String KeyEncode::CatalogIndexKey(const String &db_id, const String &table_id, c
 String KeyEncode::CatalogIndexPrefix(const String &db_id, const String &table_id, const String &index_name) {
     return fmt::format("catalog|idx|{}|{}|{}|", db_id, table_id, index_name);
 }
+String KeyEncode::CatalogTableIndexPrefix(const String &db_id, const String &table_id) { return fmt::format("catalog|idx|{}|{}|", db_id, table_id); }
 
 String KeyEncode::CatalogIndexTagKey(const String &db_id, const String &table_id, const String &index_name, const String &tag_name) {
     return fmt::format("idx|{}|{}|{}|{}", db_id, table_id, index_name, tag_name);

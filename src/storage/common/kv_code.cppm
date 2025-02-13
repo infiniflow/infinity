@@ -38,6 +38,7 @@ public:
 
     static String CatalogIndexKey(const String &db_id, const String &table_id, const String &index_name, TxnTimeStamp ts);
     static String CatalogIndexPrefix(const String &db_id, const String &table_id, const String &index_name);
+    static String CatalogTableIndexPrefix(const String &db_id, const String &table_id);
 
     static String CatalogIndexTagKey(const String &db_id, const String &table_id, const String &index_name, const String &tag_name);
     static String CatalogIndexTagKeyPrefix(const String &db_id, const String &table_id, const String &index_name, const String &tag_name);

@@ -158,6 +158,18 @@ Status NewTxn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input
     return append_status;
 }
 
+Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
+    this->CheckTxn(db_name);
+    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
+
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
+    auto [err_msg, append_status] = table_store->Append(input_block);
+    return Status::OK();
+}
+
 Status NewTxn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict) {
     const String &db_name = *table_entry->GetDBName();
     const String &table_name = *table_entry->GetTableName();
@@ -190,7 +202,7 @@ NewTxn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Ve
 Status NewTxn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
     TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
     const String &table_name = *table_entry->GetTableName();
-//    NewTxnTableStore *txn_table_store = this->GetNewTxnTableStore(table_name);
+    //    NewTxnTableStore *txn_table_store = this->GetNewTxnTableStore(table_name);
 
     const String &index_name = *table_index_entry->GetIndexName();
     // FIXME: adapt nullptr
@@ -203,7 +215,7 @@ Status NewTxn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<Ini
     return Status::OK();
 }
 
-NewTxnTableStore *NewTxn::GetNewTxnTableStore(const String& table_name) { return txn_store_.GetNewTxnTableStore(table_name); }
+NewTxnTableStore *NewTxn::GetNewTxnTableStore(const String &table_name) { return txn_store_.GetNewTxnTableStore(table_name); }
 
 NewTxnTableStore *NewTxn::GetExistNewTxnTableStore(TableEntry *table_entry) const { return txn_store_.GetExistNewTxnTableStore(table_entry); }
 
@@ -511,8 +523,8 @@ Status NewTxn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<Column
     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
     new_table_entry->InitCompactionAlg(begin_ts);
 
-//    const String &table_name = *table_entry->GetTableName();
-//    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
+    //    const String &table_name = *table_entry->GetTableName();
+    //    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
     // TODO: adapt nullptr
     new_table_entry->AddColumns(column_defs, nullptr);
     auto add_status = db_entry->AddTable(std::move(new_table_entry), txn_context_ptr_->txn_id_, begin_ts, nullptr, true /*add_if_found*/);
@@ -683,7 +695,7 @@ Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector
     Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
     if (!status.ok()) {
         return status;
-    } 
+    }
 
     String table_index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id, table_id);
     auto iter2 = kv_instance_->GetIterator();
@@ -993,13 +1005,6 @@ Status NewTxn::Commit() {
 
     this->SetTxnCommitting(commit_ts);
 
-    Status status = this->PrepareCommit();
-    if (!status.ok()) {
-        wal_entry_ = nullptr;
-        txn_mgr_->SendToWAL(this);
-        return status;
-    }
-
     txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("NewTxn {} commit ts: {}", txn_context_ptr_->txn_id_, commit_ts));
 
@@ -1011,6 +1016,13 @@ Status NewTxn::Commit() {
         wal_entry_ = nullptr;
         txn_mgr_->SendToWAL(this);
         return Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", *conflict_reason));
+    }
+
+    Status status = this->PrepareCommit();
+    if (!status.ok()) {
+        wal_entry_ = nullptr;
+        txn_mgr_->SendToWAL(this);
+        return status;
     }
 
     // Put wal entry to the manager in the same order as commit_ts.
@@ -1681,6 +1693,24 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
     // delete index dir
     String index_storage_dir = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "dir");
     status = kv_instance_->Delete(index_storage_dir);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
+//    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+    const String &db_name = append_cmd->db_name_;
+    const String &table_name = append_cmd->table_name_;
+
+    // Get table ID
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
     if (!status.ok()) {
         return status;
     }
