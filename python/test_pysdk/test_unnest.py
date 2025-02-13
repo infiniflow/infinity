@@ -37,10 +37,14 @@ def setup_class(request, local_infinity, http):
         module = importlib.import_module("infinity_embedded.index")
         globals()["index"] = module
         module = importlib.import_module("infinity_embedded.common")
-        func = getattr(module, "ConflictType")
-        globals()["ConflictType"] = func
-        func = getattr(module, "InfinityException")
-        globals()["InfinityException"] = func
+        func = getattr(module, 'ConflictType')
+        globals()['ConflictType'] = func
+        func = getattr(module, 'InfinityException')
+        globals()['InfinityException'] = func
+        func = getattr(module, 'SparseVector')
+        globals()['SparseVector'] = func
+        func = getattr(module, 'Array')
+        globals()['Array'] = func
         uri = common_values.TEST_LOCAL_PATH
         request.cls.infinity_obj = infinity_embedded.connect(uri)
     elif http:
@@ -60,7 +64,6 @@ class TestInfinity:
 
     # test/sql/dql/unnest/test_unnest.slt
     @pytest.mark.usefixtures("skip_if_http")
-    @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_unnest(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
 
