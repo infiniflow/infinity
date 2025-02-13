@@ -44,6 +44,21 @@ String KeyEncode::CatalogTableTagPrefix(const String &db_id, const String &table
     return fmt::format("tbl|{}|{}|{}|", db_id, table_id, tag_name);
 }
 
+String KeyEncode::CatalogIndexKey(const String &db_id, const String &table_id, const String &index_name, TxnTimeStamp ts) {
+    return fmt::format("catalog|idx|{}|{}|{}|{}", db_id, table_id, index_name, ts);
+}
+String KeyEncode::CatalogIndexPrefix(const String &db_id, const String &table_id, const String &index_name) {
+    return fmt::format("catalog|idx|{}|{}|{}|", db_id, table_id, index_name);
+}
+
+String KeyEncode::CatalogIndexTagKey(const String &db_id, const String &table_id, const String &index_name, const String &tag_name) {
+    return fmt::format("idx|{}|{}|{}|{}", db_id, table_id, index_name, tag_name);
+}
+
+String KeyEncode::CatalogIndexTagKeyPrefix(const String &db_id, const String &table_id, const String &index_name, const String &tag_name) {
+    return fmt::format("idx|{}|{}|{}|{}|", db_id, table_id, index_name, tag_name);
+}
+
 String KeyEncode::TableColumnKey(const String &db_id, const String &table_id, const String &column_name) {
     return fmt::format("tbl|col|{}|{}|{}", db_id, table_id, column_name);
 }

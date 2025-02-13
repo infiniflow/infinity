@@ -597,6 +597,91 @@ Status NewTxn::ListTable(const String &db_name, Vector<String> &table_list) {
 }
 
 // Index OPs
+
+bool NewTxn::CheckIndexExists(const String &db_name, const String &table_name, const String &index_name) {
+    String index_key;
+    String index_id;
+    String table_id;
+    String db_id;
+    Status status = GetIndexID(db_name, table_name, index_name, index_key, index_id, table_id, db_id);
+    if (!status.ok()) {
+        if (status.code() != ErrorCode::kDBNotExist && status.code() != ErrorCode::kTableNotExist && status.code() != ErrorCode::kIndexNotExist) {
+            UnrecoverableError(status.message());
+        }
+        return false;
+    }
+    return true;
+}
+
+Status NewTxn::CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
+    if (conflict_type == ConflictType::kReplace) {
+        return Status::NotSupport("ConflictType::kReplace");
+    }
+    if (conflict_type == ConflictType::kInvalid) {
+        return Status::UnexpectedError("Unknown ConflictType");
+    }
+
+    this->CheckTxn(db_name);
+
+    bool index_exist = this->CheckIndexExists(db_name, table_name, *index_base->index_name_);
+    if (index_exist && conflict_type == ConflictType::kError) {
+        return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
+    }
+    if (index_exist && conflict_type == ConflictType::kIgnore) {
+        return Status::OK();
+    }
+
+    SharedPtr<String> local_index_dir = DetermineRandomPath(*index_base->index_name_);
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateIndex>(db_name, table_name, std::move(*local_index_dir), index_base);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
+    LOG_TRACE("NewTxn::CreateIndex created index entry is inserted.");
+    return Status::OK();
+}
+
+Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
+    if (conflict_type == ConflictType::kReplace) {
+        return Status::NotSupport("ConflictType::kReplace");
+    }
+    if (conflict_type == ConflictType::kInvalid) {
+        return Status::UnexpectedError("Unknown ConflictType");
+    }
+
+    this->CheckTxnStatus();
+
+    bool index_exist = this->CheckIndexExists(db_name, table_name, index_name);
+    if (!index_exist && conflict_type == ConflictType::kError) {
+        return Status::IndexNotExist(index_name);
+    }
+
+    if (!index_exist && conflict_type == ConflictType::kIgnore) {
+        return Status::OK();
+    }
+
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
+    LOG_TRACE(fmt::format("NewTxn::DropIndexByName dropped index: {}.{}.{}", db_name, table_name, index_name));
+    return Status::OK();
+}
+
+// Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector<String> &index_list) {
+//     this->CheckTxnStatus();
+
+//     String table_key;
+//     String table_id;
+//     String db_id;
+//     Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+//     if (!status.ok()) {
+//         return status;
+//     } 
+
+//     String table_index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id, table_id);
+//     return Status::OK();
+// }
+
 Tuple<TableIndexEntry *, Status> NewTxn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
     TxnTimeStamp begin_ts = this->BeginTS();
 
@@ -695,27 +780,6 @@ Status NewTxn::CreateIndexFinish(const String &db_name, const String &table_name
     // String index_dir_tail = table_index_entry->GetPathNameTail();
     // this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, std::move(index_dir_tail), index_base));
     return Status::OK();
-}
-
-Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type) {
-    this->CheckTxn(db_name);
-
-    TxnTimeStamp begin_ts = this->BeginTS();
-
-    auto [table_index_entry, index_status] =
-        catalog_->DropIndex(db_name, table_name, index_name, conflict_type, txn_context_ptr_->txn_id_, begin_ts, nullptr);
-    if (table_index_entry.get() == nullptr) {
-        return index_status;
-    }
-    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
-    auto *txn_table_store = this->GetTxnTableStore(table_entry);
-    txn_table_store->DropIndexStore(table_index_entry.get());
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-    return index_status;
 }
 
 Tuple<TableEntry *, Status> NewTxn::GetTableByName(const String &db_name, const String &table_name) {
@@ -997,7 +1061,24 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::CREATE_INDEX: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(command.get());
+                Status status = CommitCreateIndex(create_index_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case WalCommandType::DROP_INDEX: {
+                auto *drop_index_cmd = static_cast<WalCmdDropIndex *>(command.get());
+                Status status = CommitDropIndex(drop_index_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             default: {
+                LOG_WARN(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
                 break;
             }
         }
@@ -1078,6 +1159,52 @@ Status NewTxn::GetTableID(const String &db_name, const String &table_name, Strin
                 return a + ", " + b;
             });
         UnrecoverableError(fmt::format("Found multiple table keys: {}", error_table_keys_str));
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::GetIndexID(const String &db_name,
+                          const String &table_name,
+                          const String &index_name,
+                          String &index_key,
+                          String &index_id,
+                          String &table_id,
+                          String &db_id) {
+    String table_key;
+    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String index_key_prefix = KeyEncode::CatalogIndexPrefix(db_id, table_id, index_name);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(index_key_prefix);
+    SizeT found_count = 0;
+
+    Vector<String> error_index_keys;
+    while (iter2->Valid() && iter2->Key().starts_with(index_key_prefix)) {
+        index_key = iter2->Key().ToString();
+        index_id = iter2->Value().ToString();
+        if (found_count > 0) {
+            // Error branch
+            error_index_keys.push_back(index_key);
+        }
+        iter2->Next();
+        ++found_count;
+    }
+
+    if (found_count == 0) {
+        return Status::IndexNotExist(index_name);
+    }
+
+    if (!error_index_keys.empty()) {
+        // join error_index_keys
+        String error_index_keys_str =
+            std::accumulate(std::next(error_index_keys.begin()), error_index_keys.end(), error_index_keys.front(), [](String a, String b) {
+                return std::move(a) + ", " + std::move(b);
+            });
+        UnrecoverableError(fmt::format("Found multiple index keys: {}", error_index_keys_str));
     }
 
     return Status::OK();
@@ -1435,6 +1562,76 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
             return Status::ColumnNotExist(column_name);
         }
     }
+    return Status::OK();
+}
+
+Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+    const String &db_name = create_index_cmd->db_name_;
+    const String &table_name = create_index_cmd->table_name_;
+    const String &index_name = *create_index_cmd->index_base_->index_name_;
+
+    // Get table ID
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Get latest index id and lock the id
+    String table_latest_index_id = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_INDEX_ID.data());
+    String index_id_str;
+    status = kv_instance_->GetForUpdate(table_latest_index_id, index_id_str);
+    SizeT index_id = 0;
+    if (status.ok()) {
+        index_id = std::stoull(index_id_str);
+    } else {
+        LOG_DEBUG(fmt::format("Failed to get latest_index_id: {}", status.message()));
+    }
+
+    // Create index key value pair
+    ++index_id;
+    String index_key = KeyEncode::CatalogIndexKey(db_id_str, table_id_str, index_name, commit_ts);
+    index_id_str = fmt::format("{}", index_id);
+    status = kv_instance_->Put(index_key, index_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // create tags
+    // ...
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
+    String db_id_str;
+    String table_id_str;
+    String index_id_str;
+    String index_key;
+    Status status = GetIndexID(drop_index_cmd->db_name_,
+                               drop_index_cmd->table_name_,
+                               drop_index_cmd->index_name_,
+                               index_key,
+                               index_id_str,
+                               table_id_str,
+                               db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // delete index key
+    status = kv_instance_->Delete(index_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // delete index tags
+    // ...
+
     return Status::OK();
 }
 

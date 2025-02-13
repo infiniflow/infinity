@@ -54,6 +54,8 @@ struct WalCmdCreateTable;
 struct WalCmdDropTable;
 struct WalCmdAddColumns;
 struct WalCmdDropColumns;
+struct WalCmdCreateIndex;
+struct WalCmdDropIndex;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
@@ -169,6 +171,14 @@ public:
     Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
     // Index OPs
+    bool CheckIndexExists(const String &db_name, const String &table_name, const String &index_name);
+
+    Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
+
+    Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
+
+    Status ListIndex(const String &db_name, const String &table_name, Vector<String> &index_list);
+
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
@@ -191,8 +201,6 @@ public:
     Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
 
     Status CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry);
-
-    Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
     // View Ops
     // Fixme: view definition should be given
@@ -286,6 +294,13 @@ private:
 
     Status GetDbID(const String &db_name, String &db_key, String &db_id);
     Status GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id, String &db_id);
+    Status GetIndexID(const String &db_name,
+                      const String &table_name,
+                      const String &index_name,
+                      String &index_key,
+                      String &index_id,
+                      String &table_id,
+                      String &db_id);
 
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
@@ -295,6 +310,8 @@ private:
     Status CommitDropTableDef(const String &db_id, const String &table_id);
     Status CommitAddColumns(const WalCmdAddColumns *add_columns_cmd);
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
+    Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
+    Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
 
 private:
     // Reference to external class

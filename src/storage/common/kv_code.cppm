@@ -36,6 +36,12 @@ public:
     static String CatalogTableTagKey(const String &db_id, const String &table_id, const String &tag_name);
     static String CatalogTableTagPrefix(const String &db_id, const String &table_id, const String &tag_name);
 
+    static String CatalogIndexKey(const String &db_id, const String &table_id, const String &index_name, TxnTimeStamp ts);
+    static String CatalogIndexPrefix(const String &db_id, const String &table_id, const String &index_name);
+
+    static String CatalogIndexTagKey(const String &db_id, const String &table_id, const String &index_name, const String &tag_name);
+    static String CatalogIndexTagKeyPrefix(const String &db_id, const String &table_id, const String &index_name, const String &tag_name);
+
     static String TableColumnKey(const String &db_id, const String &table_id, const String &column_name);
     static String TableColumnPrefix(const String &db_id, const String &table_id);
 
