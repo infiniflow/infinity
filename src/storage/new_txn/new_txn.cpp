@@ -1444,7 +1444,7 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd) {
 
     // Get the latest database id of system
     String db_id_str;
-    Status status = IncrLatestDatabaseID(db_id_str);
+    Status status = IncrLatestID(db_id_str, LATEST_DATABASE_ID);
     if (!status.ok()) {
         return status;
     }
@@ -1558,7 +1558,7 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
 
     // Get latest table id and increase the id
     String table_id_str;
-    status = IncrLatestTableID(table_id_str);
+    status = IncrLatestID(table_id_str, LATEST_TABLE_ID);
     if (!status.ok()) {
         return status;
     }
@@ -1766,7 +1766,7 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
 
     // Get latest index id and lock the id
     String index_id_str;
-    status = IncrLatestIndexID(index_id_str);
+    status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
     if (!status.ok()) {
         return status;
     }
@@ -1900,40 +1900,16 @@ Status NewTxn::CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::IncrLatestDatabaseID(String &db_id_str) const {
-    String db_string_id;
-    Status status = kv_instance_->Get(LATEST_DATABASE_ID.data(), db_string_id);
+Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
+    String string_id;
+    Status status = kv_instance_->Get(id_name.data(), string_id);
     if (!status.ok()) {
         return status;
     }
-    SizeT db_id = std::stoull(db_string_id);
-    ++db_id;
-    db_id_str = fmt::format("{}", db_id);
-    return kv_instance_->Put(LATEST_DATABASE_ID.data(), db_id_str);
-}
-
-Status NewTxn::IncrLatestTableID(String &table_id_str) const {
-    String table_string_id;
-    Status status = kv_instance_->Get(LATEST_TABLE_ID.data(), table_string_id);
-    if (!status.ok()) {
-        return status;
-    }
-    SizeT table_id = std::stoull(table_string_id);
-    ++table_id;
-    table_id_str = fmt::format("{}", table_id);
-    return kv_instance_->Put(LATEST_TABLE_ID.data(), table_id_str);
-}
-
-Status NewTxn::IncrLatestIndexID(String &index_id_str) const {
-    String index_string_id;
-    Status status = kv_instance_->Get(LATEST_INDEX_ID.data(), index_string_id);
-    if (!status.ok()) {
-        return status;
-    }
-    SizeT index_id = std::stoull(index_string_id);
-    ++index_id;
-    index_id_str = fmt::format("{}", index_id);
-    return kv_instance_->Put(LATEST_INDEX_ID.data(), index_id_str);
+    SizeT id_num = std::stoull(string_id);
+    ++id_num;
+    id_str = fmt::format("{}", id_num);
+    return kv_instance_->Put(id_name.data(), id_str);
 }
 
 bool NewTxn::CheckConflict() { return txn_store_.CheckConflict(catalog_); }
