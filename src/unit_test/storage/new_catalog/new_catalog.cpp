@@ -462,6 +462,141 @@ TEST_P(NewCatalogTest, createdb_dropdb_test) {
 
         status = new_txn_mgr->RollBackTxn(txn2);
         EXPECT_TRUE(status.ok());
+
+        // drop db1
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        status = txn4->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+    }
+
+    //           t1      create      commit (success)
+    //           |----------|---------|
+    //       |---------------------|----------|
+    //       t2                drop(fail)  rollback
+    // Drop db conflict
+    {
+        // drop db1
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+
+        // start txn1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+
+        Status status = txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->DropDatabase("db1", ConflictType::kError);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // drop db1
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        status = txn4->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+    }
+
+    //           t1      create      commit (success)
+    //           |----------|---------|
+    //       |---------|-----------------------|
+    //       t2     drop(fail)            rollback
+    // Drop db conflict
+    {
+        // drop db1
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+
+        // start txn1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+
+        Status status = txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->DropDatabase("db1", ConflictType::kError);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // drop db1
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        status = txn4->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+    }
+
+    //  t1                create                commit (success)
+    //  |-------------------|-----------------------|
+    //       |---------|-----------------------|
+    //       t2     drop(fail)            rollback
+    // Drop db conflict
+    {
+        // start txn1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+
+        // drop db1
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+
+        Status status = txn2->DropDatabase("db1", ConflictType::kError);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // drop db1
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        status = txn4->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+    }
+
+    //  t1                create                commit (success)
+    //  |-------------------|-----------------------|
+    //       |------------------|---------------|
+    //       t2           drop(fail)        rollback
+    // Drop db conflict
+    {
+        // start txn1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+
+        // drop db1
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+
+        Status status = txn1->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->DropDatabase("db1", ConflictType::kError);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // drop db1
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        status = txn4->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
     }
 
     new_txn_mgr->PrintAllKeyValue();
