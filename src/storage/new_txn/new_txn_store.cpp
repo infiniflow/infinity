@@ -813,4 +813,19 @@ void NewTxnStore::SetCompacting(TableEntry *table_entry) { GetNewTxnTableStore(*
 
 void NewTxnStore::SetCreatingIndex(TableEntry *table_entry) { GetNewTxnTableStore(*table_entry->GetTableName())->SetCreatingIndex(); }
 
+WalCmdDumpIndex *NewTxnStore::GetDumpIndexCmd(const String &idx_segment_key) {
+    std::unique_lock lock(mtx_);
+    auto iter = dump_index_cmds_.find(idx_segment_key);
+    if (iter != dump_index_cmds_.end()) {
+        return iter->second;
+    }
+    return nullptr;
+}
+
+bool NewTxnStore::AddDumpIndexCmd(String idx_segment_key, WalCmdDumpIndex *dump_index_cmd) {
+    std::unique_lock lock(mtx_);
+    bool add_success = dump_index_cmds_.emplace(std::move(idx_segment_key), dump_index_cmd).second;
+    return add_success;
+}
+
 } // namespace infinity

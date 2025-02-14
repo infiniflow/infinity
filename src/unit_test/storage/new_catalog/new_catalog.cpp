@@ -36,6 +36,7 @@ import embedding_info;
 import internal_types;
 import defer_op;
 import statement_common;
+import meta_info;
 
 using namespace infinity;
 
@@ -748,6 +749,112 @@ TEST_P(NewCatalogTest, index_test2) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
+    }
+}
+
+TEST_P(NewCatalogTest, index_segment_test) {
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto index_name = std::make_shared<String>("idx1");
+    auto index_def = IndexSecondary::Make(index_name, MakeShared<String>(), "file_name", {column_def1->name()});
+    SegmentID idx_segment_id = 0;
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        Status status = txn3->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add index segment"), TransactionType::kNormal);
+        Status status = txn4->AddIndexSegment(*db_name, *table_name, *index_name, idx_segment_id);
+        EXPECT_TRUE(status.ok());
+
+        {
+            ChunkIndexInfo chunk_info;
+            chunk_info.base_name_ = "chunk1";
+            chunk_info.paths_.emplace_back("file1");
+            chunk_info.base_rowid_ = RowID(idx_segment_id, 0);
+            chunk_info.row_count_ = 10000;
+            status = txn4->AddIndexChunk(*db_name, *table_name, *index_name, idx_segment_id, chunk_info);
+        }
+        {
+            ChunkIndexInfo chunk_info;
+            chunk_info.base_name_ = "chunk2";
+            chunk_info.paths_.emplace_back("file2");
+            chunk_info.base_rowid_ = RowID(idx_segment_id, 10000);
+            chunk_info.row_count_ = 10000;
+            status = txn4->AddIndexChunk(*db_name, *table_name, *index_name, idx_segment_id, chunk_info);
+        }
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("get index chunk"), TransactionType::kNormal);
+        Vector<ChunkIndexInfo> chunk_infos;
+        Status status = txn5->GetIndexChunks(*db_name, *table_name, *index_name, idx_segment_id, chunk_infos);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(chunk_infos.size(), 2);
+        for (const auto &chunk_info : chunk_infos) {
+            std::cout << "chunk name: " << chunk_info.base_name_ << ", row count: " << chunk_info.row_count_ << std::endl;
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        new_txn_mgr->PrintAllKeyValue();
+    }
+    {
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact index"), TransactionType::kNormal);
+        {
+            ChunkIndexInfo chunk_info;
+            chunk_info.base_name_ = "chunk3";
+            chunk_info.paths_.emplace_back("file3");
+            chunk_info.base_rowid_ = RowID(idx_segment_id, 0);
+            chunk_info.row_count_ = 20000;
+            Status status = txn6->AddIndexChunk(*db_name, *table_name, *index_name, idx_segment_id, chunk_info);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            Vector<ChunkID> chunk_ids{0, 1};
+            Status status = txn6->DeprecateIndexChunk(*db_name, *table_name, *index_name, idx_segment_id, chunk_ids);
+            EXPECT_TRUE(status.ok());
+        }
+        Status status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get index chunk2"), TransactionType::kNormal);
+        Vector<ChunkIndexInfo> chunk_infos;
+        Status status = txn7->GetIndexChunks(*db_name, *table_name, *index_name, idx_segment_id, chunk_infos);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(chunk_infos.size(), 1);
+        for (const auto &chunk_info : chunk_infos) {
+            std::cout << "chunk name: " << chunk_info.base_name_ << ", row count: " << chunk_info.row_count_ << std::endl;
+        }
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        new_txn_mgr->PrintAllKeyValue();
     }
 }
 

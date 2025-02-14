@@ -734,6 +734,148 @@ Status NewTxn::GetIndexDefByName(const String &db_name, const String &table_name
     return Status::OK();
 }
 
+Status NewTxn::AddIndexSegment(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+    this->CheckTxn(db_name);
+
+    bool index_exist = this->CheckIndexExists(db_name, table_name, index_name);
+    if (!index_exist) {
+        return Status::IndexNotExist(index_name);
+    }
+
+    auto wal_dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id);
+    wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(wal_dump_cmd));
+    String idx_segment_key = KeyEncode::CatalogIdxSegmentKey(db_name, table_name, index_name, segment_id);
+    bool add_success = txn_store_.AddDumpIndexCmd(idx_segment_key, wal_dump_cmd.get());
+    if (!add_success) {
+        return Status::UnexpectedError(fmt::format("Add dump index command {} failed", idx_segment_key));
+    }
+
+    LOG_TRACE(fmt::format("NewTxn::AddIndexSegment added index segment: {}.{}.{}.{}", db_name, table_name, index_name, segment_id));
+    return Status::OK();
+}
+
+Status NewTxn::AddIndexChunk(const String &db_name,
+                             const String &table_name,
+                             const String &index_name,
+                             SegmentID segment_id,
+                             const ChunkIndexInfo &chunk_info) {
+    this->CheckTxn(db_name);
+
+    bool index_exist = this->CheckIndexExists(db_name, table_name, index_name);
+    if (!index_exist) {
+        return Status::IndexNotExist(index_name);
+    }
+
+    String idx_segment_key = KeyEncode::CatalogIdxSegmentKey(db_name, table_name, index_name, segment_id);
+    WalCmdDumpIndex *dump_cmd = txn_store_.GetDumpIndexCmd(idx_segment_key);
+    if (dump_cmd == nullptr) {
+        auto wal_dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id);
+        wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(wal_dump_cmd));
+        bool add_success = txn_store_.AddDumpIndexCmd(idx_segment_key, wal_dump_cmd.get());
+        if (!add_success) {
+            return Status::UnexpectedError(fmt::format("Add dump index command {} failed", idx_segment_key));
+        }
+        dump_cmd = wal_dump_cmd.get();
+    }
+    WalChunkIndexInfo wal_chunk_info;
+    wal_chunk_info.base_name_ = chunk_info.base_name_;
+    wal_chunk_info.paths_ = chunk_info.paths_;
+    wal_chunk_info.base_rowid_ = chunk_info.base_rowid_;
+    wal_chunk_info.row_count_ = chunk_info.row_count_;
+    {
+        std::unique_lock lock(rw_locker_);
+        dump_cmd->chunk_infos_.push_back(std::move(wal_chunk_info));
+    }
+
+    LOG_TRACE(fmt::format("NewTxn::AddIndexChunk added index chunk: {}.{}.{}.{}", db_name, table_name, index_name, segment_id));
+    return Status::OK();
+}
+
+Status NewTxn::DeprecateIndexChunk(const String &db_name,
+                                   const String &table_name,
+                                   const String &index_name,
+                                   SegmentID segment_id,
+                                   const Vector<ChunkID> &deprecate_ids) {
+    this->CheckTxn(db_name);
+
+    bool index_exist = this->CheckIndexExists(db_name, table_name, index_name);
+    if (!index_exist) {
+        return Status::IndexNotExist(index_name);
+    }
+
+    String idx_segment_key = KeyEncode::CatalogIdxSegmentKey(db_name, table_name, index_name, segment_id);
+    WalCmdDumpIndex *dump_cmd = txn_store_.GetDumpIndexCmd(idx_segment_key);
+    if (dump_cmd == nullptr) {
+        auto wal_dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id);
+        wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(wal_dump_cmd));
+        bool add_success = txn_store_.AddDumpIndexCmd(idx_segment_key, wal_dump_cmd.get());
+        if (!add_success) {
+            return Status::UnexpectedError(fmt::format("Add dump index command {} failed", idx_segment_key));
+        }
+        dump_cmd = wal_dump_cmd.get();
+    }
+    dump_cmd->deprecate_ids_.insert(dump_cmd->deprecate_ids_.end(), deprecate_ids.begin(), deprecate_ids.end());
+
+    LOG_TRACE(fmt::format("NewTxn::DeprecateIndexChunk deprecated index chunk: {}.{}.{}.{}", db_name, table_name, index_name, segment_id));
+    return Status::OK();
+}
+
+Status NewTxn::GetIndexChunks(const String &db_name,
+                              const String &table_name,
+                              const String &index_name,
+                              SegmentID segment_id,
+                              Vector<ChunkIndexInfo> &chunk_infos) {
+    this->CheckTxn(db_name);
+
+    bool index_exist = this->CheckIndexExists(db_name, table_name, index_name);
+    if (!index_exist) {
+        return Status::IndexNotExist(index_name);
+    }
+
+    String db_id_str;
+    String table_id_str;
+    String index_id_str;
+    String index_key;
+    Status status = GetIndexID(db_name, table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return GetIndexChunksByID(db_id_str, table_id_str, index_id_str, segment_id, chunk_infos);
+}
+
+Status NewTxn::GetIndexChunksByID(const String &db_id_str,
+                                  const String &table_id_str,
+                                  const String &index_id_str,
+                                  SegmentID segment_id,
+                                  Vector<ChunkIndexInfo> &chunk_infos) {
+    String chunk_key_prefix = KeyEncode::CatalogIdxChunkPrefix(db_id_str, table_id_str, index_id_str, segment_id);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(chunk_key_prefix);
+    while (iter2->Valid() && iter2->Key().starts_with(chunk_key_prefix)) {
+        String key_str = iter2->Key().ToString();
+        size_t start = chunk_key_prefix.size();
+        size_t end = key_str.find('|', start);
+        ChunkID chunk_id = std::stoull(key_str.substr(start, end - start));
+        String chunk_info_key = KeyEncode::CatalogIdxChunkTagKey(db_id_str, table_id_str, index_id_str, segment_id, chunk_id, "chunk_info");
+        String chunk_info_str;
+        Status status = kv_instance_->Get(chunk_info_key, chunk_info_str);
+        if (!status.ok()) {
+            return status;
+        }
+        ChunkIndexInfo chunk_info;
+        nlohmann::json chunk_info_json = nlohmann::json::parse(chunk_info_str);
+        bool parse_success = ChunkIndexInfo::FromJson(chunk_info_json, chunk_info);
+        if (!parse_success) {
+            return Status::UnexpectedError(fmt::format("Parse chunk info failed: {}", chunk_info_str));
+        }
+        chunk_infos.push_back(std::move(chunk_info));
+        iter2->Next();
+    }
+
+    return Status::OK();
+}
+
 Tuple<TableIndexEntry *, Status> NewTxn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
     TxnTimeStamp begin_ts = this->BeginTS();
 
@@ -1131,6 +1273,14 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::DUMP_INDEX: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(command.get());
+                Status status = CommitDumpIndex(dump_index_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             default: {
                 LOG_WARN(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
                 break;
@@ -1259,6 +1409,31 @@ Status NewTxn::GetIndexID(const String &db_name,
                 return std::move(a) + ", " + std::move(b);
             });
         UnrecoverableError(fmt::format("Found multiple index keys: {}", error_index_keys_str));
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitAddIdxChunkByCmd(const String &db_id,
+                                      const String &table_id,
+                                      const String &index_id,
+                                      SegmentID segment_id,
+                                      const WalChunkIndexInfo &chunk_info) {
+    String chunk_info_key = KeyEncode::CatalogIdxChunkTagKey(db_id, table_id, index_id, segment_id, chunk_info.chunk_id_, "chunk_info");
+    String chunk_info_str = ChunkIndexInfo(chunk_info).ToJson().dump();
+    Status status = kv_instance_->Put(chunk_info_key, std::move(chunk_info_str));
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitDropIdxChunkByID(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, ChunkID chunk_id) {
+    String chunk_info_key = KeyEncode::CatalogIdxChunkTagKey(db_id, table_id, index_id, segment_id, chunk_id, "chunk_info");
+    Status status = kv_instance_->Delete(chunk_info_key);
+    if (!status.ok()) {
+        return status;
     }
 
     return Status::OK();
@@ -1725,7 +1900,7 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
 }
 
 Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
-//    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     const String &db_name = append_cmd->db_name_;
     const String &table_name = append_cmd->table_name_;
@@ -1737,6 +1912,48 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
     if (!status.ok()) {
         return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
+    String db_id_str;
+    String table_id_str;
+    String index_id_str;
+    String index_key;
+    Status status = GetIndexID(dump_index_cmd->db_name_,
+                               dump_index_cmd->table_name_,
+                               dump_index_cmd->index_name_,
+                               index_key,
+                               index_id_str,
+                               table_id_str,
+                               db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String idx_segment_last_chunk_key =
+        KeyEncode::CatalogIdxSegmentTagKey(db_id_str, table_id_str, index_id_str, dump_index_cmd->segment_id_, LATEST_CHUNK_ID.data());
+    String last_chunk_id_str;
+    ChunkID last_chunk_id = 0;
+    status = kv_instance_->GetForUpdate(idx_segment_last_chunk_key, last_chunk_id_str);
+    if (status.code() == ErrorCode::kNotFound) {
+        kv_instance_->Put(idx_segment_last_chunk_key, "0");
+        last_chunk_id_str = "0";
+        last_chunk_id = 0;
+    } else {
+        last_chunk_id = std::stoull(last_chunk_id_str);
+    }
+    for (WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
+        chunk_info.chunk_id_ = last_chunk_id++;
+        CommitAddIdxChunkByCmd(db_id_str, table_id_str, index_id_str, dump_index_cmd->segment_id_, chunk_info);
+    }
+    last_chunk_id_str = fmt::format("{}", last_chunk_id);
+    kv_instance_->Put(idx_segment_last_chunk_key, last_chunk_id_str);
+
+    for (ChunkID deprecate_id : dump_index_cmd->deprecate_ids_) {
+        CommitDropIdxChunkByID(db_id_str, table_id_str, index_id_str, dump_index_cmd->segment_id_, deprecate_id);
     }
 
     return Status::OK();

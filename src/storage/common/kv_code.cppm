@@ -43,6 +43,17 @@ public:
     static String CatalogIndexTagKey(const String &db_id, const String &table_id, const String &index_name, const String &tag_name);
     static String CatalogIndexTagKeyPrefix(const String &db_id, const String &table_id, const String &index_name, const String &tag_name);
 
+    static String CatalogIdxSegmentKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id);
+    static String
+    CatalogIdxSegmentTagKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, const String &tag_name);
+    static String CatalogIdxChunkPrefix(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id);
+    static String CatalogIdxChunkTagKey(const String &db_id,
+                                        const String &table_id,
+                                        const String &index_id,
+                                        SegmentID segment_id,
+                                        ChunkID chunk_id,
+                                        const String &tag_name);
+
     static String TableColumnKey(const String &db_id, const String &table_id, const String &column_name);
     static String TableColumnPrefix(const String &db_id, const String &table_id);
 

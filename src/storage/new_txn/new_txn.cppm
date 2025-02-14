@@ -57,6 +57,8 @@ struct WalCmdDropColumns;
 struct WalCmdCreateIndex;
 struct WalCmdDropIndex;
 struct WalCmdAppend;
+struct WalCmdDumpIndex;
+struct WalChunkIndexInfo;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
@@ -182,6 +184,29 @@ public:
 
     Status GetIndexDefByName(const String &db_name, const String &table_name, const String &index_name, SharedPtr<IndexBase> &index_base);
 
+    Status AddIndexSegment(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
+    Status
+    AddIndexChunk(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, const ChunkIndexInfo &chunk_info);
+
+    Status DeprecateIndexChunk(const String &db_name,
+                               const String &table_name,
+                               const String &index_name,
+                               SegmentID segment_id,
+                               const Vector<ChunkID> &deprecate_ids);
+
+    Status GetIndexChunks(const String &db_name,
+                          const String &table_name,
+                          const String &index_name,
+                          SegmentID segment_id,
+                          Vector<ChunkIndexInfo> &chunk_infos);
+
+    Status GetIndexChunksByID(const String &db_id_str,
+                              const String &table_id_str,
+                              const String &index_id_str,
+                              SegmentID segment_id,
+                              Vector<ChunkIndexInfo> &chunk_infos);
+
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
@@ -220,7 +245,7 @@ public:
 
     Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
 
-    Status Append(const String& db_name, const String& table_name, const SharedPtr<DataBlock> &input_block);
+    Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
     Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
@@ -306,6 +331,12 @@ private:
                       String &index_id,
                       String &table_id,
                       String &db_id);
+    Status CommitAddIdxChunkByCmd(const String &db_id,
+                                  const String &table_id,
+                                  const String &index_id,
+                                  SegmentID segment_id,
+                                  const WalChunkIndexInfo &chunk_info);
+    Status CommitDropIdxChunkByID(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, ChunkID chunk_id);
 
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
@@ -318,6 +349,7 @@ private:
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
     Status CommitAppend(const WalCmdAppend *drop_index_cmd);
+    Status CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
 private:
     // Reference to external class

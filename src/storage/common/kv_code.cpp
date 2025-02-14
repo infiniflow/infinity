@@ -60,6 +60,31 @@ String KeyEncode::CatalogIndexTagKeyPrefix(const String &db_id, const String &ta
     return fmt::format("idx|{}|{}|{}|{}|", db_id, table_id, index_name, tag_name);
 }
 
+String KeyEncode::CatalogIdxSegmentKey(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id) {
+    return fmt::format("idx_seg|{}|{}|{}|{}", db_id, table_id, index_id, segment_id);
+}
+
+String KeyEncode::CatalogIdxSegmentTagKey(const String &db_id,
+                                          const String &table_id,
+                                          const String &index_id,
+                                          SegmentID segment_id,
+                                          const String &tag_name) {
+    return fmt::format("idx_seg|{}|{}|{}|{}|{}", db_id, table_id, index_id, segment_id, tag_name);
+}
+
+String KeyEncode::CatalogIdxChunkPrefix(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id) {
+    return fmt::format("idx_chunk|{}|{}|{}|{}|", db_id, table_id, index_id, segment_id);
+}
+
+String KeyEncode::CatalogIdxChunkTagKey(const String &db_id,
+                                        const String &table_id,
+                                        const String &index_id,
+                                        SegmentID segment_id,
+                                        ChunkID chunk_id,
+                                        const String &tag_name) {
+    return fmt::format("idx_chunk|{}|{}|{}|{}|{}|{}", db_id, table_id, index_id, segment_id, chunk_id, tag_name);
+}
+
 String KeyEncode::TableColumnKey(const String &db_id, const String &table_id, const String &column_name) {
     return fmt::format("tbl|col|{}|{}|{}", db_id, table_id, column_name);
 }

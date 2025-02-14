@@ -276,6 +276,14 @@ private:
     HashMap<String, UniquePtr<NewTxnTableStore>> txn_tables_store_{};
 
     Vector<UniquePtr<std::binary_semaphore>> semas_{};
+
+public:
+    WalCmdDumpIndex *GetDumpIndexCmd(const String &idx_segment_key);
+
+    bool AddDumpIndexCmd(String idx_segment_key, WalCmdDumpIndex *dump_index_cmd);
+
+private:
+    HashMap<String, WalCmdDumpIndex *> dump_index_cmds_{};
 };
 
 } // namespace infinity
