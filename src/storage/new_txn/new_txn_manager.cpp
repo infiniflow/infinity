@@ -82,7 +82,7 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
     }
 
     // Create txn instance
-    auto new_txn = SharedPtr<NewTxn>(new NewTxn(this, buffer_mgr_, new_txn_id, begin_ts, kv_store_->GetInstance(), std::move(txn_text), txn_type));
+    auto new_txn = MakeShared<NewTxn>(this, buffer_mgr_, new_txn_id, begin_ts, kv_store_->GetInstance(), std::move(txn_text), txn_type);
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
