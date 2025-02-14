@@ -351,6 +351,10 @@ private:
     Status CommitAppend(const WalCmdAppend *drop_index_cmd);
     Status CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
+    Status IncrLatestDatabaseID(String &db_id_str) const;
+    Status IncrLatestTableID(String &table_id_str) const;
+    Status IncrLatestIndexID(String &index_id_str) const;
+
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};

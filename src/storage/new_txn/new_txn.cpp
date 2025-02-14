@@ -1443,35 +1443,20 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     // Get the latest database id of system
-    String db_string_id;
-    Status status = kv_instance_->GetForUpdate(LATEST_DATABASE_ID.data(), db_string_id);
-    SizeT db_id = 0;
-    if (status.ok()) {
-        db_id = std::stoull(db_string_id);
-    } else {
-        LOG_DEBUG(fmt::format("Failed to get latest_database_id: {}", status.message()));
-    }
-
-    ++db_id;
-    String db_key = KeyEncode::CatalogDbKey(create_db_cmd->db_name_, commit_ts);
-    String db_id_str = fmt::format("{}", db_id);
-    status = kv_instance_->Put(db_key, db_id_str);
+    String db_id_str;
+    Status status = IncrLatestDatabaseID(db_id_str);
     if (!status.ok()) {
         return status;
     }
-    status = kv_instance_->Put(LATEST_DATABASE_ID.data(), db_id_str);
+
+    String db_key = KeyEncode::CatalogDbKey(create_db_cmd->db_name_, commit_ts);
+    status = kv_instance_->Put(db_key, db_id_str);
     if (!status.ok()) {
         return status;
     }
 
     String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id_str, "dir");
     status = kv_instance_->Put(db_storage_dir, create_db_cmd->db_dir_tail_);
-    if (!status.ok()) {
-        return status;
-    }
-
-    String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_table_id");
-    status = kv_instance_->Put(db_latest_table_id, "0");
     if (!status.ok()) {
         return status;
     }
@@ -1555,12 +1540,6 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
         return status;
     }
 
-    String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id_str, LATEST_TABLE_ID.data());
-    status = kv_instance_->Delete(db_latest_table_id);
-    if (!status.ok()) {
-        return status;
-    }
-
     return Status::OK();
 }
 Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
@@ -1577,28 +1556,16 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
         return status;
     }
 
-    // Get latest table id and lock the id
-    String db_latest_table_id = KeyEncode::CatalogDbTagKey(db_id_str, LATEST_TABLE_ID.data());
+    // Get latest table id and increase the id
     String table_id_str;
-    status = kv_instance_->GetForUpdate(db_latest_table_id, table_id_str);
-    SizeT table_id = 0;
-    if (status.ok()) {
-        table_id = std::stoull(table_id_str);
-    } else {
-        LOG_DEBUG(fmt::format("Failed to get latest_table_id: {}", status.message()));
-    }
-
-    // Create table key value pair
-    ++table_id;
-    String table_key = KeyEncode::CatalogTableKey(db_id_str, table_name, commit_ts);
-    table_id_str = fmt::format("{}", table_id);
-    status = kv_instance_->Put(table_key, table_id_str);
+    status = IncrLatestTableID(table_id_str);
     if (!status.ok()) {
         return status;
     }
 
-    // Update latest table id
-    status = kv_instance_->Put(db_latest_table_id, table_id_str);
+    // Create table key value pair
+    String table_key = KeyEncode::CatalogTableKey(db_id_str, table_name, commit_ts);
+    status = kv_instance_->Put(table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -1616,13 +1583,6 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
     // Create table column id;
     String table_latest_column_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_COLUMN_ID.data());
     status = kv_instance_->Put(table_latest_column_id_key, "0");
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Create table index id;
-    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_INDEX_ID.data());
-    status = kv_instance_->Put(table_latest_index_id_key, "0");
     if (!status.ok()) {
         return status;
     }
@@ -1673,13 +1633,6 @@ Status NewTxn::CommitDropTable(const String &db_name, const String &table_name) 
 
     // delete table key
     status = kv_instance_->Delete(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // delete table index id;
-    String table_latest_index_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_INDEX_ID.data());
-    status = kv_instance_->Delete(table_latest_index_id_key);
     if (!status.ok()) {
         return status;
     }
@@ -1812,27 +1765,15 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
     }
 
     // Get latest index id and lock the id
-    String table_latest_index_id = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_INDEX_ID.data());
     String index_id_str;
-    status = kv_instance_->GetForUpdate(table_latest_index_id, index_id_str);
-    SizeT index_id = 0;
-    if (status.ok()) {
-        index_id = std::stoull(index_id_str);
-    } else {
-        LOG_DEBUG(fmt::format("Failed to get latest_index_id: {}", status.message()));
-    }
-
-    // Create index key value pair
-    ++index_id;
-    String index_key = KeyEncode::CatalogIndexKey(db_id_str, table_id_str, index_name, commit_ts);
-    index_id_str = fmt::format("{}", index_id);
-    status = kv_instance_->Put(index_key, index_id_str);
+    status = IncrLatestIndexID(index_id_str);
     if (!status.ok()) {
         return status;
     }
 
-    // Update latest index id
-    status = kv_instance_->Put(table_latest_index_id, index_id_str);
+    // Create index key value pair
+    String index_key = KeyEncode::CatalogIndexKey(db_id_str, table_id_str, index_name, commit_ts);
+    status = kv_instance_->Put(index_key, index_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -1957,6 +1898,42 @@ Status NewTxn::CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
     }
 
     return Status::OK();
+}
+
+Status NewTxn::IncrLatestDatabaseID(String &db_id_str) const {
+    String db_string_id;
+    Status status = kv_instance_->Get(LATEST_DATABASE_ID.data(), db_string_id);
+    if (!status.ok()) {
+        return status;
+    }
+    SizeT db_id = std::stoull(db_string_id);
+    ++db_id;
+    db_id_str = fmt::format("{}", db_id);
+    return kv_instance_->Put(LATEST_DATABASE_ID.data(), db_id_str);
+}
+
+Status NewTxn::IncrLatestTableID(String &table_id_str) const {
+    String table_string_id;
+    Status status = kv_instance_->Get(LATEST_TABLE_ID.data(), table_string_id);
+    if (!status.ok()) {
+        return status;
+    }
+    SizeT table_id = std::stoull(table_string_id);
+    ++table_id;
+    table_id_str = fmt::format("{}", table_id);
+    return kv_instance_->Put(LATEST_TABLE_ID.data(), table_id_str);
+}
+
+Status NewTxn::IncrLatestIndexID(String &index_id_str) const {
+    String index_string_id;
+    Status status = kv_instance_->Get(LATEST_INDEX_ID.data(), index_string_id);
+    if (!status.ok()) {
+        return status;
+    }
+    SizeT index_id = std::stoull(index_string_id);
+    ++index_id;
+    index_id_str = fmt::format("{}", index_id);
+    return kv_instance_->Put(LATEST_INDEX_ID.data(), index_id_str);
 }
 
 bool NewTxn::CheckConflict() { return txn_store_.CheckConflict(catalog_); }
