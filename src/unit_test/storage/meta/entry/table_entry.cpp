@@ -378,7 +378,7 @@ TEST_P(TableEntryTest, get_fulltext_analyzers_test) {
     // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+        auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
     }
@@ -455,7 +455,7 @@ TEST_P(TableEntryTest, optimize_fulltext_index_test) {
     // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+        auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
     }
@@ -535,7 +535,7 @@ TEST_P(TableEntryTest, roll_back_committed_write_test) {
     // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+        auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
     }
@@ -613,7 +613,7 @@ TEST_P(TableEntryTest, roll_back_uncommitted_write_test) {
     // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+        auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
     }
@@ -660,7 +660,7 @@ TEST_P(TableEntryTest, compact_test) {
     // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+        auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
     }
@@ -709,7 +709,7 @@ TEST_P(TableEntryTest, check_any_delete_test) {
     // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+        auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
     }
@@ -786,7 +786,7 @@ TEST_P(TableEntryTest, serialize_test) {
     // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+        auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
     }
@@ -859,7 +859,7 @@ TEST_P(TableEntryTest, deserialize_test) {
     // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+        auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
     }
@@ -903,7 +903,7 @@ TEST_P(TableEntryTest, get_colunm_id_by_name_test) {
     // drop table
     {
         auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+        auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn1);
     }

@@ -159,7 +159,7 @@ public:
 
     Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
-    Status DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type);
+    Status DropTable(const String &db_name, const String &table_name, ConflictType conflict_type);
 
     Status ListTable(const String &db_name, Vector<String> &table_list);
 

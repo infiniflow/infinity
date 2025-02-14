@@ -564,7 +564,7 @@ Status NewTxn::DropColumns(TableEntry *table_entry, const Vector<String> &column
     return Status::OK();
 }
 
-Status NewTxn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
+Status NewTxn::DropTable(const String &db_name, const String &table_name, ConflictType conflict_type) {
 
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
@@ -588,7 +588,7 @@ Status NewTxn::DropTableCollectionByName(const String &db_name, const String &ta
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
-    LOG_TRACE(fmt::format("NewTxn::DropTableCollectionByName dropped table: {}.{}", db_name, table_name));
+    LOG_TRACE(fmt::format("NewTxn::DropTable dropped table: {}.{}", db_name, table_name));
     return Status::OK();
 }
 
