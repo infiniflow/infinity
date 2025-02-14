@@ -25,6 +25,7 @@ module kv_store;
 import stl;
 import status;
 import third_party;
+import rocksdb_merge_operator;
 
 namespace infinity {
 
@@ -151,6 +152,8 @@ Status KVStore::Init(const String &db_path) {
     options_.create_if_missing = true;
     options_.manual_wal_flush = true;
     options_.avoid_flush_during_shutdown = true;
+    options_.merge_operator = String2UInt64AddOperator::Create();
+
     txn_options_.set_snapshot = true;
 
     write_options_.disableWAL = true;
@@ -216,6 +219,45 @@ UniquePtr<KVInstance> KVStore::GetInstance() {
     kv_instance->transaction_ = transaction_db_->BeginTransaction(write_options_, txn_options_);
     kv_instance->read_options_.snapshot = kv_instance->transaction_->GetSnapshot();
     return kv_instance;
+}
+
+Status KVStore::Put(const String &key, const String &value) {
+    rocksdb::Status s = transaction_db_->Put(write_options_, key, value);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
+Status KVStore::Delete(const String &key) {
+    rocksdb::Status s = transaction_db_->Delete(write_options_, key);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
+}
+
+Status KVStore::Get(const String &key, String &value) {
+    rocksdb::Status s = transaction_db_->Get(read_options_, key, &value);
+    if (!s.ok()) {
+        switch (s.code()) {
+            case rocksdb::Status::Code::kNotFound: {
+                return Status::NotFound(fmt::format("Key not found: {}", key));
+            }
+            default: {
+                return Status::UnexpectedError(s.ToString());
+            }
+        }
+    }
+    return Status::OK();
+}
+
+Status KVStore::Merge(const String &key, const String &value) {
+    rocksdb::Status s = transaction_db_->Merge(write_options_, nullptr, key, value);
+    if (!s.ok()) {
+        return Status::UnexpectedError(fmt::format("Unexpected error: {}", s.ToString()));
+    }
+    return Status::OK();
 }
 
 String KVStore::ToString() const {

@@ -77,6 +77,9 @@ module;
 #include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/transaction_db.h"
 #include "rocksdb/utilities/backup_engine.h"
+#include "rocksdb/utilities/merge_operators.h"
+#include "rocksdb/merge_operator.h"
+#include "rocksdb/env.h"
 
 #pragma clang diagnostic pop
 
@@ -363,6 +366,10 @@ using BackupEngineOptions = ::ROCKSDB_NAMESPACE::BackupEngineOptions;
 using Env = ::ROCKSDB_NAMESPACE::Env;
 using IOStatus = ::ROCKSDB_NAMESPACE::IOStatus;
 using Slice = ::ROCKSDB_NAMESPACE::Slice;
+using AssociativeMergeOperator = ::ROCKSDB_NAMESPACE::AssociativeMergeOperator;
+using MergeOperator = ::ROCKSDB_NAMESPACE::MergeOperator;
+using MergeOperators = ::ROCKSDB_NAMESPACE::MergeOperators;
+using Logger = ::ROCKSDB_NAMESPACE::Logger;
 } // namespace rocksdb
 
 } // namespace infinity

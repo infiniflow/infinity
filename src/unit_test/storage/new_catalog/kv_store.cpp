@@ -28,6 +28,44 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          KVStoreTest,
                          ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
+TEST_P(KVStoreTest, kv_store0) {
+    using namespace infinity;
+
+    UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
+    Status status = kv_store->Init("/tmp/rocksdb_transaction_example1");
+    EXPECT_TRUE(status.ok());
+
+    std::string value;
+    status = kv_store->Get("key1", value);
+    EXPECT_FALSE(status.ok());
+
+    status = kv_store->Put("key1", "1");
+    EXPECT_TRUE(status.ok());
+
+    status = kv_store->Get("key1", value);
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(value, "1");
+
+    status = kv_store->Merge("key1", "2");
+    EXPECT_TRUE(status.ok());
+
+    status = kv_store->Get("key1", value);
+    EXPECT_TRUE(status.ok());
+    EXPECT_EQ(value, "3");
+
+    status = kv_store->Delete("key1");
+    EXPECT_TRUE(status.ok());
+
+    status = kv_store->Get("key1", value);
+    EXPECT_FALSE(status.ok());
+
+    status = kv_store->Uninit();
+    EXPECT_TRUE(status.ok());
+
+    status = kv_store->Destroy("/tmp/rocksdb_transaction_example1");
+    EXPECT_TRUE(status.ok());
+}
+
 TEST_P(KVStoreTest, kv_store1) {
     using namespace infinity;
 

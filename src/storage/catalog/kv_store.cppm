@@ -79,6 +79,11 @@ public:
 
     UniquePtr<KVInstance> GetInstance();
 
+    Status Put(const String &key, const String &value);
+    Status Delete(const String &key);
+    Status Get(const String &key, String &value);
+    Status Merge(const String &key, const String &value);
+
     String ToString() const;
 
     // For UT
@@ -91,6 +96,7 @@ private:
     rocksdb::TransactionDBOptions txn_db_options_;
     rocksdb::TransactionOptions txn_options_;
     rocksdb::WriteOptions write_options_;
+    rocksdb::ReadOptions read_options_;
 };
 
 } // namespace infinity
