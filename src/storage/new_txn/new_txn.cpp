@@ -710,6 +710,30 @@ Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector
     return Status::OK();
 }
 
+Status NewTxn::GetIndexDefByName(const String &db_name, const String &table_name, const String &index_name, SharedPtr<IndexBase> &index_base) {
+    this->CheckTxnStatus();
+
+    String index_key;
+    String index_id;
+    String table_id;
+    String db_id;
+    Status status = GetIndexID(db_name, table_name, index_name, index_key, index_id, table_id, db_id);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String index_def_key = KeyEncode::CatalogIndexTagKey(db_id, table_id, index_id, "index_def");
+    String index_def_str;
+    status = kv_instance_->Get(index_def_key, index_def_str);
+    if (!status.ok()) {
+        return status;
+    }
+    nlohmann::json index_def_json = nlohmann::json::parse(index_def_str);
+    index_base = IndexBase::Deserialize(index_def_json);
+
+    return Status::OK();
+}
+
 Tuple<TableIndexEntry *, Status> NewTxn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
     TxnTimeStamp begin_ts = this->BeginTS();
 

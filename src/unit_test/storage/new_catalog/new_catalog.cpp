@@ -28,6 +28,7 @@ import column_def;
 import data_type;
 import logical_type;
 import table_def;
+import index_base;
 import index_secondary;
 import index_full_text;
 import index_hnsw;
@@ -631,6 +632,16 @@ TEST_P(NewCatalogTest, index_test1) {
         EXPECT_TRUE(status.ok());
 
         new_txn_mgr->PrintAllKeyValue();
+    }
+    {
+        // get index def
+        auto *txn3_1 = new_txn_mgr->BeginTxn(MakeUnique<String>("get index"), TransactionType::kNormal);
+        SharedPtr<IndexBase> index_def1;
+        Status status = txn3_1->GetIndexDefByName(*db_name, *table_name, *index_name, index_def1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3_1);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_def1, *index_def);
     }
     {
         // list and drop index

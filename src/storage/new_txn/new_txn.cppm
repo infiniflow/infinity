@@ -180,6 +180,8 @@ public:
 
     Status ListIndex(const String &db_name, const String &table_name, Vector<String> &index_list);
 
+    Status GetIndexDefByName(const String &db_name, const String &table_name, const String &index_name, SharedPtr<IndexBase> &index_base);
+
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
