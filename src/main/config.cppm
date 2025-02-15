@@ -33,6 +33,8 @@ export struct DefaultConfig {
     LogLevel default_log_level_{LogLevel::kInfo};
     bool default_log_to_stdout_{false};
     String default_log_dir_ = "/var/infinity/log";
+    String default_catalog_dir_ = "/var/infinity/catalog";
+    String default_snapshot_dir_ = "/var/infinity/snapshot";
     String default_data_dir_ = "/var/infinity/data";
     String default_wal_dir_ = "/var/infinity/wal";
     String default_temp_dir_ = "/var/infinity/tmp";
@@ -92,6 +94,8 @@ public:
 
     // Storage
     String DataDir();
+    String CatalogDir();
+    String SnapshotDir();
 
     i64 CleanupInterval();
     void SetCleanupInterval(i64);
@@ -102,7 +106,6 @@ public:
     i64 OptimizeIndexInterval();
     void SetOptimizeInterval(i64);
 
-    String SnapshotDir();
     i64 MemIndexCapacity();
     i64 DenseIndexBuildingWorker();
     i64 SparseIndexBuildingWorker();

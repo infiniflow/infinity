@@ -440,7 +440,7 @@ Status Status::FunctionIsDisable(const String &function_name) {
     return Status(ErrorCode::kFunctionIsDisable, MakeUnique<String>(fmt::format("Function: {} is disable", function_name)));
 }
 
-Status Status::NotFound(const String &detailed_info) { return Status(ErrorCode::kFunctionIsDisable, MakeUnique<String>(detailed_info)); }
+Status Status::NotFound(const String &detailed_info) { return Status(ErrorCode::kNotFound, MakeUnique<String>(detailed_info)); }
 
 Status Status::ErrorInit(const String &detailed_info) { return Status(ErrorCode::kErrorInit, MakeUnique<String>(detailed_info)); }
 

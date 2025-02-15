@@ -449,6 +449,9 @@ export struct WalCmdOptimize final : public WalCmd {
 };
 
 export struct WalCmdDumpIndex final : public WalCmd {
+    WalCmdDumpIndex(String db_name, String table_name, String index_name, SegmentID segment_id)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id) {}
+
     WalCmdDumpIndex(String db_name,
                     String table_name,
                     String index_name,
