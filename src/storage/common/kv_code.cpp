@@ -20,16 +20,19 @@ module kv_code;
 
 import stl;
 import third_party;
+import infinity_exception;
 
 namespace infinity {
 
 UniquePtr<KeyBase> KeyBase::FromString(const String &key_str) {
     if (key_str.empty()) {
+        UnrecoverableError(fmt::format("Empty key: {}", key_str));
         return nullptr;
     }
 
     auto pos = key_str.find_first_of('|');
     if (pos == String::npos) {
+        UnrecoverableError(fmt::format("Unrecognized key: {}", key_str));
         return nullptr;
     }
 
@@ -83,6 +86,7 @@ UniquePtr<KeyBase> KeyBase::FromString(const String &key_str) {
         key_index_tag->index_id_ = key_index_tag->index_id_.substr(0, key_index_tag->index_id_.find_first_of('|'));
         return key_index_tag;
     } else {
+        UnrecoverableError(fmt::format("Unrecognized key: {}", key_str));
         return nullptr;
     }
 }

@@ -1502,24 +1502,25 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
         return status;
     }
 
-    // Find all tables of this database to drop
-    String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(db_table_prefix);
-
-    while (iter2->Valid() && iter2->Key().starts_with(db_table_prefix)) {
-        String table_key = iter2->Key().ToString();
-        // extract table name
-        size_t start = db_table_prefix.size();
-        size_t end = table_key.find('|', start);
-        String table_name = table_key.substr(start, end - start);
-        LOG_TRACE(fmt::format("Drop table: {}.{}", drop_db_cmd->db_name_, table_name));
-        Status status = CommitDropTable(drop_db_cmd->db_name_, table_name);
-        if (!status.ok()) {
-            return status;
-        }
-        iter2->Next();
-    }
+    // All tables in dropped DB will be cleanup by background thread
+    //    // Find all tables of this database to drop
+    //    String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str);
+    //    auto iter2 = kv_instance_->GetIterator();
+    //    iter2->Seek(db_table_prefix);
+    //
+    //    while (iter2->Valid() && iter2->Key().starts_with(db_table_prefix)) {
+    //        String table_key = iter2->Key().ToString();
+    //        // extract table name
+    //        size_t start = db_table_prefix.size();
+    //        size_t end = table_key.find('|', start);
+    //        String table_name = table_key.substr(start, end - start);
+    //        LOG_TRACE(fmt::format("Drop table: {}.{}", drop_db_cmd->db_name_, table_name));
+    //        Status status = CommitDropTable(drop_db_cmd->db_name_, table_name);
+    //        if (!status.ok()) {
+    //            return status;
+    //        }
+    //        iter2->Next();
+    //    }
 
     LOG_TRACE(fmt::format("Drop database: {}", drop_db_cmd->db_name_));
     status = kv_instance_->Delete(db_key);
@@ -1527,7 +1528,7 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
         return status;
     }
 
-    // Delete db_dir, db_comment and latest_table_id
+    // Delete db_dir, db_comment
     String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id_str, "dir");
     status = kv_instance_->Delete(db_storage_dir);
     if (!status.ok()) {
