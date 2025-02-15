@@ -20,6 +20,76 @@ import stl;
 
 namespace infinity {
 
+enum class KeyType {
+    kDb,
+    kDbTag,
+    kTable,
+    kTableTag,
+    kIndex,
+    kIndexTag,
+    kInvalid,
+};
+
+export struct KeyBase {
+    KeyBase(KeyType key_type) : key_type_(key_type) {}
+    KeyType key_type_{KeyType::kInvalid};
+    static UniquePtr<KeyBase> FromString(const String &key_str);
+};
+
+export struct KeyDb : public KeyBase {
+    KeyDb() : KeyBase(KeyType::kDb) {}
+    String db_name_{};
+    TxnTimeStamp ts_{};
+
+    String ToString() const;
+};
+
+export struct KeyDbTag : public KeyBase {
+    KeyDbTag() : KeyBase(KeyType::kDbTag) {}
+    String db_id_{};
+    String tag_name_{};
+
+    String ToString() const;
+};
+
+export struct KeyTable : public KeyBase {
+    KeyTable() : KeyBase(KeyType::kTable) {}
+    String db_id_{};
+    String table_name_{};
+    TxnTimeStamp ts_{};
+
+    String ToString() const;
+};
+
+export struct KeyTableTag : public KeyBase {
+    KeyTableTag() : KeyBase(KeyType::kTableTag) {}
+    String db_id_{};
+    String table_id_{};
+    String tag_name_{};
+
+    String ToString() const;
+};
+
+export struct KeyIndex : public KeyBase {
+    KeyIndex() : KeyBase(KeyType::kIndex) {}
+    String db_id_{};
+    String table_id_{};
+    String index_name_{};
+    TxnTimeStamp ts_{};
+
+    String ToString() const;
+};
+
+export struct KeyIndexTag : public KeyBase {
+    KeyIndexTag() : KeyBase(KeyType::kIndexTag) {}
+    String db_id_{};
+    String table_id_{};
+    String index_id_{};
+    String tag_name_{};
+
+    String ToString() const;
+};
+
 export class KeyEncode {
 public:
     static String CatalogDbKey(const String &db_name, TxnTimeStamp ts);

@@ -14,12 +14,88 @@
 
 module;
 
+#include <string>
+
 module kv_code;
 
 import stl;
 import third_party;
 
 namespace infinity {
+
+UniquePtr<KeyBase> KeyBase::FromString(const String &key_str) {
+    if (key_str.empty()) {
+        return nullptr;
+    }
+
+    auto pos = key_str.find_first_of('|');
+    if (pos == String::npos) {
+        return nullptr;
+    }
+
+    String key_type_str = key_str.substr(0, pos);
+    if (key_type_str == "db") {
+        auto key_db = MakeUnique<KeyDb>();
+        key_db->db_name_ = key_str.substr(pos + 1);
+        key_db->ts_ = std::stoull(key_db->db_name_.substr(key_db->db_name_.find_first_of('|') + 1));
+        key_db->db_name_ = key_db->db_name_.substr(0, key_db->db_name_.find_first_of('|'));
+        return key_db;
+    } else if (key_type_str == "db_tag") {
+        auto key_db_tag = MakeUnique<KeyDbTag>();
+        key_db_tag->db_id_ = key_str.substr(pos + 1);
+        key_db_tag->tag_name_ = key_db_tag->db_id_.substr(key_db_tag->db_id_.find_first_of('|') + 1);
+        key_db_tag->db_id_ = key_db_tag->db_id_.substr(0, key_db_tag->db_id_.find_first_of('|'));
+        return key_db_tag;
+    } else if (key_type_str == "tbl") {
+        auto key_table = MakeUnique<KeyTable>();
+        key_table->db_id_ = key_str.substr(pos + 1);
+        key_table->table_name_ = key_table->db_id_.substr(key_table->db_id_.find_first_of('|') + 1);
+        key_table->db_id_ = key_table->db_id_.substr(0, key_table->db_id_.find_first_of('|'));
+        key_table->ts_ = std::stoull(key_table->table_name_.substr(key_table->table_name_.find_first_of('|') + 1));
+        key_table->table_name_ = key_table->table_name_.substr(0, key_table->table_name_.find_first_of('|'));
+        return key_table;
+    } else if (key_type_str == "tbl_tag") {
+        auto key_table_tag = MakeUnique<KeyTableTag>();
+        key_table_tag->db_id_ = key_str.substr(pos + 1);
+        key_table_tag->table_id_ = key_table_tag->db_id_.substr(key_table_tag->db_id_.find_first_of('|') + 1);
+        key_table_tag->db_id_ = key_table_tag->db_id_.substr(0, key_table_tag->db_id_.find_first_of('|'));
+        key_table_tag->tag_name_ = key_table_tag->table_id_.substr(key_table_tag->table_id_.find_first_of('|') + 1);
+        key_table_tag->table_id_ = key_table_tag->table_id_.substr(0, key_table_tag->table_id_.find_first_of('|'));
+        return key_table_tag;
+    } else if (key_type_str == "idx") {
+        auto key_index = MakeUnique<KeyIndex>();
+        key_index->db_id_ = key_str.substr(pos + 1);
+        key_index->table_id_ = key_index->db_id_.substr(key_index->db_id_.find_first_of('|') + 1);
+        key_index->db_id_ = key_index->db_id_.substr(0, key_index->db_id_.find_first_of('|'));
+        key_index->index_name_ = key_index->table_id_.substr(key_index->table_id_.find_first_of('|') + 1);
+        key_index->table_id_ = key_index->table_id_.substr(0, key_index->table_id_.find_first_of('|'));
+        key_index->ts_ = std::stoull(key_index->index_name_.substr(key_index->index_name_.find_first_of('|') + 1));
+        key_index->index_name_ = key_index->index_name_.substr(0, key_index->index_name_.find_first_of('|'));
+        return key_index;
+    } else if (key_type_str == "idx_tag") {
+        auto key_index_tag = MakeUnique<KeyIndexTag>();
+        key_index_tag->db_id_ = key_str.substr(pos + 1);
+        key_index_tag->table_id_ = key_index_tag->db_id_.substr(key_index_tag->db_id_.find_first_of('|') + 1);
+        key_index_tag->db_id_ = key_index_tag->db_id_.substr(0, key_index_tag->db_id_.find_first_of('|'));
+        key_index_tag->index_id_ = key_index_tag->table_id_.substr(key_index_tag->table_id_.find_first_of('|') + 1);
+        key_index_tag->table_id_ = key_index_tag->table_id_.substr(0, key_index_tag->table_id_.find_first_of('|'));
+        key_index_tag->tag_name_ = key_index_tag->index_id_.substr(key_index_tag->index_id_.find_first_of('|') + 1);
+        key_index_tag->index_id_ = key_index_tag->index_id_.substr(0, key_index_tag->index_id_.find_first_of('|'));
+        return key_index_tag;
+    } else {
+        return nullptr;
+    }
+}
+
+String KeyDb::ToString() const { return fmt::format("db|{}|{}", db_name_, ts_); }
+
+String KeyDbTag::ToString() const { return fmt::format("db|{}|{}", db_id_, tag_name_); }
+
+String KeyTable::ToString() const { return fmt::format("tbl|{}|{}|{}", db_id_, table_name_, ts_); }
+
+String KeyIndex::ToString() const { return fmt::format("tbl|{}|{}|{}", db_id_, table_id_, index_name_); }
+
+String KeyIndexTag::ToString() const { return fmt::format("idx|{}|{}|{}|{}", db_id_, table_id_, index_id_, tag_name_); }
 
 String KeyEncode::CatalogDbKey(const String &db_name, TxnTimeStamp ts) { return fmt::format("catalog|db|{}|{}", db_name, ts); }
 
