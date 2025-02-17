@@ -14,6 +14,7 @@
 
 module;
 
+
 #include <string>
 #include <unistd.h>
 
@@ -58,6 +59,7 @@ void Config::ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_z
     ToUpper(parsed_time_zone);
     parsed_time_zone_bias = std::stoi(time_zone_str.substr(3, String::npos));
 }
+
 
 Status Config::ParseByteSize(const String &byte_size_str, i64 &byte_size) {
 
@@ -2925,12 +2927,44 @@ String Config::ResourcePath() {
     return global_options_.GetStringValue(GlobalOptionIndex::kResourcePath);
 }
 
+// Date and Time
+
+void Config::SetTimeZone(const String &value) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZone);
+    if (base_option->data_type_ != BaseOptionDataType::kString) {
+        String error_message = "Attempt to set a non-string value to the time zone";
+        UnrecoverableError(error_message);
+    }
+    StringOption *time_zone_option = static_cast<StringOption *>(base_option);
+    time_zone_option->value_ = value;
+    return;
+}
+
+
+void Config::SetTimeZoneBias(i64 bias) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZoneBias);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to the time zone bias";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *time_zone_bias_option = static_cast<IntegerOption *>(base_option);
+    time_zone_bias_option->value_ = bias;
+    return;
+}
+
+
 //// Profiler
 // bool enable_profiler() const { return system_option_.enable_profiler; }
 //
 // SizeT profile_record_capacity() const { return system_option_.profile_record_capacity; }
 
 Tuple<BaseOption *, Status> Config::GetConfigByName(const String &name) { return global_options_.GetOptionByName(name); }
+
+// void Config::SetUserTimeZone(const String &value) {
+//     ParseTimeZoneStr(value);
+// }
 
 void Config::PrintAll() {
     fmt::print("Infinity system configs: \n");

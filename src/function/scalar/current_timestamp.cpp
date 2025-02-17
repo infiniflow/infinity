@@ -15,9 +15,11 @@ module;
 #include <chrono>
 module current_timestamp;
 import stl;
+import config;
 import catalog;
 import status;
 import logical_type;
+import infinity_context;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -25,51 +27,30 @@ import third_party;
 import internal_types;
 import data_type;
 import column_vector;
+import query_context;
 
 namespace infinity {
 using namespace std::chrono;
 struct CurrentTimestampFunction {
-    const char* defaultTZ = "Asia/Shanghai";
     template <typename TA, typename TB>
     static inline void Run(TA &left, TB &result) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
-    static inline void TimeZoneConvertHelper(VarcharT &left) {
-        const char* tzValue = std::getenv("TZ");
-        const std::string str = left.ToString();
-        const char* newTZ = str.c_str();
-        if ( tzValue == newTZ) {
-            return;
-        }
-        if (setenv("TZ", newTZ, 1) != 0) {
-            const char* newTZ = "Asia/Shanghai";
-            setenv("TZ", newTZ, 1);
-        }
-        tzset();
-        return;
-    }
-
-    static inline void TimeZoneResetHelper() {
-        const char* tzValue = std::getenv("TZ");
-        if (tzValue == CurrentTimestampFunction().defaultTZ) {
-            return;
-        }
-        setenv("TZ", CurrentTimestampFunction().defaultTZ, 1);
-        tzset();
-        return;
-    }
 };
 
 template <>
 inline void CurrentTimestampFunction::Run(VarcharT &left, TimestampT &result) {
-        TimeZoneConvertHelper(left);
-        auto now = system_clock::now();
-        auto sys_days = std::chrono::floor<std::chrono::days>(now);
-        auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
-        result.time.value = static_cast<i32>(sys_secs.time_since_epoch().count() - sys_days.time_since_epoch().count());
-        result.date.value = static_cast<i32>(sys_days.time_since_epoch().count());
-        TimeZoneResetHelper();
+    String tz_str = left.ToString();
+    InfinityContext& infinityContext = InfinityContext::instance();
+    Config* config = infinityContext.config();
+    auto offset = config->TimeZoneBias();
+    hours offset_hour(offset);
+    auto now = system_clock::now() + offset_hour;
+    auto sys_days = std::chrono::floor<std::chrono::days>(now);
+    auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
+    result.time.value = static_cast<i32>(sys_secs.time_since_epoch().count() - sys_days.time_since_epoch().count());
+    result.date.value = static_cast<i32>(sys_days.time_since_epoch().count());
 }
 
 void RegisterCurrentTimestampFunction(const UniquePtr<Catalog> &catalog_ptr) {
