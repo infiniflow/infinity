@@ -591,6 +591,8 @@ export struct QueueSinkState : public SinkState {
 
     Vector<UniquePtr<DataBlock>> data_block_array_{};
     Vector<BlockingQueue<SharedPtr<FragmentDataBase>> *> fragment_data_queues_;
+
+    bool sent_data_{false};
 };
 
 export struct MaterializeSinkState : public SinkState {

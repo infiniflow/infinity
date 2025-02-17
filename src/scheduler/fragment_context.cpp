@@ -664,6 +664,20 @@ bool FragmentContext::TryFinishFragment() {
     if (!TryFinishFragmentInner()) {
         LOG_TRACE(fmt::format("{} tasks in fragment {} are not completed", unfinished_task_n_.load(), fragment_id));
         if (fragment_type_ == FragmentType::kParallelStream) {
+            bool sent_data = false;
+            for (auto &task : tasks_) {
+                if (task->sink_state_->state_type_ == SinkStateType::kQueue) {
+                    auto *queue_sink_state = static_cast<QueueSinkState *>(task->sink_state_.get());
+                    if (queue_sink_state->sent_data_) {
+                        sent_data = true;
+                        queue_sink_state->sent_data_ = false;
+                    }
+                }
+            }
+            if (!sent_data) {
+                return false;
+            }
+
             for (auto *parent_plan_fragment : parent_plan_fragments) {
                 auto *scheduler = query_context_->scheduler();
                 LOG_TRACE(fmt::format("Schedule fragment: {} before fragment {} has finished.", parent_plan_fragment->FragmentID(), fragment_id));

@@ -200,12 +200,6 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         table_scan_operator_state->SetComplete();
     }
 
-    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids_count));
-
-    if (block_ids_idx >= block_ids_count) {
-        table_scan_operator_state->SetComplete();
-    }
-
     output_ptr->Finalize();
 }
 
