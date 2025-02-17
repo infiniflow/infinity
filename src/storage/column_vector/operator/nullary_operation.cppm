@@ -14,33 +14,26 @@
 
 module;
 
-export module function_expression;
+#include <concepts>
+#include <type_traits>
+
+export module nullary_operation;
 
 import stl;
-import base_expression;
-import data_type;
-import scalar_function;
+import column_vector;
 import internal_types;
 
 namespace infinity {
 
-export class FunctionExpression : public BaseExpression {
-public:
-    FunctionExpression(ScalarFunction function, Vector<SharedPtr<BaseExpression>> arguments);
-
-    inline DataType Type() const override { return func_.return_type(); }
-
-    [[nodiscard]] inline const String &ScalarFunctionName() const { return func_.name(); }
-
-    String ToString() const override;
-
-    u64 Hash() const override;
-
-    bool Eq(const BaseExpression &other) const override;
+export class NullaryOperator {
 
 public:
-    ScalarFunction func_;
-    bool nullary_{false};
+    template <typename ResultType, typename Operator>
+    static void inline Execute(SharedPtr<ColumnVector> &result, void *state_ptr) {
+        auto *result_ptr = (ResultType *)(result->data());
+        Operator::template Execute<ResultType>(result_ptr[0], state_ptr);
+        result->Finalize(1);
+    }
 };
 
 } // namespace infinity

@@ -32,8 +32,8 @@ import singleton;
 namespace infinity {
 using namespace std::chrono;
 struct CurrentDateFunction {
-    template <typename TA, typename TB>
-    static inline void Run(TA &left, TB &result) {
+    template <typename TB>
+    static inline void Run(TB &result) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
         return;
@@ -41,26 +41,22 @@ struct CurrentDateFunction {
 };
 
 template <>
-inline void CurrentDateFunction::Run(VarcharT &left, DateT &result) {
-    String tz_str = left.ToString();
-//    Config::SetUserTimeZone(tz_str);
-    InfinityContext& infinityContext = InfinityContext::instance();
-    Config* config = infinityContext.config();
-    auto offset = config->TimeZoneBias();
+inline void CurrentDateFunction::Run(DateT &result) {
+    //    InfinityContext& infinityContext = InfinityContext::instance();
+    //    Config* config = infinityContext.config();
+    //    auto offset = config->TimeZoneBias();
     auto now = system_clock::now();
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
-    result.value = sys_days.time_since_epoch().count() + offset * (60 * 60);
+    //    result.value = sys_days.time_since_epoch().count() + offset * (60 * 60);
+    result.value = sys_days.time_since_epoch().count();
 }
 
 void RegisterCurrentDateFunction(const UniquePtr<Catalog> &catalog_ptr) {
-    String func_name = "currentdate";
+    String func_name = "current_date";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
-    ScalarFunction current_date_function(func_name,
-                                  {DataType(LogicalType::kVarchar)},
-                                  DataType(LogicalType::kDate),
-                                  &ScalarFunction::UnaryFunction<VarcharT, DateT, CurrentDateFunction>);
+    ScalarFunction current_date_function(func_name, {}, DataType(LogicalType::kDate), &ScalarFunction::NullaryFunction<DateT, CurrentDateFunction>);
     function_set_ptr->AddFunction(current_date_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);

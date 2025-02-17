@@ -25,6 +25,7 @@ import infinity_exception;
 import data_type;
 import data_block;
 import roaring_bitmap;
+import nullary_operation;
 import unary_operator;
 import binary_operator;
 import ternary_operator;
@@ -39,6 +40,14 @@ struct ScalarFunctionData {
 
     bool all_converted_{true};
     ColumnVector *column_vector_ptr_{nullptr};
+};
+
+template <typename Operator>
+struct NullaryOpDirectWrapper {
+    template <typename SourceValueType, typename TargetValueType>
+    inline static void Execute(TargetValueType &result, void *state_ptr) {
+        return Operator::template Run<TargetValueType>(result);
+    }
 };
 
 template <typename Operator>
@@ -103,6 +112,15 @@ struct TernaryTryOpWrapper {
 
         nulls_ptr->SetFalse(idx);
         result = NullValue<ResultType>();
+    }
+};
+
+template <typename Operator>
+struct NullaryOpDirectToVarlenWrapper {
+    template <typename TargetValueType>
+    inline static void Execute(TargetValueType &result, void *state_ptr) {
+        auto *function_data_ptr = (ScalarFunctionData *)(state_ptr);
+        return Operator::template Run<TargetValueType>(result, function_data_ptr->column_vector_ptr_);
     }
 };
 
@@ -271,6 +289,19 @@ public:
     ScalarFunctionTypePtr function_{};
 
 public:
+    // No argument function without any failure.
+    template <typename OutputType, typename Operation>
+    static inline void NullaryFunction(const DataBlock &, SharedPtr<ColumnVector> &output) {
+        NullaryOperator::Execute<OutputType, NullaryOpDirectWrapper<Operation>>(output, nullptr);
+    }
+
+    // No argument function result is varchar without any failure.
+    template <typename OutputType, typename Operation>
+    static inline void NullaryFunctionToVarlen(const DataBlock &, SharedPtr<ColumnVector> &output) {
+        ScalarFunctionData function_data(output.get());
+        NullaryOperator::Execute<OutputType, NullaryOpDirectToVarlenWrapper<Operation>>(output, &function_data);
+    }
+
     // Unary function
     static void NoOpFunction(const DataBlock &input, SharedPtr<ColumnVector> &output);
 

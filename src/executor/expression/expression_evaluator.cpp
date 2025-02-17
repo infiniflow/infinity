@@ -165,7 +165,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,
     }
 
     DataBlock func_input_data_block;
-    func_input_data_block.Init(arguments);
+    if (!expr->nullary_) {
+        func_input_data_block.Init(arguments);
+    }
 
     expr->func_.function_(func_input_data_block, output_column_vector);
 }
