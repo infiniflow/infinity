@@ -62,6 +62,7 @@ import kv_store;
 import random;
 import kv_code;
 import constant_expr;
+import extra_command;
 
 namespace infinity {
 
@@ -613,6 +614,45 @@ Status NewTxn::ListTable(const String &db_name, Vector<String> &table_list) {
         iter2->Next();
     }
     return Status::OK();
+}
+
+Status NewTxn::LockTable(const String &db_name, const String &table_name) {
+    this->CheckTxnStatus();
+
+    String table_key;
+    String table_id;
+    String db_id;
+    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = new_catalog_->LockTable(table_key);
+    if (status.ok()) {
+        SharedPtr<LockTableCommand> extra_command = MakeShared<LockTableCommand>(table_key);
+        extra_commands_.push_back(extra_command);
+    }
+    return status;
+}
+
+Status NewTxn::UnlockTable(const String &db_name, const String &table_name) {
+    this->CheckTxnStatus();
+
+    String table_key;
+    String table_id;
+    String db_id;
+    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = new_catalog_->UnlockTable(table_key);
+    if (status.ok()) {
+        SharedPtr<UnlockTableCommand> extra_command = MakeShared<UnlockTableCommand>(table_key);
+        extra_commands_.push_back(extra_command);
+    }
+
+    return status;
 }
 
 // Index OPs
@@ -1989,6 +2029,23 @@ Status NewTxn::Rollback() {
         UnrecoverableError(error_message);
     }
     this->SetTxnRollbacking(abort_ts);
+
+    for (const auto &extra_command : extra_commands_) {
+        switch (extra_command->GetType()) {
+            case ExtraCommandType::kLockTable: {
+                // Not check the unlock result
+                LockTableCommand *lock_table_command = static_cast<LockTableCommand *>(extra_command.get());
+                new_catalog_->UnlockTable(lock_table_command->table_key());
+                break;
+            }
+            case ExtraCommandType::kUnlockTable: {
+                // Not check the lock result
+                UnlockTableCommand *unlock_table_command = static_cast<UnlockTableCommand *>(extra_command.get());
+                new_catalog_->LockTable(unlock_table_command->table_key());
+                break;
+            }
+        }
+    }
 
     Status status = kv_instance_->Rollback();
     if (!status.ok()) {

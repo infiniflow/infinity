@@ -27,6 +27,11 @@ namespace infinity {
 
 class NewTxn;
 
+export struct TableMemoryContext {
+    bool locked_{false};
+    SizeT write_txn_num_{0};
+};
+
 export struct NewCatalog {
 public:
     explicit NewCatalog(KVStore *kv_store);
@@ -63,8 +68,19 @@ public:
 
     static String GetPathNameTail(const String &path);
 
+public:
+    Status LockTable(const String &table_key);
+    Status UnlockTable(const String &table_key);
+    bool IsTableLocked(const String &table_key);
+    Status IncreaseTableWriteCount(const String &table_key);
+    Status DecreaseTableWriteCount(const String &table_key);
+
 private:
     KVStore *kv_store_{};
+
+private:
+    mutable std::mutex mtx_;
+    HashMap<String, SharedPtr<TableMemoryContext>> table_memory_context_map_;
 };
 
 } // namespace infinity

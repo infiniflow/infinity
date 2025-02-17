@@ -36,6 +36,7 @@ import snapshot_info;
 import txn_context;
 import kv_store;
 import new_catalog;
+import extra_command;
 
 namespace infinity {
 
@@ -162,6 +163,10 @@ public:
     Status DropTable(const String &db_name, const String &table_name, ConflictType conflict_type);
 
     Status ListTable(const String &db_name, Vector<String> &table_list);
+
+    Status LockTable(const String &db_name, const String &table_name);
+
+    Status UnlockTable(const String &db_name, const String &table_name);
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
@@ -371,6 +376,8 @@ private:
     /// LOG
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
+
+    Vector<SharedPtr<BaseExtraCommand>> extra_commands_{};
     // TODO: remove this
     UniquePtr<CatalogDeltaEntry> txn_delta_ops_entry_{};
 

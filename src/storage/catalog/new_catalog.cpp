@@ -158,4 +158,80 @@ String NewCatalog::GetPathNameTail(const String &path) {
     return path.substr(delimiter_i + 1);
 }
 
+Status NewCatalog::LockTable(const String &table_key) {
+    std::unique_lock lock(mtx_);
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        table_memory_context_map_[table_key] = MakeShared<TableMemoryContext>();
+    }
+
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    if (table_memory_context->locked_) {
+        return Status::AlreadyLocked(fmt::format("Table key: {} is already locked", table_key));
+    }
+    table_memory_context->locked_ = true;
+    return Status::OK();
+}
+Status NewCatalog::UnlockTable(const String &table_key) {
+    std::lock_guard lock(mtx_);
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        return Status::NotFound(fmt::format("Table key: {}", table_key));
+    }
+
+    SharedPtr<TableMemoryContext> &table_memory_context = table_memory_context_map_[table_key];
+    if (table_memory_context->locked_) {
+        table_memory_context->locked_ = false;
+        return Status::OK();
+    }
+
+    return Status::NotLocked(fmt::format("Table key: {} wasn't locked before", table_key));
+}
+
+bool NewCatalog::IsTableLocked(const String &table_key) {
+    std::lock_guard lock(mtx_);
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        return false;
+    }
+
+    SharedPtr<TableMemoryContext> &table_memory_context = table_memory_context_map_[table_key];
+    if (table_memory_context->locked_) {
+        return true;
+    }
+
+    return false;
+}
+
+Status NewCatalog::IncreaseTableWriteCount(const String &table_key) {
+    std::lock_guard lock(mtx_);
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        table_memory_context_map_[table_key] = MakeShared<TableMemoryContext>();
+    }
+
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    ++table_memory_context->write_txn_num_;
+    return Status::OK();
+}
+
+Status NewCatalog::DecreaseTableWriteCount(const String &table_key) {
+    std::lock_guard lock(mtx_);
+
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        return Status::NotFound(fmt::format("Table key: {}", table_key));
+    }
+
+    SizeT write_txn_num = iter->second->write_txn_num_;
+    if (write_txn_num > 0) {
+        --write_txn_num;
+    }
+
+    if (write_txn_num == 0) {
+        table_memory_context_map_.erase(table_key);
+    }
+    return Status::OK();
+}
+
 } // namespace infinity
