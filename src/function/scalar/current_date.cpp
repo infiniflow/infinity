@@ -15,9 +15,11 @@ module;
 #include <chrono>
 module current_date;
 import stl;
+import config;
 import catalog;
 import status;
 import logical_type;
+import infinity_context;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
@@ -25,49 +27,29 @@ import third_party;
 import internal_types;
 import data_type;
 import column_vector;
+import singleton;
 
 namespace infinity {
 using namespace std::chrono;
 struct CurrentDateFunction {
-    const char* defaultTZ = "Asia/Shanghai";
     template <typename TA, typename TB>
     static inline void Run(TA &left, TB &result) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
         return;
     }
-    static inline void TimeZoneConvertHelper(VarcharT &left) {
-        const char* tzValue = std::getenv("TZ");
-        const std::string str = left.ToString();
-        const char* newTZ = str.c_str();
-        if ( tzValue == newTZ) {
-            return;
-        }
-        if (setenv("TZ", newTZ, 1) != 0) {
-            const char* newTZ = CurrentDateFunction().defaultTZ;
-            setenv("TZ", newTZ, 1);
-        }
-        tzset();
-        return;
-    }
-    static inline void TimeZoneResetHelper() {
-        const char* tzValue = std::getenv("TZ");
-        if (tzValue == CurrentDateFunction().defaultTZ) {
-            return;
-        }
-        setenv("TZ", CurrentDateFunction().defaultTZ, 1);
-        tzset();
-        return;
-    }
 };
 
 template <>
 inline void CurrentDateFunction::Run(VarcharT &left, DateT &result) {
-    TimeZoneConvertHelper(left);
+    String tz_str = left.ToString();
+//    Config::SetUserTimeZone(tz_str);
+    InfinityContext& infinityContext = InfinityContext::instance();
+    Config* config = infinityContext.config();
+    auto offset = config->TimeZoneBias();
     auto now = system_clock::now();
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
-    result.value = sys_days.time_since_epoch().count();
-    TimeZoneResetHelper();
+    result.value = sys_days.time_since_epoch().count() + offset * (60 * 60);
 }
 
 void RegisterCurrentDateFunction(const UniquePtr<Catalog> &catalog_ptr) {
