@@ -1672,6 +1672,11 @@ Status NewTxn::CommitDropTable(const String &db_name, const String &table_name) 
         return status;
     }
 
+    bool table_locked = new_catalog_->IsTableLocked(table_key);
+    if (table_locked) {
+        return Status::AlreadyLocked(fmt::format("{} with table key: {} is already locked.", table_name, table_key));
+    }
+
     // delete table key
     status = kv_instance_->Delete(table_key);
     if (!status.ok()) {
