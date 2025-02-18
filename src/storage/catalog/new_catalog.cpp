@@ -166,6 +166,11 @@ Status NewCatalog::LockTable(const String &table_key) {
     }
 
     TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    SizeT write_txn_num = table_memory_context->write_txn_num_;
+    if (write_txn_num > 0) {
+        return Status::TableIsUsing(fmt::format("Table key: {} is using write transactions, count: {}", table_key, write_txn_num));
+    }
+
     if (table_memory_context->locked_) {
         return Status::AlreadyLocked(fmt::format("Table key: {} is already locked", table_key));
     }
@@ -211,6 +216,10 @@ Status NewCatalog::IncreaseTableWriteCount(const String &table_key) {
     }
 
     TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    if (table_memory_context->locked_) {
+        return Status::AlreadyLocked(fmt::format("Table key: {} is already locked", table_key));
+    }
+
     ++table_memory_context->write_txn_num_;
     return Status::OK();
 }
@@ -223,7 +232,12 @@ Status NewCatalog::DecreaseTableWriteCount(const String &table_key) {
         return Status::NotFound(fmt::format("Table key: {}", table_key));
     }
 
-    SizeT write_txn_num = iter->second->write_txn_num_;
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    if (table_memory_context->locked_) {
+        UnrecoverableError(fmt::format("Table key: {} is already locked", table_key));
+    }
+
+    SizeT& write_txn_num = iter->second->write_txn_num_;
     if (write_txn_num > 0) {
         --write_txn_num;
     }

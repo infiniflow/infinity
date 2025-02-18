@@ -585,6 +585,24 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
         return Status::OK();
     }
 
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (status.ok()) {
+        SharedPtr<DropTableCommand> extra_command = MakeShared<DropTableCommand>(db_id_str, table_id_str, table_key);
+        extra_commands_.push_back(extra_command);
+    }
+
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropTable>(db_name, table_name);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
@@ -1583,6 +1601,7 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
 
     return Status::OK();
 }
+
 Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
@@ -1672,11 +1691,6 @@ Status NewTxn::CommitDropTable(const String &db_name, const String &table_name) 
         return status;
     }
 
-    bool table_locked = new_catalog_->IsTableLocked(table_key);
-    if (table_locked) {
-        return Status::AlreadyLocked(fmt::format("{} with table key: {} is already locked.", table_name, table_key));
-    }
-
     // delete table key
     status = kv_instance_->Delete(table_key);
     if (!status.ok()) {
@@ -1712,6 +1726,11 @@ Status NewTxn::CommitDropTable(const String &db_name, const String &table_name) 
     }
 
     status = CommitDropTableDef(db_id_str, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = new_catalog_->DecreaseTableWriteCount(table_key);
     if (!status.ok()) {
         return status;
     }
@@ -2012,6 +2031,22 @@ void NewTxn::PostCommit() {
             }
         }
     }
+
+    for (const auto &extra_command : extra_commands_) {
+        switch (extra_command->GetType()) {
+            case ExtraCommandType::kDropTable: {
+                DropTableCommand *drop_table_command = static_cast<DropTableCommand *>(extra_command.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(drop_table_command->table_key());
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
 }
 
 void NewTxn::CancelCommitBottom() {
@@ -2047,6 +2082,14 @@ Status NewTxn::Rollback() {
                 // Not check the lock result
                 UnlockTableCommand *unlock_table_command = static_cast<UnlockTableCommand *>(extra_command.get());
                 new_catalog_->LockTable(unlock_table_command->table_key());
+                break;
+            }
+            case ExtraCommandType::kDropTable: {
+                DropTableCommand *drop_table_command = static_cast<DropTableCommand *>(extra_command.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(drop_table_command->table_key());
+                if (!status.ok()) {
+                    return status;
+                }
                 break;
             }
         }

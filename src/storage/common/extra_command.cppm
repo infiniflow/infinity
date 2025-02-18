@@ -20,10 +20,7 @@ import stl;
 
 namespace infinity {
 
-export enum class ExtraCommandType {
-    kLockTable,
-    kUnlockTable,
-};
+export enum class ExtraCommandType { kLockTable, kUnlockTable, kDropTable };
 
 export struct BaseExtraCommand {
 public:
@@ -57,6 +54,22 @@ public:
 
 private:
     String table_key_;
+};
+
+export struct DropTableCommand final : public BaseExtraCommand {
+public:
+    DropTableCommand(const String &db_id, const String &table_id, const String &table_key)
+        : BaseExtraCommand(ExtraCommandType::kUnlockTable), table_key_(table_key) {}
+
+    String ToString() final;
+    const String &table_key() const { return table_key_; }
+    const String &db_id() const { return db_id_; }
+    const String &table_id() const { return table_id_; }
+
+private:
+    String table_key_;
+    String db_id_;
+    String table_id_;
 };
 
 } // namespace infinity

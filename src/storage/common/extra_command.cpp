@@ -25,5 +25,6 @@ ExtraCommandType BaseExtraCommand::GetType() const { return type_; }
 
 String LockTableCommand::ToString() { return fmt::format("LockTableCommand: table_key: {}", table_key_); }
 String UnlockTableCommand::ToString() { return fmt::format("UnlockTableCommand: table_key: {}", table_key_); }
+String DropTableCommand::ToString() { return fmt::format("DropTableCommand: db_id: {}, table_id: {}, table_key: {}", db_id_, table_id_, table_key_); }
 
 } // namespace infinity

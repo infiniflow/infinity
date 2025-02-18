@@ -142,6 +142,7 @@ export enum class ErrorCode : long {
     kFailToStartTxn = 3093,
     kAlreadyLocked = 3094,
     kNotLocked = 3095,
+    kTableIsUsing = 3096,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -321,6 +322,7 @@ public:
     static Status FailToStartTxn(const String &detail);
     static Status AlreadyLocked(const String &detail);
     static Status NotLocked(const String &detail);
+    static Status TableIsUsing(const String &detail);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");

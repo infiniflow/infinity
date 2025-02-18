@@ -3416,12 +3416,12 @@ TEST_P(NewCatalogTest, lock_table) {
 
         // lock table
         status = txn3->LockTable(*db_name, table_name);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn10);
         EXPECT_FALSE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn3);
+        status = new_txn_mgr->CommitTxn(txn10);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn3);
         EXPECT_TRUE(status.ok());
 
         // drop database
@@ -3465,9 +3465,9 @@ TEST_P(NewCatalogTest, lock_table) {
 
         // drop table
         status = txn10->DropTable(*db_name, table_name, ConflictType::kError);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn10);
         EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn10);
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
