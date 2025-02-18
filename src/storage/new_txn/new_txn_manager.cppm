@@ -110,6 +110,8 @@ public:
 
     void PrintAllKeyValue() const;
 
+    KVStore *kv_store() const { return kv_store_; }
+
 private:
     mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};

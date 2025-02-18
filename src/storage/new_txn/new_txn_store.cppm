@@ -24,10 +24,13 @@ import internal_types;
 import index_base;
 import extra_ddl_info;
 import wal_entry;
+import column_def;
+import third_party;
+import logger;
 
 namespace infinity {
 
-class Txn;
+class NewTxn;
 struct Catalog;
 struct DBEntry;
 struct TableIndexEntry;
@@ -52,7 +55,7 @@ public:
 
     NewTxnSegmentStore() = default;
 
-    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, Txn *txn, bool set_sealed) const;
+    void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, NewTxn *txn, bool set_sealed) const;
 
 public:
     SegmentEntry *const segment_entry_ = nullptr;
@@ -101,9 +104,9 @@ export struct NewTxnCompactStore {
 
 export class NewTxnTableStore {
 public:
-    explicit inline NewTxnTableStore(Txn *txn, const String& table_name) : txn_(txn), table_name_(table_name) {}
+    explicit inline NewTxnTableStore(NewTxn *txn, const String& table_name) : txn_(txn), table_name_(table_name) {}
 
-    Tuple<UniquePtr<String>, Status> Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn);
+    Tuple<UniquePtr<String>, Status> Import(SharedPtr<SegmentEntry> segment_entry, NewTxn *txn);
 
     Tuple<UniquePtr<String>, Status> Append(const SharedPtr<DataBlock> &input_block);
 
@@ -138,7 +141,7 @@ public:
 
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
 
-    bool CheckConflict(Catalog *catalog, Txn *txn) const;
+    bool CheckConflict(Catalog *catalog, NewTxn *txn) const;
 
     Optional<String> CheckConflict(const NewTxnTableStore *txn_table_store) const;
 
@@ -157,7 +160,7 @@ public: // Setter, Getter
 
     const Vector<SegmentEntry *> &flushed_segments() const { return flushed_segments_; }
 
-    Txn *GetTxn() const { return txn_; }
+    NewTxn *GetTxn() const { return txn_; }
 
     TableEntry *GetTableEntry() const { return table_entry_; }
 
@@ -167,11 +170,14 @@ public: // Setter, Getter
 
     inline DeleteState *GetDeleteStatePtr() { return &delete_state_; }
 
-    inline const Vector<SharedPtr<DataBlock>> &GetBlocks() const { return blocks_; }
+    // inline const Vector<SharedPtr<DataBlock>> &GetBlocks() const { return blocks_; }
 
-    inline void SetAppendState(UniquePtr<AppendState> append_state) { append_state_ = std::move(append_state); }
+    // void SetAppendState(UniquePtr<AppendState> append_state) { append_state_ = std::move(append_state); }
 
-    inline AppendState *GetAppendState() const { return append_state_.get(); }
+    // inline AppendState *GetAppendState() const {
+    //     LOG_INFO(fmt::format("CCC: {}", sizeof(*append_state_)));
+    //     return append_state_.get();
+    // }
 
     void AddWriteTxnNum() { added_txn_num_ = true; }
 
@@ -190,13 +196,15 @@ private:
 
     NewTxnCompactStore compact_state_;
 
-    Txn *const txn_{};
-    Vector<SharedPtr<DataBlock>> blocks_{};
+    NewTxn *const txn_{};
+    // Vector<SharedPtr<DataBlock>> blocks_{};
 
+public:
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
 
-    SizeT current_block_id_{0};
+private:
+    // SizeT current_block_id_{0};
 
     TableEntry *table_entry_{};
     bool added_txn_num_{false};
@@ -218,11 +226,19 @@ private:
         kCompacting,
     };
     NewTxnStoreStatus table_status_{NewTxnStoreStatus::kNone};
+
+public:
+    Status SetColumnDefs(const String &db_name, const String &table_name);
+
+    const Vector<SharedPtr<ColumnDef>> &column_defs() const { return column_defs_; }
+
+private:
+    Vector<SharedPtr<ColumnDef>> column_defs_;
 };
 
 export class NewTxnStore {
 public:
-    explicit NewTxnStore(Txn *txn);
+    explicit NewTxnStore(NewTxn *txn);
 
     void AddDBStore(DBEntry *db_entry);
 
@@ -268,7 +284,7 @@ public:
 
 private:
     // Txn store
-    Txn *txn_{}; // TODO: remove this
+    NewTxn *txn_{}; // TODO: remove this
     int ptr_seq_n_{};
     HashMap<DBEntry *, int> txn_dbs_{};
     HashMap<TableEntry *, int> txn_tables_{};

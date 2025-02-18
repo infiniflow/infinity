@@ -36,6 +36,7 @@ import snapshot_info;
 import txn_context;
 import kv_store;
 import new_catalog;
+import column_def;
 import extra_command;
 
 namespace infinity {
@@ -336,12 +337,49 @@ private:
                       String &index_id,
                       String &table_id,
                       String &db_id);
+    Status GetColumnDefs(const String &db_id, const String &table_id, Vector<SharedPtr<ColumnDef>> &column_defs);
     Status CommitAddIdxChunkByCmd(const String &db_id,
                                   const String &table_id,
                                   const String &index_id,
                                   SegmentID segment_id,
                                   const WalChunkIndexInfo &chunk_info);
     Status CommitDropIdxChunkByID(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, ChunkID chunk_id);
+    Status AddNewSegment(const String &db_id_str,
+                         const String &table_id_str,
+                         SegmentID latest_segment_id,
+                         SizeT segment_capacity,
+                         const String &table_dir,
+                         NewTxnTableStore *txn_table_store);
+    Status AddNewBlock(const String &db_id_str,
+                       const String &table_id_str,
+                       SegmentID segment_id,
+                       BlockID latest_block_id,
+                       SizeT block_capacity,
+                       const String &table_dir,
+                       NewTxnTableStore *txn_table_store);
+    Status AddNewColumn(const String &db_id_str,
+                        const String &table_id_str,
+                        SegmentID segment_id,
+                        BlockID block_id,
+                        ColumnID column_idx,
+                        SizeT block_capacity,
+                        SharedPtr<String> block_dir,
+                        const ColumnDef *column_def);
+
+    Status PrepareAppendInBlock(SegmentID segment_id,
+                                BlockID block_id,
+                                AppendState *append_state,
+                                SizeT block_capacity,
+                                SizeT block_row_count,
+                                SizeT &actual_append);
+    Status AppendInBlock(const String &db_id_str,
+                         const String &table_id_str,
+                         SegmentID segment_id,
+                         BlockID block_id,
+                         SizeT block_offset,
+                         SizeT append_rows,
+                         const DataBlock *input_block,
+                         SizeT input_offset);
 
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
@@ -353,7 +391,8 @@ private:
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
-    Status CommitAppend(const WalCmdAppend *drop_index_cmd);
+    Status PrepareCommitAppend(const WalCmdAppend *append_cmd);
+    Status CommitAppend(const WalCmdAppend *append_cmd);
     Status CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
@@ -397,6 +436,8 @@ private:
 
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};
+
+    friend class NewTxnTableStore;
 };
 
 } // namespace infinity

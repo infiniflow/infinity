@@ -28,7 +28,7 @@ import infinity_exception;
 import data_block;
 import logger;
 import data_access_state;
-import txn;
+import new_txn;
 import default_values;
 import table_entry;
 import catalog;
@@ -56,7 +56,7 @@ NewTxnSegmentStore NewTxnSegmentStore::AddSegmentStore(SegmentEntry *segment_ent
 
 NewTxnSegmentStore::NewTxnSegmentStore(SegmentEntry *segment_entry) : segment_entry_(segment_entry) {}
 
-void NewTxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, Txn *txn, bool set_sealed) const {
+void NewTxnSegmentStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, AppendState *append_state, NewTxn *txn, bool set_sealed) const {
     TxnTimeStamp commit_ts = txn->CommitTS();
 
     if (set_sealed) {
@@ -157,18 +157,19 @@ Pair<std::shared_lock<std::shared_mutex>, const HashMap<String, UniquePtr<NewTxn
     return std::make_pair(std::move(lock), std::cref(txn_indexes_store_));
 }
 
-Tuple<UniquePtr<String>, Status> NewTxnTableStore::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
-    this->AddSegmentStore(segment_entry.get());
-    this->AddSealedSegment(segment_entry.get());
-    this->flushed_segments_.emplace_back(segment_entry.get());
-    table_entry_->Import(std::move(segment_entry), txn);
+Tuple<UniquePtr<String>, Status> NewTxnTableStore::Import(SharedPtr<SegmentEntry> segment_entry, NewTxn *txn) {
+    // this->AddSegmentStore(segment_entry.get());
+    // this->AddSealedSegment(segment_entry.get());
+    // this->flushed_segments_.emplace_back(segment_entry.get());
+    // table_entry_->Import(std::move(segment_entry), txn);
 
-    has_update_ = true;
+    // has_update_ = true;
     return {nullptr, Status::OK()};
 }
 
 Tuple<UniquePtr<String>, Status> NewTxnTableStore::Append(const SharedPtr<DataBlock> &input_block) {
-    SizeT column_count = table_entry_->ColumnCount();
+    SizeT column_count = column_defs_.size();
+
     if (input_block->column_count() != column_count) {
         String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
         LOG_ERROR(err_msg);
@@ -177,7 +178,7 @@ Tuple<UniquePtr<String>, Status> NewTxnTableStore::Append(const SharedPtr<DataBl
 
     Vector<SharedPtr<DataType>> column_types;
     for (SizeT col_id = 0; col_id < column_count; ++col_id) {
-        column_types.emplace_back(table_entry_->GetColumnDefByIdx(col_id)->type());
+        column_types.emplace_back(column_defs_[col_id]->type());
         if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
             String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
             LOG_ERROR(err_msg);
@@ -187,22 +188,25 @@ Tuple<UniquePtr<String>, Status> NewTxnTableStore::Append(const SharedPtr<DataBl
     }
 
     DataBlock *current_block{nullptr};
-    if (blocks_.empty()) {
-        blocks_.emplace_back(DataBlock::Make());
-        current_block_id_ = 0;
-        blocks_.back()->Init(column_types);
+    if (append_state_ == nullptr) {
+        append_state_ = MakeUnique<AppendState>();
+        // LOG_INFO(fmt::format("BBB {}", sizeof(*append_state_)));
     }
-    current_block = blocks_[current_block_id_].get();
+
+    if (append_state_->blocks_.empty()) {
+        append_state_->blocks_.emplace_back(DataBlock::Make());
+        append_state_->blocks_.back()->Init(column_types);
+    }
+    current_block = append_state_->blocks_.back().get();
 
     if (current_block->row_count() + input_block->row_count() > current_block->capacity()) {
         SizeT to_append = current_block->capacity() - current_block->row_count();
         current_block->AppendWith(input_block.get(), 0, to_append);
         current_block->Finalize();
 
-        blocks_.emplace_back(DataBlock::Make());
-        blocks_.back()->Init(column_types);
-        ++current_block_id_;
-        current_block = blocks_[current_block_id_].get();
+        append_state_->blocks_.emplace_back(DataBlock::Make());
+        append_state_->blocks_.back()->Init(column_types);
+        current_block = append_state_->blocks_.back().get();
         current_block->AppendWith(input_block.get(), to_append, input_block->row_count() - to_append);
     } else {
         SizeT to_append = input_block->row_count();
@@ -335,7 +339,7 @@ void NewTxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     for (const auto &[new_segment_store, old_segments] : compact_state_.compact_data_) {
         std::move(*new_segment_store.segment_entry_).Cleanup();
     }
-    blocks_.clear();
+    // blocks_.clear();
 
     for (auto &[table_index_entry, ptr_seq_n] : txn_indexes_) {
         table_index_entry->Cleanup();
@@ -346,7 +350,7 @@ void NewTxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     }
 }
 
-bool NewTxnTableStore::CheckConflict(Catalog *catalog, Txn *txn) const {
+bool NewTxnTableStore::CheckConflict(Catalog *catalog, NewTxn *txn) const {
     std::shared_lock lock(txn_table_store_mtx_);
     const String &db_name = txn->db_name();
     const String &table_name = *table_entry_->GetTableName();
@@ -463,7 +467,7 @@ void NewTxnTableStore::PrepareCommit1(const Vector<WalSegmentInfo *> &segment_in
 // TODO: remove commit_ts
 void NewTxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
     // Init append state
-    append_state_ = MakeUnique<AppendState>(this->blocks_);
+    // append_state_ = MakeUnique<AppendState>(this->blocks_);
 
     // Start to append
     LOG_TRACE(fmt::format("Transaction local storage table: {}, Start to prepare commit", *table_entry_->GetTableName()));
@@ -600,7 +604,24 @@ void NewTxnTableStore::TryRevert() {
     }
 }
 
-NewTxnStore::NewTxnStore(Txn *txn) : txn_(txn) {}
+Status NewTxnTableStore::SetColumnDefs(const String &db_name, const String &table_name) {
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    Status status = txn_->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    Vector<SharedPtr<ColumnDef>> column_defs;
+    status = txn_->GetColumnDefs(db_id_str, table_id_str, column_defs);
+    if (!status.ok()) {
+        return status;
+    }
+    column_defs_ = std::move(column_defs);
+    return Status::OK();
+}
+
+NewTxnStore::NewTxnStore(NewTxn *txn) : txn_(txn) {}
 
 void NewTxnStore::AddDBStore(DBEntry *db_entry) { txn_dbs_.emplace(db_entry, ptr_seq_n_++); }
 

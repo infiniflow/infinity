@@ -178,8 +178,18 @@ String KeyEncode::TableColumnTagKey(const String &db_id, const String &table_id,
 String KeyEncode::CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id) {
     return fmt::format("catalog|seg|{}|{}|{}", db_id, table_id, segment_id);
 }
+String KeyEncode::CatalogTableSegmentTagKey(const String &db_id, const String &table_id, SegmentID segment_id, const String &tag_name) {
+    return fmt::format("seg|{}|{}|{}|{}", db_id, table_id, segment_id, tag_name);
+}
 String KeyEncode::CatalogTableSegmentBlockKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id, TxnTimeStamp ts) {
     return fmt::format("catalog|blk|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, ts);
+}
+String KeyEncode::CatalogTableSegmentBlockTagKey(const String &db_id,
+                                                 const String &table_id,
+                                                 SegmentID segment_id,
+                                                 BlockID block_id,
+                                                 const String &tag_name) {
+    return fmt::format("blk|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, tag_name);
 }
 String KeyEncode::CatalogTableSegmentBlockColumnKey(const String &db_id,
                                                     const String &table_id,
@@ -188,6 +198,14 @@ String KeyEncode::CatalogTableSegmentBlockColumnKey(const String &db_id,
                                                     ColumnID column_id,
                                                     TxnTimeStamp ts) {
     return fmt::format("catalog|blk_col|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, column_id, ts);
+}
+String KeyEncode::CatalogTableSegmentBlockColumnTagKey(const String &db_id,
+                                                       const String &table_id,
+                                                       SegmentID segment_id,
+                                                       BlockID block_id,
+                                                       ColumnID column_id,
+                                                       const String &tag_name) {
+    return fmt::format("blk_col|{}|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, column_id, tag_name);
 }
 
 String KeyEncode::DatabaseKey(const String &db_name, TxnTimeStamp ts) { return fmt::format("db|{}|{}", db_name, ts); }

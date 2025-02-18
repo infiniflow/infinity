@@ -62,6 +62,10 @@ import kv_store;
 import random;
 import kv_code;
 import constant_expr;
+import buffer_obj;
+import data_file_worker;
+import version_file_worker;
+import block_version;
 import extra_command;
 
 namespace infinity {
@@ -73,7 +77,7 @@ NewTxn::NewTxn(NewTxnManager *txn_manager,
                UniquePtr<KVInstance> kv_instance,
                SharedPtr<String> txn_text,
                TransactionType txn_type)
-    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(nullptr), wal_entry_(MakeShared<WalEntry>()),
+    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
       txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), kv_instance_(std::move(kv_instance)), txn_text_(std::move(txn_text)) {
     catalog_ = InfinityContext::instance().storage()->catalog();
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
@@ -93,7 +97,7 @@ NewTxn::NewTxn(BufferManager *buffer_mgr,
                TxnTimeStamp begin_ts,
                UniquePtr<KVInstance> kv_instance,
                TransactionType txn_type)
-    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(nullptr), wal_entry_(MakeShared<WalEntry>()),
+    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), txn_store_(this), wal_entry_(MakeShared<WalEntry>()),
       txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()), kv_instance_(std::move(kv_instance)) {
     catalog_ = InfinityContext::instance().storage()->catalog();
     new_catalog_ = InfinityContext::instance().storage()->new_catalog();
@@ -166,6 +170,10 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
+    if (table_store->column_defs().empty()) {
+        table_store->SetColumnDefs(db_name, table_name);
+    }
 
     auto [err_msg, append_status] = table_store->Append(input_block);
     return Status::OK();
@@ -1232,15 +1240,15 @@ Status NewTxn::Commit() {
     txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("NewTxn {} commit ts: {}", txn_context_ptr_->txn_id_, commit_ts));
 
-    if (const auto conflict_reason = txn_mgr_->CheckTxnConflict(this); conflict_reason) {
-        LOG_ERROR(fmt::format("NewTxn: {} is rolled back. rollback ts: {}. NewTxn conflict reason: {}.",
-                              txn_context_ptr_->txn_id_,
-                              commit_ts,
-                              *conflict_reason));
-        wal_entry_ = nullptr;
-        txn_mgr_->SendToWAL(this);
-        return Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", *conflict_reason));
-    }
+    // if (const auto conflict_reason = txn_mgr_->CheckTxnConflict(this); conflict_reason) {
+    //     LOG_ERROR(fmt::format("NewTxn: {} is rolled back. rollback ts: {}. NewTxn conflict reason: {}.",
+    //                           txn_context_ptr_->txn_id_,
+    //                           commit_ts,
+    //                           *conflict_reason));
+    //     wal_entry_ = nullptr;
+    //     txn_mgr_->SendToWAL(this);
+    //     return Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", *conflict_reason));
+    // }
 
     Status status = this->PrepareCommit();
     if (!status.ok()) {
@@ -1337,6 +1345,9 @@ Status NewTxn::PrepareCommit() {
                 if (!status.ok()) {
                     return status;
                 }
+                break;
+            }
+            case WalCommandType::APPEND: {
                 break;
             }
             default: {
@@ -1472,6 +1483,21 @@ Status NewTxn::GetIndexID(const String &db_name,
     return Status::OK();
 }
 
+Status NewTxn::GetColumnDefs(const String &db_id, const String &table_id, Vector<SharedPtr<ColumnDef>> &column_defs) {
+    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id, table_id);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(table_column_prefix);
+    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
+        String column_key = iter2->Key().ToString();
+        String column_value = iter2->Value().ToString();
+        [[maybe_unused]] String column_name = column_key.substr(column_key.find_last_of('|') + 1);
+        auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value));
+        column_defs.emplace_back(column_def);
+        iter2->Next();
+    }
+    return Status::OK();
+}
+
 Status NewTxn::CommitAddIdxChunkByCmd(const String &db_id,
                                       const String &table_id,
                                       const String &index_id,
@@ -1494,6 +1520,140 @@ Status NewTxn::CommitDropIdxChunkByID(const String &db_id, const String &table_i
         return status;
     }
 
+    return Status::OK();
+}
+
+Status NewTxn::AddNewSegment(const String &db_id_str,
+                             const String &table_id_str,
+                             SegmentID latest_segment_id,
+                             SizeT segment_capacity,
+                             const String &table_dir,
+                             NewTxnTableStore *txn_table_store) {
+    String lastest_block_id_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, latest_segment_id, LATEST_BLOCK_ID.data());
+    Status status = kv_instance_->Put(lastest_block_id_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
+    String segment_row_cnt_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, latest_segment_id, "row_cnt");
+    status = kv_instance_->Put(segment_row_cnt_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::AddNewBlock(const String &db_id_str,
+                           const String &table_id_str,
+                           SegmentID segment_id,
+                           BlockID latest_block_id,
+                           SizeT block_capacity,
+                           const String &table_dir,
+                           NewTxnTableStore *txn_table_store) {
+    String row_cnt_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, latest_block_id, "row_cnt");
+    Status status = kv_instance_->Put(row_cnt_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (txn_table_store->column_defs().empty()) {
+        UnrecoverableError("Column defs is empty.");
+    }
+
+    auto block_dir = MakeShared<String>(fmt::format("{}/seg_{}/block_{}", table_dir, segment_id, latest_block_id));
+    for (SizeT column_idx = 0; column_idx < txn_table_store->column_defs().size(); ++column_idx) {
+        const auto &col_def = txn_table_store->column_defs()[column_idx];
+        Status status =
+            this->AddNewColumn(db_id_str, table_id_str, segment_id, latest_block_id, column_idx, block_capacity, block_dir, col_def.get());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_dir,
+                                                             BlockVersion::FileName(),
+                                                             block_capacity,
+                                                             buffer_mgr->persistence_manager());
+    BufferObj *buffer = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
+    buffer->AddObjRc();
+
+    return Status::OK();
+}
+
+Status NewTxn::AddNewColumn(const String &db_id_str,
+                            const String &table_id_str,
+                            SegmentID segment_id,
+                            BlockID block_id,
+                            ColumnID column_idx,
+                            SizeT block_capacity,
+                            SharedPtr<String> block_dir,
+                            const ColumnDef *column_def) {
+    String last_chunk_offset_key =
+        KeyEncode::CatalogTableSegmentBlockColumnTagKey(db_id_str, table_id_str, segment_id, block_id, column_idx, "last_chunk_offset");
+    Status status = kv_instance_->Put(last_chunk_offset_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    auto filename = MakeShared<String>(std::to_string(column_idx) + ".col");
+    SizeT total_data_size = block_capacity * column_def->type()->Size();
+    auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                  block_dir,
+                                                  filename,
+                                                  total_data_size,
+                                                  buffer_mgr->persistence_manager());
+
+    // UniquePtr<DataFileWorker> file_worker;
+    BufferObj *buffer = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+    buffer->AddObjRc();
+
+    return Status::OK();
+}
+
+Status NewTxn::PrepareAppendInBlock(SegmentID segment_id,
+                                    BlockID block_id,
+                                    AppendState *append_state,
+                                    SizeT block_capacity,
+                                    SizeT block_row_count,
+                                    SizeT &actual_append) {
+    while (append_state->current_block_ < append_state->blocks_.size()) {
+        DataBlock *input_block = append_state->blocks_[append_state->current_block_].get();
+        SizeT to_append_rows = input_block->row_count() - append_state->current_block_offset_;
+        if (to_append_rows == 0) {
+            ++append_state->current_block_;
+            append_state->current_block_offset_ = 0;
+            continue;
+        }
+
+        actual_append = std::min(to_append_rows, block_capacity - block_row_count);
+        AppendRange range(segment_id, block_id, block_row_count, actual_append, append_state->current_block_, append_state->current_block_offset_);
+        LOG_INFO(fmt::format("AAA {}", sizeof(range)));
+        LOG_INFO(fmt::format("BBB {}", sizeof(*(append_state->append_ranges_.data()))));
+        append_state->append_ranges_.push_back(range);
+
+        append_state->current_block_++;
+        append_state->current_count_ += actual_append;
+        append_state->current_block_offset_ += actual_append;
+        break;
+    }
+    return Status::OK();
+}
+
+Status NewTxn::AppendInBlock(const String &db_id_str,
+                             const String &table_id_str,
+                             SegmentID segment_id,
+                             BlockID block_id,
+                             SizeT block_offset,
+                             SizeT append_rows,
+                             const DataBlock *input_block,
+                             SizeT input_offset) {
+    //
     return Status::OK();
 }
 
@@ -1905,7 +2065,7 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
+Status NewTxn::PrepareCommitAppend(const WalCmdAppend *append_cmd) {
     //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     const String &db_name = append_cmd->db_name_;
@@ -1920,6 +2080,125 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
         return status;
     }
 
+    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
+
+    String table_dir_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
+    String table_dir;
+    status = kv_instance_->Get(table_dir_key, table_dir);
+    if (!status.ok()) {
+        return status;
+    }
+
+    AppendState *append_state = txn_table_store->append_state_.get();
+    // LOG_INFO(fmt::format("CCC: {}", sizeof(*append_state)));
+    if (append_state == nullptr) {
+        return Status::OK();
+    }
+    append_state->Finalize();
+    if (append_state->Finished()) {
+        return Status::OK();
+    }
+
+    String table_def_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "table_def");
+
+    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_SEGMENT_ID.data());
+    String latest_segment_id_str;
+    SegmentID latest_segment_id = 0;
+    auto update_kv_instance = txn_mgr_->kv_store()->GetInstance();
+
+    status = update_kv_instance->GetForUpdate(table_latest_segment_id_key, latest_segment_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    latest_segment_id = std::stoull(latest_segment_id_str);
+
+    SizeT block_capacity = DEFAULT_BLOCK_CAPACITY;
+    SizeT segment_capacity = DEFAULT_SEGMENT_CAPACITY;
+    SizeT cur_block_row_count = 0;
+    SizeT cur_segment_row_count = 0;
+    while (!append_state->Finished()) {
+        if (latest_segment_id == 0 || cur_segment_row_count >= segment_capacity) {
+            this->AddNewSegment(db_id_str, table_id_str, latest_segment_id, segment_capacity, table_dir, txn_table_store);
+            ++latest_segment_id;
+            cur_segment_row_count = 0;
+        } else {
+            String segment_row_cnt_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, latest_segment_id - 1, "row_cnt");
+            String segment_row_cnt_str;
+            status = kv_instance_->Get(segment_row_cnt_key, segment_row_cnt_str);
+            if (!status.ok()) {
+                return status;
+            }
+            cur_segment_row_count = std::stoull(segment_row_cnt_str);
+        }
+        String last_block_id_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, latest_segment_id - 1, LATEST_BLOCK_ID.data());
+        BlockID last_block_id = 0;
+        String last_block_id_str;
+        status = kv_instance_->GetForUpdate(last_block_id_key, last_block_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        last_block_id = std::stoull(last_block_id_str);
+        if (last_block_id == 0 || cur_block_row_count >= block_capacity) {
+            this->AddNewBlock(db_id_str, table_id_str, latest_segment_id - 1, last_block_id, block_capacity, table_dir, txn_table_store);
+            ++last_block_id;
+            cur_block_row_count = 0;
+        } else {
+            String block_row_cnt_key =
+                KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, latest_segment_id - 1, last_block_id - 1, "row_cnt");
+            String block_row_cnt_str;
+            status = kv_instance_->Get(block_row_cnt_key, block_row_cnt_str);
+            if (!status.ok()) {
+                return status;
+            }
+            cur_block_row_count = std::stoull(block_row_cnt_str);
+        }
+
+        SizeT actual_append = 0;
+        // LOG_INFO(fmt::format("DDD: {}", sizeof(*append_state)));
+        status =
+            this->PrepareAppendInBlock(latest_segment_id - 1, last_block_id - 1, append_state, block_capacity, cur_block_row_count, actual_append);
+        if (!status.ok()) {
+            return status;
+        }
+        cur_block_row_count += actual_append;
+        cur_segment_row_count += actual_append;
+
+        String lastest_block_id_str = fmt::format("{}", last_block_id);
+        kv_instance_->Put(last_block_id_key, lastest_block_id_str);
+    }
+
+    latest_segment_id_str = fmt::format("{}", latest_segment_id);
+    update_kv_instance->Put(table_latest_segment_id_key, latest_segment_id_str);
+    status = update_kv_instance->Commit();
+    if (!status.ok()) {
+        UnrecoverableError("KV instance commit failed");
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
+    const String &db_name = append_cmd->db_name_;
+    const String &table_name = append_cmd->table_name_;
+    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
+    LOG_INFO(fmt::format("DDD {}", sizeof(*txn_table_store->append_state_->append_ranges_.data())));
+    const AppendState *append_state = txn_table_store->append_state_.get();
+    if (append_state == nullptr) {
+        return Status::OK();
+    }
+
+    for (const AppendRange &range : append_state->append_ranges_) {
+        LOG_INFO(fmt::format("CCC {}", sizeof(range)));
+        const DataBlock *data_block = append_state->blocks_[range.data_block_idx_].get();
+        AppendInBlock(db_name,
+                      table_name,
+                      range.segment_id_,
+                      range.block_id_,
+                      range.start_offset_,
+                      range.row_count_,
+                      data_block,
+                      range.data_block_offset_);
+    }
     return Status::OK();
 }
 
@@ -1990,6 +2269,23 @@ void NewTxn::CommitBottom() {
     // prepare to commit txn local data into table
     //    TxnTimeStamp commit_ts = this->CommitTS();
 
+    for (auto &command : wal_entry_->cmds_) {
+        WalCommandType command_type = command->GetType();
+        switch (command_type) {
+            case WalCommandType::APPEND: {
+                auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
+                Status status = PrepareCommitAppend(append_cmd);
+                if (!status.ok()) {
+                    UnrecoverableError("PrepareCommitAppend failed");
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
     Status status = kv_instance_->Commit();
     if (!status.ok()) {
         UnrecoverableError("KV instance commit failed");
@@ -2022,12 +2318,27 @@ void NewTxn::PostCommit() {
 
     auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
-        if (wal_cmd->GetType() == WalCommandType::CHECKPOINT) {
-            auto *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(wal_cmd.get());
-            if (checkpoint_cmd->is_full_checkpoint_) {
-                wal_manager->CommitFullCheckpoint(checkpoint_cmd->max_commit_ts_);
-            } else {
-                wal_manager->CommitDeltaCheckpoint(checkpoint_cmd->max_commit_ts_);
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::APPEND: {
+                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                Status status = CommitAppend(append_cmd);
+                if (!status.ok()) {
+                    UnrecoverableError("CommitAppend failed");
+                }
+                break;
+            }
+            case WalCommandType::CHECKPOINT: {
+                auto *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(wal_cmd.get());
+                if (checkpoint_cmd->is_full_checkpoint_) {
+                    wal_manager->CommitFullCheckpoint(checkpoint_cmd->max_commit_ts_);
+                } else {
+                    wal_manager->CommitDeltaCheckpoint(checkpoint_cmd->max_commit_ts_);
+                }
+                break;
+            }
+            default: {
+                break;
             }
         }
     }
