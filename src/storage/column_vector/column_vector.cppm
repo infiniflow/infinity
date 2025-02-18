@@ -47,6 +47,7 @@ namespace infinity {
 
 class BufferManager;
 struct BlockColumnEntry;
+class BufferObj;
 
 export enum class ColumnVectorTipe : i8 {
     kReadWrite,
@@ -208,6 +209,13 @@ public:
 
     void Initialize(BufferManager *buffer_mgr,
                     BlockColumnEntry *block_column_entry,
+                    SizeT current_row_count,
+                    ColumnVectorTipe vector_tipe = ColumnVectorTipe::kReadWrite,
+                    ColumnVectorType vector_type = ColumnVectorType::kFlat,
+                    SizeT capacity = DEFAULT_VECTOR_SIZE);
+
+    void Initialize(BufferObj *buffer_obj,
+                    BufferObj *outline_buffer_obj,
                     SizeT current_row_count,
                     ColumnVectorTipe vector_tipe = ColumnVectorTipe::kReadWrite,
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,
@@ -745,10 +753,8 @@ inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_b
 }
 
 template <>
-inline void ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_buf,
-                                            VectorBuffer *__restrict dst_buf,
-                                            SizeT count,
-                                            const Selection &input_select) {
+inline void
+ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_buf, VectorBuffer *__restrict dst_buf, SizeT count, const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
     ptr_t dst = dst_buf->GetDataMut();
     const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());
@@ -987,10 +993,10 @@ inline void ColumnVector::CopyFrom<SparseT>(const VectorBuffer *__restrict src_b
 
 template <>
 inline void ColumnVector::CopyFrom<ArrayT>(const VectorBuffer *__restrict src_buf,
-                                            VectorBuffer *__restrict dst_buf,
-                                            SizeT source_start_idx,
-                                            SizeT dest_start_idx,
-                                            SizeT count) {
+                                           VectorBuffer *__restrict dst_buf,
+                                           SizeT source_start_idx,
+                                           SizeT dest_start_idx,
+                                           SizeT count) {
     const_ptr_t src = src_buf->GetData();
     ptr_t dst = dst_buf->GetDataMut();
     const auto *array_info = static_cast<const ArrayInfo *>(data_type_->type_info().get());

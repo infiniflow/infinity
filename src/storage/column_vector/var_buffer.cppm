@@ -71,6 +71,8 @@ public:
 
     VarBufferManager(BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr);
 
+    VarBufferManager(BufferObj *outline_buffer_obj);
+
     SizeT Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success = nullptr);
 
     SizeT Append(const char *data, SizeT size, bool *free_success = nullptr);
@@ -90,12 +92,17 @@ private:
 
     const VarBuffer *GetInner();
 
-private:
-    enum class BufferType { kBuffer, kBufferObj } type_;
+    enum class BufferType {
+        kBuffer,
+        kBufferObj,
+        kNewCatalog,
+    } type_;
+
     UniquePtr<VarBuffer> mem_buffer_;
     Optional<BufferHandle> buffer_handle_;
     BlockColumnEntry *block_column_entry_ = nullptr;
     BufferManager *buffer_mgr_ = nullptr;
+    BufferObj *outline_buffer_obj_ = nullptr;
 };
 
 } // namespace infinity
