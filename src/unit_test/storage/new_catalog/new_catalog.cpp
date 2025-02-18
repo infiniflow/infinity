@@ -41,6 +41,7 @@ import data_block;
 import column_vector;
 import value;
 import data_access_state;
+import kv_code;
 
 using namespace infinity;
 
@@ -3550,6 +3551,42 @@ TEST_P(NewCatalogTest, alter_column) {
     }
 
     new_txn_mgr->PrintAllKeyValue();
+}
+
+TEST_P(NewCatalogTest, test_block_lock) {
+    using namespace infinity;
+
+    NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    String db_id_str = "0";
+    String table_id_str = "0";
+    SegmentID segment_id = 0;
+    BlockID block_id = 0;
+    String block_key1 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
+    String block_key2 = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id + 1, "lock");
+
+    Status status = new_catalog->AddBlockLock(block_key1);
+    EXPECT_TRUE(status.ok());
+    status = new_catalog->AddBlockLock(block_key1);
+    EXPECT_FALSE(status.ok());
+    {
+        std::shared_lock<std::shared_mutex> lock;
+        status = new_catalog->SharedLockBlock(block_key1, lock);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        std::unique_lock<std::shared_mutex> lock;
+        status = new_catalog->UniqueLockBlock(block_key1, lock);
+        EXPECT_TRUE(status.ok());
+    }
+    status = new_catalog->DropBlockLockByBlockKey(block_key1);
+    EXPECT_TRUE(status.ok());
+    status = new_catalog->DropBlockLockByBlockKey(block_key1);
+    EXPECT_FALSE(status.ok());
+    {
+        std::shared_lock<std::shared_mutex> lock;
+        status = new_catalog->SharedLockBlock(block_key1, lock);
+        EXPECT_FALSE(status.ok());
+    }
 }
 
 TEST_P(NewCatalogTest, test_append) {

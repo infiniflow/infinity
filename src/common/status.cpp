@@ -646,4 +646,12 @@ Status Status::NodeNameMismatch(const String &actual_node_name, const String &ex
                   MakeUnique<String>(fmt::format("Expect node name: {}, actual node name: {}", expected_node_name, actual_node_name)));
 }
 
+Status Status::CatalogError(const String &detailed_info) {
+    return Status(ErrorCode::kCatalogError, MakeUnique<String>(fmt::format("Catalog error: {}", detailed_info)));
+}
+
+Status Status::BufferManagerError(const String &detailed_info) {
+    return Status(ErrorCode::kBufferManagerError, MakeUnique<String>(fmt::format("Buffer manager error: {}", detailed_info)));
+}
+
 } // namespace infinity

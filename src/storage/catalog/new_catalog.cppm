@@ -32,6 +32,10 @@ export struct TableMemoryContext {
     SizeT write_txn_num_{0};
 };
 
+export struct BlockLock {
+    std::shared_mutex mtx_;
+};
+
 export struct NewCatalog {
 public:
     explicit NewCatalog(KVStore *kv_store);
@@ -79,8 +83,18 @@ private:
     KVStore *kv_store_{};
 
 private:
-    mutable std::mutex mtx_;
-    HashMap<String, SharedPtr<TableMemoryContext>> table_memory_context_map_;
+    mutable std::mutex mtx_{};
+    HashMap<String, SharedPtr<TableMemoryContext>> table_memory_context_map_{};
+
+public:
+    Status AddBlockLock(String block_key);
+    Status SharedLockBlock(const String &block_key, std::shared_lock<std::shared_mutex> &lock);
+    Status UniqueLockBlock(const String &block_key, std::unique_lock<std::shared_mutex> &lock);
+    Status DropBlockLockByBlockKey(const String &block_key);
+
+private:
+    mutable std::shared_mutex block_lock_mtx_{};
+    HashMap<String, SharedPtr<BlockLock>> block_lock_map_{};
 };
 
 } // namespace infinity

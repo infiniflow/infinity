@@ -237,13 +237,68 @@ Status NewCatalog::DecreaseTableWriteCount(const String &table_key) {
         UnrecoverableError(fmt::format("Table key: {} is already locked", table_key));
     }
 
-    SizeT& write_txn_num = iter->second->write_txn_num_;
+    SizeT &write_txn_num = iter->second->write_txn_num_;
     if (write_txn_num > 0) {
         --write_txn_num;
     }
 
     if (write_txn_num == 0) {
         table_memory_context_map_.erase(table_key);
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::AddBlockLock(String block_key) {
+    bool insert_success = false;
+    HashMap<String, SharedPtr<BlockLock>>::iterator iter;
+    {
+        std::unique_lock lock(block_lock_mtx_);
+        std::tie(iter, insert_success) = block_lock_map_.emplace(std::move(block_key), MakeShared<BlockLock>());
+    }
+    if (!insert_success) {
+        return Status::CatalogError(fmt::format("Block key: {} already exists", iter->first));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::SharedLockBlock(const String &block_key, std::shared_lock<std::shared_mutex> &lock) {
+    BlockLock *block_lock_ptr = nullptr;
+    {
+        std::shared_lock<std::shared_mutex> lck(block_lock_mtx_);
+        if (auto iter = block_lock_map_.find(block_key); iter != block_lock_map_.end()) {
+            block_lock_ptr = iter->second.get();
+        }
+    }
+    if (block_lock_ptr == nullptr) {
+        return Status::CatalogError(fmt::format("Block key: {} not found", block_key));
+    }
+    lock = std::shared_lock(block_lock_ptr->mtx_);
+    return Status::OK();
+}
+
+Status NewCatalog::UniqueLockBlock(const String &block_key, std::unique_lock<std::shared_mutex> &lock) {
+    BlockLock *block_lock_ptr = nullptr;
+    {
+        std::shared_lock<std::shared_mutex> lck(block_lock_mtx_);
+        if (auto iter = block_lock_map_.find(block_key); iter != block_lock_map_.end()) {
+            block_lock_ptr = iter->second.get();
+        }
+    }
+    if (block_lock_ptr == nullptr) {
+        return Status::CatalogError(fmt::format("Block key: {} not found", block_key));
+    }
+    lock = std::unique_lock(block_lock_ptr->mtx_);
+    return Status::OK();
+}
+
+Status NewCatalog::DropBlockLockByBlockKey(const String &block_key) {
+    bool delete_success = false;
+    {
+        std::unique_lock lock(block_lock_mtx_);
+        delete_success = block_lock_map_.erase(block_key) > 0;
+    }
+    if (!delete_success) {
+        return Status::CatalogError(fmt::format("Block key: {} not found", block_key));
     }
     return Status::OK();
 }

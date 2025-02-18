@@ -201,7 +201,11 @@ export enum class ErrorCode : long {
     kInvalidNodeRole = 8007,
     kInvalidNodeStatus = 8008,
     kNodeInfoUpdated = 8009,
-    kNodeNameMismatch = 8010
+    kNodeNameMismatch = 8010,
+
+    // 9. internal error
+    kCatalogError = 9001,
+    kBufferManagerError = 9002,
 };
 
 export class Status {
@@ -382,6 +386,10 @@ public:
     static Status InvalidNodeStatus(const String &message);
     static Status NodeInfoUpdated(const String &message);
     static Status NodeNameMismatch(const String &actual_node_name, const String &expected_node_name);
+
+    // catalog
+    static Status CatalogError(const String &detailed_info);
+    static Status BufferManagerError(const String &detailed_info);
 
 public:
     Status() = default;
