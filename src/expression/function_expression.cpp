@@ -26,7 +26,7 @@ namespace infinity {
 
 FunctionExpression::FunctionExpression(ScalarFunction function, Vector<SharedPtr<BaseExpression>> arguments)
     : BaseExpression(ExpressionType::kFunction, std::move(arguments)), func_(std::move(function)) {
-    if(arguments.size() == 0) {
+    if(arguments_.size() == 0) {
         nullary_ = true;
     }
 }

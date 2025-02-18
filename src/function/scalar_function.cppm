@@ -32,6 +32,7 @@ import ternary_operator;
 import base_expression;
 import null_value;
 import logger;
+import third_party;
 
 namespace infinity {
 
@@ -408,7 +409,7 @@ public:
     template <typename LeftType, typename RightType, typename OutputType, typename Operation>
     static inline void BinaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 2) {
-            String error_message = "Binary function: input column count isn't two.";
+            String error_message = fmt::format("Binary function: input column count is {}, not two.", input.column_count());
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
