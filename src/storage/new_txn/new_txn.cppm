@@ -67,6 +67,7 @@ class BaseTableRef;
 enum class CompactStatementType;
 struct SegmentIndexEntry;
 struct AddDeltaEntryTask;
+struct ColumnVector;
 
 export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
@@ -344,6 +345,8 @@ private:
                                   SegmentID segment_id,
                                   const WalChunkIndexInfo &chunk_info);
     Status CommitDropIdxChunkByID(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, ChunkID chunk_id);
+
+    // DML
     Status AddNewSegment(const String &db_id_str,
                          const String &table_id_str,
                          SegmentID latest_segment_id,
@@ -365,7 +368,6 @@ private:
                         SizeT block_capacity,
                         SharedPtr<String> block_dir,
                         const ColumnDef *column_def);
-
     Status PrepareAppendInBlock(SegmentID segment_id,
                                 BlockID block_id,
                                 AppendState *append_state,
@@ -380,6 +382,16 @@ private:
                          SizeT append_rows,
                          const DataBlock *input_block,
                          SizeT input_offset);
+    Status AppendInColumn(const String &db_id_str,
+                          const String &table_id_str,
+                          SegmentID segment_id,
+                          BlockID block_id,
+                          SizeT column_idx,
+                          String block_dir,
+                          SizeT block_offset,
+                          SizeT append_rows,
+                          const ColumnVector &column_vector,
+                          SizeT input_offset);
 
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
