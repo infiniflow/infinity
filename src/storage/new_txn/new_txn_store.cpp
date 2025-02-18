@@ -190,7 +190,6 @@ Tuple<UniquePtr<String>, Status> NewTxnTableStore::Append(const SharedPtr<DataBl
     DataBlock *current_block{nullptr};
     if (append_state_ == nullptr) {
         append_state_ = MakeUnique<AppendState>();
-        // LOG_INFO(fmt::format("BBB {}", sizeof(*append_state_)));
     }
 
     if (append_state_->blocks_.empty()) {

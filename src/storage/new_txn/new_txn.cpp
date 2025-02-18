@@ -1633,8 +1633,6 @@ Status NewTxn::PrepareAppendInBlock(SegmentID segment_id,
 
         actual_append = std::min(to_append_rows, block_capacity - block_row_count);
         AppendRange range(segment_id, block_id, block_row_count, actual_append, append_state->current_block_, append_state->current_block_offset_);
-        LOG_INFO(fmt::format("AAA {}", sizeof(range)));
-        LOG_INFO(fmt::format("BBB {}", sizeof(*(append_state->append_ranges_.data()))));
         append_state->append_ranges_.push_back(range);
 
         append_state->current_block_++;
@@ -2089,8 +2087,7 @@ Status NewTxn::PrepareCommitAppend(const WalCmdAppend *append_cmd) {
         return status;
     }
 
-    AppendState *append_state = txn_table_store->append_state_.get();
-    // LOG_INFO(fmt::format("CCC: {}", sizeof(*append_state)));
+    AppendState *append_state = txn_table_store->GetAppendState();
     if (append_state == nullptr) {
         return Status::OK();
     }
@@ -2154,7 +2151,6 @@ Status NewTxn::PrepareCommitAppend(const WalCmdAppend *append_cmd) {
         }
 
         SizeT actual_append = 0;
-        // LOG_INFO(fmt::format("DDD: {}", sizeof(*append_state)));
         status =
             this->PrepareAppendInBlock(latest_segment_id - 1, last_block_id - 1, append_state, block_capacity, cur_block_row_count, actual_append);
         if (!status.ok()) {
@@ -2181,8 +2177,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     const String &db_name = append_cmd->db_name_;
     const String &table_name = append_cmd->table_name_;
     NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
-    LOG_INFO(fmt::format("DDD {}", sizeof(*txn_table_store->append_state_->append_ranges_.data())));
-    const AppendState *append_state = txn_table_store->append_state_.get();
+    const AppendState *append_state = txn_table_store->GetAppendState();
     if (append_state == nullptr) {
         return Status::OK();
     }

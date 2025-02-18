@@ -170,14 +170,7 @@ public: // Setter, Getter
 
     inline DeleteState *GetDeleteStatePtr() { return &delete_state_; }
 
-    // inline const Vector<SharedPtr<DataBlock>> &GetBlocks() const { return blocks_; }
-
-    // void SetAppendState(UniquePtr<AppendState> append_state) { append_state_ = std::move(append_state); }
-
-    // inline AppendState *GetAppendState() const {
-    //     LOG_INFO(fmt::format("CCC: {}", sizeof(*append_state_)));
-    //     return append_state_.get();
-    // }
+    inline AppendState *GetAppendState() const { return append_state_.get(); }
 
     void AddWriteTxnNum() { added_txn_num_ = true; }
 
@@ -197,15 +190,11 @@ private:
     NewTxnCompactStore compact_state_;
 
     NewTxn *const txn_{};
-    // Vector<SharedPtr<DataBlock>> blocks_{};
 
-public:
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
 
 private:
-    // SizeT current_block_id_{0};
-
     TableEntry *table_entry_{};
     bool added_txn_num_{false};
 
