@@ -472,12 +472,14 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
     }
 
     Vector<SharedPtr<BaseExpression>> arguments;
-    arguments.reserve(expr.arguments_->size());
-    for (const auto *arg_expr : *expr.arguments_) {
-        // The argument expression isn't root expression.
-        // SharedPtr<BaseExpression> expr_ptr
-        auto expr_ptr = BuildExpression(*arg_expr, bind_context_ptr, depth, false);
-        arguments.emplace_back(expr_ptr);
+    if(expr.arguments_ != nullptr) {
+        arguments.reserve(expr.arguments_->size());
+        for (const auto *arg_expr : *expr.arguments_) {
+            // The argument expression isn't root expression.
+            // SharedPtr<BaseExpression> expr_ptr
+            auto expr_ptr = BuildExpression(*arg_expr, bind_context_ptr, depth, false);
+            arguments.emplace_back(expr_ptr);
+        }
     }
 
     switch (function_set_ptr->type_) {

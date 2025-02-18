@@ -735,6 +735,10 @@ String ColumnVector::ToString(SizeT row_index) const {
         return "null";
     }
 
+    if (vector_type_ == ColumnVectorType::kConstant) {
+        row_index = 0;
+    }
+
     switch (data_type_->type()) {
         case LogicalType::kBoolean: {
             return buffer_->GetCompactBit(row_index) ? "true" : "false";
