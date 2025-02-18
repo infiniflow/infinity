@@ -477,8 +477,14 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         iter2->Next();
     }
 
+    status = new_catalog_->LockTable(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     // Generate add column cmd
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAddColumns>(db_name, table_name, column_defs);
+    SharedPtr<WalCmdAddColumns> wal_command = MakeShared<WalCmdAddColumns>(db_name, table_name, column_defs);
+    wal_command->table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -515,7 +521,13 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         }
     }
 
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropColumns>(db_name, table_name, column_names);
+    status = new_catalog_->LockTable(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    SharedPtr<WalCmdDropColumns> wal_command = MakeShared<WalCmdDropColumns>(db_name, table_name, column_names);
+    wal_command->table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -606,12 +618,8 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
         return status;
     }
 
-    if (status.ok()) {
-        SharedPtr<DropTableCommand> extra_command = MakeShared<DropTableCommand>(db_id_str, table_id_str, table_key);
-        extra_commands_.push_back(extra_command);
-    }
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropTable>(db_name, table_name);
+    SharedPtr<WalCmdDropTable> wal_command = MakeShared<WalCmdDropTable>(db_name, table_name);
+    wal_command->table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -1756,11 +1764,6 @@ Status NewTxn::CommitDropTable(const String &db_name, const String &table_name) 
         return status;
     }
 
-    status = new_catalog_->DecreaseTableWriteCount(table_key);
-    if (!status.ok()) {
-        return status;
-    }
-
     return Status::OK();
 }
 
@@ -2200,19 +2203,27 @@ void NewTxn::PostCommit() {
                 }
                 break;
             }
-            default: {
+            case WalCommandType::DROP_TABLE: {
+                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
                 break;
             }
-        }
-    }
-
-    for (const auto &extra_command : extra_commands_) {
-        switch (extra_command->GetType()) {
-            case ExtraCommandType::kDropTable: {
-                DropTableCommand *drop_table_command = static_cast<DropTableCommand *>(extra_command.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(drop_table_command->table_key());
+            case WalCommandType::ADD_COLUMNS: {
+                auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
+                Status status = new_catalog_->UnlockTable(cmd->table_key_);
                 if (!status.ok()) {
-                    UnrecoverableError(status.message());
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
+            case WalCommandType::DROP_COLUMNS: {
+                auto *cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
+                Status status = new_catalog_->UnlockTable(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
                 }
                 break;
             }
@@ -2244,6 +2255,39 @@ Status NewTxn::Rollback() {
     }
     this->SetTxnRollbacking(abort_ts);
 
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::ADD_COLUMNS: {
+                auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
+                Status status = new_catalog_->UnlockTable(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
+            case WalCommandType::DROP_COLUMNS: {
+                auto *cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
+                Status status = new_catalog_->UnlockTable(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
+            case WalCommandType::DROP_TABLE: {
+                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
     for (const auto &extra_command : extra_commands_) {
         switch (extra_command->GetType()) {
             case ExtraCommandType::kLockTable: {
@@ -2256,14 +2300,6 @@ Status NewTxn::Rollback() {
                 // Not check the lock result
                 UnlockTableCommand *unlock_table_command = static_cast<UnlockTableCommand *>(extra_command.get());
                 new_catalog_->LockTable(unlock_table_command->table_key());
-                break;
-            }
-            case ExtraCommandType::kDropTable: {
-                DropTableCommand *drop_table_command = static_cast<DropTableCommand *>(extra_command.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(drop_table_command->table_key());
-                if (!status.ok()) {
-                    return status;
-                }
                 break;
             }
         }

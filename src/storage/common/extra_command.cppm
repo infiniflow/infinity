@@ -20,7 +20,7 @@ import stl;
 
 namespace infinity {
 
-export enum class ExtraCommandType { kLockTable, kUnlockTable, kDropTable };
+export enum class ExtraCommandType { kLockTable, kUnlockTable };
 
 export struct BaseExtraCommand {
 public:

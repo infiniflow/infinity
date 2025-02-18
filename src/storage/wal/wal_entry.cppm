@@ -255,6 +255,7 @@ export struct WalCmdDropTable final : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String table_key_{};
 };
 
 export struct WalCmdCreateIndex final : public WalCmd {
@@ -505,6 +506,7 @@ export struct WalCmdAddColumns : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String table_key_{};
     Vector<SharedPtr<ColumnDef>> column_defs_{};
 };
 
@@ -521,6 +523,7 @@ export struct WalCmdDropColumns : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String table_key_{};
     Vector<String> column_names_{};
 };
 
