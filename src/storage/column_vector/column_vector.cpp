@@ -702,6 +702,10 @@ String ColumnVector::ToString(SizeT row_index) const {
         return "null";
     }
 
+    if (vector_type_ == ColumnVectorType::kConstant) {
+        row_index = 0;
+    }
+
     switch (data_type_->type()) {
         case LogicalType::kBoolean: {
             return buffer_->GetCompactBit(row_index) ? "true" : "false";
@@ -2469,7 +2473,7 @@ void ColumnVector::SetArrayValue(ArrayT &target, const Value &value) {
 }
 
 bool ColumnVector::AppendUnnestArray(const ColumnVector &other, SizeT offset, SizeT &array_offset) {
-    if(other.data_type_->type() != LogicalType::kArray) {
+    if (other.data_type_->type() != LogicalType::kArray) {
         UnrecoverableError("Attempt to unnest non-array column vector");
     }
     auto *array_info = static_cast<ArrayInfo *>(other.data_type_->type_info().get());
@@ -2545,7 +2549,6 @@ bool ColumnVector::AppendUnnestArray(const ColumnVector &other, SizeT offset, Si
     }
     return complete;
 }
-
 
 //////////////////////////////tensor end////////////////////////////////////
 
