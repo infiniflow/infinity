@@ -43,13 +43,13 @@ import column_def;
 import cleanup_scanner;
 import log_file;
 import snapshot_info;
-import SegmentIndexEntry;
 
 namespace infinity {
 
 class TxnManager;
 class Txn;
 struct CatalogDeltaOpBrief;
+class SegmentIndexEntry;
 
 class ProfileHistory {
 private:
