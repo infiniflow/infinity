@@ -148,20 +148,34 @@ public:
     // Resource
     String ResourcePath();
 
+    // Date and Time
+
+    void SetTimeZone(const String &value);
+
+    void SetTimeZoneBias(i64);
 public:
     // Get config by name
     Tuple<BaseOption *, Status> GetConfigByName(const String &name);
 
     GlobalOptionIndex GetOptionIndex(const String &var_name) const { return global_options_.GetOptionIndex(var_name); }
 
-private:
+    void SetOption(const String &var_name, const String &value);
+
+    static void SetTimeZoneOuter(const String &value);
+
     static void ParseTimeZoneStr(const String &time_zone_str, String &parsed_time_zone, i32 &parsed_time_zone_bias);
+
+private:
+
+
+    // static void ParseTimeZoneStr(const String &time_zone_str);
 
     static Status ParseByteSize(const String &byte_size_str, i64 &byte_size);
 
     static Status ParseTimeInfo(const String &time_info, i64 &time_seconds);
 
     static u64 GetAvailableMem();
+
 
 private:
     std::mutex mutex_;

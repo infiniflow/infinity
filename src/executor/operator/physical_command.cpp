@@ -329,6 +329,38 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             config->SetOptimizeInterval(interval);
                             break;
                         }
+                        case GlobalOptionIndex::kTimeZone:{
+                            if (set_command->value_type() != SetVarType::kString) {
+                                Status status = Status::DataTypeMismatch("String", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
+                            String tz;
+                            i32 tz_bias = 0;
+                            Config::ParseTimeZoneStr(set_command->value_str(), tz, tz_bias);
+                            if (tz_bias < -12 || tz_bias > 12) {
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set time zone bias: {}", tz_bias));
+                                RecoverableError(status);
+                            }
+                            if (tz == "UTC" || tz == "GMT") {
+                                config->SetTimeZone(set_command->value_str());
+                                config->SetTimeZoneBias(tz_bias);
+                                return true;
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kTimeZoneBias: {
+                            if (set_command->value_type() != SetVarType::kInteger) {
+                                Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
+                                RecoverableError(status);
+                            }
+                            i64 bias = set_command->value_int();
+                            if (bias < -12 || bias > 12) {
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set time zone bias: {}", bias));
+                                RecoverableError(status);
+                            }
+                            config->SetTimeZoneBias(bias);
+                            break;
+                        }
                         case GlobalOptionIndex::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("Unknown config: {}", set_command->var_name()));
                             RecoverableError(status);
