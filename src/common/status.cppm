@@ -143,6 +143,7 @@ export enum class ErrorCode : long {
     kAlreadyLocked = 3094,
     kNotLocked = 3095,
     kTableIsUsing = 3096,
+    kDuplicateColumnIndex = 3097,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -327,9 +328,10 @@ public:
     static Status AlreadyLocked(const String &detail);
     static Status NotLocked(const String &detail);
     static Status TableIsUsing(const String &detail);
+    static Status DuplicateColumnIndex(const String &detail);
 
     // 4. TXN fail
-    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");
+    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no re\anson gived");
     static Status TxnConflict(u64 txn_id, const String &conflict_reason);
 
     // 5. Insufficient resource or exceed limits

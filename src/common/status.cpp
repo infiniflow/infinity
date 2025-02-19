@@ -460,6 +460,8 @@ Status Status::NotLocked(const String &detail) { return Status(ErrorCode::kNotLo
 
 Status Status::TableIsUsing(const String &detail) { return Status(ErrorCode::kTableIsUsing, MakeUnique<String>(detail)); }
 
+Status Status::DuplicateColumnIndex(const String &detail) { return Status(ErrorCode::kDuplicateColumnIndex, MakeUnique<String>(detail)); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));

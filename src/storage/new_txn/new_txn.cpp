@@ -441,29 +441,36 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         return status;
     }
 
-    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str, table_id_str);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(table_column_prefix);
-
     // Construct added columns name map
     Map<String, String> column_map_to_added;
+    Set<SizeT> column_idx_set;
     for (const auto &column_def : column_defs) {
         String column_key = KeyEncode::TableColumnKey(db_id_str, table_id_str, column_def->name());
         column_map_to_added.emplace(column_key, column_def->name());
-    }
-
-    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
-        String table_column_key = iter2->Key().ToString();
-        // Check table name conflict;
-        if (column_map_to_added.find(table_column_key) != column_map_to_added.end()) {
-            return Status::DuplicateColumnName(column_map_to_added[table_column_key]);
-        }
-        iter2->Next();
+        column_idx_set.insert(column_def->id());
     }
 
     status = new_catalog_->LockTable(table_key);
     if (!status.ok()) {
         return status;
+    }
+
+    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str, table_id_str);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(table_column_prefix);
+    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
+        String table_column_key = iter2->Key().ToString();
+        String table_column_value = iter2->Value().ToString();
+        auto table_column_def = ColumnDef::FromJson(nlohmann::json::parse(table_column_value));
+        // Check table column name conflict;
+        if (column_map_to_added.find(table_column_key) != column_map_to_added.end()) {
+            return Status::DuplicateColumnName(column_map_to_added[table_column_key]);
+        }
+        // Check table column idx conflict
+        if (column_idx_set.contains(table_column_def->id())) {
+            return Status::DuplicateColumnIndex(fmt::format("Duplicate table column index: {}", table_column_def->id()));
+        }
+        iter2->Next();
     }
 
     // Generate add column cmd
@@ -490,7 +497,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     auto iter2 = kv_instance_->GetIterator();
     iter2->Seek(table_column_prefix);
 
-    // Construct added columns name map
+    // Construct existed columns name map
     Set<String> exist_columns;
     while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
         String table_column_key = iter2->Key().ToString();
@@ -1780,8 +1787,6 @@ Status NewTxn::CommitAddColumns(const WalCmdAddColumns *add_columns_cmd) {
     if (!status.ok()) {
         return status;
     }
-
-    // TODO: Check the column id conflict
 
     String column_name_value;
     for (const auto &column : add_columns_cmd->column_defs_) {
