@@ -31,16 +31,15 @@ import column_vector;
 namespace infinity {
 using namespace std::chrono;
 struct CurrentTimeFunction {
-    template <typename TA, typename TB>
-    static inline void Run(TA &left, TB &result) {
+    template <typename TB>
+    static inline void Run(TB &result) {
         Status status = Status::NotSupport("Not implemented");
         RecoverableError(status);
     }
 };
 
 template <>
-inline void CurrentTimeFunction::Run(VarcharT &left, TimeT &result) {
-    String tz_str = left.ToString();
+inline void CurrentTimeFunction::Run(TimeT &result) {
     InfinityContext& infinityContext = InfinityContext::instance();
     Config* config = infinityContext.config();
     auto offset = config->TimeZoneBias();
@@ -48,18 +47,19 @@ inline void CurrentTimeFunction::Run(VarcharT &left, TimeT &result) {
     auto now = system_clock::now() + offset_hour;
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
     auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
-    result.value = static_cast<i32>(sys_secs.time_since_epoch().count() - sys_days.time_since_epoch().count());
+    auto seconds_per_day = 24 * 60 * 60;
+    result.value = static_cast<i32>(sys_secs.time_since_epoch().count() - (seconds_per_day * sys_days.time_since_epoch().count()));
 }
 
 void RegisterCurrentTimeFunction(const UniquePtr<Catalog> &catalog_ptr) {
-    String func_name = "currenttime";
+    String func_name = "current_time";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
 
     ScalarFunction current_time_function(func_name,
-                                  {DataType(LogicalType::kVarchar)},
+                                  {},
                                   DataType(LogicalType::kTime),
-                                  &ScalarFunction::UnaryFunction<VarcharT, TimeT, CurrentTimeFunction>);
+                                  &ScalarFunction::NullaryFunction<TimeT, CurrentTimeFunction>);
     function_set_ptr->AddFunction(current_time_function);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
