@@ -1328,6 +1328,7 @@ void Catalog::MemIndexCommitLoop() {
 }
 
 void Catalog::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
+    all_memindex_recover_segment_.clear();
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();
     for (auto &[_, db_meta] : *db_meta_map_guard) {
         auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
@@ -1335,6 +1336,10 @@ void Catalog::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
             db_entry->MemIndexRecover(buffer_manager, ts);
         }
     }
+    for(auto& segment_index_entry:all_memindex_recover_segment_){
+        segment_index_entry->MemIndexWaitInflightTasks();
+    }
+    all_memindex_recover_segment_.clear();
 }
 
 void Catalog::StartMemoryIndexCommit() {

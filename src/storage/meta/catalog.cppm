@@ -43,6 +43,7 @@ import column_def;
 import cleanup_scanner;
 import log_file;
 import snapshot_info;
+import SegmentIndexEntry;
 
 namespace infinity {
 
@@ -316,6 +317,7 @@ private:
 
 public:
     void MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts);
+    Vector<SharedPtr<SegmentIndexEntry>> all_memindex_recover_segment_;
 
     void PickCleanup(CleanupScanner *scanner);
 
