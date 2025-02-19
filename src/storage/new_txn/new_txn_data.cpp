@@ -97,6 +97,32 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     return Status::OK();
 }
 
+Status NewTxn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
+    this->CheckTxn(db_name);
+
+    auto delete_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
+    {
+        String db_id_str;
+        String table_id_str;
+        String table_key;
+        Status status = this->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        delete_command->db_id_str_ = db_id_str;
+        delete_command->table_id_str_ = table_id_str;
+    }
+
+    auto wal_command = static_pointer_cast<WalCmd>(delete_command);
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(delete_command->ToString()));
+
+    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
+    auto [err_msg, delete_status] = table_store->Delete(row_ids);
+
+    return delete_status;
+}
+
 Status NewTxn::AddNewSegment(const String &db_id_str,
                              const String &table_id_str,
                              SegmentID latest_segment_id,
@@ -352,6 +378,55 @@ Status NewTxn::AppendInColumn(const String &db_id_str,
         Status status = kv_store->Put(last_chunk_offset_key, last_chunk_offset_str);
         if (!status.ok()) {
             return status;
+        }
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::DeleteInBlock(const String &db_id_str,
+                             const String &table_id_str,
+                             SegmentID segment_id,
+                             BlockID block_id,
+                             const Vector<BlockOffset> &block_offsets) {
+    KVStore *kv_store = txn_mgr_->kv_store();
+    String block_dir;
+    {
+        String block_dir_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "dir");
+        // Get with no txn, because block_dir is unmutable.
+        Status status = kv_store->Get(block_dir_key, block_dir);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    BufferObj *version_buffer = nullptr;
+    {
+        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + block_dir + "/" + String(BlockVersion::PATH);
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+        if (version_buffer == nullptr) {
+            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+        }
+    }
+
+    String block_lock_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "lock");
+    NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+    {
+        SharedPtr<BlockLock> block_lock;
+        Status status = new_catalog->GetBlockLock(block_lock_key, block_lock);
+        if (!status.ok()) {
+            return status;
+        }
+        std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
+
+        // delete in version file
+        BufferHandle buffer_handle = version_buffer->Load();
+        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        for (BlockOffset block_offset : block_offsets) {
+            block_version->Delete(block_offset, commit_ts);
         }
     }
 
@@ -667,6 +742,24 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
                                             txn_table_store);
         if (!status.ok()) {
             return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::CommitDelete(const WalCmdDelete *delete_cmd) {
+    const String &table_name = delete_cmd->table_name_;
+    const String &db_id_str = delete_cmd->db_id_str_;
+    const String &table_id_str = delete_cmd->table_id_str_;
+
+    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
+    const DeleteState &delete_state = txn_table_store->GetDeleteStateRef();
+    for (const auto &[segment_id, block_map] : delete_state.rows_) {
+        for (const auto &[block_id, block_offsets] : block_map) {
+            Status status = this->DeleteInBlock(db_id_str, table_id_str, segment_id, block_id, block_offsets);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     return Status::OK();

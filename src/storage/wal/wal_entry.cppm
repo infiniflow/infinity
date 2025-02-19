@@ -343,6 +343,9 @@ export struct WalCmdDelete final : public WalCmd {
     String db_name_{};
     String table_name_{};
     Vector<RowID> row_ids_{};
+
+    String db_id_str_{};
+    String table_id_str_{};
 };
 
 // used when append op turn an old unsealed segment full and sealed

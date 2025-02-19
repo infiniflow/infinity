@@ -1339,7 +1339,8 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
-            case WalCommandType::APPEND: {
+            case WalCommandType::APPEND:
+            case WalCommandType::DELETE: {
                 break;
             }
             default: {
@@ -2041,6 +2042,14 @@ void NewTxn::PostCommit() {
                 Status status = CommitAppend(append_cmd);
                 if (!status.ok()) {
                     UnrecoverableError("CommitAppend failed");
+                }
+                break;
+            }
+            case WalCommandType::DELETE: {
+                auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
+                Status status = CommitDelete(delete_cmd);
+                if (!status.ok()) {
+                    UnrecoverableError("CommitDelete failed");
                 }
                 break;
             }

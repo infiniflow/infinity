@@ -61,6 +61,7 @@ struct WalCmdDropColumns;
 struct WalCmdCreateIndex;
 struct WalCmdDropIndex;
 struct WalCmdAppend;
+struct WalCmdDelete;
 struct WalCmdDumpIndex;
 struct WalChunkIndexInfo;
 class CatalogDeltaEntry;
@@ -274,6 +275,8 @@ public:
 
     Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
+    Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
+
     Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
     Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
@@ -417,6 +420,11 @@ private:
                           const ColumnVector &column_vector,
                           SizeT source_offset,
                           NewTxnTableStore *txn_table_store);
+    Status DeleteInBlock(const String &db_id_str,
+                         const String &table_id_str,
+                         SegmentID segment_id,
+                         BlockID block_id,
+                         const Vector<BlockOffset> &block_offsets);
 
 public:
     Status GetColumnVector(const String &db_id_str,
@@ -449,6 +457,7 @@ private:
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
     Status PrepareCommitAppend(const WalCmdAppend *append_cmd);
     Status CommitAppend(const WalCmdAppend *append_cmd);
+    Status CommitDelete(const WalCmdDelete *delete_cmd);
     Status CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
