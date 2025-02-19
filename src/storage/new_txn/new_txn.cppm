@@ -38,6 +38,7 @@ import kv_store;
 import new_catalog;
 import column_def;
 import extra_command;
+import column_vector;
 
 namespace infinity {
 
@@ -67,7 +68,6 @@ class BaseTableRef;
 enum class CompactStatementType;
 struct SegmentIndexEntry;
 struct AddDeltaEntryTask;
-struct ColumnVector;
 
 export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
@@ -367,7 +367,7 @@ private:
                         ColumnID column_idx,
                         SizeT block_capacity,
                         SharedPtr<String> block_dir,
-                        const ColumnDef *column_def);
+                        NewTxnTableStore *txn_table_store);
     Status PrepareAppendInBlock(SegmentID segment_id,
                                 BlockID block_id,
                                 AppendState *append_state,
@@ -381,17 +381,29 @@ private:
                          SizeT block_offset,
                          SizeT append_rows,
                          const DataBlock *input_block,
-                         SizeT input_offset);
+                         SizeT input_offset,
+                         NewTxnTableStore *txn_table_store);
     Status AppendInColumn(const String &db_id_str,
                           const String &table_id_str,
                           SegmentID segment_id,
                           BlockID block_id,
                           SizeT column_idx,
                           String block_dir,
-                          SizeT block_offset,
+                          SizeT dest_offset,
                           SizeT append_rows,
                           const ColumnVector &column_vector,
-                          SizeT input_offset);
+                          SizeT source_offset,
+                          NewTxnTableStore *txn_table_store);
+    Status GetColumnVector(const String &db_id_str,
+                           const String &table_id_str,
+                           SegmentID segment_id,
+                           BlockID block_id,
+                           SizeT column_idx,
+                           String block_dir,
+                           SizeT row_count,
+                           ColumnVectorTipe tipe,
+                           NewTxnTableStore *txn_table_store,
+                           ColumnVector &column_vector);
 
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);

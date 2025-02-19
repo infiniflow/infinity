@@ -201,6 +201,8 @@ public:
         this->Initialize(vector_type, DEFAULT_VECTOR_SIZE);
     }
 
+    static VectorBufferType GetVectorBufferType(const DataType &data_type);
+
 private:
     VectorBufferType InitializeHelper(ColumnVectorType vector_type, SizeT capacity);
 

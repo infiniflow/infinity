@@ -163,6 +163,8 @@ public:
 
     SizeT AppendArrayRaw(const char *raw_data, SizeT size) const;
 
+    VarBufferManager *var_buffer_mgr() const { return var_buffer_mgr_.get(); }
+
 private:
     UniquePtr<VarBufferManager> var_buffer_mgr_{nullptr};
 };

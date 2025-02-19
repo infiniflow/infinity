@@ -54,36 +54,9 @@ import block_column_entry;
 
 namespace infinity {
 
-VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
-    if (initialized) {
-        String error_message = "Column vector is already initialized.";
-        UnrecoverableError(error_message);
-    }
-    initialized = true;
-    if (data_type_->type() == LogicalType::kInvalid) {
-        String error_message = "Attempt to initialize column vector to invalid type.";
-        UnrecoverableError(error_message);
-    }
-    if (vector_type == ColumnVectorType::kInvalid) {
-        String error_message = "Attempt to initialize column vector to invalid type.";
-        UnrecoverableError(error_message);
-    }
-
-    // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
-    // if ColumnVectorType::kFlat is used, change it to ColumnVectorType::kCompactBit
-    if (data_type_->type() == LogicalType::kBoolean && vector_type == ColumnVectorType::kFlat) {
-        vector_type = ColumnVectorType::kCompactBit;
-    }
-
-    // TODO: No check on capacity value.
-
-    vector_type_ = vector_type;
-    capacity_ = capacity;
-
-    tail_index_ = 0;
-    data_type_size_ = data_type_->Size();
+VectorBufferType ColumnVector::GetVectorBufferType(const DataType &data_type) {
     VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch (data_type_->type()) {
+    switch (data_type.type()) {
             //        case LogicalType::kBlob:
             //        case LogicalType::kBitmap:
             //        case LogicalType::kPolygon:
@@ -112,6 +85,37 @@ VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, Si
         }
     }
     return vector_buffer_type;
+}
+
+VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
+    if (initialized) {
+        String error_message = "Column vector is already initialized.";
+        UnrecoverableError(error_message);
+    }
+    initialized = true;
+    if (data_type_->type() == LogicalType::kInvalid) {
+        String error_message = "Attempt to initialize column vector to invalid type.";
+        UnrecoverableError(error_message);
+    }
+    if (vector_type == ColumnVectorType::kInvalid) {
+        String error_message = "Attempt to initialize column vector to invalid type.";
+        UnrecoverableError(error_message);
+    }
+
+    // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
+    // if ColumnVectorType::kFlat is used, change it to ColumnVectorType::kCompactBit
+    if (data_type_->type() == LogicalType::kBoolean && vector_type == ColumnVectorType::kFlat) {
+        vector_type = ColumnVectorType::kCompactBit;
+    }
+
+    // TODO: No check on capacity value.
+
+    vector_type_ = vector_type;
+    capacity_ = capacity;
+
+    tail_index_ = 0;
+    data_type_size_ = data_type_->Size();
+    return GetVectorBufferType(*data_type_);
 }
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {

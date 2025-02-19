@@ -3955,9 +3955,10 @@ TEST_P(NewCatalogTest, test_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+
+    auto input_block = MakeShared<DataBlock>();
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-        auto input_block = MakeShared<DataBlock>();
+        // Initialize input block
         {
             auto col1 = ColumnVector::Make(column_def1->type());
             col1->Initialize();
@@ -3973,9 +3974,37 @@ TEST_P(NewCatalogTest, test_append) {
             input_block->InsertVector(col2, 1);
         }
         input_block->Finalize();
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+
         Status status = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append again"), TransactionType::kNormal);
+
+        Status status = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 1"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 2"), TransactionType::kNormal);
+
+        Status status1 = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status1.ok());
+        Status status2 = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status2.ok());
+
+        status1 = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status1.ok());
+        status2 = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status2.ok());
     }
 }
