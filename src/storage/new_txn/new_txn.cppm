@@ -39,6 +39,7 @@ import new_catalog;
 import column_def;
 import extra_command;
 import column_vector;
+import buffer_handle;
 
 namespace infinity {
 
@@ -68,6 +69,23 @@ class BaseTableRef;
 enum class CompactStatementType;
 struct SegmentIndexEntry;
 struct AddDeltaEntryTask;
+
+export class NewTxnGetVisibleRangeState {
+public:
+    NewTxnGetVisibleRangeState() = default;
+
+    void Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts);
+
+    bool Next(BlockOffset block_offset_begin, Pair<BlockOffset, BlockOffset> &visible_range);
+
+    BlockOffset block_offset_end() const { return block_offset_end_; }
+
+private:
+    SharedPtr<BlockLock> block_lock_;
+    BufferHandle version_buffer_handle_;
+    TxnTimeStamp begin_ts_ = 0;
+    BlockOffset block_offset_end_ = 0;
+};
 
 export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
@@ -330,7 +348,12 @@ private:
     void CheckTxn(const String &db_name);
 
     Status GetDbID(const String &db_name, String &db_key, String &db_id);
+
+public:
+    // TODO: this is temporarily public. Because Get blocks info from table name is not available
     Status GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id, String &db_id);
+
+private:
     Status GetIndexID(const String &db_name,
                       const String &table_name,
                       const String &index_name,
@@ -394,6 +417,8 @@ private:
                           const ColumnVector &column_vector,
                           SizeT source_offset,
                           NewTxnTableStore *txn_table_store);
+
+public:
     Status GetColumnVector(const String &db_id_str,
                            const String &table_id_str,
                            SegmentID segment_id,
@@ -405,6 +430,13 @@ private:
                            NewTxnTableStore *txn_table_store,
                            ColumnVector &column_vector);
 
+    Status GetBlockVisibleRange(const String &db_id_str,
+                                const String &table_id_str,
+                                SegmentID segment_id,
+                                BlockID block_id,
+                                NewTxnGetVisibleRangeState &state);
+
+private:
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
     Status CommitCreateTable(const WalCmdCreateTable *create_table_cmd);

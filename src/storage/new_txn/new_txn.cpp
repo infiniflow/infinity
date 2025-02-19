@@ -163,22 +163,6 @@ Status NewTxn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input
     return append_status;
 }
 
-Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
-    this->CheckTxn(db_name);
-    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-    if (table_store->column_defs().empty()) {
-        table_store->SetColumnDefs(db_name, table_name);
-    }
-
-    auto [err_msg, append_status] = table_store->Append(input_block);
-    return Status::OK();
-}
-
 Status NewTxn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict) {
     const String &db_name = *table_entry->GetDBName();
     const String &table_name = *table_entry->GetTableName();

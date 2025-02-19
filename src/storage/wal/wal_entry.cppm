@@ -324,6 +324,9 @@ export struct WalCmdAppend final : public WalCmd {
     String db_name_{};
     String table_name_{};
     SharedPtr<DataBlock> block_{};
+
+    String db_id_str_{};
+    String table_id_str_{};
 };
 
 export struct WalCmdDelete final : public WalCmd {

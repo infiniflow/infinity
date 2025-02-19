@@ -88,8 +88,7 @@ private:
 
 public:
     Status AddBlockLock(String block_key);
-    Status SharedLockBlock(const String &block_key, std::shared_lock<std::shared_mutex> &lock);
-    Status UniqueLockBlock(const String &block_key, std::unique_lock<std::shared_mutex> &lock);
+    Status GetBlockLock(const String &block_key, SharedPtr<BlockLock> &block_lock);
     Status DropBlockLockByBlockKey(const String &block_key);
 
 private:

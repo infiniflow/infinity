@@ -30,12 +30,12 @@ export struct AppendRange {
     AppendRange(u32 segment_id, u16 block_id, u16 start_offset, u16 row_count)
         : segment_id_(segment_id), block_id_(block_id), start_offset_(start_offset), row_count_(row_count) {}
 
-    AppendRange(u32 segment_id, u16 block_id, u16 start_offset, u16 row_count, SizeT data_block_idx, SizeT data_block_offset)
+    AppendRange(u32 segment_id, u16 block_id, u16 start_offset, u16 row_count, SizeT data_block_idx, BlockOffset data_block_offset)
         : data_block_idx_(data_block_idx), data_block_offset_(data_block_offset), segment_id_(segment_id), block_id_(block_id),
           start_offset_(start_offset), row_count_(row_count) {}
 
     SizeT data_block_idx_{};
-    SizeT data_block_offset_{};
+    BlockOffset data_block_offset_{};
 
     SegmentID segment_id_{};
     BlockID block_id_{};

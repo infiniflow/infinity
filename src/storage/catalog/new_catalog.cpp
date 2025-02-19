@@ -261,33 +261,16 @@ Status NewCatalog::AddBlockLock(String block_key) {
     return Status::OK();
 }
 
-Status NewCatalog::SharedLockBlock(const String &block_key, std::shared_lock<std::shared_mutex> &lock) {
-    BlockLock *block_lock_ptr = nullptr;
+Status NewCatalog::GetBlockLock(const String &block_key, SharedPtr<BlockLock> &block_lock) {
     {
         std::shared_lock<std::shared_mutex> lck(block_lock_mtx_);
         if (auto iter = block_lock_map_.find(block_key); iter != block_lock_map_.end()) {
-            block_lock_ptr = iter->second.get();
+            block_lock = iter->second;
         }
     }
-    if (block_lock_ptr == nullptr) {
+    if (block_lock == nullptr) {
         return Status::CatalogError(fmt::format("Block key: {} not found", block_key));
     }
-    lock = std::shared_lock(block_lock_ptr->mtx_);
-    return Status::OK();
-}
-
-Status NewCatalog::UniqueLockBlock(const String &block_key, std::unique_lock<std::shared_mutex> &lock) {
-    BlockLock *block_lock_ptr = nullptr;
-    {
-        std::shared_lock<std::shared_mutex> lck(block_lock_mtx_);
-        if (auto iter = block_lock_map_.find(block_key); iter != block_lock_map_.end()) {
-            block_lock_ptr = iter->second.get();
-        }
-    }
-    if (block_lock_ptr == nullptr) {
-        return Status::CatalogError(fmt::format("Block key: {} not found", block_key));
-    }
-    lock = std::unique_lock(block_lock_ptr->mtx_);
     return Status::OK();
 }
 
