@@ -44,6 +44,7 @@ inline void CurrentTimeFunction::Run(TimeT &result) {
     Config* config = infinityContext.config();
     auto offset = config->TimeZoneBias();
     hours offset_hour(offset);
+
     auto now = system_clock::now() + offset_hour;
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
     auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
