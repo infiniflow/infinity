@@ -142,3 +142,5 @@ minio/
 
 # not ignore Dockerfile
 !Dockerfile*
+
+my_env/
