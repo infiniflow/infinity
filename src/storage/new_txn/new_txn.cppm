@@ -353,8 +353,11 @@ private:
     Status GetDbID(const String &db_name, String &db_key, String &db_id);
 
 public:
-    // TODO: this is temporarily public. Because Get blocks info from table name is not available
     Status GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id, String &db_id);
+
+    Status GetSegmentIDsInTable(const String &db_id, const String &table_id, Vector<SegmentID> &segment_ids);
+
+    Status GetBlockIDsInSegment(const String &db_id, const String &table_id, SegmentID segment_id, Vector<BlockID> &block_ids);
 
 private:
     Status GetIndexID(const String &db_name,

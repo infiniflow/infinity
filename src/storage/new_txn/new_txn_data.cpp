@@ -123,16 +123,91 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     return delete_status;
 }
 
+Status NewTxn::GetSegmentIDsInTable(const String &db_id_str, const String &table_id_str, Vector<SegmentID> &segment_ids) {
+    String table_segment_ids_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "segment_ids");
+    String segment_ids_str;
+    Status status = kv_instance_->Get(table_segment_ids_key, segment_ids_str);
+    if (!status.ok()) {
+        return status;
+    }
+    segment_ids.clear();
+    if (segment_ids_str.empty()) {
+        return Status::OK();
+    }
+    nlohmann::json segment_ids_json = nlohmann::json::parse(segment_ids_str);
+    for (const auto &segment_id : segment_ids_json) {
+        segment_ids.push_back(segment_id.get<SegmentID>());
+    }
+    return Status::OK();
+}
+
+Status NewTxn::GetBlockIDsInSegment(const String &db_id_str, const String &table_id_str, SegmentID segment_id, Vector<BlockID> &block_ids) {
+    String block_ids_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, segment_id, "block_ids");
+    String block_ids_str;
+    Status status = kv_instance_->Get(block_ids_key, block_ids_str);
+    if (!status.ok()) {
+        return status;
+    }
+    block_ids.clear();
+    if (block_ids_str.empty()) {
+        return Status::OK();
+    }
+    nlohmann::json block_ids_json = nlohmann::json::parse(block_ids_str);
+    for (const auto &block_id : block_ids_json) {
+        block_ids.push_back(block_id.get<BlockID>());
+    }
+    return Status::OK();
+}
+
 Status NewTxn::AddNewSegment(const String &db_id_str,
                              const String &table_id_str,
                              SegmentID latest_segment_id,
                              SizeT segment_capacity,
                              const String &table_dir,
                              NewTxnTableStore *txn_table_store) {
-    String lastest_block_id_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, latest_segment_id, LATEST_BLOCK_ID.data());
-    Status status = kv_instance_->Put(lastest_block_id_key, "0");
-    if (!status.ok()) {
-        return status;
+    { // Add segment id in table meta
+        String table_segment_ids_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "segment_ids");
+        String table_segment_ids_str;
+        Status status = kv_instance_->GetForUpdate(table_segment_ids_key, table_segment_ids_str);
+        if (!status.ok()) {
+            return status;
+        }
+        nlohmann::json segment_ids_json;
+        if (!table_segment_ids_str.empty()) {
+            segment_ids_json = nlohmann::json::parse(table_segment_ids_str);
+        } else {
+            segment_ids_json = nlohmann::json::array();
+        }
+
+        segment_ids_json.push_back(latest_segment_id);
+
+        table_segment_ids_str = segment_ids_json.dump();
+        status = kv_instance_->Put(table_segment_ids_key, table_segment_ids_str);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        String lastest_block_id_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, latest_segment_id, LATEST_BLOCK_ID.data());
+        Status status = kv_instance_->Put(lastest_block_id_key, "0");
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        String segment_row_cnt_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, latest_segment_id, "row_cnt");
+        Status status = kv_instance_->Put(segment_row_cnt_key, "0");
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        String block_ids_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, latest_segment_id, "block_ids");
+        String block_ids_str = nlohmann::json::array().dump();
+        Status status = kv_instance_->Put(block_ids_key, block_ids_str);
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     return Status::OK();
@@ -147,6 +222,28 @@ Status NewTxn::AddNewBlock(const String &db_id_str,
                            NewTxnTableStore *txn_table_store) {
     if (txn_table_store->column_defs().empty()) {
         UnrecoverableError("Column defs is empty.");
+    }
+    { // Add block id in segment meta
+        String block_ids_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, segment_id, "block_ids");
+        String block_ids_str;
+        Status status = kv_instance_->GetForUpdate(block_ids_key, block_ids_str);
+        if (!status.ok()) {
+            return status;
+        }
+        nlohmann::json block_ids_json;
+        if (!block_ids_str.empty()) {
+            block_ids_json = nlohmann::json::parse(block_ids_str);
+        } else {
+            block_ids_json = nlohmann::json::array();
+        }
+
+        block_ids_json.push_back(latest_block_id);
+
+        block_ids_str = block_ids_json.dump();
+        status = kv_instance_->Put(block_ids_key, block_ids_str);
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     auto block_dir = MakeShared<String>(fmt::format("{}/seg_{}/block_{}", table_dir, segment_id, latest_block_id));

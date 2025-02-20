@@ -1687,6 +1687,15 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
         return status;
     }
 
+    { // Create segment ids
+        String table_segment_ids_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "segment_ids");
+        String table_segment_ids_str = nlohmann::json::array().dump();
+        Status status = kv_instance_->Put(table_segment_ids_key, table_segment_ids_str);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
     status = CommitCreateTableDef(create_table_cmd->table_def_.get(), db_id_str, table_id_str);
     if (!status.ok()) {
         return status;
