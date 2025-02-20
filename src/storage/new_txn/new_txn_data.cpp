@@ -35,6 +35,10 @@ import logger;
 import var_buffer;
 import wal_entry;
 
+import segment_meta;
+import block_meta;
+import column_meta;
+
 namespace infinity {
 
 void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts) {
@@ -582,6 +586,54 @@ Status NewTxn::GetColumnVector(const String &db_id_str,
     return Status::OK();
 }
 
+Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector) {
+    SharedPtr<String> block_dir_ptr;
+    {
+        Status status = column_meta.block_meta().GetBlockDir(block_dir_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    const ColumnDef *col_def = nullptr;
+    {
+        col_def = column_meta.block_meta().segment_meta().column_defs_[column_meta.column_idx()].get();
+    }
+
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    BufferObj *buffer_obj = nullptr;
+    {
+        String col_filename = std::to_string(column_meta.column_idx()) + ".col";
+        String col_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + col_filename;
+        buffer_obj = buffer_mgr->GetBufferObject(col_filepath);
+        if (buffer_obj == nullptr) {
+            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", col_filepath));
+        }
+    }
+    BufferObj *outline_buffer_obj = nullptr;
+    [[maybe_unused]] SizeT chunk_offset = 0;
+    {
+        VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+        if (buffer_type == VectorBufferType::kVarBuffer) {
+            String outline_filename = fmt::format("col_{}_out_0", column_meta.column_idx());
+            String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
+            BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+            outline_buffer_obj = buffer_mgr->GetBufferObject(outline_filepath);
+            if (outline_buffer_obj == nullptr) {
+                return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
+            }
+            {
+                Status status = column_meta.GetChunkOffset(chunk_offset);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+        }
+    }
+    column_vector = ColumnVector(col_def->type());
+    column_vector.Initialize(buffer_obj, outline_buffer_obj, row_count, tipe);
+    return Status::OK();
+}
+
 Status NewTxn::GetBlockVisibleRange(const String &db_id_str,
                                     const String &table_id_str,
                                     SegmentID segment_id,
@@ -621,6 +673,37 @@ Status NewTxn::GetBlockVisibleRange(const String &db_id_str,
         }
     }
 
+    state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts);
+    return Status::OK();
+}
+
+Status NewTxn::GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRangeState &state) {
+    SharedPtr<String> block_dir_ptr;
+    {
+        Status status = block_meta.GetBlockDir(block_dir_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    BufferObj *version_buffer = nullptr;
+    {
+        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+        if (version_buffer == nullptr) {
+            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+        }
+    }
+
+    BufferHandle buffer_handle = version_buffer->Load();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    SharedPtr<BlockLock> block_lock;
+    {
+        Status status = block_meta.GetBlockLock(block_lock);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts);
     return Status::OK();
 }

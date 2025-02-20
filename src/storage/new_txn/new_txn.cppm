@@ -71,6 +71,10 @@ enum class CompactStatementType;
 struct SegmentIndexEntry;
 struct AddDeltaEntryTask;
 
+class ColumnMeta;
+class BlockMeta;
+class SegmentMeta;
+
 export class NewTxnGetVisibleRangeState {
 public:
     NewTxnGetVisibleRangeState() = default;
@@ -441,11 +445,15 @@ public:
                            NewTxnTableStore *txn_table_store,
                            ColumnVector &column_vector);
 
+    Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);
+
     Status GetBlockVisibleRange(const String &db_id_str,
                                 const String &table_id_str,
                                 SegmentID segment_id,
                                 BlockID block_id,
                                 NewTxnGetVisibleRangeState &state);
+
+    Status GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRangeState &state);
 
 private:
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);

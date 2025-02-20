@@ -46,6 +46,10 @@ import kv_store;
 import new_txn;
 import new_txn_store;
 
+import segment_meta;
+import block_meta;
+import column_meta;
+
 using namespace infinity;
 
 class NewCatalogTest : public BaseTestParamStr {};
@@ -4706,7 +4710,6 @@ TEST_P(NewCatalogTest, test_append) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    KVStore *kv_store = new_txn_mgr->kv_store();
 
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -4784,7 +4787,7 @@ TEST_P(NewCatalogTest, test_append) {
 
     // Check the appended data.
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn =  new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
         String table_key;
         String table_id_str;
@@ -4806,8 +4809,18 @@ TEST_P(NewCatalogTest, test_append) {
         EXPECT_EQ(block_ids[0], 0);
         BlockID block_id = block_ids[0];
 
+        SegmentMeta segment_meta(segment_id, *txn->kv_instance());
+        {
+            // TODO: remove it
+            segment_meta.db_id_str_ = db_id_str;
+            segment_meta.table_id_str_ = table_id_str;
+            segment_meta.table_dir_ = "table_dir";
+            segment_meta.column_defs_ = {column_def1, column_def2};
+        }
+        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+
         NewTxnGetVisibleRangeState state;
-        status = txn->GetBlockVisibleRange(db_id_str, table_id_str, segment_id, block_id, state);
+        status = txn->GetBlockVisibleRange(block_meta, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;
@@ -4823,31 +4836,12 @@ TEST_P(NewCatalogTest, test_append) {
 
         SizeT row_count = state.block_offset_end();
 
-        String block_dir;
-        {
-            String block_dir_key = KeyEncode::CatalogTableSegmentBlockTagKey(db_id_str, table_id_str, segment_id, block_id, "dir");
-            // Get with no txn, because block_dir is unmutable.
-            Status status = kv_store->Get(block_dir_key, block_dir);
-            EXPECT_TRUE(status.ok());
-        }
-
         {
             SizeT column_idx = 0;
+            ColumnMeta column_meta(column_idx, block_meta, *txn->kv_instance());
             ColumnVector col;
-            NewTxnTableStore *txn_table_store = txn->txn_store()->GetNewTxnTableStore(*table_name);
-            Status status = txn_table_store->SetColumnDefs(*db_name, *table_name);
-            EXPECT_TRUE(status.ok());
 
-            status = txn->GetColumnVector(db_id_str,
-                                          table_id_str,
-                                          segment_id,
-                                          block_id,
-                                          column_idx,
-                                          block_dir,
-                                          row_count,
-                                          ColumnVectorTipe::kReadOnly,
-                                          txn_table_store,
-                                          col);
+            status = txn->GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             Value v1 = col.GetValue(0);
@@ -4858,21 +4852,10 @@ TEST_P(NewCatalogTest, test_append) {
 
         {
             SizeT column_idx = 1;
+            ColumnMeta column_meta(column_idx, block_meta, *txn->kv_instance());
             ColumnVector col;
-            NewTxnTableStore *txn_table_store = txn->txn_store()->GetNewTxnTableStore(*table_name);
-            Status status = txn_table_store->SetColumnDefs(*db_name, *table_name);
-            EXPECT_TRUE(status.ok());
+            status = txn->GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
 
-            status = txn->GetColumnVector(db_id_str,
-                                          table_id_str,
-                                          segment_id,
-                                          block_id,
-                                          column_idx,
-                                          block_dir,
-                                          row_count,
-                                          ColumnVectorTipe::kReadOnly,
-                                          txn_table_store,
-                                          col);
             EXPECT_TRUE(status.ok());
             Value v1 = col.GetValue(0);
             EXPECT_EQ(v1, Value::MakeVarchar("abc"));
