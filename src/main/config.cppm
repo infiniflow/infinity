@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module;
-
+#include <chrono>
 export module config;
 
 import stl;
@@ -22,8 +22,10 @@ import status;
 import command_statement;
 import virtual_store;
 
+
 namespace infinity {
 
+using namespace std::chrono;
 export constexpr std::string_view profile_history_capacity_name = "profile_history_capacity";
 export constexpr std::string_view enable_profile_name = "enable_profile";
 export constexpr std::string_view worker_cpu_limit = "cpu_count";
@@ -180,9 +182,10 @@ private:
 private:
     std::mutex mutex_;
     GlobalOptions global_options_;
-
     // record running query flag
     Atomic<bool> record_running_query_{false};
-};
 
+public:
+    hours hour_offset_{};
+};
 } // namespace infinity
