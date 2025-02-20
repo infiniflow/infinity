@@ -59,7 +59,7 @@ TEST_P(CurrentTimestampFunctionsTest, current_timestamp_func) {
 
     RegisterCurrentTimestampFunction(catalog_ptr);
 
-    String op = "currenttimestamp";
+    String op = "current_timestamp";
 
     SharedPtr<FunctionSet> function_set = Catalog::GetFunctionSetByName(catalog_ptr.get(), op);
     EXPECT_EQ(function_set->type_, FunctionType::kScalar);
@@ -70,35 +70,19 @@ TEST_P(CurrentTimestampFunctionsTest, current_timestamp_func) {
 
         DataType data_type1(LogicalType::kVarchar);
         SharedPtr<DataType> result_type = MakeShared<DataType>(LogicalType::kTimestamp);
-        SharedPtr<ColumnExpression> col1_expr_ptr = MakeShared<ColumnExpression>(data_type1, "t1", 1, "c1", 0, 0);
-
-        inputs.emplace_back(col1_expr_ptr);
         ScalarFunction func = scalar_function_set->GetMostMatchFunction(inputs);
-        EXPECT_STREQ("currenttimestamp(Varchar)->Timestamp", func.ToString().c_str());
+        EXPECT_STREQ("current_timestamp()", func.ToString().c_str());
 
         Vector<SharedPtr<DataType>> column_types;
         column_types.emplace_back(MakeShared<DataType>(data_type1));
 
-        SizeT row_count = DEFAULT_VECTOR_SIZE;
-
         DataBlock data_block;
-        data_block.Init(column_types);
-
-        for (SizeT i = 0; i < row_count; ++i) {
-            data_block.AppendValue(0, Value::MakeVarchar("Asia/Shanghai"));
-        }
-        data_block.Finalize();
-
-        for (SizeT i = 0; i < row_count; ++i) {
-            Value v1 = data_block.GetValue(0, i);
-            EXPECT_EQ(v1.type_.type(), LogicalType::kVarchar);
-        }
 
         SharedPtr<ColumnVector> result = MakeShared<ColumnVector>(result_type);
         result->Initialize();
         func.function_(data_block, result);
 
-        for (SizeT i = 0; i < row_count; ++i) {
+        for (SizeT i = 0; i < 1; ++i) {
             Value v = result->GetValue(i);
             EXPECT_EQ(v.type_.type(), LogicalType::kTimestamp);
         }
