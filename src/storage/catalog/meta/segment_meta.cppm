@@ -24,12 +24,15 @@ namespace infinity {
 
 class KVInstance;
 class ColumnDef;
+class TableMeeta;
 
 export class SegmentMeta {
 public:
-    SegmentMeta(SegmentID segment_id, KVInstance &kv_instance);
+    SegmentMeta(SegmentID segment_id, TableMeeta &table_meta, KVInstance &kv_instance);
 
     KVInstance &kv_instance() { return kv_instance_; }
+
+    TableMeeta &table_meta() { return table_meta_; }
 
     SegmentID segment_id() const { return segment_id_; }
 
@@ -80,17 +83,12 @@ private:
 
 private:
     KVInstance &kv_instance_;
+    TableMeeta &table_meta_;
     SegmentID segment_id_;
 
     Optional<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;
     Optional<SizeT> row_cnt_;
-
-public:
-    String db_id_str_;
-    String table_id_str_;
-    String table_dir_;
-    Vector<SharedPtr<ColumnDef>> column_defs_;
 };
 
 } // namespace infinity

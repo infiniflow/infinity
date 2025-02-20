@@ -49,6 +49,7 @@ import new_txn_store;
 import segment_meta;
 import block_meta;
 import column_meta;
+import table_meeta;
 
 using namespace infinity;
 
@@ -4787,7 +4788,7 @@ TEST_P(NewCatalogTest, test_append) {
 
     // Check the appended data.
     {
-        auto *txn =  new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
         String table_key;
         String table_id_str;
@@ -4809,14 +4810,10 @@ TEST_P(NewCatalogTest, test_append) {
         EXPECT_EQ(block_ids[0], 0);
         BlockID block_id = block_ids[0];
 
-        SegmentMeta segment_meta(segment_id, *txn->kv_instance());
-        {
-            // TODO: remove it
-            segment_meta.db_id_str_ = db_id_str;
-            segment_meta.table_id_str_ = table_id_str;
-            segment_meta.table_dir_ = "table_dir";
-            segment_meta.column_defs_ = {column_def1, column_def2};
-        }
+        TableMeeta table_meta(table_id_str, *txn->kv_instance());
+        table_meta.db_id_str_ = db_id_str;
+
+        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
 
         NewTxnGetVisibleRangeState state;

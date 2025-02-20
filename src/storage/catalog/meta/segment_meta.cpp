@@ -22,10 +22,12 @@ import kv_store;
 import kv_code;
 import third_party;
 import default_values;
+import table_meeta;
 
 namespace infinity {
 
-SegmentMeta::SegmentMeta(SegmentID segment_id, KVInstance &kv_instance) : kv_instance_(kv_instance), segment_id_(segment_id) {}
+SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta, KVInstance &kv_instance)
+    : kv_instance_(kv_instance), table_meta_(table_meta), segment_id_(segment_id) {}
 
 Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
     block_ids_ = block_ids;
@@ -43,13 +45,17 @@ Status SegmentMeta::AddBlockID(BlockID block_id) {
         LoadBlockIDs();
     }
     block_ids_->push_back(block_id);
-    return SetBlockIDs(*block_ids_);
+    Status status = SetBlockIDs(*block_ids_);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
 }
 
 Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
     next_block_id_ = next_block_id;
     String next_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
-    String next_block_id_str = nlohmann::json(next_block_id).dump();
+    String next_block_id_str = fmt::format("{}", next_block_id);
     Status status = kv_instance_.Put(next_block_id_key, next_block_id_str);
     if (!status.ok()) {
         return status;
@@ -60,7 +66,7 @@ Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
 Status SegmentMeta::SetRowCnt(SizeT row_cnt) {
     row_cnt_ = row_cnt;
     String row_cnt_key = GetSegmentTag("row_cnt");
-    String row_cnt_str = nlohmann::json(row_cnt).dump();
+    String row_cnt_str = fmt::format("{}", row_cnt);
     Status status = kv_instance_.Put(row_cnt_key, row_cnt_str);
     if (!status.ok()) {
         return status;
@@ -124,7 +130,7 @@ Status SegmentMeta::LoadRowCnt() {
 }
 
 String SegmentMeta::GetSegmentTag(const String &tag) const {
-    return KeyEncode::CatalogTableSegmentTagKey(db_id_str_, table_id_str_, segment_id_, tag);
+    return KeyEncode::CatalogTableSegmentTagKey(table_meta_.db_id_str_, table_meta_.table_id_str(), segment_id_, tag);
 }
 
 } // namespace infinity

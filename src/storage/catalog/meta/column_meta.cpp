@@ -22,6 +22,7 @@ import kv_store;
 import kv_code;
 import block_meta;
 import segment_meta;
+import table_meeta;
 import third_party;
 
 namespace infinity {
@@ -60,8 +61,9 @@ Status ColumnMeta::LoadChunkOffset() {
 
 String ColumnMeta::GetColumnTag(const String &tag) const {
     SegmentMeta &segment_meta = block_meta_.segment_meta();
-    return KeyEncode::CatalogTableSegmentBlockColumnTagKey(segment_meta.db_id_str_,
-                                                           segment_meta.table_id_str_,
+    TableMeeta &table_meta = segment_meta.table_meta();
+    return KeyEncode::CatalogTableSegmentBlockColumnTagKey(table_meta.db_id_str_,
+                                                           table_meta.table_id_str(),
                                                            segment_meta.segment_id(),
                                                            block_meta_.block_id(),
                                                            column_idx_,

@@ -22,6 +22,7 @@ import kv_code;
 import third_party;
 import kv_store;
 import segment_meta;
+import table_meeta;
 import new_catalog;
 import infinity_context;
 
@@ -51,7 +52,15 @@ Status BlockMeta::SetGetRowCnt(SizeT row_cnt) {
 }
 
 Status BlockMeta::InitSet() {
-    block_dir_ = MakeShared<String>(fmt::format("{}/seg_{}/block_{}", segment_meta_.table_dir_, segment_meta_.segment_id(), block_id_));
+    TableMeeta &table_meta = segment_meta_.table_meta();
+    String *table_dir_ptr = nullptr;
+    {
+        Status status = table_meta.GetTableDir(table_dir_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    block_dir_ = MakeShared<String>(fmt::format("{}/seg_{}/block_{}", *table_dir_ptr, segment_meta_.segment_id(), block_id_));
     {
         String block_dir_key = GetBlockTag("dir");
         Status status = kv_instance_.Put(block_dir_key, *block_dir_);
@@ -95,11 +104,8 @@ Status BlockMeta::LoadRowCnt() {
 }
 
 String BlockMeta::GetBlockTag(const String &tag) const {
-    return KeyEncode::CatalogTableSegmentBlockTagKey(segment_meta_.db_id_str_,
-                                                     segment_meta_.table_id_str_,
-                                                     segment_meta_.segment_id(),
-                                                     block_id_,
-                                                     tag);
+    TableMeeta &table_meta = segment_meta_.table_meta();
+    return KeyEncode::CatalogTableSegmentBlockTagKey(table_meta.db_id_str_, table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, tag);
 }
 
 } // namespace infinity

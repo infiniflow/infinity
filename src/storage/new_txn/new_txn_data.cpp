@@ -35,9 +35,10 @@ import logger;
 import var_buffer;
 import wal_entry;
 
-import segment_meta;
-import block_meta;
 import column_meta;
+import block_meta;
+import segment_meta;
+import table_meeta;
 
 namespace infinity {
 
@@ -217,6 +218,23 @@ Status NewTxn::AddNewSegment(const String &db_id_str,
     return Status::OK();
 }
 
+Status NewTxn::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id) {
+    {
+        Status status = table_meta.AddSegmentID(segment_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+    {
+        Status status = segment_meta.InitSet();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status NewTxn::AddNewBlock(const String &db_id_str,
                            const String &table_id_str,
                            SegmentID segment_id,
@@ -288,6 +306,42 @@ Status NewTxn::AddNewBlock(const String &db_id_str,
     return Status::OK();
 }
 
+Status NewTxn::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id) {
+    {
+        Status status = segment_meta.AddBlockID(block_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+    {
+        Status status = block_meta.InitSet();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    SharedPtr<String> block_dir_ptr;
+    {
+        Status status = block_meta.GetBlockDir(block_dir_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    BufferObj *version_buffer = nullptr;
+    {
+        auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                 MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                 block_dir_ptr,
+                                                                 BlockVersion::FileName(),
+                                                                 block_meta.block_capacity(),
+                                                                 buffer_mgr->persistence_manager());
+        version_buffer = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
+        version_buffer->AddObjRc();
+    }
+    return Status::OK();
+}
+
 Status NewTxn::AddNewColumn(const String &db_id_str,
                             const String &table_id_str,
                             SegmentID segment_id,
@@ -330,6 +384,61 @@ Status NewTxn::AddNewColumn(const String &db_id_str,
         // outline_buffer->AddObjRc();
     }
 
+    return Status::OK();
+}
+
+Status NewTxn::AddNewColumn(BlockMeta &block_meta, SizeT column_idx) {
+    const ColumnDef *col_def = nullptr;
+    {
+        TableMeeta &table_meta = block_meta.segment_meta().table_meta();
+        Vector<SharedPtr<ColumnDef>> *column_defs_ptr = nullptr;
+        Status status = table_meta.GetColumnDefs(column_defs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        col_def = (*column_defs_ptr)[column_idx].get();
+    }
+
+    ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+    {
+        Status status = column_meta.InitSet();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    SharedPtr<String> block_dir_ptr;
+    {
+        Status status = block_meta.GetBlockDir(block_dir_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    BufferObj *buffer = nullptr;
+    {
+        auto filename = MakeShared<String>(fmt::format("{}.col", column_idx));
+        SizeT total_data_size = block_meta.block_capacity() * col_def->type()->Size();
+        auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                      block_dir_ptr,
+                                                      filename,
+                                                      total_data_size,
+                                                      buffer_mgr->persistence_manager());
+        buffer = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+        buffer->AddObjRc();
+    }
+    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+    if (buffer_type == VectorBufferType::kVarBuffer) {
+        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_idx));
+        auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_dir_ptr,
+                                                             filename,
+                                                             0, /*buffer_size*/
+                                                             buffer_mgr->persistence_manager());
+        [[maybe_unused]] BufferObj *outline_buffer = buffer_mgr->AllocateBufferObject(std::move(outline_file_worker));
+        // outline_buffer->AddObjRc();
+    }
     return Status::OK();
 }
 
@@ -430,6 +539,53 @@ Status NewTxn::AppendInBlock(const String &db_id_str,
     return Status::OK();
 }
 
+Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset) {
+    SharedPtr<String> block_dir_ptr;
+    {
+        Status status = block_meta.GetBlockDir(block_dir_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    BufferObj *version_buffer = nullptr;
+    {
+        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+        if (version_buffer == nullptr) {
+            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+        }
+    }
+
+    SharedPtr<BlockLock> block_lock;
+    {
+        Status status = block_meta.GetBlockLock(block_lock);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    {
+        std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
+
+        // append in column file
+        for (SizeT column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
+            const ColumnVector &column_vector = *input_block->column_vectors[column_idx];
+            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            Status status = this->AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+
+        // append in version file.
+        BufferHandle buffer_handle = version_buffer->Load();
+        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        block_version->Append(commit_ts, block_offset + append_rows);
+    }
+    return Status::OK();
+}
+
 // This function is called when block is locked
 Status NewTxn::AppendInColumn(const String &db_id_str,
                               const String &table_id_str,
@@ -485,6 +641,26 @@ Status NewTxn::AppendInColumn(const String &db_id_str,
     return Status::OK();
 }
 
+Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset) {
+    ColumnVector dest_vec;
+    {
+        Status status = this->GetColumnVector(column_meta, dest_offset, ColumnVectorTipe::kReadWrite, dest_vec);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    dest_vec.AppendWith(column_vector, source_offset, append_rows);
+
+    if (VarBufferManager *var_buffer_mgr = dest_vec.buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
+        SizeT chunk_size = var_buffer_mgr->TotalSize();
+        Status status = column_meta.SetChunkOffset(chunk_size);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status NewTxn::DeleteInBlock(const String &db_id_str,
                              const String &table_id_str,
                              SegmentID segment_id,
@@ -531,6 +707,43 @@ Status NewTxn::DeleteInBlock(const String &db_id_str,
         }
     }
 
+    return Status::OK();
+}
+
+Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets) {
+    SharedPtr<String> block_dir_ptr;
+    {
+        Status status = block_meta.GetBlockDir(block_dir_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    BufferObj *version_buffer = nullptr;
+    {
+        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+        if (version_buffer == nullptr) {
+            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+        }
+    }
+
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    {
+        SharedPtr<BlockLock> block_lock;
+        Status status = block_meta.GetBlockLock(block_lock);
+        if (!status.ok()) {
+            return status;
+        }
+        std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
+
+        // delete in version file
+        BufferHandle buffer_handle = version_buffer->Load();
+        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        for (BlockOffset block_offset : block_offsets) {
+            block_version->Delete(block_offset, commit_ts);
+        }
+    }
     return Status::OK();
 }
 
@@ -596,7 +809,13 @@ Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnV
     }
     const ColumnDef *col_def = nullptr;
     {
-        col_def = column_meta.block_meta().segment_meta().column_defs_[column_meta.column_idx()].get();
+        TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
+        Vector<SharedPtr<ColumnDef>> *column_defs_ptr = nullptr;
+        Status status = table_meta.GetColumnDefs(column_defs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
     }
 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();

@@ -74,6 +74,7 @@ struct AddDeltaEntryTask;
 class ColumnMeta;
 class BlockMeta;
 class SegmentMeta;
+class TableMeeta;
 
 export class NewTxnGetVisibleRangeState {
 public:
@@ -386,6 +387,7 @@ private:
                          SizeT segment_capacity,
                          const String &table_dir,
                          NewTxnTableStore *txn_table_store);
+    Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id);
     Status AddNewBlock(const String &db_id_str,
                        const String &table_id_str,
                        SegmentID segment_id,
@@ -393,6 +395,7 @@ private:
                        SizeT block_capacity,
                        const String &table_dir,
                        NewTxnTableStore *txn_table_store);
+    Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id);
     Status AddNewColumn(const String &db_id_str,
                         const String &table_id_str,
                         SegmentID segment_id,
@@ -401,6 +404,8 @@ private:
                         SizeT block_capacity,
                         SharedPtr<String> block_dir,
                         NewTxnTableStore *txn_table_store);
+    Status AddNewColumn(BlockMeta &block_meta, SizeT column_idx);
+
     Status PrepareAppendInBlock(SegmentID segment_id,
                                 BlockID block_id,
                                 AppendState *append_state,
@@ -416,6 +421,8 @@ private:
                          const DataBlock *input_block,
                          SizeT input_offset,
                          NewTxnTableStore *txn_table_store);
+    Status AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset);
+
     Status AppendInColumn(const String &db_id_str,
                           const String &table_id_str,
                           SegmentID segment_id,
@@ -427,11 +434,15 @@ private:
                           const ColumnVector &column_vector,
                           SizeT source_offset,
                           NewTxnTableStore *txn_table_store);
+    Status AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset);
+
     Status DeleteInBlock(const String &db_id_str,
                          const String &table_id_str,
                          SegmentID segment_id,
                          BlockID block_id,
                          const Vector<BlockOffset> &block_offsets);
+
+    Status DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets);
 
 public:
     Status GetColumnVector(const String &db_id_str,
