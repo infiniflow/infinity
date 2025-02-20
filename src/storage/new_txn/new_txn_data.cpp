@@ -65,7 +65,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
         }
     }
     visible_range = {block_offset_begin, row_idx};
-    return true;
+    return block_offset_begin < row_idx;
 }
 
 Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {

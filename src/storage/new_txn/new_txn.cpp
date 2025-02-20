@@ -2032,7 +2032,7 @@ void NewTxn::CommitBottom() {
 }
 
 void NewTxn::PostCommit() {
-    txn_store_.MaintainCompactionAlg();
+    // txn_store_.MaintainCompactionAlg();
 
     for (auto &sema : txn_store_.semas()) {
         sema->acquire();
