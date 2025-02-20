@@ -14,7 +14,7 @@
 
 module;
 
-
+#include <chrono>
 #include <string>
 #include <unistd.h>
 
@@ -35,6 +35,7 @@ import infinity_exception;
 import global_resource_usage;
 
 namespace infinity {
+using namespace std::chrono;
 
 Config::Config() {
 #ifdef INFINITY_DEBUG
@@ -751,6 +752,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                     if (!status.ok()) {
                                         UnrecoverableError(status.message());
                                     }
+
+                                    hours offset_hour(time_zone_bias);
+                                    hour_offset_ = offset_hour;
                                 }
                             }
                             break;

@@ -30,65 +30,50 @@ curl --request POST \
          "create_option": "ignore_if_exists",
          "fields": [
              {"name": "num", "type": "integer"},
-             {"name": "body", "type": "varchar"},
-             {"name": "vec", "type": "vector,4,float"}
+             {"name": "name", "type": "varchar"},
+             {"name": "score", "type": "float"}
          ]
      }'
 
-# Insert 3 rows into 'my_table'
-echo -e '\n-- Insert 3 rows into my_table'
+# Insert 10 rows into 'my_table'
+echo -e '\n-- Insert 10 rows into my_table'
 curl --request POST \
      --url http://localhost:23820/databases/default_db/tables/my_table/docs \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data '[
-         {"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]},
-         {"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]},
-         {"num": 3, "body": "A Bloom filter is a space-efficient probabilistic data structure...", "vec": [4.0, 4.2, 4.3, 4.2]}
+         {"num": 1, "name": "Tom", "score": 90.5},
+         {"num": 2, "name": "Henry", "score": 70.0},
+         {"num": 3, "name": "James", "score": 75.0},
+         {"num": 4, "name": "Toby", "score": 92.0},
+         {"num": 5, "name": "Thomas", "score": 72.5},
+         {"num": 6, "name": "Charlie", "score": 69.0},
+         {"num": 7, "name": "Chris", "score": 88.0},
+         {"num": 8, "name": "Bill", "score": 90.0},
+         {"num": 9, "name": "Stefan", "score": 86.5},
+         {"num": 10, "name": "Steve", "score": 86.0}
      ]'
 
-# Query all rows from 'my_table'
-echo -e '\n-- Query all rows from my_table'
+# Query rows from 'my_table' with filter: score > 80.0 and score <= 90.0
+echo -e '\n-- Query rows from my_table with filter: score > 80.0 and score <= 90.0'
 curl --request GET \
-     --url http://localhost:23820/databases/default_db/tables/my_table/docs \
-     --header 'accept: application/json' \
-     --header 'content-type: application/json' \
-     --data '{"output": ["num", "body"]}'
-
-# Delete rows from 'my_table' where num = 2
-echo -e '\n-- Delete rows from my_table where num = 2'
-curl --request DELETE \
-     --url http://localhost:23820/databases/default_db/tables/my_table/docs \
-     --header 'accept: application/json' \
-     --header 'content-type: application/json' \
-     --data '{"filter": "num = 2"}'
-
-# Insert 2 rows into 'my_table' again
-echo -e '\n-- Insert 2 rows into my_table again'
-curl --request POST \
-     --url http://localhost:23820/databases/default_db/tables/my_table/docs \
-     --header 'accept: application/json' \
-     --header 'content-type: application/json' \
-     --data '[
-         {"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]},
-         {"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}
-     ]'
-
-# Update rows in 'my_table' where num = 2
-echo -e '\n-- Update rows in my_table where num = 2'
-curl --request PUT \
      --url http://localhost:23820/databases/default_db/tables/my_table/docs \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
      --data '{
-         "update": {"body": "unnecessary and harmful", "vec": [14.0, 7.2, 0.8, 10.9]},
-         "filter": "num = 2"
+         "output": ["num", "name", "score"],
+         "filter": "(score > 80.0) and (score <= 90.0)"
      }'
 
-# Query all rows from 'my_table' after updates
-echo -e '\n-- Query all rows from my_table after updates'
+# Query rows from 'my_table' with filter: num <> 9
+echo -e '\n-- Query rows from my_table with filter: num <> 9'
 curl --request GET \
      --url http://localhost:23820/databases/default_db/tables/my_table/docs \
      --header 'accept: application/json' \
      --header 'content-type: application/json' \
-     --data '{"output": ["*"]}'
+     --data '{
+         "output": ["num", "name", "score"],
+         "filter": "num <> 9"
+     }'
+
+echo -e '\n-- Test done'
