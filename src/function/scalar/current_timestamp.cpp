@@ -43,9 +43,7 @@ template <>
 inline void CurrentTimestampFunction::Run(TimestampT &result) {
     InfinityContext& infinityContext = InfinityContext::instance();
     Config* config = infinityContext.config();
-    auto offset = config->TimeZoneBias();
-    hours offset_hour(offset);
-    auto now = system_clock::now() + offset_hour;
+    auto now = system_clock::now() + config->hour_offset_;
     auto sys_days = std::chrono::floor<std::chrono::days>(now);
     auto sys_secs = std::chrono::floor<std::chrono::seconds>(now);
     auto seconds_per_day = 24 * 60 * 60;
