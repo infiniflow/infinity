@@ -167,6 +167,8 @@ Tuple<UniquePtr<String>, Status> NewTxnTableStore::Import(SharedPtr<SegmentEntry
     return {nullptr, Status::OK()};
 }
 
+Tuple<UniquePtr<String>, Status> NewTxnTableStore::Append(const SharedPtr<DataBlock> &input_block) { return {nullptr, Status::OK()}; }
+
 void NewTxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) {
     std::lock_guard lock(txn_table_store_mtx_);
 
@@ -284,7 +286,7 @@ void NewTxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     //     Catalog::RollbackPopulateIndex(txn_index_store.get(), txn_);
     // }
     // TODO: adapt
-//    Catalog::RollbackCompact(table_entry_, txn_id, abort_ts, compact_state_);
+    //    Catalog::RollbackCompact(table_entry_, txn_id, abort_ts, compact_state_);
     for (const auto &[new_segment_store, old_segments] : compact_state_.compact_data_) {
         std::move(*new_segment_store.segment_entry_).Cleanup();
     }
@@ -424,10 +426,10 @@ void NewTxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_t
 
     // Attention: "compact" needs to be ahead of "delete"
     // TODO: Adapt
-//    if (compact_state_.type_ != CompactStatementType::kInvalid) {
-//        LOG_DEBUG(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), commit_ts));
-//        Catalog::CommitCompact(table_entry_, txn_id, commit_ts, compact_state_);
-//    }
+    //    if (compact_state_.type_ != CompactStatementType::kInvalid) {
+    //        LOG_DEBUG(fmt::format("Commit compact, table dir: {}, commit ts: {}", *table_entry_->TableEntryDir(), commit_ts));
+    //        Catalog::CommitCompact(table_entry_, txn_id, commit_ts, compact_state_);
+    //    }
 
     Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
 
@@ -447,9 +449,9 @@ void NewTxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_t
 void NewTxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
     std::shared_lock lock(txn_table_store_mtx_);
     // TODO: adapt
-//    Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_store_, &delete_state_);
+    //    Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_store_, &delete_state_);
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
-//        Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
+        //        Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
         txn_index_store->Commit(txn_id, commit_ts);
     }
     for (auto [table_index_entry, ptr_seq_n] : txn_indexes_) {
