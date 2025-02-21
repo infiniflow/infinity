@@ -4938,7 +4938,14 @@ TEST_P(NewCatalogTest, test_delete) {
         SegmentID segment_id = 0;
         BlockID block_id = 0;
         NewTxnGetVisibleRangeState state;
-        status = txn->GetBlockVisibleRange(db_id_str, table_id_str, segment_id, block_id, state);
+
+        TableMeeta table_meta(table_id_str, *txn->kv_instance());
+        table_meta.db_id_str_ = db_id_str;
+
+        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+
+        status = txn->GetBlockVisibleRange(block_meta, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;

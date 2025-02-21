@@ -2061,9 +2061,9 @@ void NewTxn::PostCommit() {
             }
             case WalCommandType::DELETE: {
                 auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
-                Status status = CommitDelete(delete_cmd);
+                Status status = CommitDelete2(delete_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError("CommitDelete failed");
+                    UnrecoverableError("CommitDelete2 failed");
                 }
                 break;
             }

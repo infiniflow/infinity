@@ -381,89 +381,22 @@ private:
     Status CommitDropIdxChunkByID(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, ChunkID chunk_id);
 
     // DML
-    Status AddNewSegment(const String &db_id_str,
-                         const String &table_id_str,
-                         SegmentID latest_segment_id,
-                         SizeT segment_capacity,
-                         const String &table_dir,
-                         NewTxnTableStore *txn_table_store);
     Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
-    Status AddNewBlock(const String &db_id_str,
-                       const String &table_id_str,
-                       SegmentID segment_id,
-                       BlockID latest_block_id,
-                       SizeT block_capacity,
-                       const String &table_dir,
-                       NewTxnTableStore *txn_table_store);
+
     Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
-    Status AddNewColumn(const String &db_id_str,
-                        const String &table_id_str,
-                        SegmentID segment_id,
-                        BlockID block_id,
-                        ColumnID column_idx,
-                        SizeT block_capacity,
-                        SharedPtr<String> block_dir,
-                        NewTxnTableStore *txn_table_store);
+
     Status AddNewColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
 
-    Status PrepareAppendInBlock(SegmentID segment_id,
-                                BlockID block_id,
-                                AppendState *append_state,
-                                SizeT block_capacity,
-                                SizeT block_row_count,
-                                SizeT &actual_append);
     Status PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full);
-    Status AppendInBlock(const String &db_id_str,
-                         const String &table_id_str,
-                         SegmentID segment_id,
-                         BlockID block_id,
-                         SizeT block_offset,
-                         SizeT append_rows,
-                         const DataBlock *input_block,
-                         SizeT input_offset,
-                         NewTxnTableStore *txn_table_store);
+
     Status AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset);
 
-    Status AppendInColumn(const String &db_id_str,
-                          const String &table_id_str,
-                          SegmentID segment_id,
-                          BlockID block_id,
-                          SizeT column_idx,
-                          String block_dir,
-                          SizeT dest_offset,
-                          SizeT append_rows,
-                          const ColumnVector &column_vector,
-                          SizeT source_offset,
-                          NewTxnTableStore *txn_table_store);
     Status AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset);
-
-    Status DeleteInBlock(const String &db_id_str,
-                         const String &table_id_str,
-                         SegmentID segment_id,
-                         BlockID block_id,
-                         const Vector<BlockOffset> &block_offsets);
 
     Status DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets);
 
 public:
-    Status GetColumnVector(const String &db_id_str,
-                           const String &table_id_str,
-                           SegmentID segment_id,
-                           BlockID block_id,
-                           SizeT column_idx,
-                           String block_dir,
-                           SizeT row_count,
-                           ColumnVectorTipe tipe,
-                           NewTxnTableStore *txn_table_store,
-                           ColumnVector &column_vector);
-
     Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);
-
-    Status GetBlockVisibleRange(const String &db_id_str,
-                                const String &table_id_str,
-                                SegmentID segment_id,
-                                BlockID block_id,
-                                NewTxnGetVisibleRangeState &state);
 
     Status GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRangeState &state);
 
@@ -478,11 +411,9 @@ private:
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
-    Status PrepareCommitAppend(const WalCmdAppend *append_cmd);
     Status CommitAppend2(const WalCmdAppend *append_cmd);
-    Status CommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitAppend2(const WalCmdAppend *append_cmd);
-    Status CommitDelete(const WalCmdDelete *delete_cmd);
+    Status CommitDelete2(const WalCmdDelete *delete_cmd);
     Status CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
