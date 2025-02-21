@@ -450,7 +450,7 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         column_idx_set.insert(column_def->id());
     }
 
-    status = new_catalog_->LockTable(table_key);
+    status = new_catalog_->ImmutateTable(table_key, txn_context_ptr_->txn_id_);
     if (!status.ok()) {
         return status;
     }
@@ -512,7 +512,7 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         }
     }
 
-    status = new_catalog_->LockTable(table_key);
+    status = new_catalog_->ImmutateTable(table_key, txn_context_ptr_->txn_id_);
     if (!status.ok()) {
         return status;
     }
@@ -652,7 +652,7 @@ Status NewTxn::LockTable(const String &db_name, const String &table_name) {
         return status;
     }
 
-    status = new_catalog_->LockTable(table_key);
+    status = new_catalog_->LockTable(table_key, txn_context_ptr_->txn_id_);
     if (status.ok()) {
         SharedPtr<LockTableCommand> extra_command = MakeShared<LockTableCommand>(table_key);
         extra_commands_.push_back(extra_command);
@@ -671,7 +671,7 @@ Status NewTxn::UnlockTable(const String &db_name, const String &table_name) {
         return status;
     }
 
-    status = new_catalog_->UnlockTable(table_key);
+    status = new_catalog_->UnlockTable(table_key, txn_context_ptr_->txn_id_);
     if (status.ok()) {
         SharedPtr<UnlockTableCommand> extra_command = MakeShared<UnlockTableCommand>(table_key);
         extra_commands_.push_back(extra_command);
@@ -1220,7 +1220,7 @@ Status NewTxn::Commit() {
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted();
-        return Status::OK();
+        return PostReadTxnCommit();
     }
 
     StorageMode current_storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -1265,6 +1265,33 @@ Status NewTxn::Commit() {
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
     PostCommit();
+
+    return Status::OK();
+}
+
+Status NewTxn::PostReadTxnCommit() {
+    for (const auto &extra_command : extra_commands_) {
+        switch (extra_command->GetType()) {
+            case ExtraCommandType::kLockTable: {
+                // Not check the unlock result
+                LockTableCommand *lock_table_command = static_cast<LockTableCommand *>(extra_command.get());
+                Status status = new_catalog_->CommitLockTable(lock_table_command->table_key(), txn_context_ptr_->txn_id_);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case ExtraCommandType::kUnlockTable: {
+                // Not check the lock result
+                UnlockTableCommand *unlock_table_command = static_cast<UnlockTableCommand *>(extra_command.get());
+                Status status = new_catalog_->CommitUnlockTable(unlock_table_command->table_key(), txn_context_ptr_->txn_id_);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+        }
+    }
 
     return Status::OK();
 }
@@ -2086,7 +2113,7 @@ void NewTxn::PostCommit() {
             }
             case WalCommandType::ADD_COLUMNS: {
                 auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
-                Status status = new_catalog_->UnlockTable(cmd->table_key_);
+                Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table");
                 }
@@ -2094,7 +2121,7 @@ void NewTxn::PostCommit() {
             }
             case WalCommandType::DROP_COLUMNS: {
                 auto *cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
-                Status status = new_catalog_->UnlockTable(cmd->table_key_);
+                Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table");
                 }
@@ -2133,7 +2160,7 @@ Status NewTxn::Rollback() {
         switch (command_type) {
             case WalCommandType::ADD_COLUMNS: {
                 auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
-                Status status = new_catalog_->UnlockTable(cmd->table_key_);
+                Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table");
                 }
@@ -2141,7 +2168,7 @@ Status NewTxn::Rollback() {
             }
             case WalCommandType::DROP_COLUMNS: {
                 auto *cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
-                Status status = new_catalog_->UnlockTable(cmd->table_key_);
+                Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table");
                 }
@@ -2166,13 +2193,13 @@ Status NewTxn::Rollback() {
             case ExtraCommandType::kLockTable: {
                 // Not check the unlock result
                 LockTableCommand *lock_table_command = static_cast<LockTableCommand *>(extra_command.get());
-                new_catalog_->UnlockTable(lock_table_command->table_key());
+                new_catalog_->RollbackLockTable(lock_table_command->table_key(), txn_context_ptr_->txn_id_);
                 break;
             }
             case ExtraCommandType::kUnlockTable: {
                 // Not check the lock result
                 UnlockTableCommand *unlock_table_command = static_cast<UnlockTableCommand *>(extra_command.get());
-                new_catalog_->LockTable(unlock_table_command->table_key());
+                new_catalog_->RollbackUnlockTable(unlock_table_command->table_key(), txn_context_ptr_->txn_id_);
                 break;
             }
         }

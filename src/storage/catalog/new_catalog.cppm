@@ -22,13 +22,17 @@ import status;
 import meta_info;
 import extra_ddl_info;
 import kv_store;
+import default_values;
 
 namespace infinity {
 
 class NewTxn;
 
+export enum class LockType { kLocking, kLocked, kUnlocking, kUnlocked, kImmutable };
+
 export struct TableMemoryContext {
-    bool locked_{false};
+    LockType locker{LockType::kUnlocked};
+    TransactionID locked_txn_{MAX_TXN_ID};
     SizeT write_txn_num_{0};
 };
 
@@ -73,9 +77,17 @@ public:
     static String GetPathNameTail(const String &path);
 
 public:
-    Status LockTable(const String &table_key);
-    Status UnlockTable(const String &table_key);
-    bool IsTableLocked(const String &table_key);
+    Status LockTable(const String &table_key, TransactionID txn_id);
+    Status CommitLockTable(const String &table_key, TransactionID txn_id);
+    Status RollbackLockTable(const String &table_key, TransactionID txn_id);
+
+    Status UnlockTable(const String &table_key, TransactionID txn_id);
+    Status CommitUnlockTable(const String &table_key, TransactionID txn_id);
+    Status RollbackUnlockTable(const String &table_key, TransactionID txn_id);
+
+    Status ImmutateTable(const String &table_key, TransactionID txn_id);
+    Status MutateTable(const String &table_key, TransactionID txn_id);
+
     Status IncreaseTableWriteCount(const String &table_key);
     Status DecreaseTableWriteCount(const String &table_key);
 

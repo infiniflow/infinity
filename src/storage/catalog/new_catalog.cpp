@@ -158,7 +158,7 @@ String NewCatalog::GetPathNameTail(const String &path) {
     return path.substr(delimiter_i + 1);
 }
 
-Status NewCatalog::LockTable(const String &table_key) {
+Status NewCatalog::LockTable(const String &table_key, TransactionID txn_id) {
     std::unique_lock lock(mtx_);
     auto iter = table_memory_context_map_.find(table_key);
     if (iter == table_memory_context_map_.end()) {
@@ -171,41 +171,241 @@ Status NewCatalog::LockTable(const String &table_key) {
         return Status::TableIsUsing(fmt::format("Table key: {} is using write transactions, count: {}", table_key, write_txn_num));
     }
 
-    if (table_memory_context->locked_) {
-        return Status::AlreadyLocked(fmt::format("Table key: {} is already locked", table_key));
+    switch (table_memory_context->locker) {
+        case LockType::kLocked: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is already locked", table_key));
+        }
+        case LockType::kLocking: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is locking", table_key));
+        }
+        case LockType::kUnlocking: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is unlocking", table_key));
+        }
+        case LockType::kImmutable: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is in immutable", table_key));
+        }
+        case LockType::kUnlocked: {
+            table_memory_context->locker = LockType::kLocking;
+            break;
+        }
     }
-    table_memory_context->locked_ = true;
+    table_memory_context->locked_txn_ = txn_id;
     return Status::OK();
 }
-Status NewCatalog::UnlockTable(const String &table_key) {
+
+Status NewCatalog::CommitLockTable(const String &table_key, TransactionID txn_id) {
+    std::unique_lock lock(mtx_);
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        return Status::NotFound(fmt::format("Table key: {} not found in table locker", table_key));
+    }
+
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    SizeT write_txn_num = table_memory_context->write_txn_num_;
+    if (write_txn_num > 0) {
+        return Status::TableIsUsing(fmt::format("Table key: {} is using write transactions, count: {}", table_key, write_txn_num));
+    }
+
+    if (txn_id != table_memory_context->locked_txn_) {
+        return Status::UnexpectedError(
+            fmt::format("Table key: {} is locked by txn: {}, but not: {}", table_key, table_memory_context->locked_txn_, txn_id));
+    }
+
+    if (table_memory_context->locker == LockType::kLocking) {
+        table_memory_context->locker = LockType::kLocked;
+    } else {
+        return Status::UnexpectedError(fmt::format("Table key: {} isn't in locking state.", table_key));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::RollbackLockTable(const String &table_key, TransactionID txn_id) {
+    std::unique_lock lock(mtx_);
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        return Status::NotFound(fmt::format("Table key: {} not found in table locker", table_key));
+    }
+
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    SizeT write_txn_num = table_memory_context->write_txn_num_;
+    if (write_txn_num > 0) {
+        return Status::TableIsUsing(fmt::format("Table key: {} is using write transactions, count: {}", table_key, write_txn_num));
+    }
+
+    if (txn_id != table_memory_context->locked_txn_) {
+        return Status::UnexpectedError(
+            fmt::format("Table key: {} is locked by txn: {}, but not: {}", table_key, table_memory_context->locked_txn_, txn_id));
+    }
+
+    if (table_memory_context->locker == LockType::kLocking) {
+        table_memory_context_map_.erase(table_key);
+    } else {
+        return Status::UnexpectedError(fmt::format("Table key: {} isn't in locking state.", table_key));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::UnlockTable(const String &table_key, TransactionID txn_id) {
     std::lock_guard lock(mtx_);
     auto iter = table_memory_context_map_.find(table_key);
     if (iter == table_memory_context_map_.end()) {
         return Status::NotFound(fmt::format("Table key: {}", table_key));
     }
 
-    SharedPtr<TableMemoryContext> &table_memory_context = table_memory_context_map_[table_key];
-    if (table_memory_context->locked_) {
-        table_memory_context->locked_ = false;
-        return Status::OK();
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    SizeT write_txn_num = table_memory_context->write_txn_num_;
+    if (write_txn_num > 0) {
+        return Status::TableIsUsing(fmt::format("Table key: {} is using write transactions, count: {}", table_key, write_txn_num));
     }
 
-    return Status::NotLocked(fmt::format("Table key: {} wasn't locked before", table_key));
+    switch (table_memory_context->locker) {
+        case LockType::kLocked: {
+            table_memory_context->locker = LockType::kUnlocking;
+            break;
+        }
+        case LockType::kLocking: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is locking", table_key));
+        }
+        case LockType::kUnlocking: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is unlocking", table_key));
+        }
+        case LockType::kUnlocked: {
+            return Status::NotLocked(fmt::format("Table key: {} wasn't locked before", table_key));
+        }
+        case LockType::kImmutable: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is in immutable", table_key));
+        }
+    }
+    table_memory_context->locked_txn_ = txn_id;
+    return Status::OK();
 }
 
-bool NewCatalog::IsTableLocked(const String &table_key) {
-    std::lock_guard lock(mtx_);
+Status NewCatalog::CommitUnlockTable(const String &table_key, TransactionID txn_id) {
+    std::unique_lock lock(mtx_);
     auto iter = table_memory_context_map_.find(table_key);
     if (iter == table_memory_context_map_.end()) {
-        return false;
+        return Status::NotFound(fmt::format("Table key: {} not found in table locker", table_key));
     }
 
-    SharedPtr<TableMemoryContext> &table_memory_context = table_memory_context_map_[table_key];
-    if (table_memory_context->locked_) {
-        return true;
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    SizeT write_txn_num = table_memory_context->write_txn_num_;
+    if (write_txn_num > 0) {
+        return Status::TableIsUsing(fmt::format("Table key: {} is using write transactions, count: {}", table_key, write_txn_num));
     }
 
-    return false;
+    if (txn_id != table_memory_context->locked_txn_) {
+        return Status::UnexpectedError(
+            fmt::format("Table key: {} is being unlocked by txn: {}, but not: {}", table_key, table_memory_context->locked_txn_, txn_id));
+    }
+
+    if (table_memory_context->locker == LockType::kUnlocking) {
+        table_memory_context_map_.erase(table_key);
+    } else {
+        return Status::UnexpectedError(fmt::format("Table key: {} isn't in unlocking state.", table_key));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::RollbackUnlockTable(const String &table_key, TransactionID txn_id) {
+    std::unique_lock lock(mtx_);
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        return Status::NotFound(fmt::format("Table key: {} not found in table locker", table_key));
+    }
+
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    SizeT write_txn_num = table_memory_context->write_txn_num_;
+    if (write_txn_num > 0) {
+        return Status::TableIsUsing(fmt::format("Table key: {} is using write transactions, count: {}", table_key, write_txn_num));
+    }
+
+    if (txn_id != table_memory_context->locked_txn_) {
+        return Status::UnexpectedError(
+            fmt::format("Table key: {} is being unlocked by txn: {}, but not: {}", table_key, table_memory_context->locked_txn_, txn_id));
+    }
+
+    if (table_memory_context->locker == LockType::kUnlocking) {
+        table_memory_context->locker = LockType::kLocked;
+    } else {
+        return Status::UnexpectedError(fmt::format("Table key: {} isn't in unlocking state.", table_key));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::ImmutateTable(const String &table_key, TransactionID txn_id) {
+    std::unique_lock lock(mtx_);
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        table_memory_context_map_[table_key] = MakeShared<TableMemoryContext>();
+    }
+
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    SizeT write_txn_num = table_memory_context->write_txn_num_;
+    if (write_txn_num > 0) {
+        return Status::TableIsUsing(fmt::format("Table key: {} is using write transactions, count: {}", table_key, write_txn_num));
+    }
+
+    switch (table_memory_context->locker) {
+        case LockType::kLocked: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is already locked", table_key));
+        }
+        case LockType::kLocking: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is locking", table_key));
+        }
+        case LockType::kUnlocking: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is unlocking", table_key));
+        }
+        case LockType::kImmutable: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is in immutable", table_key));
+        }
+        case LockType::kUnlocked: {
+            table_memory_context->locker = LockType::kImmutable;
+            break;
+        }
+    }
+
+    table_memory_context->locked_txn_ = txn_id;
+    return Status::OK();
+}
+
+Status NewCatalog::MutateTable(const String &table_key, TransactionID txn_id) {
+    std::unique_lock lock(mtx_);
+    auto iter = table_memory_context_map_.find(table_key);
+    if (iter == table_memory_context_map_.end()) {
+        table_memory_context_map_[table_key] = MakeShared<TableMemoryContext>();
+    }
+
+    TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
+    SizeT write_txn_num = table_memory_context->write_txn_num_;
+    if (write_txn_num > 0) {
+        return Status::TableIsUsing(fmt::format("Table key: {} is using write transactions, count: {}", table_key, write_txn_num));
+    }
+
+    if (txn_id != table_memory_context->locked_txn_) {
+        return Status::UnexpectedError(
+            fmt::format("Table key: {} is immutated by txn: {}, but not: {}", table_key, table_memory_context->locked_txn_, txn_id));
+    }
+
+    switch (table_memory_context->locker) {
+        case LockType::kLocked: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is already locked", table_key));
+        }
+        case LockType::kLocking: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is locking", table_key));
+        }
+        case LockType::kUnlocking: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is unlocking", table_key));
+        }
+        case LockType::kImmutable: {
+            table_memory_context_map_.erase(table_key);
+            break;
+        }
+        case LockType::kUnlocked: {
+            return Status::AlreadyLocked(fmt::format("Table key: {} is in unlocked state", table_key));
+        }
+    }
+
+    return Status::OK();
 }
 
 Status NewCatalog::IncreaseTableWriteCount(const String &table_key) {
@@ -216,7 +416,7 @@ Status NewCatalog::IncreaseTableWriteCount(const String &table_key) {
     }
 
     TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
-    if (table_memory_context->locked_) {
+    if (table_memory_context->locker != LockType::kUnlocked) {
         return Status::AlreadyLocked(fmt::format("Table key: {} is already locked", table_key));
     }
 
@@ -233,7 +433,7 @@ Status NewCatalog::DecreaseTableWriteCount(const String &table_key) {
     }
 
     TableMemoryContext *table_memory_context = table_memory_context_map_[table_key].get();
-    if (table_memory_context->locked_) {
+    if (table_memory_context->locker != LockType::kUnlocked) {
         UnrecoverableError(fmt::format("Table key: {} is already locked", table_key));
     }
 

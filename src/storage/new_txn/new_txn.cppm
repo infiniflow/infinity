@@ -136,6 +136,8 @@ public:
 
     Status Commit();
 
+    Status PostReadTxnCommit();
+
     bool CheckConflict();
 
     Optional<String> CheckConflict(NewTxn *txn);
