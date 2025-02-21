@@ -49,6 +49,7 @@ namespace infinity {
 class TxnManager;
 class Txn;
 struct CatalogDeltaOpBrief;
+class SegmentIndexEntry;
 
 class ProfileHistory {
 private:
@@ -316,6 +317,7 @@ private:
 
 public:
     void MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts);
+    Vector<SharedPtr<SegmentIndexEntry>> all_memindex_recover_segment_;
 
     void PickCleanup(CleanupScanner *scanner);
 
