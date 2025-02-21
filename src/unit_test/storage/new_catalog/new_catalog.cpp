@@ -5647,24 +5647,24 @@ TEST_P(NewCatalogTest, test_append) {
         Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
 
+        TableMeeta table_meta(table_id_str, *txn->kv_instance());
+        table_meta.db_id_str_ = db_id_str;
+
         Vector<SegmentID> segment_ids;
-        status = txn->GetSegmentIDsInTable(db_id_str, table_id_str, segment_ids);
+        status = table_meta.GetSegmentIDs(segment_ids);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(segment_ids.size(), 1);
         EXPECT_EQ(segment_ids[0], 0);
         SegmentID segment_id = segment_ids[0];
+        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
 
         Vector<BlockID> block_ids;
-        status = txn->GetBlockIDsInSegment(db_id_str, table_id_str, segment_ids[0], block_ids);
+        status = segment_meta.GetBlockIDs(block_ids);
+
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(block_ids.size(), 1);
         EXPECT_EQ(block_ids[0], 0);
         BlockID block_id = block_ids[0];
-
-        TableMeeta table_meta(table_id_str, *txn->kv_instance());
-        table_meta.db_id_str_ = db_id_str;
-
-        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
 
         NewTxnGetVisibleRangeState state;

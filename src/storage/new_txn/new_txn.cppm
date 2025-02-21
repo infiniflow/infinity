@@ -362,10 +362,6 @@ private:
 public:
     Status GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id, String &db_id);
 
-    Status GetSegmentIDsInTable(const String &db_id, const String &table_id, Vector<SegmentID> &segment_ids);
-
-    Status GetBlockIDsInSegment(const String &db_id, const String &table_id, SegmentID segment_id, Vector<BlockID> &block_ids);
-
 private:
     Status GetIndexID(const String &db_name,
                       const String &table_name,
@@ -387,7 +383,7 @@ private:
 
     Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
-    Status AddNewColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
+    Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
 
     Status PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full);
 
@@ -413,9 +409,9 @@ private:
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
-    Status CommitAppend2(const WalCmdAppend *append_cmd);
-    Status PostCommitAppend2(const WalCmdAppend *append_cmd);
-    Status CommitDelete2(const WalCmdDelete *delete_cmd);
+    Status CommitAppend(const WalCmdAppend *append_cmd);
+    Status PostCommitAppend(const WalCmdAppend *append_cmd);
+    Status CommitDelete(const WalCmdDelete *delete_cmd);
     Status CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;

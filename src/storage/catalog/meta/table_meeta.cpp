@@ -29,6 +29,17 @@ namespace infinity {
 
 TableMeeta::TableMeeta(String table_id_str, KVInstance &kv_instance) : kv_instance_(kv_instance), table_id_str_(table_id_str) {}
 
+Status TableMeeta::GetColumnIDByColumnName(const String &column_name, ColumnID &column_id) {
+    String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
+    String column_id_str;
+    Status status = kv_instance_.Get(column_key, column_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    column_id = std::stoull(column_id_str);
+    return Status::OK();
+}
+
 Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
     segment_ids_ = segment_ids;
     String segment_ids_key = GetTableTag("segment_ids");

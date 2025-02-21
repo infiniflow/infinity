@@ -76,6 +76,8 @@ public:
         return Status::OK();
     }
 
+    Status GetColumnIDByColumnName(const String &column_name, ColumnID &column_id);
+
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
     Status AddSegmentID(SegmentID segment_id);
@@ -104,11 +106,6 @@ private:
     Optional<Vector<SegmentID>> segment_ids_;
     Optional<SegmentID> next_segment_id_;
     Optional<String> table_dir_;
-
-    // String db_id_str_;
-    // String table_id_str_;
-    // String table_dir_;
-    // Vector<SharedPtr<ColumnDef>> column_defs_;
 
 public:
     String db_id_str_;

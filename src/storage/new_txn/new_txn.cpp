@@ -2032,9 +2032,9 @@ void NewTxn::CommitBottom() {
         switch (command_type) {
             case WalCommandType::APPEND: {
                 auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
-                Status status = CommitAppend2(append_cmd);
+                Status status = CommitAppend(append_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError("CommitAppend2 failed");
+                    UnrecoverableError("CommitAppend failed");
                 }
                 break;
             }
@@ -2080,17 +2080,17 @@ void NewTxn::PostCommit() {
         switch (command_type) {
             case WalCommandType::APPEND: {
                 auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                Status status = PostCommitAppend2(append_cmd);
+                Status status = PostCommitAppend(append_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError("PostCommitAppend2 failed");
+                    UnrecoverableError("PostCommitAppend failed");
                 }
                 break;
             }
             case WalCommandType::DELETE: {
                 auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
-                Status status = CommitDelete2(delete_cmd);
+                Status status = CommitDelete(delete_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError("CommitDelete2 failed");
+                    UnrecoverableError("CommitDelete failed");
                 }
                 break;
             }

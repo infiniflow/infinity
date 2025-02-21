@@ -167,56 +167,6 @@ Tuple<UniquePtr<String>, Status> NewTxnTableStore::Import(SharedPtr<SegmentEntry
     return {nullptr, Status::OK()};
 }
 
-Tuple<UniquePtr<String>, Status> NewTxnTableStore::Append(const SharedPtr<DataBlock> &input_block) {
-    SizeT column_count = column_defs_.size();
-
-    if (input_block->column_count() != column_count) {
-        String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
-        LOG_ERROR(err_msg);
-        return {MakeUnique<String>(err_msg), Status::ColumnCountMismatch(err_msg)};
-    }
-
-    Vector<SharedPtr<DataType>> column_types;
-    for (SizeT col_id = 0; col_id < column_count; ++col_id) {
-        column_types.emplace_back(column_defs_[col_id]->type());
-        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
-            String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
-            LOG_ERROR(err_msg);
-            return {MakeUnique<String>(err_msg),
-                    Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString())};
-        }
-    }
-
-    DataBlock *current_block{nullptr};
-    if (append_state_ == nullptr) {
-        append_state_ = MakeUnique<AppendState>();
-    }
-
-    if (append_state_->blocks_.empty()) {
-        append_state_->blocks_.emplace_back(DataBlock::Make());
-        append_state_->blocks_.back()->Init(column_types);
-    }
-    current_block = append_state_->blocks_.back().get();
-
-    if (current_block->row_count() + input_block->row_count() > current_block->capacity()) {
-        SizeT to_append = current_block->capacity() - current_block->row_count();
-        current_block->AppendWith(input_block.get(), 0, to_append);
-        current_block->Finalize();
-
-        append_state_->blocks_.emplace_back(DataBlock::Make());
-        append_state_->blocks_.back()->Init(column_types);
-        current_block = append_state_->blocks_.back().get();
-        current_block->AppendWith(input_block.get(), to_append, input_block->row_count() - to_append);
-    } else {
-        SizeT to_append = input_block->row_count();
-        current_block->AppendWith(input_block.get(), 0, to_append);
-    }
-    current_block->Finalize();
-
-    has_update_ = true;
-    return {nullptr, Status::OK()};
-}
-
 void NewTxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) {
     std::lock_guard lock(txn_table_store_mtx_);
 
@@ -601,23 +551,6 @@ void NewTxnTableStore::TryRevert() {
     for (const auto &[index_name, index_store] : txn_indexes_store_) {
         index_store->TryRevert();
     }
-}
-
-Status NewTxnTableStore::SetColumnDefs(const String &db_name, const String &table_name) {
-    String db_id_str;
-    String table_id_str;
-    String table_key;
-    Status status = txn_->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    Vector<SharedPtr<ColumnDef>> column_defs;
-    status = txn_->GetColumnDefs(db_id_str, table_id_str, column_defs);
-    if (!status.ok()) {
-        return status;
-    }
-    column_defs_ = std::move(column_defs);
-    return Status::OK();
 }
 
 NewTxnStore::NewTxnStore(NewTxn *txn) : txn_(txn) {}

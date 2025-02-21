@@ -94,10 +94,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(append_command->ToString()));
 
-    if (table_store->column_defs().empty()) {
-        table_store->SetColumnDefs(db_name, table_name);
-    }
-
     auto [err_msg, append_status] = table_store->Append(input_block);
     return Status::OK();
 }
@@ -126,42 +122,6 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     auto [err_msg, delete_status] = table_store->Delete(row_ids);
 
     return delete_status;
-}
-
-Status NewTxn::GetSegmentIDsInTable(const String &db_id_str, const String &table_id_str, Vector<SegmentID> &segment_ids) {
-    String table_segment_ids_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "segment_ids");
-    String segment_ids_str;
-    Status status = kv_instance_->Get(table_segment_ids_key, segment_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    segment_ids.clear();
-    if (segment_ids_str.empty()) {
-        return Status::OK();
-    }
-    nlohmann::json segment_ids_json = nlohmann::json::parse(segment_ids_str);
-    for (const auto &segment_id : segment_ids_json) {
-        segment_ids.push_back(segment_id.get<SegmentID>());
-    }
-    return Status::OK();
-}
-
-Status NewTxn::GetBlockIDsInSegment(const String &db_id_str, const String &table_id_str, SegmentID segment_id, Vector<BlockID> &block_ids) {
-    String block_ids_key = KeyEncode::CatalogTableSegmentTagKey(db_id_str, table_id_str, segment_id, "block_ids");
-    String block_ids_str;
-    Status status = kv_instance_->Get(block_ids_key, block_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    block_ids.clear();
-    if (block_ids_str.empty()) {
-        return Status::OK();
-    }
-    nlohmann::json block_ids_json = nlohmann::json::parse(block_ids_str);
-    for (const auto &block_id : block_ids_json) {
-        block_ids.push_back(block_id.get<BlockID>());
-    }
-    return Status::OK();
 }
 
 Status NewTxn::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
@@ -226,7 +186,7 @@ Status NewTxn::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional
     }
     for (SizeT column_idx = 0; column_idx < column_num; ++column_idx) {
         [[maybe_unused]] Optional<ColumnMeta> column_meta;
-        Status status = this->AddNewColumn(*block_meta, column_idx, column_meta);
+        Status status = this->AddNewBlockColumn(*block_meta, column_idx, column_meta);
         if (!status.ok()) {
             return status;
         }
@@ -234,7 +194,7 @@ Status NewTxn::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional
     return Status::OK();
 }
 
-Status NewTxn::AddNewColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta) {
+Status NewTxn::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta) {
     const ColumnDef *col_def = nullptr;
     {
         TableMeeta &table_meta = block_meta.segment_meta().table_meta();
@@ -523,7 +483,7 @@ Status NewTxn::GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRange
     return Status::OK();
 }
 
-Status NewTxn::CommitAppend2(const WalCmdAppend *append_cmd) {
+Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     const String &db_name = append_cmd->db_name_;
     const String &table_name = append_cmd->table_name_;
 
@@ -661,7 +621,7 @@ Status NewTxn::CommitAppend2(const WalCmdAppend *append_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PostCommitAppend2(const WalCmdAppend *append_cmd) {
+Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
     KVStore *kv_store = txn_mgr_->kv_store();
     UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
 
@@ -703,7 +663,7 @@ Status NewTxn::PostCommitAppend2(const WalCmdAppend *append_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDelete2(const WalCmdDelete *delete_cmd) {
+Status NewTxn::CommitDelete(const WalCmdDelete *delete_cmd) {
     KVStore *kv_store = txn_mgr_->kv_store();
     UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
 

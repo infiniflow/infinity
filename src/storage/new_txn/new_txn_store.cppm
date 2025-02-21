@@ -215,14 +215,6 @@ private:
         kCompacting,
     };
     NewTxnStoreStatus table_status_{NewTxnStoreStatus::kNone};
-
-public:
-    Status SetColumnDefs(const String &db_name, const String &table_name);
-
-    const Vector<SharedPtr<ColumnDef>> &column_defs() const { return column_defs_; }
-
-private:
-    Vector<SharedPtr<ColumnDef>> column_defs_;
 };
 
 export class NewTxnStore {

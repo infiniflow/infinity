@@ -42,7 +42,10 @@ Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
 
 Status SegmentMeta::AddBlockID(BlockID block_id) {
     if (!block_ids_) {
-        LoadBlockIDs();
+        Status status = LoadBlockIDs();
+        if (!status.ok()) {
+            return status;
+        }
     }
     block_ids_->push_back(block_id);
     Status status = SetBlockIDs(*block_ids_);
