@@ -52,9 +52,9 @@ Status TableMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
-Status TableMeeta::SetNextBlockID(SegmentID next_segment_id) {
+Status TableMeeta::SetNextSegmentID(SegmentID next_segment_id) {
     next_segment_id_ = next_segment_id;
-    String next_id_key = GetTableTag(String(LATEST_BLOCK_ID));
+    String next_id_key = GetTableTag(String(LATEST_SEGMENT_ID));
     String next_id_str = fmt::format("{}", next_segment_id);
     Status status = kv_instance_.Put(next_id_key, next_id_str);
     if (!status.ok()) {
@@ -71,7 +71,7 @@ Status TableMeeta::InitSet() {
         }
     }
     {
-        Status status = SetNextBlockID(0);
+        Status status = SetNextSegmentID(0);
         if (!status.ok()) {
             return status;
         }
@@ -111,7 +111,7 @@ Status TableMeeta::LoadSegmentIDs() {
 }
 
 Status TableMeeta::LoadNextSegmentID() {
-    String next_id_key = GetTableTag(String(LATEST_BLOCK_ID));
+    String next_id_key = GetTableTag(String(LATEST_SEGMENT_ID));
     String next_id_str;
     Status status = kv_instance_.Get(next_id_key, next_id_str);
     if (!status.ok()) {

@@ -218,16 +218,16 @@ Status NewTxn::AddNewSegment(const String &db_id_str,
     return Status::OK();
 }
 
-Status NewTxn::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id) {
+Status NewTxn::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
     {
         Status status = table_meta.AddSegmentID(segment_id);
         if (!status.ok()) {
             return status;
         }
     }
-    SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+    segment_meta.emplace(segment_id, table_meta, table_meta.kv_instance());
     {
-        Status status = segment_meta.InitSet();
+        Status status = segment_meta->InitSet();
         if (!status.ok()) {
             return status;
         }
@@ -306,23 +306,23 @@ Status NewTxn::AddNewBlock(const String &db_id_str,
     return Status::OK();
 }
 
-Status NewTxn::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id) {
+Status NewTxn::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta) {
     {
         Status status = segment_meta.AddBlockID(block_id);
         if (!status.ok()) {
             return status;
         }
     }
-    BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+    block_meta.emplace(block_id, segment_meta, segment_meta.kv_instance());
     {
-        Status status = block_meta.InitSet();
+        Status status = block_meta->InitSet();
         if (!status.ok()) {
             return status;
         }
     }
     SharedPtr<String> block_dir_ptr;
     {
-        Status status = block_meta.GetBlockDir(block_dir_ptr);
+        Status status = block_meta->GetBlockDir(block_dir_ptr);
         if (!status.ok()) {
             return status;
         }
@@ -334,10 +334,27 @@ Status NewTxn::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id) {
                                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                  block_dir_ptr,
                                                                  BlockVersion::FileName(),
-                                                                 block_meta.block_capacity(),
+                                                                 block_meta->block_capacity(),
                                                                  buffer_mgr->persistence_manager());
         version_buffer = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
         version_buffer->AddObjRc();
+    }
+    SizeT column_num = 0;
+    {
+        TableMeeta &table_meta = segment_meta.table_meta();
+        Vector<SharedPtr<ColumnDef>> *column_defs_ptr = nullptr;
+        Status status = table_meta.GetColumnDefs(column_defs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        column_num = column_defs_ptr->size();
+    }
+    for (SizeT column_idx = 0; column_idx < column_num; ++column_idx) {
+        [[maybe_unused]] Optional<ColumnMeta> column_meta;
+        Status status = this->AddNewColumn(*block_meta, column_idx, column_meta);
+        if (!status.ok()) {
+            return status;
+        }
     }
     return Status::OK();
 }
@@ -387,7 +404,7 @@ Status NewTxn::AddNewColumn(const String &db_id_str,
     return Status::OK();
 }
 
-Status NewTxn::AddNewColumn(BlockMeta &block_meta, SizeT column_idx) {
+Status NewTxn::AddNewColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta) {
     const ColumnDef *col_def = nullptr;
     {
         TableMeeta &table_meta = block_meta.segment_meta().table_meta();
@@ -399,9 +416,9 @@ Status NewTxn::AddNewColumn(BlockMeta &block_meta, SizeT column_idx) {
         col_def = (*column_defs_ptr)[column_idx].get();
     }
 
-    ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+    column_meta.emplace(column_idx, block_meta, block_meta.kv_instance());
     {
-        Status status = column_meta.InitSet();
+        Status status = column_meta->InitSet();
         if (!status.ok()) {
             return status;
         }
@@ -460,6 +477,50 @@ Status NewTxn::PrepareAppendInBlock(SegmentID segment_id,
         actual_append = std::min(to_append_rows, block_capacity - block_row_count);
         AppendRange range(segment_id, block_id, block_row_count, actual_append, append_state->current_block_, append_state->current_block_offset_);
         append_state->append_ranges_.push_back(range);
+
+        append_state->current_block_++;
+        append_state->current_count_ += actual_append;
+        append_state->current_block_offset_ += actual_append;
+        break;
+    }
+    return Status::OK();
+}
+
+Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full) {
+    while (append_state->current_block_ < append_state->blocks_.size()) {
+        DataBlock *input_block = append_state->blocks_[append_state->current_block_].get();
+        SizeT to_append_rows = input_block->row_count() - append_state->current_block_offset_;
+        if (to_append_rows == 0) {
+            ++append_state->current_block_;
+            append_state->current_block_offset_ = 0;
+            continue;
+        }
+        SizeT block_row_count = 0;
+        {
+            Status status = block_meta.GetRowCnt(block_row_count);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        SizeT actual_append = std::min(to_append_rows, block_meta.block_capacity() - block_row_count);
+
+        SegmentID segment_id = block_meta.segment_meta().segment_id();
+        BlockID block_id = block_meta.block_id();
+        AppendRange range(segment_id, block_id, block_row_count, actual_append, append_state->current_block_, append_state->current_block_offset_);
+        append_state->append_ranges_.push_back(range);
+
+        block_meta.SetRowCnt(block_row_count + actual_append);
+        block_full = block_row_count + actual_append >= block_meta.block_capacity();
+
+        SizeT segment_row_count = 0;
+        {
+            Status status = block_meta.segment_meta().GetRowCnt(segment_row_count);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
+        segment_full = segment_row_count + actual_append >= block_meta.segment_meta().segment_capacity();
 
         append_state->current_block_++;
         append_state->current_count_ += actual_append;
@@ -1117,6 +1178,144 @@ Status NewTxn::PrepareCommitAppend(const WalCmdAppend *append_cmd) {
     return Status::OK();
 }
 
+Status NewTxn::CommitAppend2(const WalCmdAppend *append_cmd) {
+    const String &db_name = append_cmd->db_name_;
+    const String &table_name = append_cmd->table_name_;
+
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    {
+        Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
+    AppendState *append_state = txn_table_store->GetAppendState();
+    if (append_state == nullptr) {
+        return Status::OK();
+    }
+    append_state->Finalize();
+    if (append_state->Finished()) {
+        return Status::OK();
+    }
+
+    TableMeeta table_meta(table_id_str, *kv_instance_.get());
+    table_meta.db_id_str_ = db_id_str;
+    SegmentID next_segment_id = 0;
+    {
+        Status status = table_meta.GetNextSegmentID(next_segment_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    Optional<SegmentMeta> segment_meta;
+    if (next_segment_id == 0) {
+        SegmentID segment_id = 0;
+        {
+            Status status = this->AddNewSegment(table_meta, segment_id, segment_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        {
+            Status status = table_meta.SetNextSegmentID(segment_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    } else {
+        SegmentID segment_id = next_segment_id - 1;
+        segment_meta.emplace(segment_id, table_meta, *kv_instance_.get());
+    }
+    BlockID next_block_id = 0;
+    {
+        Status status = segment_meta->GetNextBlockID(next_block_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    Optional<BlockMeta> block_meta;
+    if (next_block_id == 0) {
+        BlockID block_id = 0;
+        {
+            Status status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        {
+            Status status = segment_meta->SetNextBlockID(block_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    } else {
+        BlockID block_id = next_block_id - 1;
+        block_meta.emplace(block_id, segment_meta.value(), *kv_instance_.get());
+    }
+
+    while (true) {
+        bool block_full = false;
+        bool segment_full = false;
+        Status status = this->PrepareAppendInBlock(*block_meta, append_state, block_full, segment_full);
+        if (!status.ok()) {
+            return status;
+        }
+        if (append_state->Finished()) {
+            break;
+        }
+        if (segment_full) {
+            SegmentID segment_id = next_segment_id;
+            {
+                Status status = this->AddNewSegment(table_meta, segment_id, segment_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            ++next_segment_id;
+            {
+                Status status = table_meta.SetNextSegmentID(next_segment_id);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            BlockID block_id = 0;
+            {
+                Status status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            next_block_id = 1;
+            {
+                Status status = segment_meta->SetNextBlockID(next_block_id);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+        } else if (block_full) {
+            BlockID block_id = next_block_id;
+            {
+                Status status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            ++next_block_id;
+            {
+                Status status = segment_meta->SetNextBlockID(next_block_id);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     const String &table_name = append_cmd->table_name_;
     const String &db_id_str = append_cmd->db_id_str_;
@@ -1139,6 +1338,47 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
                                             data_block,
                                             range.data_block_offset_,
                                             txn_table_store);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::PostCommitAppend2(const WalCmdAppend *append_cmd) {
+    KVStore *kv_store = txn_mgr_->kv_store();
+    UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+
+    const String &table_name = append_cmd->table_name_;
+    const String &db_id_str = append_cmd->db_id_str_;
+    const String &table_id_str = append_cmd->table_id_str_;
+
+    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
+    const AppendState *append_state = txn_table_store->GetAppendState();
+    if (append_state == nullptr) {
+        return Status::OK();
+    }
+    TableMeeta table_meta(table_id_str, *kv_instance);
+    table_meta.db_id_str_ = db_id_str;
+    Optional<SegmentMeta> segment_meta;
+    Optional<BlockMeta> block_meta;
+    for (const AppendRange &range : append_state->append_ranges_) {
+        const DataBlock *data_block = append_state->blocks_[range.data_block_idx_].get();
+        SegmentID segment_id = range.segment_id_;
+        if (!segment_meta || segment_meta->segment_id() != segment_id) {
+            segment_meta.emplace(segment_id, table_meta, *kv_instance);
+        }
+        BlockID block_id = range.block_id_;
+        if (!block_meta || block_meta->block_id() != block_id) {
+            block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
+        }
+        Status status = this->AppendInBlock(*block_meta, range.start_offset_, range.row_count_, data_block, range.data_block_offset_);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        Status status = kv_instance->Commit();
         if (!status.ok()) {
             return status;
         }

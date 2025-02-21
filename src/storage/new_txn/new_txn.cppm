@@ -387,7 +387,7 @@ private:
                          SizeT segment_capacity,
                          const String &table_dir,
                          NewTxnTableStore *txn_table_store);
-    Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id);
+    Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
     Status AddNewBlock(const String &db_id_str,
                        const String &table_id_str,
                        SegmentID segment_id,
@@ -395,7 +395,7 @@ private:
                        SizeT block_capacity,
                        const String &table_dir,
                        NewTxnTableStore *txn_table_store);
-    Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id);
+    Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
     Status AddNewColumn(const String &db_id_str,
                         const String &table_id_str,
                         SegmentID segment_id,
@@ -404,7 +404,7 @@ private:
                         SizeT block_capacity,
                         SharedPtr<String> block_dir,
                         NewTxnTableStore *txn_table_store);
-    Status AddNewColumn(BlockMeta &block_meta, SizeT column_idx);
+    Status AddNewColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
 
     Status PrepareAppendInBlock(SegmentID segment_id,
                                 BlockID block_id,
@@ -412,6 +412,7 @@ private:
                                 SizeT block_capacity,
                                 SizeT block_row_count,
                                 SizeT &actual_append);
+    Status PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full);
     Status AppendInBlock(const String &db_id_str,
                          const String &table_id_str,
                          SegmentID segment_id,
@@ -478,7 +479,9 @@ private:
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
     Status PrepareCommitAppend(const WalCmdAppend *append_cmd);
+    Status CommitAppend2(const WalCmdAppend *append_cmd);
     Status CommitAppend(const WalCmdAppend *append_cmd);
+    Status PostCommitAppend2(const WalCmdAppend *append_cmd);
     Status CommitDelete(const WalCmdDelete *delete_cmd);
     Status CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 

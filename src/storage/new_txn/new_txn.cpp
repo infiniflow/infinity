@@ -2005,9 +2005,9 @@ void NewTxn::CommitBottom() {
         switch (command_type) {
             case WalCommandType::APPEND: {
                 auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
-                Status status = PrepareCommitAppend(append_cmd);
+                Status status = CommitAppend2(append_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError("PrepareCommitAppend failed");
+                    UnrecoverableError("CommitAppend2 failed");
                 }
                 break;
             }
@@ -2053,9 +2053,9 @@ void NewTxn::PostCommit() {
         switch (command_type) {
             case WalCommandType::APPEND: {
                 auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                Status status = CommitAppend(append_cmd);
+                Status status = PostCommitAppend2(append_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError("CommitAppend failed");
+                    UnrecoverableError("PostCommitAppend2 failed");
                 }
                 break;
             }

@@ -62,7 +62,7 @@ public:
 
     Status GetBlockLock(SharedPtr<BlockLock> &block_lock);
 
-    Status SetGetRowCnt(SizeT row_cnt);
+    Status SetRowCnt(SizeT row_cnt);
 
     Status InitSet();
 

@@ -80,7 +80,7 @@ public:
 
     Status AddSegmentID(SegmentID segment_id);
 
-    Status SetNextBlockID(SegmentID next_segment_id);
+    Status SetNextSegmentID(SegmentID next_segment_id);
 
     Status InitSet();
 

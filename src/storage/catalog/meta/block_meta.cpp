@@ -41,7 +41,7 @@ Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     return Status::OK();
 }
 
-Status BlockMeta::SetGetRowCnt(SizeT row_cnt) {
+Status BlockMeta::SetRowCnt(SizeT row_cnt) {
     row_cnt_ = row_cnt;
     String block_dir_key = GetBlockTag("row_cnt");
     Status status = kv_instance_.Put(block_dir_key, fmt::format("{}", row_cnt));
@@ -69,7 +69,7 @@ Status BlockMeta::InitSet() {
         }
     }
     {
-        Status status = SetGetRowCnt(0);
+        Status status = SetRowCnt(0);
         if (!status.ok()) {
             return status;
         }
