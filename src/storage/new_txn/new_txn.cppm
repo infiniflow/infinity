@@ -70,11 +70,15 @@ class BaseTableRef;
 enum class CompactStatementType;
 struct SegmentIndexEntry;
 struct AddDeltaEntryTask;
+class BufferObj;
 
 class ColumnMeta;
 class BlockMeta;
 class SegmentMeta;
 class TableMeeta;
+class ChunkIndexMeta;
+class SegmentIndexMeta;
+class TableIndexMeeta;
 
 export class NewTxnGetVisibleRangeState {
 public:
@@ -385,6 +389,14 @@ private:
 
     Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
 
+    Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
+
+    Status AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
+                            ChunkID chunk_id,
+                            RowID base_row_id,
+                            SizeT row_count,
+                            Optional<ChunkIndexMeta> &chunk_index_meta);
+
     Status PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full);
 
     Status AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset);
@@ -397,6 +409,8 @@ public:
     Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);
 
     Status GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRangeState &state);
+
+    Status GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffer_obj);
 
 private:
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
