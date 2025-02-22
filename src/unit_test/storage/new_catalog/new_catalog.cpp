@@ -3719,6 +3719,173 @@ TEST_P(NewCatalogTest, lock_table) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
+TEST_P(NewCatalogTest, lock_table_and_lock_table) {
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    String table_name = "tb1";
+    {
+        // lock table and lock table
+        //  t1            lock table     commit (success)
+        //  |--------------|----------------|
+        //                         |------|--------------------|
+        //                        t2    lock table(fail)   rollback (success)
+        // create db1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table tb1
+        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), MakeShared<String>(), {column_def1, column_def2});
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // lock table
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
+        status = txn3->LockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
+
+        // lock table
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
+        status = txn4->LockTable(*db_name, table_name);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // unlock table
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("unlock table"), TransactionType::kNormal);
+        status = txn5->UnlockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn11 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn11->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn11);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // lock table and unlock table
+        //  t1            lock table     commit (success)
+        //  |--------------|----------------|
+        //              |------|-----------------------|
+        //              t2    unlock table (fail)   rollback (success)
+        // create db1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table tb1
+        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), MakeShared<String>(), {column_def1, column_def2});
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // lock table
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
+        status = txn3->LockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
+
+        // unlock table
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("unlock table"), TransactionType::kNormal);
+        status = txn4->UnlockTable(*db_name, table_name);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // unlock table
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("unlock table"), TransactionType::kNormal);
+        status = txn5->UnlockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn11 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn11->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn11);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // lock table and unlock table
+        //  t1            lock table     commit (success)
+        //  |--------------|----------------|
+        //              |------|-----------------------|
+        //              t2    unlock table (fail)   rollback (success)
+        // create db1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table tb1
+        auto table_def1 = TableDef::Make(db_name, std::make_shared<std::string>(table_name), MakeShared<String>(), {column_def1, column_def2});
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def1), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // lock table
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
+        status = txn3->LockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // unlock table
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("unlock table"), TransactionType::kNormal);
+        status = txn4->UnlockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
+
+        // unlock table
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("unlock table"), TransactionType::kNormal);
+        status = txn5->UnlockTable(*db_name, table_name);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn11 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn11->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn11);
+        EXPECT_TRUE(status.ok());
+    }
+
+    new_txn_mgr->PrintAllKeyValue();
+}
+
 TEST_P(NewCatalogTest, alter_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -5705,7 +5872,7 @@ TEST_P(NewCatalogTest, drop_column_and_drop_column) {
     }
 
     {
-        // add column and drop column
+        // drop column and drop column
         //    t1         drop column      commit (success)
         //    |--------------|---------------------|
         //                       |------|------------------|
@@ -5759,7 +5926,7 @@ TEST_P(NewCatalogTest, drop_column_and_drop_column) {
 
     {
         // drop column and drop column
-        //    t1         add column(fail)      rollback (success)
+        //    t1         drop column(fail)      rollback (success)
         //    |--------------|---------------------|
         //         |------|------------------|
         //        t2    drop column        commit (success)
