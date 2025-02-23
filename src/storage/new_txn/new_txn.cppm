@@ -56,6 +56,7 @@ struct WalCmdCreateDatabase;
 struct WalCmdDropDatabase;
 struct WalCmdCreateTable;
 struct WalCmdDropTable;
+struct WalCmdRenameTable;
 struct WalCmdAddColumns;
 struct WalCmdDropColumns;
 struct WalCmdCreateIndex;
@@ -193,6 +194,8 @@ public:
     Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
     Status DropTable(const String &db_name, const String &table_name, ConflictType conflict_type);
+
+    Status RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name);
 
     Status ListTable(const String &db_name, Vector<String> &table_list);
 
@@ -417,8 +420,9 @@ private:
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
     Status CommitCreateTable(const WalCmdCreateTable *create_table_cmd);
     Status CommitCreateTableDef(const TableDef *table_def, const String &db_id, const String &table_id);
-    Status CommitDropTable(const String &db_name, const String &table_name);
+    Status CommitDropTable(const WalCmdDropTable *drop_table_cmd);
     Status CommitDropTableDef(const String &db_id, const String &table_id);
+    Status CommitRenameTable(const WalCmdRenameTable *create_table_cmd);
     Status CommitAddColumns(const WalCmdAddColumns *add_columns_cmd);
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);

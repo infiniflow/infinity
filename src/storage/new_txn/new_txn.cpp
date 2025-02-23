@@ -610,11 +610,47 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
     }
 
     SharedPtr<WalCmdDropTable> wal_command = MakeShared<WalCmdDropTable>(db_name, table_name);
+    wal_command->db_id_ = db_id_str;
+    wal_command->table_id_ = table_id_str;
     wal_command->table_key_ = table_key;
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
     LOG_TRACE(fmt::format("NewTxn::DropTable dropped table: {}.{}", db_name, table_name));
+    return Status::OK();
+}
+
+Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name) {
+
+    this->CheckTxnStatus();
+    this->CheckTxn(db_name);
+
+    bool table_exist = this->CheckTableExists(db_name, new_table_name);
+    if (table_exist) {
+        return Status(ErrorCode::kDuplicateTableName, MakeUnique<String>(fmt::format("Table: {} already exists", new_table_name)));
+    }
+
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    Status status = GetTableID(db_name, old_table_name, table_key, table_id_str, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    SharedPtr<WalCmdRenameTable> wal_command = MakeShared<WalCmdRenameTable>(db_name, old_table_name, new_table_name);
+    wal_command->old_table_key_ = table_key;
+    wal_command->old_table_id_ = table_id_str;
+    wal_command->old_db_id_ = db_id_str;
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
+    LOG_TRACE(fmt::format("NewTxn::Rename table from {}.{} to {}.{}.", db_name, old_table_name, db_name, new_table_name));
     return Status::OK();
 }
 
@@ -1327,7 +1363,15 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::DROP_TABLE: {
                 auto *drop_table_cmd = static_cast<WalCmdDropTable *>(command.get());
-                Status status = CommitDropTable(drop_table_cmd->db_name_, drop_table_cmd->table_name_);
+                Status status = CommitDropTable(drop_table_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case WalCommandType::RENAME_TABLE: {
+                auto *rename_table_cmd = static_cast<WalCmdRenameTable *>(command.get());
+                Status status = CommitRenameTable(rename_table_cmd);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1742,19 +1786,15 @@ Status NewTxn::CommitCreateTableDef(const TableDef *table_def, const String &db_
     return Status::OK();
 }
 
-Status NewTxn::CommitDropTable(const String &db_name, const String &table_name) {
+Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
     //    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
-    String db_id_str;
-    String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
-    if (!status.ok()) {
-        return status;
-    }
+    const String &db_id_str = drop_table_cmd->db_id_;
+    const String &table_id_str = drop_table_cmd->table_id_;
+    const String &table_key = drop_table_cmd->table_key_;
 
     // delete table key
-    status = kv_instance_->Delete(table_key);
+    Status status = kv_instance_->Delete(table_key);
     if (!status.ok()) {
         return status;
     }
@@ -1807,6 +1847,26 @@ Status NewTxn::CommitDropTableDef(const String &db_id, const String &table_id) {
             return status;
         }
         iter2->Next();
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::CommitRenameTable(const WalCmdRenameTable *rename_table_cmd) {
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    const String &old_table_key = rename_table_cmd->old_table_key_;
+    const String &table_id = rename_table_cmd->old_table_id_;
+    const String &db_id = rename_table_cmd->old_db_id_;
+    // delete table key
+    Status status = kv_instance_->Delete(old_table_key);
+    if (!status.ok()) {
+        return status;
+    }
+    // create new table key
+    String new_table_key = KeyEncode::CatalogTableKey(db_id, rename_table_cmd->new_table_name_, commit_ts);
+    status = kv_instance_->Put(new_table_key, table_id);
+    if (!status.ok()) {
+        return status;
     }
 
     return Status::OK();
@@ -2111,6 +2171,14 @@ void NewTxn::PostCommit() {
                 }
                 break;
             }
+            case WalCommandType::RENAME_TABLE: {
+                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->old_table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
             case WalCommandType::ADD_COLUMNS: {
                 auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
                 Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
@@ -2177,6 +2245,14 @@ Status NewTxn::Rollback() {
             case WalCommandType::DROP_TABLE: {
                 auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
+            case WalCommandType::RENAME_TABLE: {
+                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->old_table_key_);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table");
                 }

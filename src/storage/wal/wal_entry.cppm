@@ -255,6 +255,8 @@ export struct WalCmdDropTable final : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String db_id_{};
+    String table_id_{};
     String table_key_{};
 };
 
@@ -497,6 +499,9 @@ export struct WalCmdRenameTable : public WalCmd {
     String db_name_{};
     String table_name_{};
     String new_table_name_{};
+    String old_db_id_{};
+    String old_table_id_{};
+    String old_table_key_{};
 };
 
 export struct WalCmdAddColumns : public WalCmd {
