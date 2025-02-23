@@ -20,10 +20,14 @@ import column_def;
 import default_values;
 import data_type;
 import create_index_info;
+import internal_types;
+import third_party;
 
 export module meta_info;
 
 namespace infinity {
+
+struct WalChunkIndexInfo;
 
 enum class SegmentStatus;
 
@@ -125,6 +129,21 @@ export struct SegmentIndexInfo {
     SharedPtr<String> index_dir_{};
     SizeT chunk_count_{};
     Vector<String> files_{};
+};
+
+export struct ChunkIndexInfo {
+    String base_name_{};
+    Vector<String> paths_{};
+    RowID base_rowid_{};
+    u32 row_count_{};
+
+public:
+    ChunkIndexInfo() = default;
+    ChunkIndexInfo(const WalChunkIndexInfo &wal_chunk_info);
+
+    nlohmann::json ToJson() const;
+
+    static bool FromJson(const nlohmann::json &json, ChunkIndexInfo &chunk_index_info);
 };
 
 } // namespace infinity

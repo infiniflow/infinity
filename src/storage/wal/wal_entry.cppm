@@ -255,6 +255,9 @@ export struct WalCmdDropTable final : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String db_id_{};
+    String table_id_{};
+    String table_key_{};
 };
 
 export struct WalCmdCreateIndex final : public WalCmd {
@@ -323,6 +326,9 @@ export struct WalCmdAppend final : public WalCmd {
     String db_name_{};
     String table_name_{};
     SharedPtr<DataBlock> block_{};
+
+    String db_id_str_{};
+    String table_id_str_{};
 };
 
 export struct WalCmdDelete final : public WalCmd {
@@ -339,6 +345,9 @@ export struct WalCmdDelete final : public WalCmd {
     String db_name_{};
     String table_name_{};
     Vector<RowID> row_ids_{};
+
+    String db_id_str_{};
+    String table_id_str_{};
 };
 
 // used when append op turn an old unsealed segment full and sealed
@@ -449,6 +458,9 @@ export struct WalCmdOptimize final : public WalCmd {
 };
 
 export struct WalCmdDumpIndex final : public WalCmd {
+    WalCmdDumpIndex(String db_name, String table_name, String index_name, SegmentID segment_id)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id) {}
+
     WalCmdDumpIndex(String db_name,
                     String table_name,
                     String index_name,
@@ -487,6 +499,9 @@ export struct WalCmdRenameTable : public WalCmd {
     String db_name_{};
     String table_name_{};
     String new_table_name_{};
+    String old_db_id_{};
+    String old_table_id_{};
+    String old_table_key_{};
 };
 
 export struct WalCmdAddColumns : public WalCmd {
@@ -502,6 +517,7 @@ export struct WalCmdAddColumns : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String table_key_{};
     Vector<SharedPtr<ColumnDef>> column_defs_{};
 };
 
@@ -518,6 +534,7 @@ export struct WalCmdDropColumns : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String table_key_{};
     Vector<String> column_names_{};
 };
 

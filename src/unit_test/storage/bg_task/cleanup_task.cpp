@@ -168,7 +168,7 @@ TEST_P(CleanupTaskTest, test_delete_table_simple) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table1"), TransactionType::kNormal);
 
-        Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         txn_mgr->CommitTxn(txn);
@@ -210,7 +210,7 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table1"), TransactionType::kNormal);
 
-        Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         txn_mgr->CommitTxn(txn);
@@ -233,7 +233,7 @@ TEST_P(CleanupTaskTest, test_delete_table_complex) {
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table1"), TransactionType::kNormal);
 
-        Status status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         WaitCleanup(storage);
         txn_mgr->CommitTxn(txn);

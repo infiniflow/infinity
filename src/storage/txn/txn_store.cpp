@@ -387,16 +387,12 @@ Optional<String> TxnTableStore::CheckConflict(const TxnTableStore *other_table_s
         }
         for (const auto &index_entry : std::views::keys(txn_indexes_)) {
             if (const auto &index_name = *index_entry->GetIndexName(); other_txn_indexes_set.contains(index_name)) {
-                return fmt::format("{}: txn_indexes_ containing Index {} conflict with other_table_store->txn_indexes_",
-                                   __func__,
-                                   index_name);
+                return fmt::format("{}: txn_indexes_ containing Index {} conflict with other_table_store->txn_indexes_", __func__, index_name);
             }
         }
         for (const auto &[index_name, index_store] : txn_indexes_store_) {
             if (other_txn_indexes_set.contains(index_name)) {
-                return fmt::format("{}: txn_indexes_store_ containing Index {} conflict with other_table_store->txn_indexes_",
-                                   __func__,
-                                   index_name);
+                return fmt::format("{}: txn_indexes_store_ containing Index {} conflict with other_table_store->txn_indexes_", __func__, index_name);
             }
             if (const auto iter = other_txn_indexes_store_map.find(index_name); iter != other_txn_indexes_store_map.end()) {
                 for (const auto &other_segment_set = iter->second; const auto segment_id : std::views::keys(index_store->index_entry_map_)) {
@@ -708,6 +704,10 @@ Optional<String> TxnStore::CheckConflict(const TxnStore &other_txn_store) {
 }
 
 void TxnStore::PrepareCommit1() {
+    if (txn_ == nullptr) {
+        // New txn branch
+        return;
+    }
     WalEntry *wal_entry = txn_->GetWALEntry();
     Vector<WalSegmentInfo *> segment_infos;
     for (auto &cmd : wal_entry->cmds_) {

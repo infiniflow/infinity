@@ -27,6 +27,7 @@ import base_table_ref;
 import data_type;
 import logical_type;
 import embedding_info;
+import meta_info;
 
 using namespace infinity;
 

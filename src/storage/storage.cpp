@@ -27,10 +27,13 @@ import buffer_manager;
 import default_values;
 import wal_manager;
 import catalog;
+import new_catalog;
 import txn_manager;
+import new_txn_manager;
 import builtin_functions;
 import third_party;
 import logger;
+import kv_store;
 
 import txn;
 import infinity_exception;
@@ -258,7 +261,10 @@ Status Storage::AdminToWriter() {
     if (system_start_ts == 0) {
         // Init database, need to create default_db
         LOG_INFO(fmt::format("Init a new catalog"));
+        kv_store_ = MakeUnique<KVStore>();
+        kv_store_->Init(config_ptr_->CatalogDir());
         catalog_ = Catalog::NewCatalog();
+        new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
     }
 
     i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
@@ -284,12 +290,16 @@ Status Storage::AdminToWriter() {
     txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
     txn_mgr_->Start();
 
+    // TODO: new txn manager
+    new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
+    new_txn_mgr_->Start();
+
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
-    if (system_start_ts == 0) {
-        CreateDefaultDB();
-    }
+//    if (system_start_ts == 0) {
+//        CreateDefaultDB();
+//    }
 
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
@@ -334,13 +344,13 @@ Status Storage::AdminToWriter() {
         MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
     bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
-    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
-    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
-    bg_processor_->Submit(force_ckp_task);
-    force_ckp_task->Wait();
-    txn->AddOperation(MakeShared<String>("ForceCheckpointTask"));
-    txn->SetReaderAllowed(true);
-    txn_mgr_->CommitTxn(txn);
+//    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
+//    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
+//    bg_processor_->Submit(force_ckp_task);
+//    force_ckp_task->Wait();
+//    txn->AddOperation(MakeShared<String>("ForceCheckpointTask"));
+//    txn->SetReaderAllowed(true);
+//    txn_mgr_->CommitTxn(txn);
 
     periodic_trigger_thread_->Start();
     return Status::OK();
@@ -367,6 +377,8 @@ Status Storage::UnInitFromReader() {
         }
 
         catalog_.reset();
+        kv_store_->Uninit();
+        kv_store_.reset();
 
         if (memory_index_tracer_ != nullptr) {
             memory_index_tracer_.reset();
@@ -383,6 +395,14 @@ Status Storage::UnInitFromReader() {
             }
             txn_mgr_->Stop();
             txn_mgr_.reset();
+        }
+
+        if (new_txn_mgr_ != nullptr) {
+            if (reader_init_phase_ != ReaderInitPhase::kPhase2) {
+                UnrecoverableError("Error reader init phase");
+            }
+            new_txn_mgr_->Stop();
+            new_txn_mgr_.reset();
         }
 
         switch (config_ptr_->StorageType()) {
@@ -485,6 +505,8 @@ Status Storage::WriterToAdmin() {
     }
 
     catalog_.reset();
+    kv_store_->Uninit();
+    kv_store_.reset();
 
     memory_index_tracer_.reset();
 
@@ -496,6 +518,11 @@ Status Storage::WriterToAdmin() {
     if (txn_mgr_ != nullptr) {
         txn_mgr_->Stop();
         txn_mgr_.reset();
+    }
+
+    if (new_txn_mgr_ != nullptr) {
+        new_txn_mgr_->Stop();
+        new_txn_mgr_.reset();
     }
 
     if (buffer_mgr_ != nullptr) {
@@ -564,6 +591,8 @@ Status Storage::UnInitFromWriter() {
     }
 
     catalog_.reset();
+    kv_store_->Uninit();
+    kv_store_.reset();
 
     memory_index_tracer_.reset();
 
@@ -593,6 +622,11 @@ Status Storage::UnInitFromWriter() {
     if (txn_mgr_ != nullptr) {
         txn_mgr_->Stop();
         txn_mgr_.reset();
+    }
+
+    if (new_txn_mgr_ != nullptr) {
+        new_txn_mgr_->Stop();
+        new_txn_mgr_.reset();
     }
 
     if (buffer_mgr_ != nullptr) {
@@ -726,6 +760,10 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
     }
     txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
     txn_mgr_->Start();
+
+    // TODO: new txn manager
+    new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
+    new_txn_mgr_->Start();
 
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();

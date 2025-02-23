@@ -142,6 +142,8 @@ export enum class ErrorCode : long {
     kFailToStartTxn = 3093,
     kAlreadyLocked = 3094,
     kNotLocked = 3095,
+    kTableIsUsing = 3096,
+    kDuplicateColumnIndex = 3097,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -200,7 +202,11 @@ export enum class ErrorCode : long {
     kInvalidNodeRole = 8007,
     kInvalidNodeStatus = 8008,
     kNodeInfoUpdated = 8009,
-    kNodeNameMismatch = 8010
+    kNodeNameMismatch = 8010,
+
+    // 9. internal error
+    kCatalogError = 9001,
+    kBufferManagerError = 9002,
 };
 
 export class Status {
@@ -321,9 +327,11 @@ public:
     static Status FailToStartTxn(const String &detail);
     static Status AlreadyLocked(const String &detail);
     static Status NotLocked(const String &detail);
+    static Status TableIsUsing(const String &detail);
+    static Status DuplicateColumnIndex(const String &detail);
 
     // 4. TXN fail
-    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");
+    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no re\anson gived");
     static Status TxnConflict(u64 txn_id, const String &conflict_reason);
 
     // 5. Insufficient resource or exceed limits
@@ -380,6 +388,10 @@ public:
     static Status InvalidNodeStatus(const String &message);
     static Status NodeInfoUpdated(const String &message);
     static Status NodeNameMismatch(const String &actual_node_name, const String &expected_node_name);
+
+    // catalog
+    static Status CatalogError(const String &detailed_info);
+    static Status BufferManagerError(const String &detailed_info);
 
 public:
     Status() = default;
