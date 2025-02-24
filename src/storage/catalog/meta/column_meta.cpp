@@ -62,7 +62,7 @@ Status ColumnMeta::LoadChunkOffset() {
 String ColumnMeta::GetColumnTag(const String &tag) const {
     SegmentMeta &segment_meta = block_meta_.segment_meta();
     TableMeeta &table_meta = segment_meta.table_meta();
-    return KeyEncode::CatalogTableSegmentBlockColumnTagKey(table_meta.db_id_str_,
+    return KeyEncode::CatalogTableSegmentBlockColumnTagKey(table_meta.db_id_str(),
                                                            table_meta.table_id_str(),
                                                            segment_meta.segment_id(),
                                                            block_meta_.block_id(),

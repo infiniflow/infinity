@@ -68,7 +68,7 @@ Status ChunkIndexMeta::LoadChunkInfo() {
 String ChunkIndexMeta::GetChunkIndexTag(const String &tag) const {
     const TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
     const TableMeeta &table_meta = table_index_meta.table_meta();
-    return KeyEncode::CatalogIdxChunkTagKey(table_meta.db_id_str_,
+    return KeyEncode::CatalogIdxChunkTagKey(table_meta.db_id_str(),
                                             table_meta.table_id_str(),
                                             table_index_meta.index_id_str(),
                                             segment_index_meta_.segment_id(),

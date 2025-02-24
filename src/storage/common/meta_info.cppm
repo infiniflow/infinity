@@ -50,6 +50,8 @@ export struct TableInfo {
     TableEntryType table_entry_type_{TableEntryType::kTableEntry};
     TxnTimeStamp max_commit_ts_{UNCOMMIT_TS};
     Vector<SharedPtr<ColumnDef>> column_defs_{};
+    String db_id_{};
+    String table_id_{};
 
 public:
     u64 GetColumnIdByName(const String &column_name) const;

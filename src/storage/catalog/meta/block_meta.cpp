@@ -105,7 +105,7 @@ Status BlockMeta::LoadRowCnt() {
 
 String BlockMeta::GetBlockTag(const String &tag) const {
     TableMeeta &table_meta = segment_meta_.table_meta();
-    return KeyEncode::CatalogTableSegmentBlockTagKey(table_meta.db_id_str_, table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, tag);
+    return KeyEncode::CatalogTableSegmentBlockTagKey(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, tag);
 }
 
 } // namespace infinity

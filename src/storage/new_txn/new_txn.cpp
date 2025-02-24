@@ -1100,6 +1100,9 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
         return {nullptr, status};
     }
 
+    table_info->db_id_ = db_id_str;
+    table_info->table_id_ = table_id_str;
+
     // Create table comment;
     String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");
     String table_comment;

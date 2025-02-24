@@ -106,7 +106,7 @@ Status SegmentIndexMeta::LoadNextChunkID() {
 
 String SegmentIndexMeta::GetSegmentIndexTag(const String &tag) {
     const TableMeeta &table_meta = table_index_meta_.table_meta();
-    return KeyEncode::CatalogIdxSegmentTagKey(table_meta.db_id_str_, table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, tag);
+    return KeyEncode::CatalogIdxSegmentTagKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, tag);
 }
 
 } // namespace infinity

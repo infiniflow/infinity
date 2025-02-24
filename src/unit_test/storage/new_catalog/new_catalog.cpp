@@ -6790,8 +6790,7 @@ TEST_P(NewCatalogTest, test_append) {
         Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
 
-        TableMeeta table_meta(table_id_str, *txn->kv_instance());
-        table_meta.db_id_str_ = db_id_str;
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 
         Vector<SegmentID> *segment_ids{};
         status = table_meta.GetSegmentIDs(segment_ids);
@@ -6933,8 +6932,7 @@ TEST_P(NewCatalogTest, test_delete) {
         BlockID block_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        TableMeeta table_meta(table_id_str, *txn->kv_instance());
-        table_meta.db_id_str_ = db_id_str;
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 
         SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());

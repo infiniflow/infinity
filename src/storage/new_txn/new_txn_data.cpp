@@ -629,8 +629,7 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
     if (append_state == nullptr) {
         return Status::OK();
     }
-    TableMeeta table_meta(table_id_str, *kv_instance);
-    table_meta.db_id_str_ = db_id_str;
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
     for (const AppendRange &range : append_state->append_ranges_) {
@@ -665,8 +664,7 @@ Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd) {
     const String &db_id_str = delete_cmd->db_id_str_;
     const String &table_id_str = delete_cmd->table_id_str_;
 
-    TableMeeta table_meta(table_id_str, *kv_instance);
-    table_meta.db_id_str_ = db_id_str;
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
 
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;

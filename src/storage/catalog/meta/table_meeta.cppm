@@ -26,11 +26,12 @@ class KVInstance;
 
 export class TableMeeta {
 public:
-    TableMeeta(String table_id_str, KVInstance &kv_instance);
+    TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance);
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
     const String &table_id_str() const { return table_id_str_; }
+    const String &db_id_str() const { return db_id_str_; }
 
     Status GetColumnDefs(Vector<SharedPtr<ColumnDef>> *&column_defs);
 
@@ -55,10 +56,10 @@ public:
 
     Status AddSegmentID(SegmentID segment_id);
 
-    Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name) ;
-    Tuple<SharedPtr<String>, Status> GetTableDir() ;
-    Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs() ;
-    Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs() ;
+    Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
+    Tuple<SharedPtr<String>, Status> GetTableDir();
+    Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs();
+    Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
 
 private:
     Status LoadColumnDefs();
@@ -67,7 +68,7 @@ private:
 
     Status LoadNextSegmentID();
 
-    Status LoadCurrentSegmentID();
+    Status LoadLatestSegmentID();
 
     Status LoadTableDir();
 
@@ -75,9 +76,11 @@ private:
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
-    Status SetTableDir(const String& dir);
+    Status SetTableDir(const String &dir);
+
 private:
     KVInstance &kv_instance_;
+    String db_id_str_;
     String table_id_str_;
 
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
@@ -88,9 +91,6 @@ private:
 
     Set<SegmentID> segment_id_set_;
     Optional<SegmentID> current_segment_id_;
-
-public:
-    String db_id_str_;
 };
 
 } // namespace infinity

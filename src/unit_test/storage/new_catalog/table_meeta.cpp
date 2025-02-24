@@ -45,61 +45,114 @@ TEST_P(TableMeetaTest, table_meeta) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
-    // create db1
-    auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-    Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
-    EXPECT_TRUE(status.ok());
-    status = new_txn_mgr->CommitTxn(txn1);
-    EXPECT_TRUE(status.ok());
+    {
+        // create db1
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
 
-    // create table
-    auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-    status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-    EXPECT_TRUE(status.ok());
-    status = new_txn_mgr->CommitTxn(txn2);
-    EXPECT_TRUE(status.ok());
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
-    new_txn_mgr->PrintAllKeyValue();
+        new_txn_mgr->PrintAllKeyValue();
+    }
     // ---------------------------
+
+    // get table
+    auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
+    auto [table_info, get_status] = txn2->GetTableInfo(*db_name, *table_name);
+    EXPECT_TRUE(get_status.ok());
+    get_status = new_txn_mgr->CommitTxn(txn2);
+    EXPECT_TRUE(get_status.ok());
 
     UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
-    TableMeeta table_meta("0", *kv_instance);
+    TableMeeta table_meta(table_info->db_id_, table_info->table_id_, *kv_instance);
     table_meta.Init();
 
-    auto [segment_id, segment_status] = table_meta.GetLatestSegmentID();
-    EXPECT_TRUE(segment_status.ok());
-    EXPECT_EQ(segment_id, 0);
+    {
+        auto [segment_id, segment_status] = table_meta.GetLatestSegmentID();
+        EXPECT_TRUE(segment_status.ok());
+        EXPECT_EQ(segment_id, 0);
+    }
 
-    auto [dir_ptr, dir_status] = table_meta.GetTableDir();
-    EXPECT_TRUE(dir_status.ok());
-    EXPECT_STREQ(dir_ptr->c_str(), "0");
+    {
+        Status status = table_meta.SetLatestSegmentID(1);
+        EXPECT_TRUE(status.ok());
 
-    auto [segments_ptr, segments_status] = table_meta.GetSegmentIDs();
-    EXPECT_TRUE(segments_status.ok());
-    EXPECT_EQ(segments_ptr->size(), 0);
+        status = table_meta.AddSegmentID(1);
+        EXPECT_TRUE(status.ok());
 
-    auto [def_vectors, def_status] = table_meta.GetColumnDefs();
-    EXPECT_TRUE(def_status.ok());
-    EXPECT_EQ(def_vectors->size(), 0);
+        status = table_meta.SetLatestSegmentID(2);
+        EXPECT_TRUE(status.ok());
 
-    // ---------------------------
-    auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-    status = txn3->DropTable(*db_name, *table_name, ConflictType::kError);
-    EXPECT_TRUE(status.ok());
-    status = new_txn_mgr->CommitTxn(txn3);
-    EXPECT_TRUE(status.ok());
+        status = table_meta.AddSegmentID(2);
+        EXPECT_TRUE(status.ok());
 
-    // drop database
-    auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-    status = txn4->DropDatabase("db1", ConflictType::kError);
-    EXPECT_TRUE(status.ok());
-    status = new_txn_mgr->CommitTxn(txn4);
-    EXPECT_TRUE(status.ok());
+        auto [segment_id, segment_status] = table_meta.GetLatestSegmentID();
+        EXPECT_TRUE(segment_status.ok());
+        EXPECT_EQ(segment_id, 2);
+    }
+
+    {
+        auto [dir_ptr, dir_status] = table_meta.GetTableDir();
+        EXPECT_TRUE(dir_status.ok());
+        EXPECT_STREQ(dir_ptr->c_str(), "0");
+    }
+
+    {
+        auto [segments_ptr, segments_status] = table_meta.GetSegmentIDs();
+        EXPECT_TRUE(segments_status.ok());
+        EXPECT_EQ(segments_ptr->size(), 3);
+        EXPECT_EQ(segments_ptr->at(0), 0);
+        EXPECT_EQ(segments_ptr->at(1), 1);
+        EXPECT_EQ(segments_ptr->at(2), 2);
+    }
+
+    {
+        auto [def_vectors, def_status] = table_meta.GetColumnDefs();
+        EXPECT_TRUE(def_status.ok());
+        EXPECT_EQ(def_vectors->size(), 2);
+    }
+
+    {
+        auto [column_id1, column_status1] = table_meta.GetColumnIDByColumnName("col1");
+        EXPECT_TRUE(column_status1.ok());
+        EXPECT_EQ(column_id1, 0);
+
+        auto [column_id2, column_status2] = table_meta.GetColumnIDByColumnName("col2");
+        EXPECT_TRUE(column_status2.ok());
+        EXPECT_EQ(column_id2, 1);
+    }
+
+    kv_instance->Commit();
+    kv_instance.reset();
+
+    {
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        Status status = txn3->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop database
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn4->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+    }
 }

@@ -27,7 +27,8 @@ import default_values;
 
 namespace infinity {
 
-TableMeeta::TableMeeta(String table_id_str, KVInstance &kv_instance) : kv_instance_(kv_instance), table_id_str_(table_id_str) {}
+TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance)
+    : kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
 Status TableMeeta::GetColumnDefs(Vector<SharedPtr<ColumnDef>> *&column_defs) {
     if (!column_defs_) {
@@ -148,7 +149,12 @@ Status TableMeeta::Init() {
             return status;
         }
     }
-
+    {
+        Status status = AddSegmentID(0);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     {
         Status status = SetTableDir("0");
         if (!status.ok()) {
@@ -203,14 +209,14 @@ Status TableMeeta::LoadNextSegmentID() {
     return Status::OK();
 }
 
-Status TableMeeta::LoadCurrentSegmentID() {
+Status TableMeeta::LoadLatestSegmentID() {
     String current_seg_id_key = GetTableTag(String(LATEST_SEGMENT_ID));
     String current_seg_id_str;
     Status status = kv_instance_.Get(current_seg_id_key, current_seg_id_str);
     if (!status.ok()) {
         return status;
     }
-    current_segment_id_ = std::stoull(current_seg_id_str);
+    latest_segment_id_ = std::stoull(current_seg_id_str);
     return Status::OK();
 }
 
@@ -228,13 +234,13 @@ Status TableMeeta::LoadTableDir() {
 String TableMeeta::GetTableTag(const String &tag) const { return KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag); }
 
 Tuple<SegmentID, Status> TableMeeta::GetLatestSegmentID() {
-    if (!current_segment_id_) {
-        auto status = LoadCurrentSegmentID();
+    if (!latest_segment_id_) {
+        auto status = LoadLatestSegmentID();
         if (!status.ok()) {
             return {INVALID_SEGMENT_ID, status};
         }
     }
-    return {*current_segment_id_, Status::OK()};
+    return {*latest_segment_id_, Status::OK()};
 }
 
 Status TableMeeta::SetLatestSegmentID(SegmentID latest_segment_id) {
@@ -248,16 +254,15 @@ Status TableMeeta::SetLatestSegmentID(SegmentID latest_segment_id) {
     return Status::OK();
 }
 
-Status AddSegmentID(SegmentID segment_id);
-
 Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column_name) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
-    String column_id_str;
-    Status status = kv_instance_.Get(column_key, column_id_str);
+    String column_value_str;
+    Status status = kv_instance_.Get(column_key, column_value_str);
     if (!status.ok()) {
         return {INVALID_COLUMN_ID, status};
     }
-    return {std::stoull(column_id_str), Status::OK()};
+    auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value_str));
+    return {column_def->id_, Status::OK()};
 }
 
 Tuple<SharedPtr<String>, Status> TableMeeta::GetTableDir() {

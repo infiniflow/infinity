@@ -133,7 +133,7 @@ Status SegmentMeta::LoadRowCnt() {
 }
 
 String SegmentMeta::GetSegmentTag(const String &tag) const {
-    return KeyEncode::CatalogTableSegmentTagKey(table_meta_.db_id_str_, table_meta_.table_id_str(), segment_id_, tag);
+    return KeyEncode::CatalogTableSegmentTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, tag);
 }
 
 } // namespace infinity

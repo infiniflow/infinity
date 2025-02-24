@@ -107,7 +107,7 @@ export struct NewTxnCompactStore {
 
 export class NewTxnTableStore {
 public:
-    explicit inline NewTxnTableStore(NewTxn *txn, const String& table_name) : txn_(txn), table_name_(table_name) {}
+    explicit inline NewTxnTableStore(NewTxn *txn, const String &table_name) : txn_(txn), table_name_(table_name) {}
 
     Tuple<UniquePtr<String>, Status> Import(SharedPtr<SegmentEntry> segment_entry, NewTxn *txn);
 
@@ -223,7 +223,7 @@ private:
 
 export class NewTxnTableStore1 {
 public:
-    NewTxnTableStore1(String db_id_str, String table_id_str, KVInstance &kv_instance);
+    NewTxnTableStore1(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance);
 
     Status Append(const SharedPtr<DataBlock> &input_block);
 

@@ -85,7 +85,7 @@ Status TableIndexMeeta::LoadSegmentIDs() {
 }
 
 String TableIndexMeeta::GetTableIndexTag(const String &tag) {
-    return KeyEncode::CatalogIndexTagKey(table_meta_.db_id_str_, table_meta_.table_id_str(), index_id_str_, tag);
+    return KeyEncode::CatalogIndexTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, tag);
 }
 
 } // namespace infinity
