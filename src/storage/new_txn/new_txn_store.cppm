@@ -27,6 +27,7 @@ import wal_entry;
 import column_def;
 import third_party;
 import logger;
+import table_meeta;
 
 namespace infinity {
 
@@ -46,6 +47,8 @@ class TxnManager;
 enum class CompactStatementType;
 class CatalogDeltaEntry;
 class BufferManager;
+
+class KVInstance;
 
 export struct NewTxnSegmentStore {
 public:
@@ -201,6 +204,7 @@ private:
     bool has_update_{false};
 
     String table_name_;
+
 public:
     void SetCompacting() { table_status_ = NewTxnStoreStatus::kCompacting; }
 
@@ -217,6 +221,27 @@ private:
     NewTxnStoreStatus table_status_{NewTxnStoreStatus::kNone};
 };
 
+export class NewTxnTableStore1 {
+public:
+    NewTxnTableStore1(String db_id_str, String table_id_str, KVInstance &kv_instance);
+
+    Status Append(const SharedPtr<DataBlock> &input_block);
+
+    Status Delete(const Vector<RowID> &row_ids);
+
+    TableMeeta &table_meta() { return table_meta_; }
+
+    AppendState *append_state() const { return append_state_.get(); }
+
+    const DeleteState &delete_state() const { return delete_state_; }
+
+private:
+    TableMeeta table_meta_;
+
+    UniquePtr<AppendState> append_state_{};
+    DeleteState delete_state_{};
+};
+
 export class NewTxnStore {
 public:
     explicit NewTxnStore(NewTxn *txn);
@@ -229,7 +254,7 @@ public:
 
     void DropTableStore(TableEntry *dropped_table_entry);
 
-    NewTxnTableStore *GetNewTxnTableStore(const String& table_name);
+    NewTxnTableStore *GetNewTxnTableStore(const String &table_name);
 
     NewTxnTableStore *GetExistNewTxnTableStore(TableEntry *table_entry) const;
 
@@ -281,6 +306,12 @@ public:
 
 private:
     HashMap<String, WalCmdDumpIndex *> dump_index_cmds_{};
+
+public:
+    NewTxnTableStore1 *GetNewTxnTableStore1(const String &db_id_str, const String &table_id_str);
+
+private:
+    HashMap<String, UniquePtr<NewTxnTableStore1>> txn_tables_store1_{};
 };
 
 } // namespace infinity

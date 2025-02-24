@@ -75,7 +75,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
 
 Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
     this->CheckTxn(db_name);
-    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
+    NewTxnTableStore1 *table_store = nullptr;
 
     auto append_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
     {
@@ -88,18 +88,24 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         }
         append_command->db_id_str_ = db_id_str;
         append_command->table_id_str_ = table_id_str;
+        table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     }
+
 
     auto wal_command = static_pointer_cast<WalCmd>(append_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(append_command->ToString()));
 
-    auto [err_msg, append_status] = table_store->Append(input_block);
+    auto append_status = table_store->Append(input_block);
+    if (!append_status.ok()) {
+        return append_status;
+    }
     return Status::OK();
 }
 
 Status NewTxn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
     this->CheckTxn(db_name);
+    NewTxnTableStore1 *table_store = nullptr;
 
     auto delete_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
     {
@@ -112,16 +118,19 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
         }
         delete_command->db_id_str_ = db_id_str;
         delete_command->table_id_str_ = table_id_str;
+        table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     }
 
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(delete_command->ToString()));
 
-    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
-    auto [err_msg, delete_status] = table_store->Delete(row_ids);
+    auto delete_status = table_store->Delete(row_ids);
+    if (!delete_status.ok()) {
+        return delete_status;
+    }
 
-    return delete_status;
+    return Status::OK();
 }
 
 Status NewTxn::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
@@ -496,8 +505,8 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             return status;
         }
     }
-    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
-    AppendState *append_state = txn_table_store->GetAppendState();
+    NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
+    AppendState *append_state = txn_table_store->append_state();
     if (append_state == nullptr) {
         return Status::OK();
     }
@@ -506,7 +515,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
         return Status::OK();
     }
 
-    TableMeeta table_meta(table_id_str, *kv_instance_.get());
+    TableMeeta &table_meta = txn_table_store->table_meta();
     table_meta.db_id_str_ = db_id_str;
     SegmentID next_segment_id = 0;
     {
@@ -625,12 +634,11 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
     KVStore *kv_store = txn_mgr_->kv_store();
     UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
 
-    const String &table_name = append_cmd->table_name_;
     const String &db_id_str = append_cmd->db_id_str_;
     const String &table_id_str = append_cmd->table_id_str_;
 
-    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
-    const AppendState *append_state = txn_table_store->GetAppendState();
+    NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
+    const AppendState *append_state = txn_table_store->append_state();
     if (append_state == nullptr) {
         return Status::OK();
     }
@@ -663,11 +671,10 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitDelete(const WalCmdDelete *delete_cmd) {
+Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd) {
     KVStore *kv_store = txn_mgr_->kv_store();
     UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
 
-    const String &table_name = delete_cmd->table_name_;
     const String &db_id_str = delete_cmd->db_id_str_;
     const String &table_id_str = delete_cmd->table_id_str_;
 
@@ -677,8 +684,11 @@ Status NewTxn::CommitDelete(const WalCmdDelete *delete_cmd) {
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
 
-    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
-    const DeleteState &delete_state = txn_table_store->GetDeleteStateRef();
+    NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
+    if (txn_table_store == nullptr) {
+        return Status::OK();
+    }
+    const DeleteState &delete_state = txn_table_store->delete_state();
     for (const auto &[segment_id, block_map] : delete_state.rows_) {
         if (!segment_meta || segment_id != segment_meta->segment_id()) {
             segment_meta.emplace(segment_id, table_meta, *kv_instance);

@@ -44,6 +44,8 @@ import persistence_manager;
 import infinity_context;
 import persist_result_handler;
 
+import kv_store;
+
 namespace infinity {
 
 NewTxnSegmentStore NewTxnSegmentStore::AddSegmentStore(SegmentEntry *segment_entry) {
@@ -233,23 +235,7 @@ NewTxnIndexStore *NewTxnTableStore::GetIndexStore(TableIndexEntry *table_index_e
     return ptr;
 }
 
-Tuple<UniquePtr<String>, Status> NewTxnTableStore::Delete(const Vector<RowID> &row_ids) {
-    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = delete_state_.rows_;
-    for (auto row_id : row_ids) {
-        BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
-        BlockOffset block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
-        auto &seg_map = row_hash_table[row_id.segment_id_];
-        auto &block_vec = seg_map[block_id];
-        block_vec.emplace_back(block_offset);
-        if (block_vec.size() > DEFAULT_BLOCK_CAPACITY) {
-            String error_message = "Delete row exceed block capacity";
-            UnrecoverableError(error_message);
-        }
-    }
-
-    has_update_ = true;
-    return {nullptr, Status::OK()};
-}
+Tuple<UniquePtr<String>, Status> NewTxnTableStore::Delete(const Vector<RowID> &row_ids) { return {nullptr, Status::OK()}; }
 
 void NewTxnTableStore::SetCompactType(CompactStatementType type) { compact_state_.type_ = type; }
 
@@ -555,6 +541,83 @@ void NewTxnTableStore::TryRevert() {
     }
 }
 
+NewTxnTableStore1::NewTxnTableStore1(String db_id_str, String table_id_str, KVInstance &kv_instance)
+    : table_meta_(std::move(table_id_str), kv_instance) {
+    table_meta_.db_id_str_ = db_id_str;
+}
+
+Status NewTxnTableStore1::Append(const SharedPtr<DataBlock> &input_block) {
+    Vector<SharedPtr<ColumnDef>> *column_defs = nullptr;
+    {
+        Status status = table_meta_.GetColumnDefs(column_defs);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    SizeT column_count = column_defs->size();
+
+    if (input_block->column_count() != column_count) {
+        String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
+        LOG_ERROR(err_msg);
+        return Status::ColumnCountMismatch(err_msg);
+    }
+
+    Vector<SharedPtr<DataType>> column_types;
+    for (SizeT col_id = 0; col_id < column_count; ++col_id) {
+        column_types.emplace_back((*column_defs)[col_id]->type());
+        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+            String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
+            LOG_ERROR(err_msg);
+            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+        }
+    }
+
+    DataBlock *current_block{nullptr};
+    if (append_state_ == nullptr) {
+        append_state_ = MakeUnique<AppendState>();
+    }
+
+    if (append_state_->blocks_.empty()) {
+        append_state_->blocks_.emplace_back(DataBlock::Make());
+        append_state_->blocks_.back()->Init(column_types);
+    }
+    current_block = append_state_->blocks_.back().get();
+
+    if (current_block->row_count() + input_block->row_count() > current_block->capacity()) {
+        SizeT to_append = current_block->capacity() - current_block->row_count();
+        current_block->AppendWith(input_block.get(), 0, to_append);
+        current_block->Finalize();
+
+        append_state_->blocks_.emplace_back(DataBlock::Make());
+        append_state_->blocks_.back()->Init(column_types);
+        current_block = append_state_->blocks_.back().get();
+        current_block->AppendWith(input_block.get(), to_append, input_block->row_count() - to_append);
+    } else {
+        SizeT to_append = input_block->row_count();
+        current_block->AppendWith(input_block.get(), 0, to_append);
+    }
+    current_block->Finalize();
+
+    return Status::OK();
+}
+
+Status NewTxnTableStore1::Delete(const Vector<RowID> &row_ids) {
+    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = delete_state_.rows_;
+    for (auto row_id : row_ids) {
+        BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
+        BlockOffset block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
+        auto &seg_map = row_hash_table[row_id.segment_id_];
+        auto &block_vec = seg_map[block_id];
+        block_vec.emplace_back(block_offset);
+        if (block_vec.size() > DEFAULT_BLOCK_CAPACITY) {
+            String error_message = "Delete row exceed block capacity";
+            UnrecoverableError(error_message);
+        }
+    }
+
+    return Status::OK();
+}
+
 NewTxnStore::NewTxnStore(NewTxn *txn) : txn_(txn) {}
 
 void NewTxnStore::AddDBStore(DBEntry *db_entry) { txn_dbs_.emplace(db_entry, ptr_seq_n_++); }
@@ -781,6 +844,15 @@ bool NewTxnStore::AddDumpIndexCmd(String idx_segment_key, WalCmdDumpIndex *dump_
     std::unique_lock lock(mtx_);
     bool add_success = dump_index_cmds_.emplace(std::move(idx_segment_key), dump_index_cmd).second;
     return add_success;
+}
+
+NewTxnTableStore1 *NewTxnStore::GetNewTxnTableStore1(const String &db_id_str, const String &table_id_str) {
+    auto iter = txn_tables_store1_.find(table_id_str);
+    if (iter == txn_tables_store1_.end()) {
+        KVInstance &kv_instance = *txn_->kv_instance();
+        iter = txn_tables_store1_.emplace(table_id_str, MakeUnique<NewTxnTableStore1>(db_id_str, table_id_str, kv_instance)).first;
+    }
+    return iter->second.get();
 }
 
 } // namespace infinity

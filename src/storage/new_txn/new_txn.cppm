@@ -429,7 +429,7 @@ private:
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
     Status CommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitAppend(const WalCmdAppend *append_cmd);
-    Status CommitDelete(const WalCmdDelete *delete_cmd);
+    Status PostCommitDelete(const WalCmdDelete *delete_cmd);
     Status CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
