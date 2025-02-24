@@ -47,6 +47,8 @@ public:
     Status InitSet();
 
     // New
+    Status Init();
+
     Tuple<SegmentID, Status> GetLatestSegmentID();
 
     Status SetLatestSegmentID(SegmentID next_segment_id);
@@ -73,6 +75,7 @@ private:
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
+    Status SetTableDir(const String& dir);
 private:
     KVInstance &kv_instance_;
     String table_id_str_;
@@ -80,6 +83,7 @@ private:
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
     Optional<Vector<SegmentID>> segment_ids_;
     Optional<SegmentID> next_segment_id_;
+    Optional<SegmentID> latest_segment_id_;
     Optional<String> table_dir_;
 
     Set<SegmentID> segment_id_set_;

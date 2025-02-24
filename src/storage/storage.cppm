@@ -78,6 +78,8 @@ public:
 
     [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
 
+    UniquePtr<KVInstance> KVInstance();
+
     [[nodiscard]] ResultCacheManager *result_cache_manager() const noexcept;
 
     [[nodiscard]] ResultCacheManager *GetResultCacheManagerPtr() const noexcept;

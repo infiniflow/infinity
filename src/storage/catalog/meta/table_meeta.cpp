@@ -135,6 +135,29 @@ Status TableMeeta::InitSet() {
     return Status::OK();
 }
 
+Status TableMeeta::Init() {
+    {
+        Status status = SetSegmentIDs(Vector<SegmentID>());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        Status status = SetLatestSegmentID(0);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    {
+        Status status = SetTableDir("0");
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status TableMeeta::LoadColumnDefs() {
     Vector<SharedPtr<ColumnDef>> column_defs;
 
@@ -214,7 +237,16 @@ Tuple<SegmentID, Status> TableMeeta::GetLatestSegmentID() {
     return {*current_segment_id_, Status::OK()};
 }
 
-Status SetLatestSegmentID(SegmentID next_segment_id);
+Status TableMeeta::SetLatestSegmentID(SegmentID latest_segment_id) {
+    latest_segment_id_ = latest_segment_id;
+    String latest_id_key = GetTableTag(String(LATEST_SEGMENT_ID));
+    String latest_id_str = fmt::format("{}", latest_segment_id);
+    Status status = kv_instance_.Put(latest_id_key, latest_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
 
 Status AddSegmentID(SegmentID segment_id);
 
@@ -228,8 +260,54 @@ Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column
     return {std::stoull(column_id_str), Status::OK()};
 }
 
-Tuple<SharedPtr<String>, Status> TableMeeta::GetTableDir() { return {nullptr, Status::OK()}; }
-Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() { return {nullptr, Status::OK()}; }
-Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs() { return {nullptr, Status::OK()}; }
+Tuple<SharedPtr<String>, Status> TableMeeta::GetTableDir() {
+    if (!table_dir_) {
+        auto status = LoadTableDir();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    return {MakeShared<String>(table_dir_.value()), Status::OK()};
+}
+
+Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() {
+    if (!segment_ids_) {
+        auto status = LoadSegmentIDs();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    return {MakeShared<Vector<SegmentID>>(segment_ids_.value()), Status::OK()};
+}
+
+Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs() {
+    if (!column_defs_) {
+        auto status = LoadColumnDefs();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    return {MakeShared<Vector<SharedPtr<ColumnDef>>>(column_defs_.value()), Status::OK()};
+}
+
+Status TableMeeta::SetTableDir(const String &dir) {
+    if (table_dir_) {
+        return Status::UnexpectedError(fmt::format("Table dir is already set as: {}", table_dir_.value()));
+    }
+
+    table_dir_ = dir;
+    String table_dir_key = GetTableTag("dir");
+    String table_dir;
+    Status status = kv_instance_.Get(table_dir_key, table_dir);
+    if (status.ok()) {
+        return Status::UnexpectedError(fmt::format("Table dir is already set as: {}", table_dir_.value()));
+    }
+
+    if (status.code() == ErrorCode::kNotFound) {
+        return kv_instance_.Put(table_dir_key, dir);
+    } else {
+        return status;
+    }
+}
 
 } // namespace infinity
