@@ -120,4 +120,22 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     static Tuple<SharedPtr<TableSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
 };
 
+// export struct DatabaseSnapshotInfo : public SnapshotInfo {
+//     String db_name_;
+//     String db_comment_{};
+//
+//     TxnTimeStamp txn_id_{};
+//     TxnTimeStamp begin_ts_{};
+//     TxnTimeStamp commit_ts_{};
+//     TxnTimeStamp max_commit_ts_{};
+//     String db_entry_dir_{};
+//     SegmentID next_segment_id_{};
+//     SizeT table_count_{};
+//     Map<String, SharedPtr<TableSnapshotInfo>> table_snapshots_{};
+//
+//     Vector<String> GetFiles() const;
+//     void Serialize(const String &save_path);
+//     static Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
+// };
+
 } // namespace infinity

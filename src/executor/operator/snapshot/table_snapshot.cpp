@@ -45,6 +45,7 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     return Status::OK();
 }
 
+
 Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name) {
     Txn *txn_ptr = query_context->GetTxn();
     String snapshot_dir = query_context->global_config()->SnapshotDir();

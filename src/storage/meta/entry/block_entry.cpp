@@ -169,9 +169,14 @@ BlockEntry::ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *b
         auto column_entry = BlockColumnEntry::ApplyBlockColumnSnapshot(block_entry.get(), block_column_snapshot.get(), txn_id, begin_ts);
         block_entry->columns_.emplace_back(std::move(column_entry));
     }
-    // Version file rewrite
+    // // Version file rewrite
     nlohmann::json fast_rough_filter_json = nlohmann::json::parse(block_snapshot_info->fast_rough_filter_);
     block_entry->GetFastRoughFilter()->LoadFromJsonFile(fast_rough_filter_json);
+
+    if (!block_snapshot_info->fast_rough_filter_.empty()) {
+        nlohmann::json fast_rough_filter_json = nlohmann::json::parse(block_snapshot_info->fast_rough_filter_);
+        block_entry->GetFastRoughFilter()->LoadFromJsonFile(fast_rough_filter_json);
+    }
     return block_entry;
 }
 
