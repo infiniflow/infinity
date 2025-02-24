@@ -91,7 +91,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     }
 
-
     auto wal_command = static_pointer_cast<WalCmd>(append_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(append_command->ToString()));
@@ -493,30 +492,18 @@ Status NewTxn::GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRange
 }
 
 Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
-    const String &db_name = append_cmd->db_name_;
-    const String &table_name = append_cmd->table_name_;
+    const String &db_id_str = append_cmd->db_id_str_;
+    const String &table_id_str = append_cmd->table_id_str_;
 
-    String db_id_str;
-    String table_id_str;
-    String table_key;
-    {
-        Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
-        if (!status.ok()) {
-            return status;
-        }
-    }
     NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     AppendState *append_state = txn_table_store->append_state();
-    if (append_state == nullptr) {
-        return Status::OK();
-    }
     append_state->Finalize();
     if (append_state->Finished()) {
+        // FIXME append_state will merge all appended blocks data. If append more than one block, this branch will be executed.
         return Status::OK();
     }
 
     TableMeeta &table_meta = txn_table_store->table_meta();
-    table_meta.db_id_str_ = db_id_str;
     SegmentID next_segment_id = 0;
     {
         Status status = table_meta.GetNextSegmentID(next_segment_id);

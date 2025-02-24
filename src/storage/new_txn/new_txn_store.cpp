@@ -547,6 +547,10 @@ NewTxnTableStore1::NewTxnTableStore1(String db_id_str, String table_id_str, KVIn
 }
 
 Status NewTxnTableStore1::Append(const SharedPtr<DataBlock> &input_block) {
+    if (input_block->row_count() == 0) {
+        UnrecoverableError("Attempt to append empty data block into transaction table store");
+    }
+
     Vector<SharedPtr<ColumnDef>> *column_defs = nullptr;
     {
         Status status = table_meta_.GetColumnDefs(column_defs);
