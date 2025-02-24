@@ -38,19 +38,25 @@ public:
 
     Status GetNextSegmentID(SegmentID &next_segment_id);
 
-    Tuple<SegmentID, Status> GetLatestSegmentID();
-
     Status GetTableDir(String *&table_dir);
 
     Status GetColumnIDByColumnName(const String &column_name, ColumnID &column_id);
 
-    Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
-
-    Status AddSegmentID(SegmentID segment_id);
-
     Status SetNextSegmentID(SegmentID next_segment_id);
 
     Status InitSet();
+
+    // New
+    Tuple<SegmentID, Status> GetLatestSegmentID();
+
+    Status SetLatestSegmentID(SegmentID next_segment_id);
+
+    Status AddSegmentID(SegmentID segment_id);
+
+    Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name) ;
+    Tuple<SharedPtr<String>, Status> GetTableDir() ;
+    Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs() ;
+    Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs() ;
 
 private:
     Status LoadColumnDefs();
@@ -64,6 +70,8 @@ private:
     Status LoadTableDir();
 
     String GetTableTag(const String &tag) const;
+
+    Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
 private:
     KVInstance &kv_instance_;

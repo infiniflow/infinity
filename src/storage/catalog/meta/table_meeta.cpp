@@ -73,16 +73,6 @@ Status TableMeeta::GetTableDir(String *&table_dir) {
     return Status::OK();
 }
 
-Tuple<SegmentID, Status> TableMeeta::GetLatestSegmentID() {
-    if (!current_segment_id_) {
-        auto status = LoadCurrentSegmentID();
-        if (!status.ok()) {
-            return {INVALID_SEGMENT_ID, status};
-        }
-    }
-    return {*current_segment_id_, Status::OK()};
-}
-
 Status TableMeeta::GetColumnIDByColumnName(const String &column_name, ColumnID &column_id) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
     String column_id_str;
@@ -213,5 +203,33 @@ Status TableMeeta::LoadTableDir() {
 }
 
 String TableMeeta::GetTableTag(const String &tag) const { return KeyEncode::CatalogTableTagKey(db_id_str_, table_id_str_, tag); }
+
+Tuple<SegmentID, Status> TableMeeta::GetLatestSegmentID() {
+    if (!current_segment_id_) {
+        auto status = LoadCurrentSegmentID();
+        if (!status.ok()) {
+            return {INVALID_SEGMENT_ID, status};
+        }
+    }
+    return {*current_segment_id_, Status::OK()};
+}
+
+Status SetLatestSegmentID(SegmentID next_segment_id);
+
+Status AddSegmentID(SegmentID segment_id);
+
+Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column_name) {
+    String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
+    String column_id_str;
+    Status status = kv_instance_.Get(column_key, column_id_str);
+    if (!status.ok()) {
+        return {INVALID_COLUMN_ID, status};
+    }
+    return {std::stoull(column_id_str), Status::OK()};
+}
+
+Tuple<SharedPtr<String>, Status> TableMeeta::GetTableDir() { return {nullptr, Status::OK()}; }
+Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() { return {nullptr, Status::OK()}; }
+Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs() { return {nullptr, Status::OK()}; }
 
 } // namespace infinity
