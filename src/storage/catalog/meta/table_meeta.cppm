@@ -32,49 +32,15 @@ public:
 
     const String &table_id_str() const { return table_id_str_; }
 
-    Status GetColumnDefs(Vector<SharedPtr<ColumnDef>> *&column_defs) {
-        if (!column_defs_) {
-            auto status = LoadColumnDefs();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        column_defs = &column_defs_.value();
-        return Status::OK();
-    }
+    Status GetColumnDefs(Vector<SharedPtr<ColumnDef>> *&column_defs);
 
-    Status GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
-        if (!segment_ids_) {
-            auto status = LoadSegmentIDs();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        segment_ids = &segment_ids_.value();
-        return Status::OK();
-    }
+    Status GetSegmentIDs(Vector<SegmentID> *&segment_ids);
 
-    Status GetNextSegmentID(SegmentID &next_segment_id) {
-        if (!next_segment_id_) {
-            auto status = LoadNextSegmentID();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        next_segment_id = *next_segment_id_;
-        return Status::OK();
-    }
+    Status GetNextSegmentID(SegmentID &next_segment_id);
 
-    Status GetTableDir(String *&table_dir) {
-        if (!table_dir_) {
-            auto status = LoadTableDir();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        table_dir = &table_dir_.value();
-        return Status::OK();
-    }
+    Tuple<SegmentID, Status> GetLatestSegmentID();
+
+    Status GetTableDir(String *&table_dir);
 
     Status GetColumnIDByColumnName(const String &column_name, ColumnID &column_id);
 
@@ -93,6 +59,8 @@ private:
 
     Status LoadNextSegmentID();
 
+    Status LoadCurrentSegmentID();
+
     Status LoadTableDir();
 
     String GetTableTag(const String &tag) const;
@@ -102,10 +70,12 @@ private:
     String table_id_str_;
 
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
-
     Optional<Vector<SegmentID>> segment_ids_;
     Optional<SegmentID> next_segment_id_;
     Optional<String> table_dir_;
+
+    Set<SegmentID> segment_id_set_;
+    Optional<SegmentID> current_segment_id_;
 
 public:
     String db_id_str_;

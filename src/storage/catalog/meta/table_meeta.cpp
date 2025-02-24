@@ -29,6 +29,60 @@ namespace infinity {
 
 TableMeeta::TableMeeta(String table_id_str, KVInstance &kv_instance) : kv_instance_(kv_instance), table_id_str_(table_id_str) {}
 
+Status TableMeeta::GetColumnDefs(Vector<SharedPtr<ColumnDef>> *&column_defs) {
+    if (!column_defs_) {
+        auto status = LoadColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    column_defs = &column_defs_.value();
+    return Status::OK();
+}
+
+Status TableMeeta::GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
+    if (!segment_ids_) {
+        auto status = LoadSegmentIDs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    segment_ids = &segment_ids_.value();
+    return Status::OK();
+}
+
+Status TableMeeta::GetNextSegmentID(SegmentID &next_segment_id) {
+    if (!next_segment_id_) {
+        auto status = LoadNextSegmentID();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    next_segment_id = *next_segment_id_;
+    return Status::OK();
+}
+
+Status TableMeeta::GetTableDir(String *&table_dir) {
+    if (!table_dir_) {
+        auto status = LoadTableDir();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    table_dir = &table_dir_.value();
+    return Status::OK();
+}
+
+Tuple<SegmentID, Status> TableMeeta::GetLatestSegmentID() {
+    if (!current_segment_id_) {
+        auto status = LoadCurrentSegmentID();
+        if (!status.ok()) {
+            return {INVALID_SEGMENT_ID, status};
+        }
+    }
+    return {*current_segment_id_, Status::OK()};
+}
+
 Status TableMeeta::GetColumnIDByColumnName(const String &column_name, ColumnID &column_id) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
     String column_id_str;
@@ -118,6 +172,10 @@ Status TableMeeta::LoadSegmentIDs() {
         return status;
     }
     segment_ids_ = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
+    segment_id_set_.clear();
+    for (SegmentID segment_id : *segment_ids_) {
+        segment_id_set_.insert(segment_id);
+    }
     return Status::OK();
 }
 
@@ -129,6 +187,17 @@ Status TableMeeta::LoadNextSegmentID() {
         return status;
     }
     next_segment_id_ = std::stoull(next_id_str);
+    return Status::OK();
+}
+
+Status TableMeeta::LoadCurrentSegmentID() {
+    String current_seg_id_key = GetTableTag(String(LATEST_SEGMENT_ID));
+    String current_seg_id_str;
+    Status status = kv_instance_.Get(current_seg_id_key, current_seg_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    current_segment_id_ = std::stoull(current_seg_id_str);
     return Status::OK();
 }
 

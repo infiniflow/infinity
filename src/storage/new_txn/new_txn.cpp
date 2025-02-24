@@ -2094,7 +2094,7 @@ void NewTxn::CommitBottom() {
                 auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
                 Status status = CommitAppend(append_cmd);
                 if (!status.ok()) {
-                    UnrecoverableError("CommitAppend failed");
+                    UnrecoverableError(fmt::format("CommitAppend failed: {}", status.message()));
                 }
                 break;
             }
