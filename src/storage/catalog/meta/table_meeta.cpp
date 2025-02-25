@@ -138,19 +138,13 @@ Status TableMeeta::InitSet() {
 
 Status TableMeeta::Init() {
     {
-        Status status = SetSegmentIDs(Vector<SegmentID>());
+        Status status = SetSegmentIDs({0});
         if (!status.ok()) {
             return status;
         }
     }
     {
         Status status = SetLatestSegmentID(0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = AddSegmentID(0);
         if (!status.ok()) {
             return status;
         }

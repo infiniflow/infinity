@@ -28,7 +28,7 @@ import logical_type;
 import table_def;
 import txn_state;
 import extra_ddl_info;
-// import segment_meta;
+import segment_meta;
 // import block_meta;
 // import column_meta;
 import table_meeta;
@@ -85,6 +85,46 @@ TEST_P(TableMeetaTest, table_meeta) {
         auto [segment_id, segment_status] = table_meta.GetLatestSegmentID();
         EXPECT_TRUE(segment_status.ok());
         EXPECT_EQ(segment_id, 0);
+        {
+            SegmentMeta segment_meta(0, table_meta, *kv_instance);
+            segment_meta.Init();
+            segment_meta.SetRowCnt(1048);
+            {
+                auto [block_id, block_status] = segment_meta.GetLatestBlockID();
+                EXPECT_TRUE(block_status.ok());
+                EXPECT_EQ(block_id, 0);
+            }
+            {
+                auto [blocks, block_status] = segment_meta.GetBlockIDs();
+                EXPECT_EQ(blocks->size(), 1);
+            }
+            {
+                auto block_status = segment_meta.AddBlockID(1);
+                EXPECT_TRUE(block_status.ok());
+
+                block_status = segment_meta.AddBlockID(2);
+                EXPECT_TRUE(block_status.ok());
+
+                block_status = segment_meta.SetLatestBlockID(2);
+                EXPECT_TRUE(block_status.ok());
+            }
+
+            {
+                auto [block_id, block_status] = segment_meta.GetLatestBlockID();
+                EXPECT_TRUE(block_status.ok());
+                EXPECT_EQ(block_id, 2);
+            }
+
+            {
+                auto [blocks, block_status] = segment_meta.GetBlockIDs();
+                EXPECT_EQ(blocks->size(), 3);
+            }
+
+            {
+                auto [row_count, block_status] = segment_meta.GetRowCnt();
+                EXPECT_EQ(row_count, 1048);
+            }
+        }
     }
 
     {

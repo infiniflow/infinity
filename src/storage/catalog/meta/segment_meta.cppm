@@ -64,7 +64,7 @@ public:
 
     Status SetBlockIDs(const Vector<BlockID> &block_ids);
 
-    Status AddBlockID(BlockID block_id);
+//    Status AddBlockID(BlockID block_id);
 
     Status SetNextBlockID(BlockID next_block_id);
 
@@ -72,10 +72,21 @@ public:
 
     Status InitSet();
 
+    // New
+    Status Init();
+    Tuple<BlockID, Status> GetLatestBlockID();
+    Status SetLatestBlockID(BlockID next_block_id);
+    Status AddBlockID(BlockID block_id);
+    Tuple<SharedPtr<String>, Status> GetSegmentDir();
+    Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
+    Tuple<SizeT, Status> GetRowCnt();
+
 private:
     Status LoadBlockIDs();
 
     Status LoadNextBlockID();
+
+    Status LoadLatestBlockID();
 
     Status LoadRowCnt();
 
@@ -85,10 +96,13 @@ private:
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     SegmentID segment_id_;
+    Optional<String> segment_dir_;
 
     Optional<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;
     Optional<SizeT> row_cnt_;
+
+    Optional<BlockID> latest_block_id_;
 };
 
 } // namespace infinity

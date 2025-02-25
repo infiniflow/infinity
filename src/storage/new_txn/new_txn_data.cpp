@@ -505,6 +505,9 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     }
 
     TableMeeta &table_meta = txn_table_store->table_meta();
+#if 0
+
+#else
     SegmentID next_segment_id = 0;
     {
         Status status = table_meta.GetNextSegmentID(next_segment_id);
@@ -614,7 +617,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             }
         }
     }
-
+#endif
     return Status::OK();
 }
 

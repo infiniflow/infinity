@@ -40,20 +40,20 @@ Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
     return Status::OK();
 }
 
-Status SegmentMeta::AddBlockID(BlockID block_id) {
-    if (!block_ids_) {
-        Status status = LoadBlockIDs();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    block_ids_->push_back(block_id);
-    Status status = SetBlockIDs(*block_ids_);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
+// Status SegmentMeta::AddBlockID(BlockID block_id) {
+//     if (!block_ids_) {
+//         Status status = LoadBlockIDs();
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
+//     block_ids_->push_back(block_id);
+//     Status status = SetBlockIDs(*block_ids_);
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     return Status::OK();
+// }
 
 Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
     next_block_id_ = next_block_id;
@@ -134,6 +134,108 @@ Status SegmentMeta::LoadRowCnt() {
 
 String SegmentMeta::GetSegmentTag(const String &tag) const {
     return KeyEncode::CatalogTableSegmentTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, tag);
+}
+
+Status SegmentMeta::Init() {
+    {
+        Status status = SetBlockIDs({0});
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        Status status = SetLatestBlockID(0);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        Status status = SetRowCnt(0);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status SegmentMeta::LoadLatestBlockID() {
+    String latest_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
+    String latest_block_id_str;
+    Status status = kv_instance_.Get(latest_block_id_key, latest_block_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    latest_block_id_ = std::stoull(latest_block_id_str);
+    return Status::OK();
+}
+
+Tuple<BlockID, Status> SegmentMeta::GetLatestBlockID() {
+    if (!latest_block_id_) {
+        Status status = LoadLatestBlockID();
+        if (!status.ok()) {
+            return {INVALID_BLOCK_ID, status};
+        }
+    }
+
+    return {*latest_block_id_, Status::OK()};
+}
+
+Status SegmentMeta::SetLatestBlockID(BlockID latest_block_id) {
+    latest_block_id_ = latest_block_id;
+    String latest_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
+    String latest_block_id_str = fmt::format("{}", latest_block_id);
+    Status status = kv_instance_.Put(latest_block_id_key, latest_block_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Status SegmentMeta::AddBlockID(BlockID block_id) {
+    if (!block_ids_) {
+        Status status = LoadBlockIDs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    block_ids_->push_back(block_id);
+    String block_ids_key = GetSegmentTag("block_ids");
+    String block_ids_str = nlohmann::json(block_ids_.value()).dump();
+    Status status = kv_instance_.Put(block_ids_key, block_ids_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
+    String seg_dir_key = GetSegmentTag("dir");
+    String seg_dir;
+    Status status = kv_instance_.Get(seg_dir_key, seg_dir);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    segment_dir_ = seg_dir;
+    return {MakeShared<String>(seg_dir), Status::OK()};
+}
+
+Tuple<SharedPtr<Vector<BlockID>>, Status> SegmentMeta::GetBlockIDs() {
+    if (!block_ids_) {
+        Status status = LoadBlockIDs();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    return {MakeShared<Vector<BlockID>>(block_ids_.value()), Status::OK()};
+}
+
+Tuple<SizeT, Status> SegmentMeta::GetRowCnt() {
+    if (!row_cnt_) {
+        Status status = LoadRowCnt();
+        if (!status.ok()) {
+            return {0, status};
+        }
+    }
+    return {row_cnt_.value(), Status::OK()};
 }
 
 } // namespace infinity
