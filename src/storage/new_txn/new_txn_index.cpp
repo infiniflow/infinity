@@ -228,12 +228,13 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
 
     SharedPtr<String> index_dir;
     {
-        String *table_dir_ptr = nullptr;
+        SharedPtr<String> table_dir_ptr{nullptr};
         {
-            Status status = table_index_meta.table_meta().GetTableDir(table_dir_ptr);
+            auto [table_dir, status] = table_index_meta.table_meta().GetTableDir();
             if (!status.ok()) {
                 return status;
             }
+            table_dir_ptr = table_dir;
         }
         String *index_dir_ptr = nullptr;
         {
@@ -591,12 +592,13 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
 
     String index_dir;
     {
-        String *table_dir_ptr = nullptr;
+        SharedPtr<String> table_dir_ptr{nullptr};
         {
-            Status status = table_meta.GetTableDir(table_dir_ptr);
+            auto [table_dir, status] = table_meta.GetTableDir();
             if (!status.ok()) {
                 return status;
             }
+            table_dir_ptr = table_dir;
         }
         String *index_dir_ptr = nullptr;
         {
@@ -675,12 +677,11 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
         }
     }
     {
-        Vector<SegmentID> *segment_ids = nullptr;
-        Status status = table_meta.GetSegmentIDs(segment_ids);
+        auto [segment_ids_ptr, status] = table_meta.GetSegmentIDs();
         if (!status.ok()) {
             return status;
         }
-        for (SegmentID segment_id : *segment_ids) {
+        for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
             Status status = this->PopulateIndex(table_index_meta, segment_meta);
             if (!status.ok()) {

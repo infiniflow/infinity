@@ -6695,9 +6695,8 @@ TEST_P(NewCatalogTest, test_append) {
 
         TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
 
-        Vector<SegmentID> *segment_ids{};
-        status = table_meta.GetSegmentIDs(segment_ids);
-        EXPECT_TRUE(status.ok());
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(segment_ids->size(), 1);
         SegmentID segment_id = segment_ids->at(0);
         EXPECT_EQ(segment_id, 0);
@@ -6947,8 +6946,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
 
         SegmentID segment_id = 0;
         {
-            Vector<SegmentID> *segment_ids = nullptr;
-            Status status = table_meta.GetSegmentIDs(segment_ids);
+            auto [segment_ids, status] = table_meta.GetSegmentIDs();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(segment_ids->size(), 1);
             segment_id = segment_ids->at(0);
@@ -7156,8 +7154,7 @@ TEST_P(NewCatalogTest, populate_index) {
 
         SegmentID segment_id = 0;
         {
-            Vector<SegmentID> *segment_ids = nullptr;
-            Status status = table_meta.GetSegmentIDs(segment_ids);
+            auto [segment_ids, status] = table_meta.GetSegmentIDs();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(segment_ids->size(), 1);
             segment_id = segment_ids->at(0);

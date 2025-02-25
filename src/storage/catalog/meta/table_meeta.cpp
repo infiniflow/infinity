@@ -30,50 +30,6 @@ namespace infinity {
 TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, const String &db_name, const String &table_name, KVInstance &kv_instance)
     : kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str), db_name_(db_name), table_name_(table_name) {}
 
-Status TableMeeta::GetColumnDefs(Vector<SharedPtr<ColumnDef>> *&column_defs) {
-    if (!column_defs_) {
-        auto status = LoadColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    column_defs = &column_defs_.value();
-    return Status::OK();
-}
-
-Status TableMeeta::GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
-    if (!segment_ids_) {
-        auto status = LoadSegmentIDs();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    segment_ids = &segment_ids_.value();
-    return Status::OK();
-}
-
-Status TableMeeta::GetNextSegmentID(SegmentID &next_segment_id) {
-    if (!next_segment_id_) {
-        auto status = LoadNextSegmentID();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    next_segment_id = *next_segment_id_;
-    return Status::OK();
-}
-
-Status TableMeeta::GetTableDir(String *&table_dir) {
-    if (!table_dir_) {
-        auto status = LoadTableDir();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    table_dir = &table_dir_.value();
-    return Status::OK();
-}
-
 Status TableMeeta::GetColumnDefByColumnName(const String &column_name, SharedPtr<ColumnDef> &column_def) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
     String column_def_str;
@@ -110,34 +66,6 @@ Status TableMeeta::AddSegmentID(SegmentID segment_id) {
     if (!status.ok()) {
         return status;
     }
-    return Status::OK();
-}
-
-Status TableMeeta::SetNextSegmentID(SegmentID next_segment_id) {
-    next_segment_id_ = next_segment_id;
-    String next_id_key = GetTableTag(String(LATEST_SEGMENT_ID));
-    String next_id_str = fmt::format("{}", next_segment_id);
-    Status status = kv_instance_.Put(next_id_key, next_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
-Status TableMeeta::InitSet() {
-    {
-        Status status = SetSegmentIDs(Vector<SegmentID>());
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = SetNextSegmentID(0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    // TODO: set table_dir
     return Status::OK();
 }
 

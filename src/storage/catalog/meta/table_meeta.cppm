@@ -35,10 +35,6 @@ public:
     const String &db_name() const { return db_name_; }
     const String &table_name() const { return table_name_; }
 
-    Status GetColumnDefs(Vector<SharedPtr<ColumnDef>> *&column_defs);
-
-    Status GetSegmentIDs(Vector<SegmentID> *&segment_ids);
-
     Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr) {
         if (!index_id_strs_ || !index_names_) {
             Status status = LoadIndexIDs();
@@ -53,13 +49,7 @@ public:
         return Status::OK();
     }
 
-    Status GetNextSegmentID(SegmentID &next_segment_id);
-
-    Status GetTableDir(String *&table_dir);
-
     Status GetColumnDefByColumnName(const String &column_name, SharedPtr<ColumnDef> &column_def);
-
-    Status SetNextSegmentID(SegmentID next_segment_id);
 
     Status InitSet();
 

@@ -99,12 +99,13 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     {
         TableMeeta table_meta(db_id_str, table_id_str, db_name, table_name, *kv_instance_.get());
 
-        Vector<SharedPtr<ColumnDef>> *column_defs = nullptr;
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs{nullptr};
         {
-            Status status = table_meta.GetColumnDefs(column_defs);
+            auto [col_defs, status] = table_meta.GetColumnDefs();
             if (!status.ok()) {
                 return status;
             }
+            column_defs = col_defs;
         }
         SizeT column_count = column_defs->size();
 
@@ -215,8 +216,7 @@ Status NewTxn::AddNewBlock(SegmentMeta *segment_meta, BlockID block_id, BlockMet
     SizeT column_num = 0;
     {
         TableMeeta &table_meta = segment_meta->table_meta();
-        Vector<SharedPtr<ColumnDef>> *column_defs_ptr = nullptr;
-        Status status = table_meta.GetColumnDefs(column_defs_ptr);
+        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
         }
@@ -236,8 +236,7 @@ Status NewTxn::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Option
     const ColumnDef *col_def = nullptr;
     {
         TableMeeta &table_meta = block_meta.segment_meta().table_meta();
-        Vector<SharedPtr<ColumnDef>> *column_defs_ptr = nullptr;
-        Status status = table_meta.GetColumnDefs(column_defs_ptr);
+        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
         }
@@ -447,8 +446,7 @@ Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnV
     const ColumnDef *col_def = nullptr;
     {
         TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
-        Vector<SharedPtr<ColumnDef>> *column_defs_ptr = nullptr;
-        Status status = table_meta.GetColumnDefs(column_defs_ptr);
+        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
         }
