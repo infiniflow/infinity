@@ -30,15 +30,28 @@ namespace infinity {
 TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, const String &db_name, const String &table_name, KVInstance &kv_instance)
     : kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str), db_name_(db_name), table_name_(table_name) {}
 
-Status TableMeeta::GetColumnDefByColumnName(const String &column_name, SharedPtr<ColumnDef> &column_def) {
+Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names) {
+        if (!index_id_strs_ || !index_names_) {
+            Status status = LoadIndexIDs();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        index_id_strs = &index_id_strs_.value();
+        if (index_names) {
+            *index_names = &index_names_.value();
+        }
+        return Status::OK();
+    }
+
+Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
     String column_def_str;
     Status status = kv_instance_.Get(column_key, column_def_str);
     if (!status.ok()) {
-        return status;
+        return {nullptr, status};
     }
-    column_def = ColumnDef::FromJson(nlohmann::json::parse(column_def_str));
-    return Status::OK();
+    return {ColumnDef::FromJson(nlohmann::json::parse(column_def_str)), Status::OK()};
 }
 
 Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {

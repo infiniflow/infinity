@@ -26,21 +26,16 @@ namespace infinity {
 TableIndexMeeta::TableIndexMeeta(String index_id_str, String index_name, TableMeeta &table_meta, KVInstance &kv_instance)
     : kv_instance_(kv_instance), table_meta_(table_meta), index_id_str_(std::move(index_id_str)), index_name_(std::move(index_name)) {}
 
-Status TableIndexMeeta::GetColumnDef(SharedPtr<ColumnDef> &column_def) {
+Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
     SharedPtr<IndexBase> index_def;
     {
         Status status = GetIndexDef(index_def);
         if (!status.ok()) {
-            return status;
+            return {nullptr, status};
         }
     }
-    {
-        Status status = table_meta_.GetColumnDefByColumnName(index_def->column_name(), column_def);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
+
+    return table_meta_.GetColumnDefByColumnName(index_def->column_name());
 }
 
 Status TableIndexMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {

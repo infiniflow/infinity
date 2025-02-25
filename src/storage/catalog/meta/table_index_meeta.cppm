@@ -60,7 +60,7 @@ public:
         return Status::OK();
     }
 
-    Status GetColumnDef(SharedPtr<ColumnDef> &column_def);
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef();
 
     Status GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
         if (!segment_ids_) {

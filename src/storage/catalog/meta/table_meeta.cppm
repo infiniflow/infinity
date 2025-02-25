@@ -35,23 +35,9 @@ public:
     const String &db_name() const { return db_name_; }
     const String &table_name() const { return table_name_; }
 
-    Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr) {
-        if (!index_id_strs_ || !index_names_) {
-            Status status = LoadIndexIDs();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        index_id_strs = &index_id_strs_.value();
-        if (index_names) {
-            *index_names = &index_names_.value();
-        }
-        return Status::OK();
-    }
+    Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
 
-    Status GetColumnDefByColumnName(const String &column_name, SharedPtr<ColumnDef> &column_def);
-
-    Status InitSet();
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name);
 
     // New
     Status Init();

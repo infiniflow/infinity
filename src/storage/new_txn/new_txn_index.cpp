@@ -220,10 +220,11 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
     }
     SharedPtr<ColumnDef> column_def;
     {
-        Status status = table_index_meta.GetColumnDef(column_def);
+        auto [col_def, status] = table_index_meta.GetColumnDef();
         if (!status.ok()) {
             return status;
         }
+        column_def = std::move(col_def);
     }
 
     SharedPtr<String> index_dir;
@@ -300,8 +301,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const AppendState 
     }
     ColumnID column_id = 0;
     {
-        SharedPtr<ColumnDef> column_def;
-        Status status = table_index_meta.table_meta().GetColumnDefByColumnName(index_def->column_name(), column_def);
+        auto [column_def, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_def->column_name());
         if (!status.ok()) {
             return status;
         }
@@ -399,12 +399,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
             {
                 std::unique_lock<std::mutex> lock(mem_index->mtx_);
                 if (mem_index->memory_secondary_index_.get() == nullptr) {
-                    SharedPtr<ColumnDef> column_def;
-                    {
-                        Status status = segment_index_meta.table_index_meta().GetColumnDef(column_def);
-                        if (!status.ok()) {
-                            return status;
-                        }
+                    auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+                    if (!status.ok()) {
+                        return status;
                     }
                     mem_index->memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, nullptr, base_row_id);
                 }
@@ -444,8 +441,7 @@ Status NewTxn::PopulateIndex(TableIndexMeeta &table_index_meta, SegmentMeta &seg
     }
     ColumnID column_id = 0;
     {
-        SharedPtr<ColumnDef> column_def;
-        Status status = table_index_meta.table_meta().GetColumnDefByColumnName(index_def->column_name(), column_def);
+        auto [column_def, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_def->column_name());
         if (!status.ok()) {
             return status;
         }
