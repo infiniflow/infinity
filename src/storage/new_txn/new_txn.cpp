@@ -1757,59 +1757,6 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
-    const String &db_name = create_index_cmd->db_name_;
-    const String &table_name = create_index_cmd->table_name_;
-    const String &index_name = *create_index_cmd->index_base_->index_name_;
-
-    // Get table ID
-    String db_id_str;
-    String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Get latest index id and lock the id
-    String index_id_str;
-    status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Create index key value pair
-    String index_key = KeyEncode::CatalogIndexKey(db_id_str, table_id_str, index_name, commit_ts);
-    status = kv_instance_->Put(index_key, index_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Create index def;
-    String index_def_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_def");
-    status = kv_instance_->Put(index_def_key, create_index_cmd->index_base_->Serialize().dump());
-    if (!status.ok()) {
-        return status;
-    }
-
-    String index_segment_ids = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "segment_ids");
-    status = kv_instance_->Put(index_segment_ids, nlohmann::json::array().dump());
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Create index dir
-    String index_storage_dir = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "dir");
-    status = kv_instance_->Put(index_storage_dir, create_index_cmd->index_dir_tail_);
-    if (!status.ok()) {
-        return status;
-    }
-
-    return Status::OK();
-}
-
 Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
     String db_id_str;
     String table_id_str;

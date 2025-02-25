@@ -77,6 +77,8 @@ public:
 
     Status AddSegmentID(SegmentID segment_id);
 
+    Status InitSet(SharedPtr<IndexBase> index_def, const String &index_dir);
+
 private:
     Status LoadIndexDef();
 

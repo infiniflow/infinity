@@ -68,6 +68,30 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
+Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_def, const String &index_dir) {
+    {
+        Status status = SetSegmentIDs({});
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        String index_def_key = GetTableIndexTag("index_def");
+        Status status = kv_instance_.Put(index_def_key, index_def->Serialize().dump());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        String index_storage_dir = GetTableIndexTag("dir");
+        Status status = kv_instance_.Put(index_storage_dir, index_dir);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status TableIndexMeeta::LoadIndexDef() {
     String index_def_key = GetTableIndexTag("index_def");
     String index_def_str;
