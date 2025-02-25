@@ -37,9 +37,6 @@ public:
 
     Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
 
-    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name);
-
-    // New
     Status Init();
 
     Tuple<SegmentID, Status> GetLatestSegmentID();
@@ -52,6 +49,7 @@ public:
     Tuple<SharedPtr<String>, Status> GetTableDir();
     Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs();
     Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
+    Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name);
 
 private:
     Status LoadColumnDefs();
@@ -60,17 +58,11 @@ private:
 
     Status LoadIndexIDs();
 
-    Status LoadNextSegmentID();
-
     Status LoadLatestSegmentID();
-
-    Status LoadTableDir();
 
     String GetTableTag(const String &tag) const;
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
-
-    Status SetTableDir(const String &dir);
 
 private:
     KVInstance &kv_instance_;
@@ -83,12 +75,8 @@ private:
     Optional<Vector<SegmentID>> segment_ids_;
     Optional<Vector<String>> index_id_strs_;
     Optional<Vector<String>> index_names_;
-    Optional<SegmentID> next_segment_id_;
     Optional<SegmentID> latest_segment_id_;
-    Optional<String> table_dir_;
-
     Set<SegmentID> segment_id_set_;
-    Optional<SegmentID> current_segment_id_;
 };
 
 } // namespace infinity
