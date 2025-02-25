@@ -3684,112 +3684,6 @@ TEST_P(NewCatalogTest, index_test2) {
     }
 }
 
-TEST_P(NewCatalogTest, index_segment_test) {
-    using namespace infinity;
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
-    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
-    auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-    auto index_name = std::make_shared<String>("idx1");
-    auto index_def = IndexSecondary::Make(index_name, MakeShared<String>(), "file_name", {column_def1->name()});
-    SegmentID idx_segment_id = 0;
-    {
-        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
-        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn1);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        Status status = txn3->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add index segment"), TransactionType::kNormal);
-        Status status = txn4->AddIndexSegment(*db_name, *table_name, *index_name, idx_segment_id);
-        EXPECT_TRUE(status.ok());
-
-        {
-            ChunkIndexInfo chunk_info;
-            chunk_info.base_name_ = "chunk1";
-            chunk_info.paths_.emplace_back("file1");
-            chunk_info.base_rowid_ = RowID(idx_segment_id, 0);
-            chunk_info.row_count_ = 10000;
-            status = txn4->AddIndexChunk(*db_name, *table_name, *index_name, idx_segment_id, chunk_info);
-        }
-        {
-            ChunkIndexInfo chunk_info;
-            chunk_info.base_name_ = "chunk2";
-            chunk_info.paths_.emplace_back("file2");
-            chunk_info.base_rowid_ = RowID(idx_segment_id, 10000);
-            chunk_info.row_count_ = 10000;
-            status = txn4->AddIndexChunk(*db_name, *table_name, *index_name, idx_segment_id, chunk_info);
-        }
-        status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("get index chunk"), TransactionType::kNormal);
-        Vector<ChunkIndexInfo> chunk_infos;
-        Status status = txn5->GetIndexChunks(*db_name, *table_name, *index_name, idx_segment_id, chunk_infos);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(chunk_infos.size(), 2);
-        for (const auto &chunk_info : chunk_infos) {
-            std::cout << "chunk name: " << chunk_info.base_name_ << ", row count: " << chunk_info.row_count_ << std::endl;
-        }
-        status = new_txn_mgr->CommitTxn(txn5);
-        EXPECT_TRUE(status.ok());
-
-        new_txn_mgr->PrintAllKeyValue();
-    }
-    {
-        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact index"), TransactionType::kNormal);
-        {
-            ChunkIndexInfo chunk_info;
-            chunk_info.base_name_ = "chunk3";
-            chunk_info.paths_.emplace_back("file3");
-            chunk_info.base_rowid_ = RowID(idx_segment_id, 0);
-            chunk_info.row_count_ = 20000;
-            Status status = txn6->AddIndexChunk(*db_name, *table_name, *index_name, idx_segment_id, chunk_info);
-            EXPECT_TRUE(status.ok());
-        }
-        {
-            Vector<ChunkID> chunk_ids{0, 1};
-            Status status = txn6->DeprecateIndexChunk(*db_name, *table_name, *index_name, idx_segment_id, chunk_ids);
-            EXPECT_TRUE(status.ok());
-        }
-        Status status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get index chunk2"), TransactionType::kNormal);
-        Vector<ChunkIndexInfo> chunk_infos;
-        Status status = txn7->GetIndexChunks(*db_name, *table_name, *index_name, idx_segment_id, chunk_infos);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(chunk_infos.size(), 1);
-        for (const auto &chunk_info : chunk_infos) {
-            std::cout << "chunk name: " << chunk_info.base_name_ << ", row count: " << chunk_info.row_count_ << std::endl;
-        }
-        status = new_txn_mgr->CommitTxn(txn7);
-        EXPECT_TRUE(status.ok());
-
-        new_txn_mgr->PrintAllKeyValue();
-    }
-}
-
 TEST_P(NewCatalogTest, lock_table) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -6799,7 +6693,7 @@ TEST_P(NewCatalogTest, test_append) {
         Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
 
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
 
         Vector<SegmentID> *segment_ids{};
         status = table_meta.GetSegmentIDs(segment_ids);
@@ -6941,7 +6835,7 @@ TEST_P(NewCatalogTest, test_delete) {
         BlockID block_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
 
         SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
@@ -7049,7 +6943,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         String db_id_str;
         Status status = txn->GetIndexID(*db_name, *table_name, *index_name, index_key, index_id_str, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
 
         SegmentID segment_id = 0;
         {
@@ -7061,7 +6955,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             EXPECT_EQ(segment_id, 0);
         }
 
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
+        TableIndexMeeta table_index_meta(index_id_str, *index_name, table_meta, *txn->kv_instance());
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
 
         SharedPtr<MemIndex> mem_index;
@@ -7100,4 +6994,60 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             [[maybe_unused]] const auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
         }
     }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index2"), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("merge index"), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->OptimizeIndex(*db_name, *table_name, *index_name, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    // {
+    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check merged index"), TransactionType::kNormal);
+    //     String index_key;
+    //     String index_id_str;
+    //     String table_id_str;
+    //     String db_id_str;
+    //     Status status = txn->GetIndexID(*db_name, *table_name, *index_name, index_key, index_id_str, table_id_str, db_id_str);
+    //     EXPECT_TRUE(status.ok());
+    //     SegmentID segment_id = 0;
+
+    //     TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
+    //     TableIndexMeeta table_index_meta(index_id_str, *index_name, table_meta, *txn->kv_instance());
+    //     SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
+
+    //     ChunkID chunk_id = 0;
+    //     {
+    //         Vector<ChunkID> *chunk_ids = nullptr;
+    //         Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+    //         EXPECT_TRUE(status.ok());
+    //         EXPECT_EQ(chunk_ids->size(), 1);
+    //         chunk_id = chunk_ids->at(0);
+    //         EXPECT_EQ(chunk_id, 2);
+    //     }
+    //     ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+
+    //     int32_t begin_val = 2;
+    //     int32_t end_val = 3;
+
+    //     BufferObj *buffer_obj = nullptr;
+    //     status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
+    //     EXPECT_TRUE(status.ok());
+
+    //     {
+    //         BufferHandle buffer_handle = buffer_obj->Load();
+    //         auto *index = static_cast<const SecondaryIndexData *>(buffer_handle.GetData());
+
+    //         [[maybe_unused]] const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
+    //         [[maybe_unused]] const auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
+    //     }
+    // }
 }

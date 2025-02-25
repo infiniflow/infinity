@@ -541,38 +541,12 @@ void NewTxnTableStore::TryRevert() {
     }
 }
 
-NewTxnTableStore1::NewTxnTableStore1(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance)
-    : table_meta_(db_id_str, table_id_str, kv_instance) {}
-
 Status NewTxnTableStore1::Append(const SharedPtr<DataBlock> &input_block) {
     if (input_block->row_count() == 0) {
         UnrecoverableError("Attempt to append empty data block into transaction table store");
     }
 
-    Vector<SharedPtr<ColumnDef>> *column_defs = nullptr;
-    {
-        Status status = table_meta_.GetColumnDefs(column_defs);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    SizeT column_count = column_defs->size();
-
-    if (input_block->column_count() != column_count) {
-        String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
-        LOG_ERROR(err_msg);
-        return Status::ColumnCountMismatch(err_msg);
-    }
-
-    Vector<SharedPtr<DataType>> column_types;
-    for (SizeT col_id = 0; col_id < column_count; ++col_id) {
-        column_types.emplace_back((*column_defs)[col_id]->type());
-        if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
-            String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
-            LOG_ERROR(err_msg);
-            return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
-        }
-    }
+    const Vector<SharedPtr<DataType>> &column_types = input_block->types();
 
     DataBlock *current_block{nullptr};
     if (append_state_ == nullptr) {
@@ -851,8 +825,7 @@ bool NewTxnStore::AddDumpIndexCmd(String idx_segment_key, WalCmdDumpIndex *dump_
 NewTxnTableStore1 *NewTxnStore::GetNewTxnTableStore1(const String &db_id_str, const String &table_id_str) {
     auto iter = txn_tables_store1_.find(table_id_str);
     if (iter == txn_tables_store1_.end()) {
-        KVInstance &kv_instance = *txn_->kv_instance();
-        iter = txn_tables_store1_.emplace(table_id_str, MakeUnique<NewTxnTableStore1>(db_id_str, table_id_str, kv_instance)).first;
+        iter = txn_tables_store1_.emplace(table_id_str, MakeUnique<NewTxnTableStore1>()).first;
     }
     return iter->second.get();
 }

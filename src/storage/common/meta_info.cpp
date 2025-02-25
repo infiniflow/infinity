@@ -76,28 +76,4 @@ SizeT TableInfo::GetColumnIdxByID(ColumnID column_id) const {
     return std::distance(column_defs_.begin(), iter);
 }
 
-ChunkIndexInfo::ChunkIndexInfo(const WalChunkIndexInfo &wal_chunk_info) {
-    base_name_ = wal_chunk_info.base_name_;
-    paths_ = wal_chunk_info.paths_;
-    base_rowid_ = wal_chunk_info.base_rowid_;
-    row_count_ = wal_chunk_info.row_count_;
-}
-
-nlohmann::json ChunkIndexInfo::ToJson() const {
-    nlohmann::json json;
-    json["base_name"] = base_name_;
-    json["paths"] = paths_;
-    json["base_rowid"] = base_rowid_.ToUint64();
-    json["row_count"] = row_count_;
-    return json;
-}
-
-bool ChunkIndexInfo::FromJson(const nlohmann::json &json, ChunkIndexInfo &chunk_index_info) {
-    chunk_index_info.base_name_ = json["base_name"].get<String>();
-    chunk_index_info.paths_ = json["paths"].get<Vector<String>>();
-    chunk_index_info.base_rowid_ = RowID::FromUint64(json["base_rowid"].get<u64>());
-    chunk_index_info.row_count_ = json["row_count"].get<u32>();
-    return true;
-}
-
 } // namespace infinity

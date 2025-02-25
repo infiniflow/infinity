@@ -34,7 +34,7 @@ import vector_buffer;
 import logger;
 import var_buffer;
 import wal_entry;
-
+import data_type;
 import column_meta;
 import block_meta;
 import segment_meta;
@@ -79,9 +79,9 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     NewTxnTableStore1 *table_store = nullptr;
 
     auto append_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
+    String db_id_str;
+    String table_id_str;
     {
-        String db_id_str;
-        String table_id_str;
         String table_key;
         Status status = this->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
         if (!status.ok()) {
@@ -95,6 +95,35 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     auto wal_command = static_pointer_cast<WalCmd>(append_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(append_command->ToString()));
+
+    {
+        TableMeeta table_meta(db_id_str, table_id_str, db_name, table_name, *kv_instance_.get());
+
+        Vector<SharedPtr<ColumnDef>> *column_defs = nullptr;
+        {
+            Status status = table_meta.GetColumnDefs(column_defs);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        SizeT column_count = column_defs->size();
+
+        if (input_block->column_count() != column_count) {
+            String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
+            LOG_ERROR(err_msg);
+            return Status::ColumnCountMismatch(err_msg);
+        }
+
+        Vector<SharedPtr<DataType>> column_types;
+        for (SizeT col_id = 0; col_id < column_count; ++col_id) {
+            column_types.emplace_back((*column_defs)[col_id]->type());
+            if (*column_types.back() != *input_block->column_vectors[col_id]->data_type()) {
+                String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
+                LOG_ERROR(err_msg);
+                return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+            }
+        }
+    }
 
     auto append_status = table_store->Append(input_block);
     if (!append_status.ok()) {
@@ -504,7 +533,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
         return Status::OK();
     }
 
-    TableMeeta &table_meta = txn_table_store->table_meta();
+    TableMeeta table_meta(db_id_str, table_id_str, append_cmd->db_name_, append_cmd->table_name_, *kv_instance_.get());
 #if 0
 
 #else
@@ -633,7 +662,7 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
     if (append_state == nullptr) {
         return Status::OK();
     }
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
+    TableMeeta table_meta(db_id_str, table_id_str, append_cmd->db_name_, append_cmd->table_name_, *kv_instance);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
     for (const AppendRange &range : append_state->append_ranges_) {
@@ -653,14 +682,17 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
         }
     }
     Vector<String> *index_id_strs = nullptr;
+    Vector<String> *index_names = nullptr;
     {
-        Status status = table_meta.GetIndexIDs(index_id_strs);
+        Status status = table_meta.GetIndexIDs(index_id_strs, &index_names);
         if (!status.ok()) {
             return status;
         }
     }
-    for (const String &index_id_str : *index_id_strs) {
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
+    for (SizeT i = 0; i < index_id_strs->size(); ++i) {
+        const String &index_id_str = (*index_id_strs)[i];
+        const String &index_name = (*index_names)[i];
+        TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta, *kv_instance);
         Status status = this->AppendIndex(table_index_meta, append_state);
         if (!status.ok()) {
             return status;
@@ -682,7 +714,7 @@ Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd) {
     const String &db_id_str = delete_cmd->db_id_str_;
     const String &table_id_str = delete_cmd->table_id_str_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
+    TableMeeta table_meta(db_id_str, table_id_str, delete_cmd->db_name_, delete_cmd->table_name_, *kv_instance);
 
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;

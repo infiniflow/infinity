@@ -87,9 +87,9 @@ struct SecondaryIndexChunkMerger {
             }
         }
     }
-    explicit SecondaryIndexChunkMerger(const Vector<Pair<BufferObj *, u32>> &buffer_objs) {
+    explicit SecondaryIndexChunkMerger(const Vector<Pair<u32, BufferObj *>> &buffer_objs) {
         readers_.reserve(buffer_objs.size());
-        for (const auto &[buffer_obj, row_count] : buffer_objs) {
+        for (const auto &[row_count, buffer_obj] : buffer_objs) {
             readers_.emplace_back(buffer_obj, row_count);
         }
         OrderedKeyType key = {};
@@ -165,6 +165,22 @@ public:
     }
 
     void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks) override {
+        SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
+        OrderedKeyType key = {};
+        u32 offset = 0;
+        u32 i = 0;
+        while (merger.GetNextDataPair(key, offset)) {
+            key_[i] = key;
+            offset_[i] = offset;
+            ++i;
+        }
+        if (i != chunk_row_count_) {
+            UnrecoverableError(fmt::format("InsertMergeData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_));
+        }
+        pgm_index_->BuildIndex(chunk_row_count_, key_.get());
+    }
+
+    void InsertMergeData(const Vector<Pair<u32, BufferObj *>> &old_chunks) override {
         SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
         OrderedKeyType key = {};
         u32 offset = 0;

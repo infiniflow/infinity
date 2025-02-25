@@ -224,29 +224,6 @@ public:
 
     Status GetIndexDefByName(const String &db_name, const String &table_name, const String &index_name, SharedPtr<IndexBase> &index_base);
 
-    Status AddIndexSegment(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
-
-    Status
-    AddIndexChunk(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, const ChunkIndexInfo &chunk_info);
-
-    Status DeprecateIndexChunk(const String &db_name,
-                               const String &table_name,
-                               const String &index_name,
-                               SegmentID segment_id,
-                               const Vector<ChunkID> &deprecate_ids);
-
-    Status GetIndexChunks(const String &db_name,
-                          const String &table_name,
-                          const String &index_name,
-                          SegmentID segment_id,
-                          Vector<ChunkIndexInfo> &chunk_infos);
-
-    Status GetIndexChunksByID(const String &db_id_str,
-                              const String &table_id_str,
-                              const String &index_id_str,
-                              SegmentID segment_id,
-                              Vector<ChunkIndexInfo> &chunk_infos);
-
     Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
@@ -383,12 +360,6 @@ public:
 
 private:
     Status GetColumnDefs(const String &db_id, const String &table_id, Vector<SharedPtr<ColumnDef>> &column_defs);
-    Status CommitAddIdxChunkByCmd(const String &db_id,
-                                  const String &table_id,
-                                  const String &index_id,
-                                  SegmentID segment_id,
-                                  const WalChunkIndexInfo &chunk_info);
-    Status CommitDropIdxChunkByID(const String &db_id, const String &table_id, const String &index_id, SegmentID segment_id, ChunkID chunk_id);
 
     // DML
     Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
@@ -418,6 +389,10 @@ private:
 
     Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
 
+    Status PopulateIndex(TableIndexMeeta &table_index_meta, SegmentMeta &segment_meta);
+
+    Status DumpMemIndexInner(SegmentIndexMeta &segment_index_meta);
+
 public:
     Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);
 
@@ -440,7 +415,6 @@ private:
     Status CommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitDelete(const WalCmdDelete *delete_cmd);
-    Status CommitDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 

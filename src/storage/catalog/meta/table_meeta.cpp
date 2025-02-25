@@ -27,8 +27,8 @@ import default_values;
 
 namespace infinity {
 
-TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance)
-    : kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
+TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, const String &db_name, const String &table_name, KVInstance &kv_instance)
+    : kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str), db_name_(db_name), table_name_(table_name) {}
 
 Status TableMeeta::GetColumnDefs(Vector<SharedPtr<ColumnDef>> *&column_defs) {
     if (!column_defs_) {
@@ -194,18 +194,21 @@ Status TableMeeta::LoadSegmentIDs() {
 
 Status TableMeeta::LoadIndexIDs() {
     Vector<String> index_id_strs;
+    Vector<String> index_names;
     String index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id_str_, table_id_str_);
     auto iter = kv_instance_.GetIterator();
     iter->Seek(index_prefix);
     while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
         String column_key = iter->Key().ToString();
         String column_key1 = column_key.substr(index_prefix.size());
-        [[maybe_unused]] String index_name = column_key1.substr(0, column_key1.find('|'));
+        String index_name = column_key1.substr(0, column_key1.find('|'));
         String index_id_str = iter->Value().ToString();
+        index_names.emplace_back(std::move(index_name));
         index_id_strs.emplace_back(std::move(index_id_str));
         iter->Next();
     }
     index_id_strs_ = std::move(index_id_strs);
+    index_names_ = std::move(index_names);
     return Status::OK();
 }
 

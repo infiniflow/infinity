@@ -133,19 +133,4 @@ export struct SegmentIndexInfo {
     Vector<String> files_{};
 };
 
-export struct ChunkIndexInfo {
-    String base_name_{};
-    Vector<String> paths_{};
-    RowID base_rowid_{};
-    u32 row_count_{};
-
-public:
-    ChunkIndexInfo() = default;
-    ChunkIndexInfo(const WalChunkIndexInfo &wal_chunk_info);
-
-    nlohmann::json ToJson() const;
-
-    static bool FromJson(const nlohmann::json &json, ChunkIndexInfo &chunk_index_info);
-};
-
 } // namespace infinity

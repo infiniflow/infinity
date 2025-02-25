@@ -27,7 +27,6 @@ import wal_entry;
 import column_def;
 import third_party;
 import logger;
-import table_meeta;
 
 namespace infinity {
 
@@ -223,21 +222,17 @@ private:
 
 export class NewTxnTableStore1 {
 public:
-    NewTxnTableStore1(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance);
+    NewTxnTableStore1() = default;
 
     Status Append(const SharedPtr<DataBlock> &input_block);
 
     Status Delete(const Vector<RowID> &row_ids);
-
-    TableMeeta &table_meta() { return table_meta_; }
 
     AppendState *append_state() const { return append_state_.get(); }
 
     const DeleteState &delete_state() const { return delete_state_; }
 
 private:
-    TableMeeta table_meta_;
-
     UniquePtr<AppendState> append_state_{};
     DeleteState delete_state_{};
 };
