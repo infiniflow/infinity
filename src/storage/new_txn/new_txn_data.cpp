@@ -534,7 +534,6 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     }
 
     TableMeeta table_meta(db_id_str, table_id_str, append_cmd->db_name_, append_cmd->table_name_, *kv_instance_.get());
-#if 1
     {
         Status status = table_meta.Init();
         if (!status.ok()) {
@@ -605,117 +604,6 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             }
         }
     }
-#else
-    SegmentID next_segment_id = 0;
-    {
-        Status status = table_meta.GetNextSegmentID(next_segment_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    Optional<SegmentMeta> segment_meta;
-    if (next_segment_id == 0) {
-        SegmentID segment_id = 0;
-        {
-            Status status = this->AddNewSegment(table_meta, segment_id, segment_meta);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        {
-            Status status = table_meta.SetNextSegmentID(segment_id + 1);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    } else {
-        SegmentID segment_id = next_segment_id - 1;
-        segment_meta.emplace(segment_id, table_meta, *kv_instance_.get());
-    }
-    BlockID next_block_id = 0;
-    {
-        Status status = segment_meta->GetNextBlockID(next_block_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    Optional<BlockMeta> block_meta;
-    if (next_block_id == 0) {
-        BlockID block_id = 0;
-        {
-            Status status = this->AddNewBlock(*segment_meta, block_id, block_meta);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        {
-            Status status = segment_meta->SetNextBlockID(block_id + 1);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    } else {
-        BlockID block_id = next_block_id - 1;
-        block_meta.emplace(block_id, segment_meta.value(), *kv_instance_.get());
-    }
-
-    while (true) {
-        bool block_full = false;
-        bool segment_full = false;
-        Status status = this->PrepareAppendInBlock(*block_meta, append_state, block_full, segment_full);
-        if (!status.ok()) {
-            return status;
-        }
-        if (append_state->Finished()) {
-            break;
-        }
-        if (segment_full) {
-            SegmentID segment_id = next_segment_id;
-            {
-                Status status = this->AddNewSegment(table_meta, segment_id, segment_meta);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-            ++next_segment_id;
-            {
-                Status status = table_meta.SetNextSegmentID(next_segment_id);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-            BlockID block_id = 0;
-            {
-                Status status = this->AddNewBlock(*segment_meta, block_id, block_meta);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-            next_block_id = 1;
-            {
-                Status status = segment_meta->SetNextBlockID(next_block_id);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-        } else if (block_full) {
-            BlockID block_id = next_block_id;
-            {
-                Status status = this->AddNewBlock(*segment_meta, block_id, block_meta);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-            ++next_block_id;
-            {
-                Status status = segment_meta->SetNextBlockID(next_block_id);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-        }
-    }
-#endif
     return Status::OK();
 }
 

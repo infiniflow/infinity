@@ -142,39 +142,7 @@ Status TableMeeta::InitSet() {
 }
 
 Status TableMeeta::Init() {
-    {
-        String segment_ids_key = GetTableTag("segment_ids");
-        String segment_ids_str;
-        Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
-        if (!status.ok()) {
-            if (status.code() != ErrorCode::kNotFound) {
-                return status;
-            }
-
-            segment_ids_str = nlohmann::json(Vector<SegmentID>{0}).dump();
-            status = kv_instance_.Put(segment_ids_key, segment_ids_str);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    }
-
     AddSegmentID(0);
-
-    {
-        String latest_id_key = GetTableTag(String(LATEST_SEGMENT_ID));
-        String latest_id_str;
-        Status status = kv_instance_.Get(latest_id_key, latest_id_str);
-        if (!status.ok()) {
-            if (status.code() != ErrorCode::kNotFound) {
-                return status;
-            }
-            status = kv_instance_.Put(latest_id_key, "0");
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    }
     return Status::OK();
 }
 
