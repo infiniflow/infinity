@@ -1968,8 +1968,11 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
         return status;
     }
 
-    // create tags
-    // ...
+    String index_segment_ids = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "segment_ids");
+    status = kv_instance_->Put(index_segment_ids, nlohmann::json::array().dump());
+    if (!status.ok()) {
+        return status;
+    }
 
     // Create index dir
     String index_storage_dir = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "dir");

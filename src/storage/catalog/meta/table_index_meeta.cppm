@@ -47,20 +47,20 @@ public:
         return Status::OK();
     }
 
-    Status GetIndexDir(SharedPtr<String> index_dir) {
+    Status GetIndexDir(String *&index_dir_ptr) {
         if (!index_dir_) {
             Status status = LoadIndexDir();
             if (!status.ok()) {
                 return status;
             }
         }
-        index_dir_ = index_dir;
+        index_dir_ptr = index_dir_.get();
         return Status::OK();
     }
 
     Status GetColumnDef(SharedPtr<ColumnDef> &column_def);
 
-    Status GetSegmentIds(Vector<SegmentID> *&segment_ids) {
+    Status GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
         if (!segment_ids_) {
             Status status = LoadSegmentIDs();
             if (!status.ok()) {

@@ -34,31 +34,37 @@ Status TableIndexMeeta::GetColumnDef(SharedPtr<ColumnDef> &column_def) {
             return status;
         }
     }
-    SizeT column_idx;
     {
-        Status status = table_meta_.GetColumnIDByColumnName(index_def->column_name(), column_idx);
+        Status status = table_meta_.GetColumnDefByColumnName(index_def->column_name(), column_def);
         if (!status.ok()) {
             return status;
         }
-    }
-    {
-        Vector<SharedPtr<ColumnDef>> *column_defs = nullptr;
-        Status status = table_meta_.GetColumnDefs(column_defs);
-        if (!status.ok()) {
-            return status;
-        }
-        column_def = (*column_defs)[column_idx];
     }
     return Status::OK();
 }
 
 Status TableIndexMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
-    //
+    String segment_ids_key = GetTableIndexTag("segment_ids");
+    String segment_ids_str = nlohmann::json(segment_ids).dump();
+    Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
+    if (!status.ok()) {
+        return status;
+    }
     return Status::OK();
 }
 
 Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
-    //
+    if (!segment_ids_) {
+        Status status = LoadSegmentIDs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    segment_ids_->push_back(segment_id);
+    Status status = SetSegmentIDs(*segment_ids_);
+    if (!status.ok()) {
+        return status;
+    }
     return Status::OK();
 }
 
@@ -75,12 +81,24 @@ Status TableIndexMeeta::LoadIndexDef() {
 }
 
 Status TableIndexMeeta::LoadIndexDir() {
-    //
+    index_dir_ = MakeShared<String>();
+    String index_dir_key = GetTableIndexTag("dir");
+    Status status = kv_instance_.Get(index_dir_key, *index_dir_);
+    if (!status.ok()) {
+        return status;
+    }
     return Status::OK();
 }
 
 Status TableIndexMeeta::LoadSegmentIDs() {
-    //
+    String segment_ids_key = GetTableIndexTag("segment_ids");
+    String segment_ids_str;
+    Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
+    if (!status.ok()) {
+        return status;
+    }
+    Vector<SegmentID> segment_ids = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
+    segment_ids_ = segment_ids;
     return Status::OK();
 }
 

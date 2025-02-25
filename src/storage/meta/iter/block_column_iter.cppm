@@ -192,4 +192,90 @@ private:
     SizeT end_;
 };
 
+export template <typename DataType>
+class MemIndexInserterIter1 {
+public:
+    using ValueType = const DataType *;
+
+    MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
+        : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt) {}
+
+    Optional<Pair<const DataType *, SegmentOffset>> Next() {
+        if (cur_ == end_) {
+            return None;
+        }
+        const void *ret = col_.data() + cur_ * ele_size_;
+        const auto *v_ptr = reinterpret_cast<const DataType *>(ret);
+        return std::make_pair(v_ptr, block_offset_ + cur_++);
+    }
+
+    const ColumnVector *column_vector() const { return &col_; }
+
+private:
+    SegmentOffset block_offset_;
+    const ColumnVector &col_;
+    SizeT ele_size_;
+    BlockOffset cur_;
+    BlockOffset end_;
+};
+
+export template <typename ElementT>
+class MemIndexInserterIter1<MultiVectorRef<ElementT>> {
+public:
+    using ValueType = const ElementT *;
+
+    MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
+        : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->type_info()->Size()), cur_(offset), end_(offset + row_cnt) {}
+
+    Optional<Pair<const ElementT *, SegmentOffset>> Next() {
+        // prepare multi-vector data
+        while (multi_vector_cur_ == multi_vector_ref_.embedding_num()) {
+            if (cur_ == end_) {
+                return None;
+            }
+            multi_vector_ref_ = col_.GetMultiVectorRaw(cur_++);
+            multi_vector_cur_ = 0;
+        }
+        const auto *ret = multi_vector_ref_.raw_data().data() + multi_vector_cur_ * ele_size_;
+        ++multi_vector_cur_;
+        const auto *v_ptr = reinterpret_cast<const ElementT *>(ret);
+        return std::make_pair(v_ptr, block_offset_ + cur_ - 1);
+    }
+
+    const ColumnVector *column_vector() const { return &col_; }
+
+private:
+    SegmentOffset block_offset_;
+    const ColumnVector &col_;
+    SizeT ele_size_;
+    BlockOffset cur_;
+    BlockOffset end_;
+    MultiVectorRef<ElementT> multi_vector_ref_ = {};
+    SizeT multi_vector_cur_ = 0;
+};
+
+export template <typename DataType, typename IdxType>
+class MemIndexInserterIter1<SparseVecRef<DataType, IdxType>> {
+public:
+    MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
+        : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt) {}
+
+    Optional<Pair<SparseVecRef<DataType, IdxType>, SegmentOffset>> Next() {
+        if (cur_ == end_) {
+            return None;
+        }
+        auto [data_span, index_span, nnz] = col_.GetSparseRaw(cur_++);
+        auto *data_ptr = reinterpret_cast<const DataType *>(data_span.data());
+        auto *index_ptr = reinterpret_cast<const IdxType *>(index_span.data());
+        return std::make_pair(SparseVecRef<DataType, IdxType>(nnz, index_ptr, data_ptr), block_offset_ + cur_ - 1);
+    }
+
+private:
+    SegmentOffset block_offset_;
+    const ColumnVector &col_;
+    SizeT ele_size_;
+    BlockOffset cur_;
+    BlockOffset end_;
+};
+
 } // namespace infinity

@@ -36,6 +36,7 @@ struct BlockEntry;
 struct SegmentEntry;
 struct ChunkIndexEntry;
 enum class SegmentStatus;
+class ChunkIndexMeta;
 
 export enum class WalCommandType : i8 {
     INVALID = 0,
@@ -143,6 +144,8 @@ export struct WalChunkIndexInfo {
     WalChunkIndexInfo() = default;
 
     explicit WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry);
+
+    explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta);
 
     bool operator==(const WalChunkIndexInfo &other) const;
 

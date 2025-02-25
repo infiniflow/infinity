@@ -27,6 +27,7 @@ import default_values;
 namespace infinity {
 
 class NewTxn;
+class MemIndex;
 
 export enum class LockType { kLocking, kLocked, kUnlocking, kUnlocked, kImmutable };
 
@@ -37,6 +38,10 @@ export struct TableMemoryContext {
 };
 
 export struct BlockLock {
+    std::shared_mutex mtx_;
+};
+
+export struct MemIndexLock {
     std::shared_mutex mtx_;
 };
 
@@ -104,8 +109,17 @@ public:
     Status DropBlockLockByBlockKey(const String &block_key);
 
 private:
-    mutable std::shared_mutex block_lock_mtx_{};
+    std::shared_mutex block_lock_mtx_{};
     HashMap<String, SharedPtr<BlockLock>> block_lock_map_{};
+
+public:
+    Status AddMemIndex(String mem_index_key, SharedPtr<MemIndex> mem_index);
+    Status GetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index);
+    Status DropMemIndexByMemIndexKey(const String &mem_index_key);
+
+private:
+    std::shared_mutex mem_index_mtx_{};
+    HashMap<String, SharedPtr<MemIndex>> mem_index_map_{};
 };
 
 } // namespace infinity

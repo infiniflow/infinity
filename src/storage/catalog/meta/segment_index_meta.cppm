@@ -23,6 +23,7 @@ namespace infinity {
 
 class KVInstance;
 class TableIndexMeeta;
+class MemIndex;
 
 export class SegmentIndexMeta {
 public:
@@ -47,7 +48,7 @@ public:
 
     Status GetNextChunkID(ChunkID &chunk_id) {
         if (!next_chunk_id_) {
-            Status status = LoadChunkIDs();
+            Status status = LoadNextChunkID();
             if (!status.ok()) {
                 return status;
             }
@@ -63,6 +64,8 @@ public:
     Status SetNextChunkID(ChunkID chunk_id);
 
     Status InitSet();
+
+    Status GetMemIndex(SharedPtr<MemIndex> &mem_index);
 
 private:
     Status LoadChunkIDs();

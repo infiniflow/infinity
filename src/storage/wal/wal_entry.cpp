@@ -42,6 +42,9 @@ import create_index_info;
 import persistence_manager;
 import infinity_context;
 import virtual_store;
+import chunk_index_meta;
+import default_values;
+import status;
 
 namespace infinity {
 
@@ -232,6 +235,23 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
             UnrecoverableError(error_message);
         }
     }
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
+}
+
+WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta) : chunk_id_(chunk_index_meta.chunk_id()) {
+    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+    Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+    if (!status.ok()) {
+        UnrecoverableError("Failed to get chunk info from chunk index meta.");
+    }
+    base_name_ = chunk_info_ptr->base_name_;
+    base_rowid_ = chunk_info_ptr->base_row_id_;
+    row_count_ = chunk_info_ptr->row_cnt_;
+    deprecate_ts_ = UNCOMMIT_TS;
+
+    // TODO
+
     auto *pm = InfinityContext::instance().persistence_manager();
     addr_serializer_.Initialize(pm, paths_);
 }

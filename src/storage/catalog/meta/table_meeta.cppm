@@ -37,11 +37,22 @@ public:
 
     Status GetSegmentIDs(Vector<SegmentID> *&segment_ids);
 
+    Status GetIndexIDs(Vector<String> *&index_id_strs) {
+        if (!index_id_strs_) {
+            Status status = LoadIndexIDs();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        index_id_strs = &index_id_strs_.value();
+        return Status::OK();
+    }
+
     Status GetNextSegmentID(SegmentID &next_segment_id);
 
     Status GetTableDir(String *&table_dir);
 
-    Status GetColumnIDByColumnName(const String &column_name, ColumnID &column_id);
+    Status GetColumnDefByColumnName(const String &column_name, SharedPtr<ColumnDef> &column_def);
 
     Status SetNextSegmentID(SegmentID next_segment_id);
 
@@ -66,6 +77,8 @@ private:
 
     Status LoadSegmentIDs();
 
+    Status LoadIndexIDs();
+
     Status LoadNextSegmentID();
 
     Status LoadLatestSegmentID();
@@ -85,6 +98,7 @@ private:
 
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
     Optional<Vector<SegmentID>> segment_ids_;
+    Optional<Vector<String>> index_id_strs_;
     Optional<SegmentID> next_segment_id_;
     Optional<SegmentID> latest_segment_id_;
     Optional<String> table_dir_;

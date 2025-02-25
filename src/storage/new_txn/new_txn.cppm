@@ -247,6 +247,10 @@ public:
                               SegmentID segment_id,
                               Vector<ChunkIndexInfo> &chunk_infos);
 
+    Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
+    Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
     // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
     // operator. (called by `PhysicalCreateIndexDo`)
@@ -369,7 +373,6 @@ private:
 public:
     Status GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id, String &db_id);
 
-private:
     Status GetIndexID(const String &db_name,
                       const String &table_name,
                       const String &index_name,
@@ -377,6 +380,8 @@ private:
                       String &index_id,
                       String &table_id,
                       String &db_id);
+
+private:
     Status GetColumnDefs(const String &db_id, const String &table_id, Vector<SharedPtr<ColumnDef>> &column_defs);
     Status CommitAddIdxChunkByCmd(const String &db_id,
                                   const String &table_id,
@@ -398,7 +403,8 @@ private:
                             ChunkID chunk_id,
                             RowID base_row_id,
                             SizeT row_count,
-                            Optional<ChunkIndexMeta> &chunk_index_meta);
+                            Optional<ChunkIndexMeta> &chunk_index_meta,
+                            BufferObj *&buffer_obj);
 
     Status PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full);
 
@@ -407,6 +413,10 @@ private:
     Status AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset);
 
     Status DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets);
+
+    Status AppendIndex(TableIndexMeeta &table_index_meta, const AppendState *append_state);
+
+    Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
 
 public:
     Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);

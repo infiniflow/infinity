@@ -39,6 +39,7 @@ import column_meta;
 import block_meta;
 import segment_meta;
 import table_meeta;
+import table_index_meeta;
 
 namespace infinity {
 
@@ -644,6 +645,20 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
             block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
         }
         Status status = this->AppendInBlock(*block_meta, range.start_offset_, range.row_count_, data_block, range.data_block_offset_);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    Vector<String> *index_id_strs = nullptr;
+    {
+        Status status = table_meta.GetIndexIDs(index_id_strs);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    for (const String &index_id_str : *index_id_strs) {
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
+        Status status = this->AppendIndex(table_index_meta, append_state);
         if (!status.ok()) {
             return status;
         }

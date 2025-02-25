@@ -14,12 +14,18 @@
 
 module;
 
+#include <vector>
+
 module new_txn;
 
 import chunk_index_meta;
 import segment_index_meta;
 import table_index_meeta;
 import table_meeta;
+import segment_meta;
+import block_meta;
+import column_meta;
+
 import infinity_context;
 import buffer_manager;
 import third_party;
@@ -30,6 +36,10 @@ import internal_types;
 import index_file_worker;
 import create_index_info;
 import buffer_obj;
+import mem_index;
+import wal_entry;
+
+import secondary_index_in_mem;
 
 namespace infinity {
 
@@ -38,6 +48,97 @@ namespace {
 String IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
 
 } // namespace
+
+Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+    String db_id_str;
+    String table_id_str;
+    String index_id_str;
+    String index_key;
+    {
+        Status status = this->GetIndexID(db_name, table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
+    TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+    SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
+
+    SharedPtr<IndexBase> index_base;
+    {
+        Status status = table_index_meta.GetIndexDef(index_base);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    SharedPtr<MemIndex> mem_index;
+    {
+        Status status = segment_index_meta.GetMemIndex(mem_index);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    ChunkID chunk_id = 0;
+    {
+        Status status = segment_index_meta.GetNextChunkID(chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    RowID row_id{};
+    u32 row_count = 0;
+
+    MemIndex mem_index_copy;
+    switch (index_base->index_type_) {
+        case IndexType::kSecondary: {
+            {
+                std::unique_lock<std::mutex> lock(mem_index->mtx_);
+                mem_index_copy.memory_secondary_index_ = std::exchange(mem_index->memory_secondary_index_, nullptr);
+            }
+            if (mem_index_copy.memory_secondary_index_.get() == nullptr) {
+                return Status::OK();
+            }
+            row_id = mem_index_copy.memory_secondary_index_->GetBeginRowID();
+            row_count = mem_index_copy.memory_secondary_index_->GetRowCount();
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented yet");
+        }
+    }
+    Optional<ChunkIndexMeta> chunk_index_meta;
+    BufferObj *buffer_obj = nullptr;
+    {
+        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, row_id, row_count, chunk_index_meta, buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    switch (index_base->index_type_) {
+        case IndexType::kSecondary: {
+            mem_index_copy.memory_secondary_index_->Dump(buffer_obj);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented yet");
+        }
+    }
+    {
+        Vector<WalChunkIndexInfo> chunk_infos;
+        chunk_infos.emplace_back(*chunk_index_meta);
+        Vector<ChunkID> deprecate_ids;
+        auto dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id, std::move(chunk_infos), std::move(deprecate_ids));
+
+        wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
+        txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
+    }
+    return Status::OK();
+}
 
 Status NewTxn::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta) {
     {
@@ -60,7 +161,8 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                 ChunkID chunk_id,
                                 RowID base_row_id,
                                 SizeT row_count,
-                                Optional<ChunkIndexMeta> &chunk_index_meta) {
+                                Optional<ChunkIndexMeta> &chunk_index_meta,
+                                BufferObj *&buffer_obj) {
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     SegmentID segment_id = segment_index_meta.segment_id();
 
@@ -78,12 +180,24 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
             return status;
         }
     }
+
     SharedPtr<String> index_dir;
     {
-        Status status = table_index_meta.GetIndexDir(index_dir);
-        if (!status.ok()) {
-            return status;
+        String *table_dir_ptr = nullptr;
+        {
+            Status status = table_index_meta.table_meta().GetTableDir(table_dir_ptr);
+            if (!status.ok()) {
+                return status;
+            }
         }
+        String *index_dir_ptr = nullptr;
+        {
+            Status status = table_index_meta.GetIndexDir(index_dir_ptr);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        index_dir = MakeShared<String>(fmt::format("{}/{}", *table_dir_ptr, *index_dir_ptr));
     }
     ChunkIndexMetaInfo chunk_info;
     {
@@ -106,7 +220,7 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                 UnrecoverableError("Not implemented yet");
             }
         }
-        BufferObj *buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
+        buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
         if (buffer_obj == nullptr) {
             return Status::BufferManagerError("AllocateBufferObject failed");
         }
@@ -130,8 +244,158 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
     return Status::OK();
 }
 
+Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const AppendState *append_state) {
+    SharedPtr<IndexBase> index_def;
+    {
+        Status status = table_index_meta.GetIndexDef(index_def);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    ColumnID column_id = 0;
+    {
+        SharedPtr<ColumnDef> column_def;
+        Status status = table_index_meta.table_meta().GetColumnDefByColumnName(index_def->column_name(), column_def);
+        if (!status.ok()) {
+            return status;
+        }
+        column_id = column_def->id();
+    }
+    Optional<SegmentMeta> segment_meta;
+    Optional<SegmentIndexMeta> segment_index_meta;
+    Optional<BlockMeta> block_meta;
+    Optional<ColumnMeta> column_meta;
+    BlockOffset cur_offset = 0;
+    BlockOffset cur_row_cnt = 0;
+
+    auto append_in_column = [&]() {
+        ColumnVector col;
+        {
+            Status status = this->GetColumnVector(*column_meta, cur_offset + cur_row_cnt, ColumnVectorTipe::kReadOnly, col);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        SegmentOffset block_offset = block_meta->block_capacity() * block_meta->block_id();
+        RowID base_row_id(segment_meta->segment_id(), block_offset);
+        {
+            Status status = this->AppendMemIndex(*segment_index_meta, base_row_id, col, cur_offset, cur_row_cnt);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    };
+
+    for (const AppendRange &range : append_state->append_ranges_) {
+        if (!segment_meta || segment_meta->segment_id() != range.segment_id_) {
+            segment_meta.emplace(range.segment_id_, table_index_meta.table_meta(), table_index_meta.kv_instance());
+
+            {
+                Vector<SegmentID> *segment_ids_ptr = nullptr;
+                Status status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+                if (!status.ok()) {
+                    return status;
+                }
+                auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), range.segment_id_);
+                if (iter == segment_ids_ptr->end()) {
+                    status = this->AddNewSegmentIndex(table_index_meta, range.segment_id_, segment_index_meta);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                } else {
+                    segment_index_meta.emplace(range.segment_id_, table_index_meta, table_index_meta.kv_instance());
+                }
+            }
+            block_meta.reset();
+        }
+        if (!block_meta || block_meta->block_id() != range.block_id_) {
+            if (block_meta) {
+                append_in_column();
+            }
+            block_meta.emplace(range.block_id_, segment_meta.value(), table_index_meta.kv_instance());
+            column_meta.emplace(column_id, *block_meta, table_index_meta.kv_instance());
+            cur_offset = range.start_offset_;
+            cur_row_cnt = range.row_count_;
+        } else {
+            if (cur_offset + cur_row_cnt != range.start_offset_) {
+                UnrecoverableError("AppendIndex: append range is not continuous");
+            }
+            cur_row_cnt += range.row_count_;
+        }
+    }
+    if (cur_row_cnt > 0) {
+        append_in_column();
+    }
+
+    return Status::OK();
+}
+
+Status
+NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) {
+    SharedPtr<IndexBase> index_def;
+    {
+        Status status = segment_index_meta.table_index_meta().GetIndexDef(index_def);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    SharedPtr<MemIndex> mem_index;
+    {
+        Status status = segment_index_meta.GetMemIndex(mem_index);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    switch (index_def->index_type_) {
+        case IndexType::kSecondary: {
+            SharedPtr<SecondaryIndexInMem> memory_secondary_index;
+            {
+                std::unique_lock<std::mutex> lock(mem_index->mtx_);
+                if (mem_index->memory_secondary_index_.get() == nullptr) {
+                    SharedPtr<ColumnDef> column_def;
+                    {
+                        Status status = segment_index_meta.table_index_meta().GetColumnDef(column_def);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                    }
+                    mem_index->memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, nullptr, base_row_id);
+                }
+                memory_secondary_index = mem_index->memory_secondary_index_;
+            }
+            memory_secondary_index->InsertBlockData(base_row_id.segment_offset_, col, offset, row_cnt);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented yet");
+        }
+    }
+    return Status::OK();
+}
+
 Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffer_obj) {
     TableIndexMeeta &table_index_meta = chunk_index_meta.segment_index_meta().table_index_meta();
+    TableMeeta &table_meta = table_index_meta.table_meta();
+
+    String index_dir;
+    {
+        String *table_dir_ptr = nullptr;
+        {
+            Status status = table_meta.GetTableDir(table_dir_ptr);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        String *index_dir_ptr = nullptr;
+        {
+            Status status = table_index_meta.GetIndexDir(index_dir_ptr);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        index_dir = fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), *table_dir_ptr, *index_dir_ptr);
+    }
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     SharedPtr<IndexBase> index_base;
@@ -146,7 +410,8 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             String secondary_index_file_name = IndexFileName(segment_id, chunk_id);
-            buffer_obj = buffer_mgr->GetBufferObject(secondary_index_file_name);
+            String index_filepath = fmt::format("{}/{}", index_dir, secondary_index_file_name);
+            buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
             if (buffer_obj == nullptr) {
                 return Status::BufferManagerError("GetBufferObject failed");
             }

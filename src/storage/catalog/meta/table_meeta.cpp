@@ -74,14 +74,14 @@ Status TableMeeta::GetTableDir(String *&table_dir) {
     return Status::OK();
 }
 
-Status TableMeeta::GetColumnIDByColumnName(const String &column_name, ColumnID &column_id) {
+Status TableMeeta::GetColumnDefByColumnName(const String &column_name, SharedPtr<ColumnDef> &column_def) {
     String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
-    String column_id_str;
-    Status status = kv_instance_.Get(column_key, column_id_str);
+    String column_def_str;
+    Status status = kv_instance_.Get(column_key, column_def_str);
     if (!status.ok()) {
         return status;
     }
-    column_id = std::stoull(column_id_str);
+    column_def = ColumnDef::FromJson(nlohmann::json::parse(column_def_str));
     return Status::OK();
 }
 
@@ -195,6 +195,23 @@ Status TableMeeta::LoadSegmentIDs() {
     for (SegmentID segment_id : *segment_ids_) {
         segment_id_set_.insert(segment_id);
     }
+    return Status::OK();
+}
+
+Status TableMeeta::LoadIndexIDs() {
+    Vector<String> index_id_strs;
+    String index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id_str_, table_id_str_);
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(index_prefix);
+    while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
+        String column_key = iter->Key().ToString();
+        String column_key1 = column_key.substr(index_prefix.size());
+        [[maybe_unused]] String index_name = column_key1.substr(0, column_key1.find('|'));
+        String index_id_str = iter->Value().ToString();
+        index_id_strs.emplace_back(std::move(index_id_str));
+        iter->Next();
+    }
+    index_id_strs_ = std::move(index_id_strs);
     return Status::OK();
 }
 

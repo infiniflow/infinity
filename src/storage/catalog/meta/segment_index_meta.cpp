@@ -23,6 +23,9 @@ import kv_store;
 import table_index_meeta;
 import table_meeta;
 import third_party;
+import infinity_context;
+import new_catalog;
+import mem_index;
 
 namespace infinity {
 
@@ -78,6 +81,24 @@ Status SegmentIndexMeta::InitSet() {
         if (!status.ok()) {
             return status;
         }
+    }
+    {
+        String mem_index_key = GetSegmentIndexTag("mem_index");
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        Status status = new_catalog->AddMemIndex(std::move(mem_index_key), MakeShared<MemIndex>());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status SegmentIndexMeta::GetMemIndex(SharedPtr<MemIndex> &mem_index) {
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    String mem_index_key = GetSegmentIndexTag("mem_index");
+    Status status = new_catalog->GetMemIndex(mem_index_key, mem_index);
+    if (!status.ok()) {
+        return status;
     }
     return Status::OK();
 }

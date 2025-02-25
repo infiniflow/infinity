@@ -28,6 +28,7 @@ import third_party;
 import logger;
 import infinity_exception;
 import default_values;
+import mem_index;
 
 namespace infinity {
 
@@ -482,6 +483,44 @@ Status NewCatalog::DropBlockLockByBlockKey(const String &block_key) {
     }
     if (!delete_success) {
         return Status::CatalogError(fmt::format("Block key: {} not found", block_key));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::AddMemIndex(String mem_index_key, SharedPtr<MemIndex> mem_index) {
+    bool insert_success = false;
+    HashMap<String, SharedPtr<MemIndex>>::iterator iter;
+    {
+        std::unique_lock lock(mem_index_mtx_);
+        std::tie(iter, insert_success) = mem_index_map_.emplace(std::move(mem_index_key), std::move(mem_index));
+    }
+    if (!insert_success) {
+        return Status::CatalogError(fmt::format("MemIndex key: {} already exists", iter->first));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::GetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index) {
+    {
+        std::shared_lock<std::shared_mutex> lck(mem_index_mtx_);
+        if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {
+            mem_index = iter->second;
+        }
+    }
+    if (mem_index == nullptr) {
+        return Status::CatalogError(fmt::format("MemIndex key: {} not found", mem_index_key));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
+    bool delete_success = false;
+    {
+        std::unique_lock lock(mem_index_mtx_);
+        delete_success = mem_index_map_.erase(mem_index_key) > 0;
+    }
+    if (!delete_success) {
+        return Status::CatalogError(fmt::format("MemIndex key: {} not found", mem_index_key));
     }
     return Status::OK();
 }

@@ -45,11 +45,20 @@ import kv_code;
 import kv_store;
 import new_txn;
 import new_txn_store;
-
+import buffer_obj;
+import buffer_handle;
+import secondary_index_in_mem;
+import secondary_index_data;
 import segment_meta;
 import block_meta;
 import column_meta;
 import table_meeta;
+import table_index_meeta;
+import segment_index_meta;
+import chunk_index_meta;
+import mem_index;
+import roaring_bitmap;
+import index_filter_evaluators;
 
 using namespace infinity;
 
@@ -6954,6 +6963,141 @@ TEST_P(NewCatalogTest, test_delete) {
             offset = range.second;
             has_next = state.Next(offset, range);
             EXPECT_FALSE(has_next);
+        }
+    }
+}
+
+TEST_P(NewCatalogTest, test_append_with_index) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto index_name = std::make_shared<std::string>("index1");
+    auto index_def = IndexSecondary::Make(index_name, MakeShared<String>(), "file_name", {column_def1->name()});
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    auto input_block = MakeShared<DataBlock>();
+    {
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            col1->AppendValue(Value::MakeInt(1));
+            col1->AppendValue(Value::MakeInt(2));
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            col2->AppendValue(Value::MakeVarchar("abc"));
+            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+    }
+    auto append_a_block = [&] {
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+
+            Status status = txn->Append(*db_name, *table_name, input_block);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    };
+    append_a_block();
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index"), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    append_a_block();
+    new_txn_mgr->PrintAllKeyValue();
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check mem index"), TransactionType::kNormal);
+        String index_key;
+        String index_id_str;
+        String table_id_str;
+        String db_id_str;
+        Status status = txn->GetIndexID(*db_name, *table_name, *index_name, index_key, index_id_str, table_id_str, db_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+
+        SegmentID segment_id = 0;
+        {
+            Vector<SegmentID> *segment_ids = nullptr;
+            Status status = table_meta.GetSegmentIDs(segment_ids);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(segment_ids->size(), 1);
+            segment_id = segment_ids->at(0);
+            EXPECT_EQ(segment_id, 0);
+        }
+
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
+
+        SharedPtr<MemIndex> mem_index;
+        status = segment_index_meta.GetMemIndex(mem_index);
+        EXPECT_TRUE(status.ok());
+
+        int32_t begin_val = 2;
+        int32_t end_val = 3;
+        {
+            SharedPtr<SecondaryIndexInMem> memory_secondary_index = mem_index->memory_secondary_index_;
+            u32 segment_row_count = 2;
+            Tuple<u32, int32_t, int32_t> arg_tuple = {segment_row_count, begin_val, end_val};
+            [[maybe_unused]] Pair<u32, Bitmask> result = memory_secondary_index->RangeQuery(&arg_tuple);
+        }
+
+        ChunkID chunk_id = 0;
+        {
+            Vector<ChunkID> *chunk_ids = nullptr;
+            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_ids->size(), 1);
+            chunk_id = chunk_ids->at(0);
+            EXPECT_EQ(chunk_id, 0);
+        }
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+
+        BufferObj *buffer_obj = nullptr;
+        status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
+        EXPECT_TRUE(status.ok());
+
+        {
+            BufferHandle buffer_handle = buffer_obj->Load();
+            auto *index = static_cast<const SecondaryIndexData *>(buffer_handle.GetData());
+
+            [[maybe_unused]] const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
+            [[maybe_unused]] const auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
         }
     }
 }
