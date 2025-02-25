@@ -107,6 +107,10 @@ Status SegmentMeta::LoadBlockIDs() {
         return status;
     }
     block_ids_ = nlohmann::json::parse(block_ids_str).get<Vector<BlockID>>();
+    block_id_set_.clear();
+    for (BlockID block_id : *block_ids_) {
+        block_id_set_.insert(block_id);
+    }
     return Status::OK();
 }
 
@@ -138,21 +142,33 @@ String SegmentMeta::GetSegmentTag(const String &tag) const {
 
 Status SegmentMeta::Init() {
     {
-        Status status = SetBlockIDs({0});
+        String latest_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
+        String latest_block_id_str;
+        Status status = kv_instance_.Get(latest_block_id_key, latest_block_id_str);
         if (!status.ok()) {
-            return status;
+            if (status.code() != ErrorCode::kNotFound) {
+                return status;
+            }
+            status = kv_instance_.Put(latest_block_id_key, "0");
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
+    AddBlockID(0);
     {
-        Status status = SetLatestBlockID(0);
+
+        String row_cnt_key = GetSegmentTag("row_cnt");
+        String row_cnt_str;
+        Status status = kv_instance_.Get(row_cnt_key, row_cnt_str);
         if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = SetRowCnt(0);
-        if (!status.ok()) {
-            return status;
+            if (status.code() != ErrorCode::kNotFound) {
+                return status;
+            }
+            status = kv_instance_.Put(row_cnt_key, "0");
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     return Status::OK();
@@ -195,8 +211,25 @@ Status SegmentMeta::AddBlockID(BlockID block_id) {
     if (!block_ids_) {
         Status status = LoadBlockIDs();
         if (!status.ok()) {
-            return status;
+            if (status.code() == ErrorCode::kNotFound) {
+                String block_ids_key = GetSegmentTag("block_ids");
+                String block_ids_str = nlohmann::json(Vector<BlockID>{}).dump();
+                status = kv_instance_.Put(block_ids_key, block_ids_str);
+                if (!status.ok()) {
+                    return status;
+                }
+            } else {
+                return status;
+            }
         }
+    }
+
+    if (block_id_set_.contains(block_id)) {
+        return Status::OK();
+    }
+    block_id_set_.insert(block_id);
+    if (block_ids_ == std::nullopt) {
+        block_ids_ = Vector<BlockID>();
     }
     block_ids_->push_back(block_id);
     String block_ids_key = GetSegmentTag("block_ids");

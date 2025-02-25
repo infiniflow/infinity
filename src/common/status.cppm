@@ -380,7 +380,7 @@ public:
     // meta
     static Status InvalidEntry();
     static Status NotFoundEntry();
-    static Status DuplicateEntry();
+    static Status DuplicateEntry(const String& detailed_info);
     static Status EmptyEntryList();
     static Status NoWALEntryFound(const String &file_name, i64 index);
     static Status WrongCheckpointType(const String &expect_type, const String &actual_type);

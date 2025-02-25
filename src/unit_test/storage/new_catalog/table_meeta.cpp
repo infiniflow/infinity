@@ -148,7 +148,7 @@ TEST_P(TableMeetaTest, table_meeta) {
     {
         auto [dir_ptr, dir_status] = table_meta.GetTableDir();
         EXPECT_TRUE(dir_status.ok());
-        EXPECT_STREQ(dir_ptr->c_str(), "0");
+        EXPECT_STREQ(dir_ptr->c_str(), "1");
     }
 
     {

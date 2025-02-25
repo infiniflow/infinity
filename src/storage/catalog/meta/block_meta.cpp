@@ -53,25 +53,44 @@ Status BlockMeta::SetRowCnt(SizeT row_cnt) {
 
 Status BlockMeta::InitSet() {
     TableMeeta &table_meta = segment_meta_.table_meta();
-    String *table_dir_ptr = nullptr;
+    SharedPtr<String> table_dir_ptr{};
     {
-        Status status = table_meta.GetTableDir(table_dir_ptr);
+        auto [table_dir, status] = table_meta.GetTableDir();
         if (!status.ok()) {
             return status;
         }
+        table_dir_ptr = table_dir;
     }
-    block_dir_ = MakeShared<String>(fmt::format("{}/seg_{}/block_{}", *table_dir_ptr, segment_meta_.segment_id(), block_id_));
+    block_dir_ = MakeShared<String>(fmt::format("tbl_{}/seg_{}/block_{}", *table_dir_ptr, segment_meta_.segment_id(), block_id_));
     {
         String block_dir_key = GetBlockTag("dir");
-        Status status = kv_instance_.Put(block_dir_key, *block_dir_);
+        String block_dir_str;
+        Status status = kv_instance_.Get(block_dir_key, block_dir_str);
         if (!status.ok()) {
-            return status;
+            if (status.code() != ErrorCode::kNotFound) {
+                return status;
+            }
+
+            Status status = kv_instance_.Put(block_dir_key, *block_dir_);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
+
     {
-        Status status = SetRowCnt(0);
+        String block_row_cnt_key = GetBlockTag("row_cnt");
+        String block_row_cnt_str;
+        Status status = kv_instance_.Get(block_row_cnt_key, block_row_cnt_str);
         if (!status.ok()) {
-            return status;
+            if (status.code() != ErrorCode::kNotFound) {
+                return status;
+            }
+
+            Status status = kv_instance_.Put(block_row_cnt_key, "0");
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();

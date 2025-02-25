@@ -624,7 +624,7 @@ Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUniq
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }
 
-Status Status::DuplicateEntry() { return Status(ErrorCode::kDuplicateEntry, MakeUnique<String>("Duplicate entry")); }
+Status Status::DuplicateEntry(const String &detail_info) { return Status(ErrorCode::kDuplicateEntry, MakeUnique<String>(detail_info)); }
 
 Status Status::EmptyEntryList() { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>("Empty entry list")); }
 

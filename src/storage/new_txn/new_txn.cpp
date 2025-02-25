@@ -976,15 +976,14 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
         UnrecoverableError(status.message());
     }
 
-    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
-    String table_storage_tail;
-    status = kv_instance_->Get(table_storage_dir, table_storage_tail);
-    if (!status.ok()) {
-        return {nullptr, status};
-    }
+    //    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
+    //    String table_storage_tail;
+    //    status = kv_instance_->Get(table_storage_dir, table_storage_tail);
+    //    if (!status.ok()) {
+    //        return {nullptr, status};
+    //    }
 
-    table_info->table_full_dir_ =
-        MakeShared<String>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), db_dir, table_storage_tail));
+    table_info->table_full_dir_ = MakeShared<String>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), db_dir, table_id_str));
 
     String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str, table_id_str);
     auto iter2 = kv_instance_->GetIterator();
@@ -1581,11 +1580,11 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
     }
 
     // Create table dir
-    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
-    status = kv_instance_->Put(table_storage_dir, create_table_cmd->table_dir_tail_);
-    if (!status.ok()) {
-        return status;
-    }
+    //    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
+    //    status = kv_instance_->Put(table_storage_dir, create_table_cmd->table_dir_tail_);
+    //    if (!status.ok()) {
+    //        return status;
+    //    }
 
     { // Create segment ids
         String table_segment_ids_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "segment_ids");
@@ -1643,11 +1642,11 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
     }
 
     // Delete table dir
-    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
-    status = kv_instance_->Delete(table_storage_dir);
-    if (!status.ok()) {
-        return status;
-    }
+    //    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
+    //    status = kv_instance_->Delete(table_storage_dir);
+    //    if (!status.ok()) {
+    //        return status;
+    //    }
 
     // Delete table comment
     String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");

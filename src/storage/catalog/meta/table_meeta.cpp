@@ -100,6 +100,11 @@ Status TableMeeta::AddSegmentID(SegmentID segment_id) {
     if (!segment_ids_) {
         LoadSegmentIDs();
     }
+
+    if (segment_id_set_.contains(segment_id)) {
+        return Status::DuplicateEntry(fmt::format("Duplicated segment id: {}", segment_id));
+    }
+    segment_id_set_.insert(segment_id);
     segment_ids_->emplace_back(segment_id);
     Status status = SetSegmentIDs(*segment_ids_);
     if (!status.ok()) {
@@ -138,21 +143,36 @@ Status TableMeeta::InitSet() {
 
 Status TableMeeta::Init() {
     {
-        Status status = SetSegmentIDs({0});
+        String segment_ids_key = GetTableTag("segment_ids");
+        String segment_ids_str;
+        Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
         if (!status.ok()) {
-            return status;
+            if (status.code() != ErrorCode::kNotFound) {
+                return status;
+            }
+
+            segment_ids_str = nlohmann::json(Vector<SegmentID>{0}).dump();
+            status = kv_instance_.Put(segment_ids_key, segment_ids_str);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
+
+    AddSegmentID(0);
+
     {
-        Status status = SetLatestSegmentID(0);
+        String latest_id_key = GetTableTag(String(LATEST_SEGMENT_ID));
+        String latest_id_str;
+        Status status = kv_instance_.Get(latest_id_key, latest_id_str);
         if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = SetTableDir("0");
-        if (!status.ok()) {
-            return status;
+            if (status.code() != ErrorCode::kNotFound) {
+                return status;
+            }
+            status = kv_instance_.Put(latest_id_key, "0");
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     return Status::OK();
@@ -279,15 +299,7 @@ Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column
     return {column_def->id_, Status::OK()};
 }
 
-Tuple<SharedPtr<String>, Status> TableMeeta::GetTableDir() {
-    if (!table_dir_) {
-        auto status = LoadTableDir();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
-    }
-    return {MakeShared<String>(table_dir_.value()), Status::OK()};
-}
+Tuple<SharedPtr<String>, Status> TableMeeta::GetTableDir() { return {MakeShared<String>(table_id_str_), Status::OK()}; }
 
 Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() {
     if (!segment_ids_) {

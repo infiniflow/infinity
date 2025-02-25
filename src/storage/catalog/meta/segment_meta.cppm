@@ -103,6 +103,7 @@ private:
     Optional<SizeT> row_cnt_;
 
     Optional<BlockID> latest_block_id_;
+    Set<BlockID> block_id_set_;
 };
 
 } // namespace infinity
