@@ -96,28 +96,28 @@ TEST_P(TableMeetaTest, table_meeta) {
             }
             {
                 auto [blocks, block_status] = segment_meta.GetBlockIDs();
-                EXPECT_EQ(blocks->size(), 1);
+                EXPECT_EQ(blocks->size(), 0);
             }
             {
-                auto block_status = segment_meta.AddBlockID(1);
+                auto block_status = segment_meta.AddBlockID(0);
                 EXPECT_TRUE(block_status.ok());
 
-                block_status = segment_meta.AddBlockID(2);
+                block_status = segment_meta.AddBlockID(1);
                 EXPECT_TRUE(block_status.ok());
 
-                block_status = segment_meta.SetLatestBlockID(2);
+                block_status = segment_meta.SetLatestBlockID(1);
                 EXPECT_TRUE(block_status.ok());
             }
 
             {
                 auto [block_id, block_status] = segment_meta.GetLatestBlockID();
                 EXPECT_TRUE(block_status.ok());
-                EXPECT_EQ(block_id, 2);
+                EXPECT_EQ(block_id, 1);
             }
 
             {
                 auto [blocks, block_status] = segment_meta.GetBlockIDs();
-                EXPECT_EQ(blocks->size(), 3);
+                EXPECT_EQ(blocks->size(), 2);
             }
 
             {

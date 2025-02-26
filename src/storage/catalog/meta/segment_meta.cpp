@@ -158,7 +158,14 @@ Status SegmentMeta::Init() {
             }
         }
     }
-    AddBlockID(0);
+    {
+        String block_ids_key = GetSegmentTag("block_ids");
+        String block_ids_str = nlohmann::json::array().dump();
+        Status status = kv_instance_.Put(block_ids_key, block_ids_str);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     {
 
         String row_cnt_key = GetSegmentTag("row_cnt");

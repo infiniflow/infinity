@@ -93,6 +93,9 @@ Status BlockMeta::InitSet() {
             }
         }
     }
+    {
+        segment_meta_.AddBlockID(block_id_);
+    }
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {
         String block_lock_key = GetBlockTag("lock");
