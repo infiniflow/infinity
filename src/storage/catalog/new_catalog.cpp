@@ -29,6 +29,7 @@ import logger;
 import infinity_exception;
 import default_values;
 import mem_index;
+import column_index_reader;
 
 namespace infinity {
 
@@ -523,6 +524,45 @@ Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
     }
     if (!delete_success) {
         return Status::CatalogError(fmt::format("MemIndex key: {} not found", mem_index_key));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache) {
+    bool insert_success = false;
+    HashMap<String, SharedPtr<TableIndexReaderCache>>::iterator iter;
+    {
+        std::unique_lock lock(ft_index_cache_mtx_);
+        std::tie(iter, insert_success) = ft_index_cache_map_.emplace(std::move(ft_index_cache_key), std::move(ft_index_cache));
+    }
+    if (!insert_success) {
+        return Status::CatalogError(fmt::format("FtIndexCache key: {} already exists", iter->first));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::GetFtIndexCache(const String &ft_index_cache_key, SharedPtr<TableIndexReaderCache> &ft_index_cache) {
+    ft_index_cache = nullptr;
+    {
+        std::shared_lock<std::shared_mutex> lck(ft_index_cache_mtx_);
+        if (auto iter = ft_index_cache_map_.find(ft_index_cache_key); iter != ft_index_cache_map_.end()) {
+            ft_index_cache = iter->second;
+        }
+    }
+    if (ft_index_cache == nullptr) {
+        return Status::CatalogError(fmt::format("FtIndexCache key: {} not found", ft_index_cache_key));
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const String &ft_index_cache_key) {
+    bool delete_success = false;
+    {
+        std::unique_lock lock(ft_index_cache_mtx_);
+        delete_success = ft_index_cache_map_.erase(ft_index_cache_key) > 0;
+    }
+    if (!delete_success) {
+        return Status::CatalogError(fmt::format("FtIndexCache key: {} not found", ft_index_cache_key));
     }
     return Status::OK();
 }

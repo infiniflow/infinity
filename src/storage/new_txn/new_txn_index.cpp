@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <vector>
 
 module new_txn;
@@ -25,15 +26,17 @@ import table_meeta;
 import segment_meta;
 import block_meta;
 import column_meta;
-
+import logger;
 import infinity_context;
 import buffer_manager;
 import third_party;
 import infinity_exception;
 import secondary_index_file_worker;
+import ivf_index_file_worker;
+import raw_file_worker;
 import column_def;
 import internal_types;
-import index_file_worker;
+import file_worker;
 import create_index_info;
 import buffer_obj;
 import mem_index;
@@ -42,6 +45,11 @@ import kv_code;
 import secondary_index_in_mem;
 import secondary_index_data;
 import default_values;
+import ivf_index_data_in_mem;
+import memory_indexer;
+import index_defines;
+import index_full_text;
+import column_index_reader;
 
 namespace infinity {
 
@@ -149,7 +157,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, chunk_index_meta, buffer_obj);
+        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, "" /*base_name*/, chunk_index_meta, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -159,6 +167,19 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             BufferHandle buffer_handle = buffer_obj->Load();
             auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_handle.GetDataMut());
             data_ptr->InsertMergeData(old_buffers);
+            break;
+        }
+        case IndexType::kFullText: {
+            // TODO
+            UnrecoverableError("Not implemented yet");
+            break;
+        }
+        case IndexType::kIVF: {
+            // TODO
+            UnrecoverableError("Not implemented yet");
+            // BufferHandle buffer_handle = buffer_obj->Load();
+            // auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
+            // data_ptr->BuildIVFIndex();
             break;
         }
         default: {
@@ -208,6 +229,7 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                 ChunkID chunk_id,
                                 RowID base_row_id,
                                 SizeT row_count,
+                                const String &base_name,
                                 Optional<ChunkIndexMeta> &chunk_index_meta,
                                 BufferObj *&buffer_obj) {
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
@@ -229,33 +251,20 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
         column_def = std::move(col_def);
     }
 
-    SharedPtr<String> index_dir;
+    SharedPtr<String> index_dir = MakeShared<String>();
     {
-        SharedPtr<String> table_dir_ptr{nullptr};
-        {
-            auto [table_dir, status] = table_index_meta.table_meta().GetTableDir();
-            if (!status.ok()) {
-                return status;
-            }
-            table_dir_ptr = table_dir;
+        Status status = table_index_meta.GetTableIndexDir(*index_dir);
+        if (!status.ok()) {
+            return status;
         }
-        String *index_dir_ptr = nullptr;
-        {
-            Status status = table_index_meta.GetIndexDir(index_dir_ptr);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        index_dir = MakeShared<String>(fmt::format("{}/{}", *table_dir_ptr, *index_dir_ptr));
     }
     ChunkIndexMetaInfo chunk_info;
     {
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        UniquePtr<IndexFileWorker> index_file_worker;
         switch (index_base->index_type_) {
             case IndexType::kSecondary: {
                 auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                auto index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                                          MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                                          index_dir,
                                                                          std::move(secondary_index_file_name),
@@ -263,18 +272,44 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                                                          column_def,
                                                                          row_count,
                                                                          buffer_mgr->persistence_manager());
+                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
+                break;
+            }
+            case IndexType::kFullText: {
+                auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
+                auto index_file_worker = MakeUnique<RawFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                              index_dir,
+                                                              std::move(column_length_file_name),
+                                                              row_count * sizeof(u32),
+                                                              buffer_mgr->persistence_manager());
+                buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
+                break;
+            }
+            case IndexType::kIVF: {
+                // TODO
+                UnrecoverableError("Not implemented yet");
+                // auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+                // index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                //                                                    MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                //                                                    index_dir,
+                //                                                    std::move(ivf_index_file_name),
+                //                                                    index_base,
+                //                                                    column_def,
+                //                                                    buffer_mgr->persistence_manager());
+                // buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
                 break;
             }
             default: {
                 UnrecoverableError("Not implemented yet");
             }
         }
-        buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
         if (buffer_obj == nullptr) {
             return Status::BufferManagerError("AllocateBufferObject failed");
         }
         buffer_obj->AddObjRc();
     }
+    chunk_info.base_name_ = base_name;
     chunk_info.base_row_id_ = base_row_id;
     chunk_info.row_cnt_ = row_count;
     {
@@ -412,6 +447,67 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
             memory_secondary_index->InsertBlockData(base_row_id.segment_offset_, col, offset, row_cnt);
             break;
         }
+        case IndexType::kFullText: {
+            const auto *index_fulltext = static_cast<const IndexFullText *>(index_def.get());
+            SharedPtr<MemoryIndexer> memory_indexer;
+            {
+                std::unique_lock<std::mutex> lock(mem_index->mtx_);
+                if (mem_index->memory_indexer_.get() == nullptr) {
+                    auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+                    if (!status.ok()) {
+                        return status;
+                    }
+
+                    String index_dir;
+                    {
+                        Status status = segment_index_meta.table_index_meta().GetTableIndexDir(index_dir);
+                        if (!status.ok()) {
+                            return status;
+                        }
+                    }
+                    String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
+                    String full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), index_dir);
+                    mem_index->memory_indexer_ =
+                        MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
+                    // table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
+                } else {
+                    RowID exp_begin_row_id = mem_index->memory_indexer_->GetBaseRowId() + mem_index->memory_indexer_->GetDocCount();
+                    assert(base_row_id >= exp_begin_row_id);
+                    if (base_row_id > exp_begin_row_id) {
+                        LOG_WARN(fmt::format("Begin row id: {}, expect begin row id: {}, insert gap: {}",
+                                             base_row_id.ToUint64(),
+                                             exp_begin_row_id.ToUint64(),
+                                             base_row_id - exp_begin_row_id));
+                        mem_index->memory_indexer_->InsertGap(base_row_id - exp_begin_row_id);
+                    }
+                }
+                if (index_fulltext->IsRealtime()) {
+                    UnrecoverableError("Not implemented yet");
+                } else {
+                    auto col_ptr = MakeShared<ColumnVector>(std::move(col));
+                    mem_index->memory_indexer_->Insert(col_ptr, offset, row_cnt, false);
+                }
+            }
+            break;
+        }
+        case IndexType::kIVF: {
+            // TODO
+            UnrecoverableError("Not implemented yet");
+            // SharedPtr<IVFIndexInMem> memory_ivf_index;
+            // {
+            //     std::unique_lock<std::mutex> lock(mem_index->mtx_);
+            //     if (mem_index->memory_ivf_index_.get() == nullptr) {
+            //         auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+            //         if (!status.ok()) {
+            //             return status;
+            //         }
+            //         mem_index->memory_ivf_index_ = IVFIndexInMem::NewIVFIndexInMem(column_def.get(), index_def.get(), base_row_id, nullptr);
+            //     }
+            //     memory_ivf_index = mem_index->memory_ivf_index_;
+            // }
+            // memory_ivf_index->InsertBlockData(base_row_id.segment_offset_, col, offset, row_cnt);
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -536,6 +632,7 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
     }
     RowID row_id{};
     u32 row_count = 0;
+    String base_name;
 
     MemIndex mem_index_copy;
     switch (index_base->index_type_) {
@@ -551,6 +648,33 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
             row_count = mem_index_copy.memory_secondary_index_->GetRowCount();
             break;
         }
+        case IndexType::kFullText: {
+            {
+                std::unique_lock<std::mutex> lock(mem_index->mtx_);
+                mem_index_copy.memory_indexer_ = std::exchange(mem_index->memory_indexer_, nullptr);
+            }
+            if (mem_index_copy.memory_indexer_.get() == nullptr) {
+                return Status::OK();
+            }
+            base_name = mem_index_copy.memory_indexer_->GetBaseName();
+            row_id = mem_index_copy.memory_indexer_->GetBaseRowId();
+            row_count = mem_index_copy.memory_indexer_->GetDocCount();
+            break;
+        }
+        case IndexType::kIVF: {
+            // TODO
+            UnrecoverableError("Not implemented yet");
+            // {
+            //     std::unique_lock<std::mutex> lock(mem_index->mtx_);
+            //     mem_index_copy.memory_ivf_index_ = std::exchange(mem_index->memory_ivf_index_, nullptr);
+            // }
+            // if (mem_index_copy.memory_ivf_index_.get() == nullptr) {
+            //     return Status::OK();
+            // }
+            // row_id = mem_index_copy.memory_ivf_index_->GetBeginRowID();
+            // row_count = mem_index_copy.memory_ivf_index_->GetRowCount();
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -558,7 +682,7 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, row_id, row_count, chunk_index_meta, buffer_obj);
+        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, row_id, row_count, base_name, chunk_index_meta, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -569,6 +693,27 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
             buffer_obj->Save();
             break;
         }
+        case IndexType::kFullText: {
+            u64 len_sum = mem_index_copy.memory_indexer_->GetColumnLengthSum();
+            u32 len_cnt = mem_index_copy.memory_indexer_->GetDocCount();
+            Status status = segment_index_meta.UpdateFtInfo(len_sum, len_cnt);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case IndexType::kIVF: {
+            // TODO
+            UnrecoverableError("Not implemented yet");
+            // mem_index_copy.memory_ivf_index_->Dump(buffer_obj, nullptr);
+            // buffer_obj->Save();
+            break;
+        }
+        // case IndexType::kHnsw:
+        // case IndexType::kBMP: {
+        //     buffer_obj->ToMmap();
+        //     break;
+        // }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -587,26 +732,14 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
 
 Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffer_obj) {
     TableIndexMeeta &table_index_meta = chunk_index_meta.segment_index_meta().table_index_meta();
-    TableMeeta &table_meta = table_index_meta.table_meta();
 
     String index_dir;
     {
-        SharedPtr<String> table_dir_ptr{nullptr};
-        {
-            auto [table_dir, status] = table_meta.GetTableDir();
-            if (!status.ok()) {
-                return status;
-            }
-            table_dir_ptr = table_dir;
+        Status status = table_index_meta.GetTableIndexDir(index_dir);
+        if (!status.ok()) {
+            return status;
         }
-        String *index_dir_ptr = nullptr;
-        {
-            Status status = table_index_meta.GetIndexDir(index_dir_ptr);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        index_dir = fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), *table_dir_ptr, *index_dir_ptr);
+        index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), index_dir);
     }
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
@@ -627,6 +760,32 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
             if (buffer_obj == nullptr) {
                 return Status::BufferManagerError("GetBufferObject failed");
             }
+            break;
+        }
+        case IndexType::kFullText: {
+            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+            {
+                Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            auto column_length_file_name = chunk_info_ptr->base_name_ + LENGTH_SUFFIX;
+            String index_filepath = fmt::format("{}/{}", index_dir, column_length_file_name);
+            buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
+            if (buffer_obj == nullptr) {
+                return Status::BufferManagerError("GetBufferObject failed");
+            }
+            break;
+        }
+        case IndexType::kIVF: {
+            // String ivf_index_file_name = IndexFileName(segment_id, chunk_id);
+            // String index_filepath = fmt::format("{}/{}", index_dir, ivf_index_file_name);
+            // buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
+            // if (buffer_obj == nullptr) {
+            //     return Status::BufferManagerError("GetBufferObject failed");
+            // }
+            UnrecoverableError("Not implemented yet");
             break;
         }
         default: {
@@ -686,6 +845,15 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
             if (!status.ok()) {
                 return status;
             }
+        }
+    }
+    if (create_index_cmd->index_base_->index_type_ == IndexType::kFullText) {
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        String ft_cache_key = table_index_meta.FtIndexCacheTag();
+        auto ft_cache = MakeShared<TableIndexReaderCache>(db_id_str, table_id_str);
+        Status status = new_catalog->AddFtIndexCache(std::move(ft_cache_key), std::move(ft_cache));
+        if (!status.ok()) {
+            return status;
         }
     }
 

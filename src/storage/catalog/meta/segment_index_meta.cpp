@@ -26,8 +26,20 @@ import third_party;
 import infinity_context;
 import new_catalog;
 import mem_index;
+import index_base;
+import create_index_info;
 
 namespace infinity {
+
+void SegmentIndexFtInfo::ToJson(nlohmann::json &json) const {
+    json["ft_column_len_sum"] = ft_column_len_sum_;
+    json["ft_column_len_cnt"] = ft_column_len_cnt_;
+}
+
+void SegmentIndexFtInfo::FromJson(const nlohmann::json &json) {
+    ft_column_len_sum_ = json["ft_column_len_sum"].get<u64>();
+    ft_column_len_cnt_ = json["ft_column_len_cnt"].get<u32>();
+}
 
 SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta, KVInstance &kv_instance)
     : kv_instance_(kv_instance), table_index_meta_(table_index_meta), segment_id_(segment_id) {}
@@ -69,6 +81,35 @@ Status SegmentIndexMeta::SetNextChunkID(ChunkID chunk_id) {
     return Status::OK();
 }
 
+Status SegmentIndexMeta::SetFtInfo(const SegmentIndexFtInfo &ft_info) {
+    ft_info_ = ft_info;
+    String ft_info_key = GetSegmentIndexTag("ft_info");
+    nlohmann::json ft_info_json;
+    ft_info.ToJson(ft_info_json);
+    String ft_info_str = ft_info_json.dump();
+    Status status = kv_instance_.Put(ft_info_key, ft_info_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
+    if (!ft_info_) {
+        Status status = LoadFtInfo();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    ft_info_->ft_column_len_sum_ += column_len_sum;
+    ft_info_->ft_column_len_cnt_ += column_len_cnt;
+    Status status = SetFtInfo(*ft_info_);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Status SegmentIndexMeta::InitSet() {
     {
         Status status = SetChunkIDs(Vector<ChunkID>());
@@ -88,6 +129,20 @@ Status SegmentIndexMeta::InitSet() {
         Status status = new_catalog->AddMemIndex(std::move(mem_index_key), MakeShared<MemIndex>());
         if (!status.ok()) {
             return status;
+        }
+    }
+    {
+        SharedPtr<IndexBase> index_def;
+        Status status = table_index_meta_.GetIndexDef(index_def);
+        if (!status.ok()) {
+            return status;
+        }
+        if (index_def->index_type_ == IndexType::kFullText) {
+            SegmentIndexFtInfo ft_info{};
+            Status status = this->SetFtInfo(ft_info);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     return Status::OK();
@@ -122,6 +177,19 @@ Status SegmentIndexMeta::LoadNextChunkID() {
         return status;
     }
     next_chunk_id_ = std::stoull(next_chunk_id_str);
+    return Status::OK();
+}
+
+Status SegmentIndexMeta::LoadFtInfo() {
+    String ft_info_key = GetSegmentIndexTag("ft_info");
+    String ft_info_str;
+    Status status = kv_instance_.Get(ft_info_key, ft_info_str);
+    if (!status.ok()) {
+        return status;
+    }
+    nlohmann::json ft_info_json = nlohmann::json::parse(ft_info_str);
+    ft_info_ = SegmentIndexFtInfo();
+    ft_info_->FromJson(ft_info_json);
     return Status::OK();
 }
 

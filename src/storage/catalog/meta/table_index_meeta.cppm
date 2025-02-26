@@ -58,6 +58,8 @@ public:
         return Status::OK();
     }
 
+    Status GetTableIndexDir(String &table_index_dir);
+
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef();
 
     Status GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
@@ -85,6 +87,9 @@ private:
     Status LoadSegmentIDs();
 
     String GetTableIndexTag(const String &tag) const;
+
+public:
+    String FtIndexCacheTag() const;
 
 private:
     KVInstance &kv_instance_;

@@ -24,7 +24,14 @@ import storage;
 namespace infinity {
 
 void BaseMemIndex::IncreaseMemoryUsageBase(SizeT mem) {
-    auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+    Storage *storage = InfinityContext::instance().storage();
+    if (!storage) {
+        return;
+    }
+    auto *memindex_tracer = storage->memindex_tracer();
+    if (!memindex_tracer) {
+        return;
+    }
     memindex_tracer->IncreaseMemoryUsage(mem);
 }
 

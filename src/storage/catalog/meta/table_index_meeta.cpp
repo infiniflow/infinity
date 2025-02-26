@@ -14,6 +14,8 @@
 
 module;
 
+#include <string>
+
 module table_index_meeta;
 
 import kv_store;
@@ -25,6 +27,26 @@ namespace infinity {
 
 TableIndexMeeta::TableIndexMeeta(String index_id_str, TableMeeta &table_meta, KVInstance &kv_instance)
     : kv_instance_(kv_instance), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
+
+Status TableIndexMeeta::GetTableIndexDir(String &table_index_dir) {
+    SharedPtr<String> table_dir_ptr{nullptr};
+    {
+        auto [table_dir, status] = table_meta_.GetTableDir();
+        if (!status.ok()) {
+            return status;
+        }
+        table_dir_ptr = table_dir;
+    }
+    String *index_dir_ptr = nullptr;
+    {
+        Status status = this->GetIndexDir(index_dir_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    table_index_dir = fmt::format("{}/{}", *table_dir_ptr, *index_dir_ptr);
+    return Status::OK();
+}
 
 Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
     SharedPtr<IndexBase> index_def;
@@ -124,5 +146,7 @@ Status TableIndexMeeta::LoadSegmentIDs() {
 String TableIndexMeeta::GetTableIndexTag(const String &tag) const {
     return KeyEncode::CatalogIndexTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, tag);
 }
+
+String TableIndexMeeta::FtIndexCacheTag() const { return GetTableIndexTag("ft_cache"); }
 
 } // namespace infinity

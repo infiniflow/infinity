@@ -30,6 +30,7 @@ import logical_type;
 import table_def;
 import index_base;
 import index_secondary;
+import index_ivf;
 import index_full_text;
 import index_hnsw;
 import embedding_info;
@@ -6868,10 +6869,19 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def3 =
+        std::make_shared<ColumnDef>(2,
+                                    std::make_shared<DataType>(LogicalType::kEmbedding, MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4)),
+                                    "col3",
+                                    std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-    auto index_name = std::make_shared<std::string>("index1");
-    auto index_def = IndexSecondary::Make(index_name, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3});
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_name2 = std::make_shared<String>("index2");
+    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    // auto index_name3 = std::make_shared<std::string>("index3");
+    // auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, Vector<InitParameter *>{});
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -6887,12 +6897,26 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         EXPECT_TRUE(status.ok());
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index1"), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index2"), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    // {
+    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index3"), TransactionType::kNormal);
+    //     Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
+    //     EXPECT_TRUE(status.ok());
+    //     status = new_txn_mgr->CommitTxn(txn);
+    //     EXPECT_TRUE(status.ok());
+    // }
 
     auto input_block = MakeShared<DataBlock>();
     {
@@ -6911,6 +6935,13 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             input_block->InsertVector(col2, 1);
         }
+        {
+            auto col3 = ColumnVector::Make(column_def3->type());
+            col3->Initialize();
+            col3->AppendValue(Value::MakeEmbedding(Vector<float>{1.0, 2.0, 3.0, 4.0}));
+            col3->AppendValue(Value::MakeEmbedding(Vector<float>{5.0, 6.0, 7.0, 8.0}));
+            input_block->InsertVector(col3, 2);
+        }
         input_block->Finalize();
     }
     auto append_a_block = [&] {
@@ -6925,9 +6956,17 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     };
     append_a_block();
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index1"), TransactionType::kNormal);
         SegmentID segment_id = 0;
-        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name, segment_id);
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index2"), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name2, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -6935,12 +6974,12 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     append_a_block();
     new_txn_mgr->PrintAllKeyValue();
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check mem index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
         String index_key;
         String index_id_str;
         String table_id_str;
         String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, *index_name, index_key, index_id_str, table_id_str, db_id_str);
+        Status status = txn->GetIndexID(*db_name, *table_name, *index_name1, index_key, index_id_str, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
         TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 
@@ -7007,28 +7046,83 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         // }
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index2"), TransactionType::kNormal);
-        SegmentID segment_id = 0;
-        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name, segment_id);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("merge index"), TransactionType::kNormal);
-        SegmentID segment_id = 0;
-        Status status = txn->OptimizeIndex(*db_name, *table_name, *index_name, segment_id);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check merged index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index2"), TransactionType::kNormal);
         String index_key;
         String index_id_str;
         String table_id_str;
         String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, *index_name, index_key, index_id_str, table_id_str, db_id_str);
+        Status status = txn->GetIndexID(*db_name, *table_name, *index_name2, index_key, index_id_str, table_id_str, db_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+
+        SegmentID segment_id = 0;
+        {
+            auto [segment_ids, status] = table_meta.GetSegmentIDs();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(segment_ids->size(), 1);
+            segment_id = segment_ids->at(0);
+            EXPECT_EQ(segment_id, 0);
+        }
+
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
+
+        SharedPtr<MemIndex> mem_index;
+        status = segment_index_meta.GetMemIndex(mem_index);
+        EXPECT_TRUE(status.ok());
+
+        {
+            RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+            u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+            EXPECT_EQ(begin_id, RowID(0, 2));
+            EXPECT_EQ(row_cnt, 2);
+        }
+
+        ChunkID chunk_id = 0;
+        {
+            Vector<ChunkID> *chunk_ids = nullptr;
+            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_ids->size(), 1);
+            chunk_id = chunk_ids->at(0);
+            EXPECT_EQ(chunk_id, 0);
+        }
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+        {
+            ChunkIndexMetaInfo *chunk_info = nullptr;
+            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_info->row_cnt_, 2);
+            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
+        }
+
+        BufferObj *buffer_obj = nullptr;
+        status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index1"), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("merge index1"), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check merged index1"), TransactionType::kNormal);
+        String index_key;
+        String index_id_str;
+        String table_id_str;
+        String db_id_str;
+        Status status = txn->GetIndexID(*db_name, *table_name, *index_name1, index_key, index_id_str, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
         SegmentID segment_id = 0;
 
@@ -7084,10 +7178,19 @@ TEST_P(NewCatalogTest, populate_index) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def3 =
+        std::make_shared<ColumnDef>(2,
+                                    std::make_shared<DataType>(LogicalType::kEmbedding, MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4)),
+                                    "col3",
+                                    std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
-    auto index_name = std::make_shared<std::string>("index1");
-    auto index_def = IndexSecondary::Make(index_name, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3});
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_name2 = std::make_shared<String>("idx2");
+    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    // auto index_name3 = std::make_shared<std::string>("index3");
+    // auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, Vector<InitParameter *>{});
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -7119,6 +7222,13 @@ TEST_P(NewCatalogTest, populate_index) {
             col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             input_block->InsertVector(col2, 1);
         }
+        {
+            auto col3 = ColumnVector::Make(column_def3->type());
+            col3->Initialize();
+            col3->AppendValue(Value::MakeEmbedding(Vector<float>{1.0, 2.0, 3.0, 4.0}));
+            col3->AppendValue(Value::MakeEmbedding(Vector<float>{5.0, 6.0, 7.0, 8.0}));
+            input_block->InsertVector(col3, 2);
+        }
         input_block->Finalize();
     }
     auto append_a_block = [&] {
@@ -7135,12 +7245,26 @@ TEST_P(NewCatalogTest, populate_index) {
         append_a_block();
     }
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index1"), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index2"), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    // {
+    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index3"), TransactionType::kNormal);
+    //     Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
+    //     EXPECT_TRUE(status.ok());
+    //     status = new_txn_mgr->CommitTxn(txn);
+    //     EXPECT_TRUE(status.ok());
+    // }
     append_a_block();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
@@ -7148,7 +7272,7 @@ TEST_P(NewCatalogTest, populate_index) {
         String index_id_str;
         String table_id_str;
         String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, *index_name, index_key, index_id_str, table_id_str, db_id_str);
+        Status status = txn->GetIndexID(*db_name, *table_name, *index_name1, index_key, index_id_str, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
         TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 

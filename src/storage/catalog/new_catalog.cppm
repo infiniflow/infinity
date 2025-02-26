@@ -28,6 +28,7 @@ namespace infinity {
 
 class NewTxn;
 class MemIndex;
+class TableIndexReaderCache;
 
 export enum class LockType { kLocking, kLocked, kUnlocking, kUnlocked, kImmutable };
 
@@ -116,6 +117,15 @@ public:
 private:
     std::shared_mutex mem_index_mtx_{};
     HashMap<String, SharedPtr<MemIndex>> mem_index_map_{};
+
+public:
+    Status AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache);
+    Status GetFtIndexCache(const String &ft_index_cache_key, SharedPtr<TableIndexReaderCache> &ft_index_cache);
+    Status DropFtIndexCacheByFtIndexCacheKey(const String &ft_index_cache_key);
+
+private:
+    std::shared_mutex ft_index_cache_mtx_{};
+    HashMap<String, SharedPtr<TableIndexReaderCache>> ft_index_cache_map_{};
 };
 
 } // namespace infinity
