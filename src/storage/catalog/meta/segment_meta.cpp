@@ -142,6 +142,9 @@ String SegmentMeta::GetSegmentTag(const String &tag) const {
 
 Status SegmentMeta::Init() {
     {
+        table_meta_.AddSegmentID(segment_id_);
+    }
+    {
         String latest_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
         String latest_block_id_str;
         Status status = kv_instance_.Get(latest_block_id_key, latest_block_id_str);

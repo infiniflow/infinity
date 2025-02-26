@@ -6656,7 +6656,7 @@ TEST_P(NewCatalogTest, test_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-
+    new_txn_mgr->PrintAllKeyValue();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append again"), TransactionType::kNormal);
 

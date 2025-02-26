@@ -71,10 +71,13 @@ Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
 Status TableMeeta::AddSegmentID(SegmentID segment_id) {
     if (!segment_ids_) {
         Status status = LoadSegmentIDs();
-        if (!status.ok() && status.code() != ErrorCode::kNotFound) {
+        //        if (!status.ok() && status.code() != ErrorCode::kNotFound) {
+        //            return status;
+        //        }
+        //        segment_ids_ = Vector<SegmentID>();
+        if (!status.ok()) {
             return status;
         }
-        segment_ids_ = Vector<SegmentID>();
     }
 
     if (segment_id_set_.contains(segment_id)) {
@@ -91,7 +94,7 @@ Status TableMeeta::AddSegmentID(SegmentID segment_id) {
 }
 
 Status TableMeeta::Init() {
-    AddSegmentID(0);
+    //    AddSegmentID(0);
     return Status::OK();
 }
 
@@ -204,11 +207,11 @@ Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() {
     if (!segment_ids_) {
         auto status = LoadSegmentIDs();
         if (!status.ok()) {
-            if (status.code() == ErrorCode::kNotFound) {
-                return {MakeShared<Vector<SegmentID>>(), Status::OK()};
-            } else {
-                return {nullptr, status};
-            }
+            //            if (status.code() == ErrorCode::kNotFound) {
+            //                return {MakeShared<Vector<SegmentID>>(), Status::OK()};
+            //            } else {
+            return {nullptr, status};
+            //            }
         }
     }
     return {MakeShared<Vector<SegmentID>>(segment_ids_.value()), Status::OK()};
