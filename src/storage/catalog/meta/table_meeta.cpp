@@ -24,6 +24,7 @@ import kv_store;
 import column_def;
 import third_party;
 import default_values;
+import logger;
 
 namespace infinity {
 
@@ -49,6 +50,7 @@ Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const S
     String column_def_str;
     Status status = kv_instance_.Get(column_key, column_def_str);
     if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to get column definition from kv store, key: {}, cause: {}", column_key, status.message()));
         return {nullptr, status};
     }
     return {ColumnDef::FromJson(nlohmann::json::parse(column_def_str)), Status::OK()};
@@ -60,6 +62,7 @@ Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
     String segment_ids_str = nlohmann::json(segment_ids).dump();
     Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
     if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to set segment ids to kv store, key: {}, cause: {}", segment_ids_key, status.message()));
         return status;
     }
     return Status::OK();
@@ -67,10 +70,15 @@ Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
 
 Status TableMeeta::AddSegmentID(SegmentID segment_id) {
     if (!segment_ids_) {
-        LoadSegmentIDs();
+        Status status = LoadSegmentIDs();
+        if (!status.ok() && status.code() != ErrorCode::kNotFound) {
+            return status;
+        }
+        segment_ids_ = Vector<SegmentID>();
     }
 
     if (segment_id_set_.contains(segment_id)) {
+        LOG_ERROR(fmt::format("Attempt to add a duplicate segment id into table meta: {}", segment_id));
         return Status::DuplicateEntry(fmt::format("Duplicated segment id: {}", segment_id));
     }
     segment_id_set_.insert(segment_id);
@@ -111,6 +119,7 @@ Status TableMeeta::LoadSegmentIDs() {
     String segment_ids_str;
     Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
     if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to get segment ids from kv store, key: {}, cause: {}", segment_ids_key, status.message()));
         return status;
     }
     segment_ids_ = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
@@ -146,6 +155,7 @@ Status TableMeeta::LoadLatestSegmentID() {
     String current_seg_id_str;
     Status status = kv_instance_.Get(current_seg_id_key, current_seg_id_str);
     if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to get latest segment id from kv store, key: {}, cause: {}", current_seg_id_key, status.message()));
         return status;
     }
     latest_segment_id_ = std::stoull(current_seg_id_str);
@@ -170,6 +180,7 @@ Status TableMeeta::SetLatestSegmentID(SegmentID latest_segment_id) {
     String latest_id_str = fmt::format("{}", latest_segment_id);
     Status status = kv_instance_.Put(latest_id_key, latest_id_str);
     if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to set latest segment id from kv store, key: {}:{}, cause: {}", latest_id_key, latest_id_str, status.message()));
         return status;
     }
     return Status::OK();
@@ -180,6 +191,7 @@ Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column
     String column_value_str;
     Status status = kv_instance_.Get(column_key, column_value_str);
     if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to get column id by column name: key: {}, cause: {}", column_key, status.message()));
         return {INVALID_COLUMN_ID, status};
     }
     auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value_str));
@@ -192,7 +204,11 @@ Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() {
     if (!segment_ids_) {
         auto status = LoadSegmentIDs();
         if (!status.ok()) {
-            return {nullptr, status};
+            if (status.code() == ErrorCode::kNotFound) {
+                return {MakeShared<Vector<SegmentID>>(), Status::OK()};
+            } else {
+                return {nullptr, status};
+            }
         }
     }
     return {MakeShared<Vector<SegmentID>>(segment_ids_.value()), Status::OK()};
