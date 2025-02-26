@@ -463,6 +463,7 @@ Status NewCatalog::AddBlockLock(String block_key) {
 }
 
 Status NewCatalog::GetBlockLock(const String &block_key, SharedPtr<BlockLock> &block_lock) {
+    block_lock = nullptr;
     {
         std::shared_lock<std::shared_mutex> lck(block_lock_mtx_);
         if (auto iter = block_lock_map_.find(block_key); iter != block_lock_map_.end()) {
@@ -501,6 +502,7 @@ Status NewCatalog::AddMemIndex(String mem_index_key, SharedPtr<MemIndex> mem_ind
 }
 
 Status NewCatalog::GetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index) {
+    mem_index = nullptr;
     {
         std::shared_lock<std::shared_mutex> lck(mem_index_mtx_);
         if (auto iter = mem_index_map_.find(mem_index_key); iter != mem_index_map_.end()) {

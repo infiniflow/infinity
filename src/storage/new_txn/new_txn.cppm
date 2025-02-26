@@ -389,9 +389,13 @@ private:
 
     Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
 
-    Status PopulateIndex(TableIndexMeeta &table_index_meta, SegmentMeta &segment_meta);
+    Status PopulateIndex(const String &db_name,
+                         const String &table_name,
+                         const String &index_name,
+                         TableIndexMeeta &table_index_meta,
+                         SegmentMeta &segment_meta);
 
-    Status DumpMemIndexInner(SegmentIndexMeta &segment_index_meta);
+    Status DumpMemIndexInner(const String &db_name, const String &table_name, const String &index_name, SegmentIndexMeta &segment_index_meta);
 
 public:
     Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);

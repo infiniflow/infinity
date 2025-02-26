@@ -97,7 +97,7 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     txn_context_ptr_->AddOperation(MakeShared<String>(append_command->ToString()));
 
     {
-        TableMeeta table_meta(db_id_str, table_id_str, db_name, table_name, *kv_instance_.get());
+        TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
 
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs{nullptr};
         {
@@ -531,7 +531,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
         return Status::OK();
     }
 
-    TableMeeta table_meta(db_id_str, table_id_str, append_cmd->db_name_, append_cmd->table_name_, *kv_instance_.get());
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
     {
         Status status = table_meta.Init();
         if (!status.ok()) {
@@ -617,7 +617,7 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
     if (append_state == nullptr) {
         return Status::OK();
     }
-    TableMeeta table_meta(db_id_str, table_id_str, append_cmd->db_name_, append_cmd->table_name_, *kv_instance);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;
     for (const AppendRange &range : append_state->append_ranges_) {
@@ -637,17 +637,15 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
         }
     }
     Vector<String> *index_id_strs = nullptr;
-    Vector<String> *index_names = nullptr;
     {
-        Status status = table_meta.GetIndexIDs(index_id_strs, &index_names);
+        Status status = table_meta.GetIndexIDs(index_id_strs, nullptr);
         if (!status.ok()) {
             return status;
         }
     }
     for (SizeT i = 0; i < index_id_strs->size(); ++i) {
         const String &index_id_str = (*index_id_strs)[i];
-        const String &index_name = (*index_names)[i];
-        TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta, *kv_instance);
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
         Status status = this->AppendIndex(table_index_meta, append_state);
         if (!status.ok()) {
             return status;
@@ -669,7 +667,7 @@ Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd) {
     const String &db_id_str = delete_cmd->db_id_str_;
     const String &table_id_str = delete_cmd->table_id_str_;
 
-    TableMeeta table_meta(db_id_str, table_id_str, delete_cmd->db_name_, delete_cmd->table_name_, *kv_instance);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
 
     Optional<SegmentMeta> segment_meta;
     Optional<BlockMeta> block_meta;

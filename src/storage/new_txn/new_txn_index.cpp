@@ -63,11 +63,11 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         }
     }
 
-    TableMeeta table_meta(db_id_str, table_id_str, db_name, table_name, *kv_instance_);
-    TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta, table_meta.kv_instance());
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
+    TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
     SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
 
-    return this->DumpMemIndexInner(segment_index_meta);
+    return this->DumpMemIndexInner(db_name, table_name, index_name, segment_index_meta);
 }
 
 Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
@@ -82,8 +82,8 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
         }
     }
 
-    TableMeeta table_meta(db_id_str, table_id_str, db_name, table_name, *kv_instance_);
-    TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta, table_meta.kv_instance());
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
+    TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
     SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
 
     Vector<ChunkIndexMeta> old_chunk_metas;
@@ -148,12 +148,14 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     }
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
+    {
+        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, chunk_index_meta, buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
-            Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, chunk_index_meta, buffer_obj);
-            if (!status.ok()) {
-                return status;
-            }
             BufferHandle buffer_handle = buffer_obj->Load();
             auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_handle.GetDataMut());
             data_ptr->InsertMergeData(old_buffers);
@@ -417,7 +419,11 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
     return Status::OK();
 }
 
-Status NewTxn::PopulateIndex(TableIndexMeeta &table_index_meta, SegmentMeta &segment_meta) {
+Status NewTxn::PopulateIndex(const String &db_name,
+                             const String &table_name,
+                             const String &index_name,
+                             TableIndexMeeta &table_index_meta,
+                             SegmentMeta &segment_meta) {
     Optional<SegmentIndexMeta> segment_index_meta;
     {
         Status status = this->AddNewSegmentIndex(table_index_meta, segment_meta.segment_id(), segment_index_meta);
@@ -491,7 +497,7 @@ Status NewTxn::PopulateIndex(TableIndexMeeta &table_index_meta, SegmentMeta &seg
         }
     }
     {
-        Status status = DumpMemIndexInner(*segment_index_meta);
+        Status status = DumpMemIndexInner(db_name, table_name, index_name, *segment_index_meta);
         if (!status.ok()) {
             return status;
         }
@@ -500,7 +506,7 @@ Status NewTxn::PopulateIndex(TableIndexMeeta &table_index_meta, SegmentMeta &seg
     return Status::OK();
 }
 
-Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta) {
+Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name, const String &index_name, SegmentIndexMeta &segment_index_meta) {
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     SegmentID segment_id = segment_index_meta.segment_id();
     SharedPtr<IndexBase> index_base;
@@ -560,6 +566,7 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta) {
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             mem_index_copy.memory_secondary_index_->Dump(buffer_obj);
+            buffer_obj->Save();
             break;
         }
         default: {
@@ -567,10 +574,6 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta) {
         }
     }
     {
-        const String &db_name = table_index_meta.table_meta().db_name();
-        const String &table_name = table_index_meta.table_meta().table_name();
-        const String &index_name = table_index_meta.index_name();
-
         Vector<WalChunkIndexInfo> chunk_infos;
         chunk_infos.emplace_back(*chunk_index_meta);
         Vector<ChunkID> deprecate_ids;
@@ -664,8 +667,8 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
         return status;
     }
 
-    TableMeeta table_meta(db_id_str, table_id_str, db_name, table_name, *kv_instance_);
-    TableIndexMeeta table_index_meta(index_id_str, index_name, table_meta, *kv_instance_);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
+    TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance_);
     {
         Status status = table_index_meta.InitSet(create_index_cmd->index_base_, create_index_cmd->index_dir_tail_);
         if (!status.ok()) {
@@ -679,7 +682,7 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
         }
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
-            Status status = this->PopulateIndex(table_index_meta, segment_meta);
+            Status status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, segment_meta);
             if (!status.ok()) {
                 return status;
             }

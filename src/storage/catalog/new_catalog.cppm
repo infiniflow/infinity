@@ -41,10 +41,6 @@ export struct BlockLock {
     std::shared_mutex mtx_;
 };
 
-export struct MemIndexLock {
-    std::shared_mutex mtx_;
-};
-
 export struct NewCatalog {
 public:
     explicit NewCatalog(KVStore *kv_store);

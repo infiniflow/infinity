@@ -28,8 +28,8 @@ import logger;
 
 namespace infinity {
 
-TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, const String &db_name, const String &table_name, KVInstance &kv_instance)
-    : kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str), db_name_(db_name), table_name_(table_name) {}
+TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance)
+    : kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
 Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names) {
     if (!index_id_strs_ || !index_names_) {

@@ -23,8 +23,8 @@ import third_party;
 
 namespace infinity {
 
-TableIndexMeeta::TableIndexMeeta(String index_id_str, String index_name, TableMeeta &table_meta, KVInstance &kv_instance)
-    : kv_instance_(kv_instance), table_meta_(table_meta), index_id_str_(std::move(index_id_str)), index_name_(std::move(index_name)) {}
+TableIndexMeeta::TableIndexMeeta(String index_id_str, TableMeeta &table_meta, KVInstance &kv_instance)
+    : kv_instance_(kv_instance), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
 
 Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
     SharedPtr<IndexBase> index_def;
@@ -121,7 +121,7 @@ Status TableIndexMeeta::LoadSegmentIDs() {
     return Status::OK();
 }
 
-String TableIndexMeeta::GetTableIndexTag(const String &tag) {
+String TableIndexMeeta::GetTableIndexTag(const String &tag) const {
     return KeyEncode::CatalogIndexTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), index_id_str_, tag);
 }
 

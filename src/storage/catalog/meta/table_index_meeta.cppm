@@ -28,15 +28,13 @@ class TableMeeta;
 
 export class TableIndexMeeta {
 public:
-    TableIndexMeeta(String index_id_str, String index_name, TableMeeta &table_meta, KVInstance &kv_instance);
+    TableIndexMeeta(String index_id_str, TableMeeta &table_meta, KVInstance &kv_instance);
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
     TableMeeta &table_meta() const { return table_meta_; }
 
     const String &index_id_str() const { return index_id_str_; }
-
-    const String &index_name() const { return index_name_; }
 
     Status GetIndexDef(SharedPtr<IndexBase> &index_def) {
         if (!index_def_) {
@@ -86,13 +84,12 @@ private:
 
     Status LoadSegmentIDs();
 
-    String GetTableIndexTag(const String &tag);
+    String GetTableIndexTag(const String &tag) const;
 
 private:
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     String index_id_str_;
-    String index_name_;
 
     SharedPtr<IndexBase> index_def_;
     SharedPtr<String> index_dir_;

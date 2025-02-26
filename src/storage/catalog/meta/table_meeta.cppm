@@ -26,14 +26,12 @@ class KVInstance;
 
 export class TableMeeta {
 public:
-    TableMeeta(const String &db_id_str, const String &table_id_str, const String &db_name, const String &table_name, KVInstance &kv_instance);
+    TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance);
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
     const String &table_id_str() const { return table_id_str_; }
     const String &db_id_str() const { return db_id_str_; }
-    const String &db_name() const { return db_name_; }
-    const String &table_name() const { return table_name_; }
 
     Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
 
@@ -68,8 +66,6 @@ private:
     KVInstance &kv_instance_;
     String db_id_str_;
     String table_id_str_;
-    String db_name_;
-    String table_name_;
 
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
     Optional<Vector<SegmentID>> segment_ids_;

@@ -6693,7 +6693,7 @@ TEST_P(NewCatalogTest, test_append) {
         Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
 
-        TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
@@ -6834,7 +6834,7 @@ TEST_P(NewCatalogTest, test_delete) {
         BlockID block_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 
         SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
@@ -6942,7 +6942,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         String db_id_str;
         Status status = txn->GetIndexID(*db_name, *table_name, *index_name, index_key, index_id_str, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 
         SegmentID segment_id = 0;
         {
@@ -6953,7 +6953,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             EXPECT_EQ(segment_id, 0);
         }
 
-        TableIndexMeeta table_index_meta(index_id_str, *index_name, table_meta, *txn->kv_instance());
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
 
         SharedPtr<MemIndex> mem_index;
@@ -7032,8 +7032,8 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         EXPECT_TRUE(status.ok());
         SegmentID segment_id = 0;
 
-        TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
-        TableIndexMeeta table_index_meta(index_id_str, *index_name, table_meta, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
 
         SharedPtr<MemIndex> mem_index;
@@ -7150,7 +7150,7 @@ TEST_P(NewCatalogTest, populate_index) {
         String db_id_str;
         Status status = txn->GetIndexID(*db_name, *table_name, *index_name, index_key, index_id_str, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, *db_name, *table_name, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 
         SegmentID segment_id = 0;
         {
@@ -7161,7 +7161,7 @@ TEST_P(NewCatalogTest, populate_index) {
             EXPECT_EQ(segment_id, 0);
         }
 
-        TableIndexMeeta table_index_meta(index_id_str, *index_name, table_meta, *txn->kv_instance());
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
 
         SharedPtr<MemIndex> mem_index;
