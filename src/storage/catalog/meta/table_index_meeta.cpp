@@ -28,6 +28,28 @@ namespace infinity {
 TableIndexMeeta::TableIndexMeeta(String index_id_str, TableMeeta &table_meta, KVInstance &kv_instance)
     : kv_instance_(kv_instance), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
 
+Status TableIndexMeeta::GetIndexDef(SharedPtr<IndexBase> &index_def) {
+    if (!index_def_) {
+        Status status = LoadIndexDef();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    index_def = index_def_;
+    return Status::OK();
+}
+
+Status TableIndexMeeta::GetIndexDir(String *&index_dir_ptr) {
+    if (!index_dir_) {
+        Status status = LoadIndexDir();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    index_dir_ptr = index_dir_.get();
+    return Status::OK();
+}
+
 Status TableIndexMeeta::GetTableIndexDir(String &table_index_dir) {
     SharedPtr<String> table_dir_ptr{nullptr};
     {
@@ -44,7 +66,7 @@ Status TableIndexMeeta::GetTableIndexDir(String &table_index_dir) {
             return status;
         }
     }
-    table_index_dir = fmt::format("{}/{}", *table_dir_ptr, *index_dir_ptr);
+    table_index_dir = fmt::format("tbl_{}/{}", *table_dir_ptr, *index_dir_ptr);
     return Status::OK();
 }
 
@@ -58,6 +80,17 @@ Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
     }
 
     return table_meta_.GetColumnDefByColumnName(index_def->column_name());
+}
+
+Status TableIndexMeeta::GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
+    if (!segment_ids_) {
+        Status status = LoadSegmentIDs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    segment_ids = &segment_ids_.value();
+    return Status::OK();
 }
 
 Status TableIndexMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {

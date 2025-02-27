@@ -36,42 +36,15 @@ public:
 
     const String &index_id_str() const { return index_id_str_; }
 
-    Status GetIndexDef(SharedPtr<IndexBase> &index_def) {
-        if (!index_def_) {
-            Status status = LoadIndexDef();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        index_def = index_def_;
-        return Status::OK();
-    }
+    Status GetIndexDef(SharedPtr<IndexBase> &index_def);
 
-    Status GetIndexDir(String *&index_dir_ptr) {
-        if (!index_dir_) {
-            Status status = LoadIndexDir();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        index_dir_ptr = index_dir_.get();
-        return Status::OK();
-    }
+    Status GetIndexDir(String *&index_dir_ptr);
 
     Status GetTableIndexDir(String &table_index_dir);
 
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef();
 
-    Status GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
-        if (!segment_ids_) {
-            Status status = LoadSegmentIDs();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        segment_ids = &segment_ids_.value();
-        return Status::OK();
-    }
+    Status GetSegmentIDs(Vector<SegmentID> *&segment_ids);
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
