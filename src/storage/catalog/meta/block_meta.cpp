@@ -52,32 +52,6 @@ Status BlockMeta::SetRowCnt(SizeT row_cnt) {
 }
 
 Status BlockMeta::InitSet() {
-    TableMeeta &table_meta = segment_meta_.table_meta();
-    SharedPtr<String> table_dir_ptr{};
-    {
-        auto [table_dir, status] = table_meta.GetTableDir();
-        if (!status.ok()) {
-            return status;
-        }
-        table_dir_ptr = table_dir;
-    }
-    block_dir_ = MakeShared<String>(fmt::format("tbl_{}/seg_{}/block_{}", *table_dir_ptr, segment_meta_.segment_id(), block_id_));
-    {
-        String block_dir_key = GetBlockTag("dir");
-        String block_dir_str;
-        Status status = kv_instance_.Get(block_dir_key, block_dir_str);
-        if (!status.ok()) {
-            if (status.code() != ErrorCode::kNotFound) {
-                return status;
-            }
-
-            Status status = kv_instance_.Put(block_dir_key, *block_dir_);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    }
-
     {
         String block_row_cnt_key = GetBlockTag("row_cnt");
         String block_row_cnt_str;
