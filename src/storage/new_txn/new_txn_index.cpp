@@ -257,13 +257,7 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
         column_def = std::move(col_def);
     }
 
-    SharedPtr<String> index_dir = MakeShared<String>();
-    {
-        Status status = table_index_meta.GetTableIndexDir(*index_dir);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
     ChunkIndexMetaInfo chunk_info;
     {
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
@@ -450,15 +444,9 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                         return status;
                     }
 
-                    String index_dir;
-                    {
-                        Status status = segment_index_meta.table_index_meta().GetTableIndexDir(index_dir);
-                        if (!status.ok()) {
-                            return status;
-                        }
-                    }
+                    SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
                     String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
-                    String full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), index_dir);
+                    String full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
                     mem_index->memory_indexer_ =
                         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
                     // table_index_entry_->UpdateFulltextSegmentTs(commit_ts);
@@ -632,12 +620,8 @@ NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_def, SegmentIndexMeta &s
     String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
     String full_path;
     {
-        String index_dir;
-        Status status = segment_index_meta.table_index_meta().GetTableIndexDir(index_dir);
-        if (!status.ok()) {
-            return status;
-        }
-        full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), index_dir);
+        SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
+        full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
     }
     SharedPtr<MemIndex> mem_index;
     {
@@ -811,14 +795,8 @@ Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_def,
     msg += " -> " + dst_base_name;
     LOG_INFO(msg);
 
-    String index_dir;
-    {
-        Status status = segment_index_meta.table_index_meta().GetTableIndexDir(index_dir);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    ColumnIndexMerger column_index_merger(index_dir, index_fulltext->flag_);
+    SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
+    ColumnIndexMerger column_index_merger(*index_dir, index_fulltext->flag_);
     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
     {
         base_rowid_out = base_rowid;
@@ -950,14 +928,7 @@ Status NewTxn::AddChunkWal(const String &db_name,
 Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffer_obj) {
     TableIndexMeeta &table_index_meta = chunk_index_meta.segment_index_meta().table_index_meta();
 
-    String index_dir;
-    {
-        Status status = table_index_meta.GetTableIndexDir(index_dir);
-        if (!status.ok()) {
-            return status;
-        }
-        index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), index_dir);
-    }
+    String index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), table_index_meta.GetTableIndexDir()->c_str());
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     SharedPtr<IndexBase> index_base;

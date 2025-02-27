@@ -96,14 +96,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
     }
     String index_dir;
     {
-        SharedPtr<String> table_dir_ptr{nullptr};
-        {
-            auto [table_dir, status] = table_index_meta.table_meta().GetTableDir();
-            if (!status.ok()) {
-                return status;
-            }
-            table_dir_ptr = table_dir;
-        }
+        SharedPtr<String> table_dir_ptr = table_index_meta.table_meta().GetTableDir();
         String *index_dir_ptr = nullptr;
         {
             Status status = table_index_meta.GetIndexDir(index_dir_ptr);

@@ -50,24 +50,8 @@ Status TableIndexMeeta::GetIndexDir(String *&index_dir_ptr) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::GetTableIndexDir(String &table_index_dir) {
-    SharedPtr<String> table_dir_ptr{nullptr};
-    {
-        auto [table_dir, status] = table_meta_.GetTableDir();
-        if (!status.ok()) {
-            return status;
-        }
-        table_dir_ptr = table_dir;
-    }
-    String *index_dir_ptr = nullptr;
-    {
-        Status status = this->GetIndexDir(index_dir_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    table_index_dir = fmt::format("tbl_{}/{}", *table_dir_ptr, *index_dir_ptr);
-    return Status::OK();
+SharedPtr<String> TableIndexMeeta::GetTableIndexDir() {
+    return MakeShared<String>(fmt::format("tbl_{}/idx_{}", table_meta_.GetTableDir()->c_str(), index_id_str_));
 }
 
 Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
@@ -128,13 +112,6 @@ Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_def, const String &in
     {
         String index_def_key = GetTableIndexTag("index_def");
         Status status = kv_instance_.Put(index_def_key, index_def->Serialize().dump());
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        String index_storage_dir = GetTableIndexTag("dir");
-        Status status = kv_instance_.Put(index_storage_dir, index_dir);
         if (!status.ok()) {
             return status;
         }

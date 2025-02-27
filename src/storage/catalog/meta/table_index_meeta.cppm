@@ -40,7 +40,7 @@ public:
 
     Status GetIndexDir(String *&index_dir_ptr);
 
-    Status GetTableIndexDir(String &table_index_dir);
+    SharedPtr<String> GetTableIndexDir();
 
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef();
 

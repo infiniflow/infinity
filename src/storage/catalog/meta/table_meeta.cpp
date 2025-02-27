@@ -201,7 +201,7 @@ Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column
     return {column_def->id_, Status::OK()};
 }
 
-Tuple<SharedPtr<String>, Status> TableMeeta::GetTableDir() { return {MakeShared<String>(table_id_str_), Status::OK()}; }
+SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_id_str_)}; }
 
 Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() {
     if (!segment_ids_) {

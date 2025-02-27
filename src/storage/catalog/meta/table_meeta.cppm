@@ -44,7 +44,7 @@ public:
     Status AddSegmentID(SegmentID segment_id);
 
     Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
-    Tuple<SharedPtr<String>, Status> GetTableDir();
+    SharedPtr<String> GetTableDir();
     Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs();
     Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name);
