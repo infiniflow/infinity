@@ -38,8 +38,6 @@ public:
 
     Status GetIndexDef(SharedPtr<IndexBase> &index_def);
 
-    Status GetIndexDir(String *&index_dir_ptr);
-
     SharedPtr<String> GetTableIndexDir();
 
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef();
@@ -54,8 +52,6 @@ public:
 
 private:
     Status LoadIndexDef();
-
-    Status LoadIndexDir();
 
     Status LoadSegmentIDs();
 

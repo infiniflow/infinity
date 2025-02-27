@@ -39,17 +39,6 @@ Status TableIndexMeeta::GetIndexDef(SharedPtr<IndexBase> &index_def) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::GetIndexDir(String *&index_dir_ptr) {
-    if (!index_dir_) {
-        Status status = LoadIndexDir();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    index_dir_ptr = index_dir_.get();
-    return Status::OK();
-}
-
 SharedPtr<String> TableIndexMeeta::GetTableIndexDir() {
     return MakeShared<String>(fmt::format("tbl_{}/idx_{}", table_meta_.GetTableDir()->c_str(), index_id_str_));
 }
@@ -128,16 +117,6 @@ Status TableIndexMeeta::LoadIndexDef() {
     }
     nlohmann::json index_def_json = nlohmann::json::parse(index_def_str);
     index_def_ = IndexBase::Deserialize(index_def_json);
-    return Status::OK();
-}
-
-Status TableIndexMeeta::LoadIndexDir() {
-    index_dir_ = MakeShared<String>();
-    String index_dir_key = GetTableIndexTag("dir");
-    Status status = kv_instance_.Get(index_dir_key, *index_dir_);
-    if (!status.ok()) {
-        return status;
-    }
     return Status::OK();
 }
 

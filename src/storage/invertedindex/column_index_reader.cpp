@@ -94,18 +94,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             return status;
         }
     }
-    String index_dir;
-    {
-        SharedPtr<String> table_dir_ptr = table_index_meta.table_meta().GetTableDir();
-        String *index_dir_ptr = nullptr;
-        {
-            Status status = table_index_meta.GetIndexDir(index_dir_ptr);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        index_dir = fmt::format("{}/{}", *table_dir_ptr, *index_dir_ptr);
-    }
+    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
 
     u64 column_len_sum = 0;
     u32 column_len_cnt = 0;
@@ -129,7 +118,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
                 }
             }
             SharedPtr<DiskIndexSegmentReader> segment_reader =
-                MakeShared<DiskIndexSegmentReader>(segment_id, chunk_id, index_dir, chunk_info_ptr->base_name_, chunk_info_ptr->base_row_id_, flag);
+                MakeShared<DiskIndexSegmentReader>(segment_id, chunk_id, *index_dir, chunk_info_ptr->base_name_, chunk_info_ptr->base_row_id_, flag);
             segment_readers_.push_back(std::move(segment_reader));
         }
 
