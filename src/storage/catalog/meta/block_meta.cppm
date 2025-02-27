@@ -38,16 +38,7 @@ public:
 
     SizeT block_capacity() const { return DEFAULT_BLOCK_CAPACITY; }
 
-    Status GetBlockDir(SharedPtr<String> &block_dir) {
-        if (!block_dir_) {
-            Status status = LoadBlockDir();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        block_dir = block_dir_;
-        return Status::OK();
-    }
+    SharedPtr<String> GetBlockDir();
 
     Status GetRowCnt(SizeT &row_cnt) {
         if (!row_cnt_) {
@@ -67,8 +58,6 @@ public:
     Status InitSet();
 
 private:
-    Status LoadBlockDir();
-
     Status LoadRowCnt();
 
     String GetBlockTag(const String &tag) const;

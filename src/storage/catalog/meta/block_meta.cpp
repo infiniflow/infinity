@@ -107,11 +107,13 @@ Status BlockMeta::InitSet() {
     return Status::OK();
 }
 
-Status BlockMeta::LoadBlockDir() {
-    String block_dir_key = GetBlockTag("dir");
-    block_dir_ = MakeShared<String>();
-    Status status = kv_instance_.Get(block_dir_key, *block_dir_);
-    return status;
+SharedPtr<String> BlockMeta::GetBlockDir() {
+    if (block_dir_ == nullptr) {
+        TableMeeta &table_meta = segment_meta_.table_meta();
+        block_dir_ = MakeShared<String>(fmt::format("tbl_{}/seg_{}/block_{}", table_meta.table_id_str(), segment_meta_.segment_id(), block_id_));
+    }
+
+    return block_dir_;
 }
 
 Status BlockMeta::LoadRowCnt() {

@@ -194,13 +194,7 @@ Status NewTxn::AddNewBlock(SegmentMeta *segment_meta, BlockID block_id, BlockMet
             return status;
         }
     }
-    SharedPtr<String> block_dir_ptr;
-    {
-        Status status = block_meta->GetBlockDir(block_dir_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    SharedPtr<String> block_dir_ptr = block_meta->GetBlockDir();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     BufferObj *version_buffer = nullptr;
     {
@@ -250,13 +244,7 @@ Status NewTxn::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Option
             return status;
         }
     }
-    SharedPtr<String> block_dir_ptr;
-    {
-        Status status = block_meta.GetBlockDir(block_dir_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     BufferObj *buffer = nullptr;
     {
@@ -331,13 +319,7 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
 }
 
 Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset) {
-    SharedPtr<String> block_dir_ptr;
-    {
-        Status status = block_meta.GetBlockDir(block_dir_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     BufferObj *version_buffer = nullptr;
     {
@@ -399,13 +381,7 @@ Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT 
 }
 
 Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets) {
-    SharedPtr<String> block_dir_ptr;
-    {
-        Status status = block_meta.GetBlockDir(block_dir_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
     BufferObj *version_buffer = nullptr;
     {
         String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
@@ -436,13 +412,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &b
 }
 
 Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector) {
-    SharedPtr<String> block_dir_ptr;
-    {
-        Status status = column_meta.block_meta().GetBlockDir(block_dir_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    SharedPtr<String> block_dir_ptr = column_meta.block_meta().GetBlockDir();
     const ColumnDef *col_def = nullptr;
     {
         TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
@@ -489,13 +459,7 @@ Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnV
 }
 
 Status NewTxn::GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRangeState &state) {
-    SharedPtr<String> block_dir_ptr;
-    {
-        Status status = block_meta.GetBlockDir(block_dir_ptr);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     BufferObj *version_buffer = nullptr;
     {
