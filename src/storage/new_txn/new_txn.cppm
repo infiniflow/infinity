@@ -420,6 +420,7 @@ private:
     Status CommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitDelete(const WalCmdDelete *delete_cmd);
+    Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 

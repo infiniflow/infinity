@@ -110,6 +110,28 @@ Status SegmentIndexMeta::UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt) {
     return Status::OK();
 }
 
+Status SegmentIndexMeta::SetNoMemIndex() {
+    String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+    String has_mem_index_str = "0";
+    // block here when mem index is inserting.
+    Status status = kv_instance_.Put(has_mem_index_key, has_mem_index_str);
+    if (!status.ok()) {
+        return status;
+    }
+    has_mem_index_ = false;
+    {
+        SharedPtr<MemIndex> mem_index;
+        Status status = GetMemIndex(mem_index);
+        if (!status.ok()) {
+            return status;
+        }
+        if (mem_index) {
+            mem_index->SetToClear();
+        }
+    }
+    return Status::OK();
+}
+
 Status SegmentIndexMeta::InitSet() {
     {
         Status status = SetChunkIDs(Vector<ChunkID>());
@@ -132,6 +154,12 @@ Status SegmentIndexMeta::InitSet() {
         }
     }
     {
+        Status status = SetNoMemIndex ();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
         SharedPtr<IndexBase> index_def;
         Status status = table_index_meta_.GetIndexDef(index_def);
         if (!status.ok()) {
@@ -149,12 +177,80 @@ Status SegmentIndexMeta::InitSet() {
 }
 
 Status SegmentIndexMeta::GetMemIndex(SharedPtr<MemIndex> &mem_index) {
+    mem_index.reset();
+    bool has_mem_index = false;
+    {
+        Status status = GetHasMemIndex(has_mem_index);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     String mem_index_key = GetSegmentIndexTag("mem_index");
     Status status = new_catalog->GetMemIndex(mem_index_key, mem_index);
     if (!status.ok()) {
         return status;
     }
+    if (!has_mem_index) {
+        mem_index->Clear();
+    }
+
+    return Status::OK();
+}
+
+Status SegmentIndexMeta::GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index) {
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+
+    String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+    bool has_mem_index = false;
+    {
+        String has_mem_index_str;
+        // block here when mem index is dumpping.
+        // Use GetForUpdate here. because if we use Get, when `has_mem_index_key` is true, we skip mem_index->Clear() here.
+        // when we dump mem index simultaneously, we do append and dump on the same mem index.
+        Status status = kv_instance_.GetForUpdate(has_mem_index_key, has_mem_index_str);
+        if (!status.ok()) {
+            return status;
+        }
+        has_mem_index = std::stoi(has_mem_index_str);
+    }
+
+    if (!has_mem_index) {
+        String has_mem_index_str = "1";
+        {
+            Status status = kv_instance_.Put(has_mem_index_key, has_mem_index_str);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        has_mem_index_ = true;
+    }
+    {
+        String mem_index_key = GetSegmentIndexTag("mem_index");
+        Status status = new_catalog->GetMemIndex(mem_index_key, mem_index);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    if (!has_mem_index) {
+        // Clear here because dump mem index may not clear after commit.
+        mem_index->Clear();
+    }
+    return Status::OK();
+}
+
+Status SegmentIndexMeta::GetHasMemIndex(bool &has_mem_index) {
+    if (!has_mem_index_) {
+        String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+        String has_mem_index_str;
+        Status status = kv_instance_.Get(has_mem_index_key, has_mem_index_str);
+        if (!status.ok()) {
+            return status;
+        }
+        has_mem_index_ = std::stoi(has_mem_index_str);
+    }
+    has_mem_index = *has_mem_index_;
     return Status::OK();
 }
 

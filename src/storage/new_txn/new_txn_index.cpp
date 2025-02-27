@@ -174,14 +174,6 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             UnrecoverableError("Not implemented yet");
             break;
         }
-        case IndexType::kIVF: {
-            // TODO
-            UnrecoverableError("Not implemented yet");
-            // BufferHandle buffer_handle = buffer_obj->Load();
-            // auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
-            // data_ptr->BuildIVFIndex();
-            break;
-        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -284,20 +276,6 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                                               row_count * sizeof(u32),
                                                               buffer_mgr->persistence_manager());
                 buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kIVF: {
-                // TODO
-                UnrecoverableError("Not implemented yet");
-                // auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                // index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                //                                                    MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                //                                                    index_dir,
-                //                                                    std::move(ivf_index_file_name),
-                //                                                    index_base,
-                //                                                    column_def,
-                //                                                    buffer_mgr->persistence_manager());
-                // buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
                 break;
             }
             default: {
@@ -425,7 +403,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
     }
     SharedPtr<MemIndex> mem_index;
     {
-        Status status = segment_index_meta.GetMemIndex(mem_index);
+        Status status = segment_index_meta.GetAndWriteMemIndex(mem_index);
         if (!status.ok()) {
             return status;
         }
@@ -490,24 +468,6 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
             }
             break;
         }
-        case IndexType::kIVF: {
-            // TODO
-            UnrecoverableError("Not implemented yet");
-            // SharedPtr<IVFIndexInMem> memory_ivf_index;
-            // {
-            //     std::unique_lock<std::mutex> lock(mem_index->mtx_);
-            //     if (mem_index->memory_ivf_index_.get() == nullptr) {
-            //         auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
-            //         if (!status.ok()) {
-            //             return status;
-            //         }
-            //         mem_index->memory_ivf_index_ = IVFIndexInMem::NewIVFIndexInMem(column_def.get(), index_def.get(), base_row_id, nullptr);
-            //     }
-            //     memory_ivf_index = mem_index->memory_ivf_index_;
-            // }
-            // memory_ivf_index->InsertBlockData(base_row_id.segment_offset_, col, offset, row_cnt);
-            break;
-        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -523,13 +483,6 @@ Status NewTxn::PopulateIndex(const String &db_name,
     Optional<SegmentIndexMeta> segment_index_meta;
     {
         Status status = this->AddNewSegmentIndex(table_index_meta, segment_meta.segment_id(), segment_index_meta);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    SharedPtr<MemIndex> mem_index;
-    {
-        Status status = segment_index_meta->GetMemIndex(mem_index);
         if (!status.ok()) {
             return status;
         }
@@ -618,6 +571,10 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
         if (!status.ok()) {
             return status;
         }
+        status = segment_index_meta.SetNoMemIndex();
+        if (!status.ok()) {
+            return status;
+        }
     }
     ChunkID chunk_id = 0;
     {
@@ -634,45 +591,17 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
     u32 row_count = 0;
     String base_name;
 
-    MemIndex mem_index_copy;
+    // dump mem index only happens in parallel with read, not write, so no lock is needed.
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
-            {
-                std::unique_lock<std::mutex> lock(mem_index->mtx_);
-                mem_index_copy.memory_secondary_index_ = std::exchange(mem_index->memory_secondary_index_, nullptr);
-            }
-            if (mem_index_copy.memory_secondary_index_.get() == nullptr) {
-                return Status::OK();
-            }
-            row_id = mem_index_copy.memory_secondary_index_->GetBeginRowID();
-            row_count = mem_index_copy.memory_secondary_index_->GetRowCount();
+            row_id = mem_index->memory_secondary_index_->GetBeginRowID();
+            row_count = mem_index->memory_secondary_index_->GetRowCount();
             break;
         }
         case IndexType::kFullText: {
-            {
-                std::unique_lock<std::mutex> lock(mem_index->mtx_);
-                mem_index_copy.memory_indexer_ = std::exchange(mem_index->memory_indexer_, nullptr);
-            }
-            if (mem_index_copy.memory_indexer_.get() == nullptr) {
-                return Status::OK();
-            }
-            base_name = mem_index_copy.memory_indexer_->GetBaseName();
-            row_id = mem_index_copy.memory_indexer_->GetBaseRowId();
-            row_count = mem_index_copy.memory_indexer_->GetDocCount();
-            break;
-        }
-        case IndexType::kIVF: {
-            // TODO
-            UnrecoverableError("Not implemented yet");
-            // {
-            //     std::unique_lock<std::mutex> lock(mem_index->mtx_);
-            //     mem_index_copy.memory_ivf_index_ = std::exchange(mem_index->memory_ivf_index_, nullptr);
-            // }
-            // if (mem_index_copy.memory_ivf_index_.get() == nullptr) {
-            //     return Status::OK();
-            // }
-            // row_id = mem_index_copy.memory_ivf_index_->GetBeginRowID();
-            // row_count = mem_index_copy.memory_ivf_index_->GetRowCount();
+            base_name = mem_index->memory_indexer_->GetBaseName();
+            row_id = mem_index->memory_indexer_->GetBaseRowId();
+            row_count = mem_index->memory_indexer_->GetDocCount();
             break;
         }
         default: {
@@ -689,24 +618,17 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
     }
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
-            mem_index_copy.memory_secondary_index_->Dump(buffer_obj);
+            mem_index->memory_secondary_index_->Dump(buffer_obj);
             buffer_obj->Save();
             break;
         }
         case IndexType::kFullText: {
-            u64 len_sum = mem_index_copy.memory_indexer_->GetColumnLengthSum();
-            u32 len_cnt = mem_index_copy.memory_indexer_->GetDocCount();
+            u64 len_sum = mem_index->memory_indexer_->GetColumnLengthSum();
+            u32 len_cnt = mem_index->memory_indexer_->GetDocCount();
             Status status = segment_index_meta.UpdateFtInfo(len_sum, len_cnt);
             if (!status.ok()) {
                 return status;
             }
-            break;
-        }
-        case IndexType::kIVF: {
-            // TODO
-            UnrecoverableError("Not implemented yet");
-            // mem_index_copy.memory_ivf_index_->Dump(buffer_obj, nullptr);
-            // buffer_obj->Save();
             break;
         }
         // case IndexType::kHnsw:
@@ -723,6 +645,12 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
         chunk_infos.emplace_back(*chunk_index_meta);
         Vector<ChunkID> deprecate_ids;
         auto dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id, std::move(chunk_infos), std::move(deprecate_ids));
+        {
+            dump_cmd->clear_mem_index_ = true;
+            dump_cmd->db_id_str_ = segment_index_meta.table_index_meta().table_meta().db_id_str();
+            dump_cmd->table_id_str_ = segment_index_meta.table_index_meta().table_meta().table_id_str();
+            dump_cmd->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
+        }
 
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
         txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
@@ -776,16 +704,6 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
             if (buffer_obj == nullptr) {
                 return Status::BufferManagerError("GetBufferObject failed");
             }
-            break;
-        }
-        case IndexType::kIVF: {
-            // String ivf_index_file_name = IndexFileName(segment_id, chunk_id);
-            // String index_filepath = fmt::format("{}/{}", index_dir, ivf_index_file_name);
-            // buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
-            // if (buffer_obj == nullptr) {
-            //     return Status::BufferManagerError("GetBufferObject failed");
-            // }
-            UnrecoverableError("Not implemented yet");
             break;
         }
         default: {
@@ -857,6 +775,28 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
         }
     }
 
+    return Status::OK();
+}
+
+Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd) {
+    KVStore *kv_store = txn_mgr_->kv_store();
+    UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+
+    if (dump_index_cmd->clear_mem_index_) {
+        const String &db_id_str_ = dump_index_cmd->db_id_str_;
+        const String &table_id_str_ = dump_index_cmd->table_id_str_;
+        TableMeeta table_meta(db_id_str_, table_id_str_, *kv_instance);
+
+        const String &index_id_str_ = dump_index_cmd->index_id_str_;
+        TableIndexMeeta table_index_meta(index_id_str_, table_meta, table_meta.kv_instance());
+
+        SegmentIndexMeta segment_index_meta(dump_index_cmd->segment_id_, table_index_meta, table_index_meta.kv_instance());
+        SharedPtr<MemIndex> mem_index;
+        Status status = segment_index_meta.GetMemIndex(mem_index);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 

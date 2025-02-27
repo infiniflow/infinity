@@ -27,7 +27,26 @@ import abstract_bmp;
 namespace infinity {
 
 export struct MemIndex {
+    void Clear() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        if (!to_clear_) {
+            return;
+        }
+        to_clear_ = false;
+        memory_hnsw_index_.reset();
+        memory_ivf_index_.reset();
+        memory_indexer_.reset();
+        memory_secondary_index_.reset();
+        memory_emvb_index_.reset();
+        memory_bmp_index_.reset();
+    }
+    void SetToClear() {
+        std::unique_lock<std::mutex> lock(mtx_);
+        to_clear_ = true;
+    }
+
     std::mutex mtx_;
+    bool to_clear_ = false;
 
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<IVFIndexInMem> memory_ivf_index_{};

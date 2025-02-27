@@ -88,11 +88,18 @@ public:
 
     Status UpdateFtInfo(u64 column_len_sum, u32 column_len_cnt);
 
+    Status SetNoMemIndex();
+
     Status InitSet();
 
     Status GetMemIndex(SharedPtr<MemIndex> &mem_index);
 
+    // write mem index should use this function
+    Status GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index);
+
 private:
+    Status GetHasMemIndex(bool &has_mem_index);
+
     Status LoadChunkIDs();
 
     Status LoadNextChunkID();
@@ -108,6 +115,7 @@ private:
 
     Optional<Vector<ChunkID>> chunk_ids_;
     Optional<ChunkID> next_chunk_id_;
+    Optional<bool> has_mem_index_;
 
     Optional<SegmentIndexFtInfo> ft_info_;
 };

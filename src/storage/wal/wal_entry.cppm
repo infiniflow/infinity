@@ -486,6 +486,11 @@ export struct WalCmdDumpIndex final : public WalCmd {
     SegmentID segment_id_{};
     Vector<WalChunkIndexInfo> chunk_infos_{};
     Vector<ChunkID> deprecate_ids_{};
+
+    bool clear_mem_index_{};
+    String db_id_str_{};
+    String table_id_str_{};
+    String index_id_str_{};
 };
 
 export struct WalCmdRenameTable : public WalCmd {

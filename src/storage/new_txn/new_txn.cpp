@@ -1932,6 +1932,14 @@ void NewTxn::PostCommit() {
                 }
                 break;
             }
+            case WalCommandType::DUMP_INDEX: {
+                auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+                Status status = PostCommitDumpIndex(cmd);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to dump index");
+                }
+                break;
+            }
             default: {
                 break;
             }
