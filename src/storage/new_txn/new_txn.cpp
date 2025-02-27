@@ -332,16 +332,10 @@ Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_
     SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
     db_info->db_name_ = MakeShared<String>(db_name);
 
-    String db_dir_prefix = KeyEncode::CatalogDbTagKey(db_id, "dir");
-    db_info->db_entry_dir_ = MakeShared<String>();
-    Status status = kv_instance_->Get(db_dir_prefix, *db_info->db_entry_dir_);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-
+    db_info->db_entry_dir_ = MakeShared<String>(fmt::format("db_{}", db_id));
     String db_comment_prefix = KeyEncode::CatalogDbTagKey(db_id, "comment");
     String db_comment;
-    status = kv_instance_->Get(db_comment_prefix, db_comment);
+    Status status = kv_instance_->Get(db_comment_prefix, db_comment);
     if (status.ok()) {
         db_info->db_comment_ = MakeShared<String>(db_comment);
     }
@@ -974,9 +968,6 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
         return {nullptr, status};
     }
 
-    table_info->db_id_ = db_id_str;
-    table_info->table_id_ = table_id_str;
-
     // Create table comment;
     String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");
     String table_comment;
@@ -985,21 +976,8 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
         return {nullptr, status};
     }
 
-    String db_dir;
-    String db_dir_prefix = KeyEncode::CatalogDbTagKey(db_id_str, "dir");
-    status = kv_instance_->Get(db_dir_prefix, db_dir);
-    if (!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-
-    //    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
-    //    String table_storage_tail;
-    //    status = kv_instance_->Get(table_storage_dir, table_storage_tail);
-    //    if (!status.ok()) {
-    //        return {nullptr, status};
-    //    }
-
-    table_info->table_full_dir_ = MakeShared<String>(fmt::format("{}/{}/{}", InfinityContext::instance().config()->DataDir(), db_dir, table_id_str));
+    table_info->table_full_dir_ =
+        MakeShared<String>(fmt::format("{}/db_{}/tbl_{}", InfinityContext::instance().config()->DataDir(), db_id_str, table_id_str));
 
     String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str, table_id_str);
     auto iter2 = kv_instance_->GetIterator();
@@ -1016,6 +994,9 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
     std::sort(table_info->column_defs_.begin(), table_info->column_defs_.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) {
         return a->id_ < b->id_;
     });
+
+    table_info->db_id_ = std::move(db_id_str);
+    table_info->table_id_ = std::move(table_id_str);
 
     return {table_info, Status::OK()};
 }
@@ -1454,24 +1435,6 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd) {
         return status;
     }
 
-    String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id_str, "dir");
-    status = kv_instance_->Put(db_storage_dir, create_db_cmd->db_dir_tail_);
-    if (!status.ok()) {
-        return status;
-    }
-
-    //                String db_latest_index_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_index_id");
-    //                status = kv_instance_->Put(db_latest_index_id, "0");
-    //                if (!status.ok()) {
-    //                    return status;
-    //                }
-    //
-    //                String db_latest_segment_id = KeyEncode::CatalogDbTagKey(db_id_str, "latest_segment_id");
-    //                status = kv_instance_->Put(db_latest_segment_id, "0");
-    //                if (!status.ok()) {
-    //                    return status;
-    //                }
-
     if (!create_db_cmd->db_comment_.empty()) {
         String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment");
         status = kv_instance_->Put(db_comment_key, create_db_cmd->db_comment_);
@@ -1523,13 +1486,6 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
 
     LOG_TRACE(fmt::format("Drop database: {}", drop_db_cmd->db_name_));
     status = kv_instance_->Delete(db_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Delete db_dir, db_comment
-    String db_storage_dir = KeyEncode::CatalogDbTagKey(db_id_str, "dir");
-    status = kv_instance_->Delete(db_storage_dir);
     if (!status.ok()) {
         return status;
     }
@@ -1595,13 +1551,6 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
         return status;
     }
 
-    // Create table dir
-    //    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
-    //    status = kv_instance_->Put(table_storage_dir, create_table_cmd->table_dir_tail_);
-    //    if (!status.ok()) {
-    //        return status;
-    //    }
-
     {
         // Create segment ids
         String table_segment_ids_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "segment_ids");
@@ -1657,13 +1606,6 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
     if (!status.ok()) {
         return status;
     }
-
-    // Delete table dir
-    //    String table_storage_dir = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "dir");
-    //    status = kv_instance_->Delete(table_storage_dir);
-    //    if (!status.ok()) {
-    //        return status;
-    //    }
 
     // Delete table comment
     String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");
@@ -1794,13 +1736,6 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
 
     // delete index tags
     // ...
-
-    // delete index dir
-    String index_storage_dir = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "dir");
-    status = kv_instance_->Delete(index_storage_dir);
-    if (!status.ok()) {
-        return status;
-    }
 
     return Status::OK();
 }

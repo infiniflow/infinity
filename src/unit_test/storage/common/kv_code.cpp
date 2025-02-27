@@ -72,8 +72,6 @@ TEST_F(KVCodeTest, kv_code1) {
 
         key = KeyEncode::CatalogDbTagPrefix(db_id, "comment");
         EXPECT_STREQ(key.c_str(), "db|3|comment|");
-        key = KeyEncode::CatalogDbTagPrefix(db_id, "dir");
-        EXPECT_STREQ(key.c_str(), "db|3|dir|");
     }
     {
         String key = KeyEncode::CatalogTableKey(db_id, table_name, ts);
