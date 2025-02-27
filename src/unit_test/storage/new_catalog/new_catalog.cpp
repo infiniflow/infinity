@@ -6881,7 +6881,8 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     auto index_name2 = std::make_shared<String>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
     // auto index_name3 = std::make_shared<std::string>("index3");
-    // auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, Vector<InitParameter *>{});
+    // auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, Vector<InitParameter
+    // *>{});
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -7044,6 +7045,9 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         //     [[maybe_unused]] const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
         //     [[maybe_unused]] const auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
         // }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index2"), TransactionType::kNormal);
@@ -7098,6 +7102,9 @@ TEST_P(NewCatalogTest, test_append_with_index) {
 
         BufferObj *buffer_obj = nullptr;
         status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
     {
@@ -7167,6 +7174,69 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         //     [[maybe_unused]] const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
         //     [[maybe_unused]] const auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
         // }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index2"), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name2, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("merge index2"), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->OptimizeIndex(*db_name, *table_name, *index_name2, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check merged index2"), TransactionType::kNormal);
+        String index_key;
+        String index_id_str;
+        String table_id_str;
+        String db_id_str;
+        Status status = txn->GetIndexID(*db_name, *table_name, *index_name2, index_key, index_id_str, table_id_str, db_id_str);
+        EXPECT_TRUE(status.ok());
+        SegmentID segment_id = 0;
+
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
+
+        SharedPtr<MemIndex> mem_index;
+        status = segment_index_meta.GetMemIndex(mem_index);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(mem_index->memory_secondary_index_, nullptr);
+
+        ChunkID chunk_id = 0;
+        {
+            Vector<ChunkID> *chunk_ids = nullptr;
+            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_ids->size(), 1);
+            chunk_id = chunk_ids->at(0);
+            EXPECT_EQ(chunk_id, 2);
+        }
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+        {
+            ChunkIndexMetaInfo *chunk_info = nullptr;
+            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_info->row_cnt_, 4);
+            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
+        }
+
+        BufferObj *buffer_obj = nullptr;
+        status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
 }
 
@@ -7190,7 +7260,8 @@ TEST_P(NewCatalogTest, populate_index) {
     auto index_name2 = std::make_shared<String>("idx2");
     auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
     // auto index_name3 = std::make_shared<std::string>("index3");
-    // auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, Vector<InitParameter *>{});
+    // auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, Vector<InitParameter
+    // *>{});
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -7315,6 +7386,9 @@ TEST_P(NewCatalogTest, populate_index) {
             EXPECT_EQ(chunk_info->row_cnt_, 4);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index2"), TransactionType::kNormal);
@@ -7365,5 +7439,8 @@ TEST_P(NewCatalogTest, populate_index) {
             EXPECT_EQ(chunk_info->row_cnt_, 4);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
 }

@@ -402,7 +402,11 @@ private:
                          TableIndexMeeta &table_index_meta,
                          SegmentMeta &segment_meta);
 
-    Status PopulateFtIndexInner(SegmentIndexMeta &segment_index_meta, Vector<Tuple<RowID, ColumnVector, u32>> &row_col_offset);
+    Status PopulateFtIndexInner(SharedPtr<IndexBase> index_def,
+                                SegmentIndexMeta &segment_index_meta,
+                                Vector<Tuple<RowID, ColumnVector, u32>> &row_col_offset);
+
+    Status OptimizeFtIndex(SharedPtr<IndexBase> index_def, SegmentIndexMeta &segment_index_meta, RowID &base_rowid, u32 &row_cnt, String &base_name);
 
     Status DumpMemIndexInner(const String &db_name, const String &table_name, const String &index_name, SegmentIndexMeta &segment_index_meta);
 

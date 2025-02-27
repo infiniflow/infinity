@@ -50,6 +50,7 @@ import memory_indexer;
 import index_defines;
 import index_full_text;
 import column_index_reader;
+import column_index_merger;
 
 namespace infinity {
 
@@ -94,26 +95,35 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
     SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
 
-    Vector<ChunkIndexMeta> old_chunk_metas;
+    Vector<ChunkID> *old_chunk_ids_ptr = nullptr;
     {
-        Vector<ChunkID> *chunk_ids;
-        {
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        for (ChunkID chunk_id : *chunk_ids) {
-            old_chunk_metas.emplace_back(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
+        Status status = segment_index_meta.GetChunkIDs(old_chunk_ids_ptr);
+        if (!status.ok()) {
+            return status;
         }
     }
-    RowID base_rowid(segment_id, 0);
+    RowID base_rowid;
     u32 row_cnt = 0;
     Vector<Pair<u32, BufferObj *>> old_buffers;
+    String base_name;
+    SharedPtr<IndexBase> index_base;
     {
+        Status status = table_index_meta.GetIndexDef(index_base);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    if (index_base->index_type_ == IndexType::kFullText) {
+        Status status = this->OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, base_name);
+        if (!status.ok()) {
+            return status;
+        }
+    } else {
+        base_rowid = RowID(segment_id, 0);
         RowID last_rowid = base_rowid;
         ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-        for (ChunkIndexMeta &old_chunk_meta : old_chunk_metas) {
+        for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
+            ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta, segment_index_meta.kv_instance());
             {
                 Status status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
                 if (!status.ok()) {
@@ -136,13 +146,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             old_buffers.emplace_back(chunk_info_ptr->row_cnt_, buffer_obj);
         }
     }
-    SharedPtr<IndexBase> index_base;
-    {
-        Status status = table_index_meta.GetIndexDef(index_base);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    Vector<ChunkID> deprecate_ids = *old_chunk_ids_ptr;
     ChunkID chunk_id = 0;
     {
         Status status = segment_index_meta.GetNextChunkID(chunk_id);
@@ -157,7 +161,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, "" /*base_name*/, chunk_index_meta, buffer_obj);
+        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, base_name, chunk_index_meta, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -170,8 +174,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             break;
         }
         case IndexType::kFullText: {
-            // TODO
-            UnrecoverableError("Not implemented yet");
+            // Skip here. merge finished in `OptimizeFtIndex`
             break;
         }
         default: {
@@ -188,10 +191,6 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     {
         Vector<WalChunkIndexInfo> chunk_infos;
         chunk_infos.emplace_back(*chunk_index_meta);
-        Vector<ChunkID> deprecate_ids;
-        for (const ChunkIndexMeta &old_chunk_meta : old_chunk_metas) {
-            deprecate_ids.push_back(old_chunk_meta.chunk_id());
-        }
         auto dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id, std::move(chunk_infos), std::move(deprecate_ids));
 
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
@@ -538,7 +537,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
         }
     }
     if (index_def->index_type_ == IndexType::kFullText) {
-        Status status = this->PopulateFtIndexInner(*segment_index_meta, row_col_offset);
+        Status status = this->PopulateFtIndexInner(index_def, *segment_index_meta, row_col_offset);
         if (!status.ok()) {
             return status;
         }
@@ -561,13 +560,11 @@ Status NewTxn::PopulateIndex(const String &db_name,
     return Status::OK();
 }
 
-Status NewTxn::PopulateFtIndexInner(SegmentIndexMeta &segment_index_meta, Vector<Tuple<RowID, ColumnVector, u32>> &row_col_offset) {
-    SharedPtr<IndexBase> index_def;
-    {
-        Status status = segment_index_meta.table_index_meta().GetIndexDef(index_def);
-        if (!status.ok()) {
-            return status;
-        }
+Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_def,
+                                    SegmentIndexMeta &segment_index_meta,
+                                    Vector<Tuple<RowID, ColumnVector, u32>> &row_col_offset) {
+    if (index_def->index_type_ != IndexType::kFullText) {
+        UnrecoverableError("Invalid index type");
     }
     const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_def.get());
     RowID base_row_id(segment_index_meta.segment_id(), 0);
@@ -606,6 +603,99 @@ Status NewTxn::PopulateFtIndexInner(SegmentIndexMeta &segment_index_meta, Vector
         memory_indexer->Insert(col_ptr, 0, row_cnt, true);
         memory_indexer->Commit(true);
     }
+    return Status::OK();
+}
+
+Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_def,
+                               SegmentIndexMeta &segment_index_meta,
+                               RowID &base_rowid_out,
+                               u32 &row_cnt_out,
+                               String &base_name_out) {
+    const auto *index_fulltext = static_cast<const IndexFullText *>(index_def.get());
+
+    Vector<ChunkID> chunk_ids;
+    {
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        chunk_ids = *chunk_ids_ptr;
+    }
+    if (chunk_ids.size() <= 1) {
+        return Status::OK();
+    }
+    String msg = fmt::format("merging {}", *index_fulltext->index_name_);
+    Vector<String> base_names;
+    Vector<RowID> base_rowids;
+    RowID base_rowid;
+    u32 total_row_count = 0;
+    Vector<ChunkID> old_ids;
+
+    for (auto iter = chunk_ids.begin(); iter != chunk_ids.end(); ++iter) {
+        ChunkID chunk_id = *iter;
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
+        ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+        {
+            Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        if (chunk_id == 0) {
+            base_rowid = chunk_info_ptr->base_row_id_;
+        }
+        if (const RowID expect_base_row_id = base_rowid + total_row_count; chunk_info_ptr->base_row_id_ > expect_base_row_id) {
+            msg += fmt::format(" stop at gap to chunk {}, expect_base_row_id: {:016x}, base_row_id: {:016x}",
+                               chunk_info_ptr->base_name_,
+                               expect_base_row_id.ToUint64(),
+                               chunk_info_ptr->base_row_id_.ToUint64());
+            chunk_ids.erase(iter, chunk_ids.end());
+            break;
+        } else if (chunk_info_ptr->base_row_id_ < expect_base_row_id) {
+            msg += fmt::format(" found overlap to chunk {}, expect_base_row_id: {:016x}, base_row_id: {:016x}",
+                               chunk_info_ptr->base_name_,
+                               expect_base_row_id.ToUint64(),
+                               chunk_info_ptr->base_row_id_.ToUint64());
+            UnrecoverableError(msg);
+            return Status::OK();
+        }
+        msg += " " + chunk_info_ptr->base_name_;
+        base_names.push_back(chunk_info_ptr->base_name_);
+        base_rowids.push_back(chunk_info_ptr->base_row_id_);
+        total_row_count += chunk_info_ptr->row_cnt_;
+    }
+
+    if (chunk_ids.size() <= 1) {
+        msg += fmt::format(" skip merge due to only {} chunk", chunk_ids.size());
+        LOG_INFO(msg);
+        return Status::OK();
+    }
+
+    String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
+    msg += " -> " + dst_base_name;
+    LOG_INFO(msg);
+
+    String index_dir;
+    {
+        Status status = segment_index_meta.table_index_meta().GetTableIndexDir(index_dir);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    ColumnIndexMerger column_index_merger(index_dir, index_fulltext->flag_);
+    column_index_merger.Merge(base_names, base_rowids, dst_base_name);
+    {
+        base_rowid_out = base_rowid;
+        row_cnt_out = total_row_count;
+        base_name_out = dst_base_name;
+    }
+
+    // // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
+    // TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
+    // table_index_entry->UpdateFulltextSegmentTs(ts);
+    LOG_INFO(fmt::format("done merging {} {}", *index_fulltext->index_name_, dst_base_name));
+
     return Status::OK();
 }
 
@@ -677,6 +767,7 @@ Status NewTxn::DumpMemIndexInner(const String &db_name, const String &table_name
             break;
         }
         case IndexType::kFullText: {
+            mem_index->memory_indexer_->Dump(false /*offline*/, false /*spill*/);
             u64 len_sum = mem_index->memory_indexer_->GetColumnLengthSum();
             u32 len_cnt = mem_index->memory_indexer_->GetDocCount();
             Status status = segment_index_meta.UpdateFtInfo(len_sum, len_cnt);
