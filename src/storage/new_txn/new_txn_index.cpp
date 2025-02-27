@@ -509,22 +509,17 @@ Status NewTxn::PopulateIndex(const String &db_name,
             return status;
         }
     }
-    for (BlockID block_id : *block_ids) {
+    Vector<Tuple<RowID, ColumnVector, u32>> row_col_offset;
+    row_col_offset.resize(block_ids->size());
+    for (SizeT i = 0; i < block_ids->size(); ++i) {
+        BlockID block_id = (*block_ids)[i];
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-        SizeT cur_row_cnt = 0;
-        {
-            Status status = block_meta.GetRowCnt(cur_row_cnt);
-            if (!status.ok()) {
-                return status;
-            }
-        }
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
         SegmentOffset block_offset = block_meta.block_capacity() * block_meta.block_id();
         RowID base_rowid(segment_meta.segment_id(), block_offset);
 
         SizeT row_cnt = 0;
-        u32 offset = 0;
         ColumnVector col;
         {
             Status status = block_meta.GetRowCnt(row_cnt);
@@ -532,13 +527,24 @@ Status NewTxn::PopulateIndex(const String &db_name,
                 return status;
             }
         }
+        auto &[row_id, column_vector, row_count] = row_col_offset[i];
+        row_id = base_rowid;
+        row_count = row_cnt;
         {
-            Status status = this->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+            Status status = this->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, column_vector);
             if (!status.ok()) {
                 return status;
             }
         }
-        {
+    }
+    if (index_def->index_type_ == IndexType::kFullText) {
+        Status status = this->PopulateFtIndexInner(*segment_index_meta, row_col_offset);
+        if (!status.ok()) {
+            return status;
+        }
+    } else {
+        for (const auto &[base_rowid, col, row_cnt] : row_col_offset) {
+            u32 offset = 0;
             Status status = this->AppendMemIndex(*segment_index_meta, base_rowid, col, offset, row_cnt);
             if (!status.ok()) {
                 return status;
@@ -552,6 +558,54 @@ Status NewTxn::PopulateIndex(const String &db_name,
         }
     }
 
+    return Status::OK();
+}
+
+Status NewTxn::PopulateFtIndexInner(SegmentIndexMeta &segment_index_meta, Vector<Tuple<RowID, ColumnVector, u32>> &row_col_offset) {
+    SharedPtr<IndexBase> index_def;
+    {
+        Status status = segment_index_meta.table_index_meta().GetIndexDef(index_def);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_def.get());
+    RowID base_row_id(segment_index_meta.segment_id(), 0);
+    String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
+    String full_path;
+    {
+        String index_dir;
+        Status status = segment_index_meta.table_index_meta().GetTableIndexDir(index_dir);
+        if (!status.ok()) {
+            return status;
+        }
+        full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), index_dir);
+    }
+    SharedPtr<MemIndex> mem_index;
+    {
+        Status status = segment_index_meta.GetAndWriteMemIndex(mem_index);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    mem_index->memory_indexer_ =
+        MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
+    MemoryIndexer *memory_indexer = mem_index->memory_indexer_.get();
+    for (auto &[begin_row_id, col, row_cnt] : row_col_offset) {
+        RowID exp_begin_row_id = memory_indexer->GetBaseRowId() + memory_indexer->GetDocCount();
+        assert(begin_row_id >= exp_begin_row_id);
+        if (begin_row_id > exp_begin_row_id) {
+            LOG_WARN(fmt::format("Begin row id: {}, expect begin row id: {}, insert gap: {}",
+                                 begin_row_id.ToUint64(),
+                                 exp_begin_row_id.ToUint64(),
+                                 begin_row_id - exp_begin_row_id));
+            memory_indexer->InsertGap(begin_row_id - exp_begin_row_id);
+        }
+
+        auto col_ptr = MakeShared<ColumnVector>(std::move(col));
+        memory_indexer->Insert(col_ptr, 0, row_cnt, true);
+        memory_indexer->Commit(true);
+    }
     return Status::OK();
 }
 

@@ -402,6 +402,8 @@ private:
                          TableIndexMeeta &table_index_meta,
                          SegmentMeta &segment_meta);
 
+    Status PopulateFtIndexInner(SegmentIndexMeta &segment_index_meta, Vector<Tuple<RowID, ColumnVector, u32>> &row_col_offset);
+
     Status DumpMemIndexInner(const String &db_name, const String &table_name, const String &index_name, SegmentIndexMeta &segment_index_meta);
 
 public:

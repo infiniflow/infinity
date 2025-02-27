@@ -7267,7 +7267,7 @@ TEST_P(NewCatalogTest, populate_index) {
     // }
     append_a_block();
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
         String index_key;
         String index_id_str;
         String table_id_str;
@@ -7294,6 +7294,56 @@ TEST_P(NewCatalogTest, populate_index) {
         {
             RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
             u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            EXPECT_EQ(begin_id, RowID(0, 4));
+            EXPECT_EQ(row_cnt, 2);
+        }
+
+        ChunkID chunk_id = 0;
+        {
+            Vector<ChunkID> *chunk_ids = nullptr;
+            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_ids->size(), 1);
+            chunk_id = chunk_ids->at(0);
+            EXPECT_EQ(chunk_id, 0);
+        }
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+        {
+            ChunkIndexMetaInfo *chunk_info = nullptr;
+            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_info->row_cnt_, 4);
+            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
+        }
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index2"), TransactionType::kNormal);
+        String index_key;
+        String index_id_str;
+        String table_id_str;
+        String db_id_str;
+        Status status = txn->GetIndexID(*db_name, *table_name, *index_name2, index_key, index_id_str, table_id_str, db_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+
+        SegmentID segment_id = 0;
+        {
+            auto [segment_ids, status] = table_meta.GetSegmentIDs();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(segment_ids->size(), 1);
+            segment_id = segment_ids->at(0);
+            EXPECT_EQ(segment_id, 0);
+        }
+
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
+
+        SharedPtr<MemIndex> mem_index;
+        status = segment_index_meta.GetMemIndex(mem_index);
+        EXPECT_TRUE(status.ok());
+        {
+            RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+            u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
             EXPECT_EQ(begin_id, RowID(0, 4));
             EXPECT_EQ(row_cnt, 2);
         }
