@@ -467,6 +467,22 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
             }
             break;
         }
+        case IndexType::kIVF: {
+            SharedPtr<IVFIndexInMem> memory_ivf_index;
+            {
+                std::unique_lock<std::mutex> lock(mem_index->mtx_);
+                if (mem_index->memory_ivf_index_.get() == nullptr) {
+                    auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    mem_index->memory_ivf_index_ = IVFIndexInMem::NewIVFIndexInMem(column_def.get(), index_def.get(), base_row_id, nullptr);
+                }
+                memory_ivf_index = mem_index->memory_ivf_index_;
+            }
+            memory_ivf_index->InsertBlockData(base_row_id.segment_offset_, col, offset, row_cnt);
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -931,6 +947,12 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd) {
         SegmentIndexMeta segment_index_meta(dump_index_cmd->segment_id_, table_index_meta, table_index_meta.kv_instance());
         SharedPtr<MemIndex> mem_index;
         Status status = segment_index_meta.GetMemIndex(mem_index);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        Status status = kv_instance->Commit();
         if (!status.ok()) {
             return status;
         }

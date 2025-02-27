@@ -6880,9 +6880,16 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<String>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
-    // auto index_name3 = std::make_shared<std::string>("index3");
-    // auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, Vector<InitParameter
-    // *>{});
+    auto index_name3 = std::make_shared<std::string>("index3");
+    Vector<InitParameter *> index3_parameters;
+    index3_parameters.emplace_back(new InitParameter("metric", "l2"));
+    index3_parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
+    DeferFn defer_fn([&] {
+        for (auto *parameter : index3_parameters) {
+            delete parameter;
+        }
+    });
+    auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index3_parameters);
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -6911,13 +6918,13 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    // {
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index3"), TransactionType::kNormal);
-    //     Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
-    //     EXPECT_TRUE(status.ok());
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    // }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index3"), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
 
     auto input_block = MakeShared<DataBlock>();
     {
@@ -7259,9 +7266,16 @@ TEST_P(NewCatalogTest, populate_index) {
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<String>("idx2");
     auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
-    // auto index_name3 = std::make_shared<std::string>("index3");
-    // auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, Vector<InitParameter
-    // *>{});
+    auto index_name3 = std::make_shared<std::string>("index3");
+    Vector<InitParameter *> index3_parameters;
+    index3_parameters.emplace_back(new InitParameter("metric", "l2"));
+    index3_parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
+    DeferFn defer_fn([&] {
+        for (auto *parameter : index3_parameters) {
+            delete parameter;
+        }
+    });
+    auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index3_parameters);
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());

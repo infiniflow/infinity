@@ -656,6 +656,12 @@ Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd) {
             }
         }
     }
+    {
+        Status status = kv_instance->Commit();
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 
