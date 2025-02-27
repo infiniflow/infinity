@@ -38,6 +38,11 @@ import kmeans_partition;
 import logical_type;
 import ivf_index_util_func;
 
+import column_meta;
+import block_meta;
+import segment_meta;
+import new_txn;
+
 namespace infinity {
 
 class IVFDataAccessor : public IVFDataAccessorBase {
@@ -80,6 +85,52 @@ private:
     ColumnVector cur_column_vector_;
 };
 
+class NewIVFDataAccessor : public IVFDataAccessorBase {
+public:
+    NewIVFDataAccessor(NewTxn *new_txn, SegmentMeta &segment_meta, ColumnID column_id)
+        : new_txn_(new_txn), segment_meta_(segment_meta), column_id_(column_id) {}
+
+    const_ptr_t GetEmbedding(SizeT offset) override {
+        SizeT block_offset = UpdateColumnVector(offset);
+        return cur_column_vector_.data() + block_offset * cur_column_vector_.data_type_size_;
+    }
+
+    Pair<Span<const char>, SizeT> GetMultiVector(SizeT offset) override {
+        SizeT block_offset = UpdateColumnVector(offset);
+        return cur_column_vector_.GetMultiVectorRaw(block_offset);
+    }
+
+private:
+    SizeT UpdateColumnVector(SizeT offset) {
+        SizeT block_offset = offset % DEFAULT_BLOCK_CAPACITY;
+        BlockID block_id = offset / DEFAULT_BLOCK_CAPACITY;
+        if (block_id != last_block_id_) {
+            last_block_id_ = block_id;
+            BlockMeta block_meta(block_id, segment_meta_, segment_meta_.kv_instance());
+            SizeT row_cnt = 0;
+            Status status = block_meta.GetRowCnt(row_cnt);
+            if (!status.ok()) {
+                UnrecoverableError("Get row count failed");
+            }
+
+            ColumnMeta column_meta(column_id_, block_meta, block_meta.kv_instance());
+            status = new_txn_->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, cur_column_vector_);
+            if (!status.ok()) {
+                UnrecoverableError("Get column vector failed");
+            }
+        }
+        return block_offset;
+    }
+
+private:
+    NewTxn *new_txn_;
+    SegmentMeta &segment_meta_;
+    ColumnID column_id_;
+
+    BlockID last_block_id_ = std::numeric_limits<BlockID>::max();
+    ColumnVector cur_column_vector_;
+};
+
 void IVFIndexInChunk::BuildIVFIndex(const RowID base_rowid,
                                     const u32 row_count,
                                     const SegmentEntry *segment_entry,
@@ -92,6 +143,17 @@ void IVFIndexInChunk::BuildIVFIndex(const RowID base_rowid,
                                        base_rowid.segment_id_));
     }
     IVFDataAccessor data_accessor(segment_entry, buffer_mgr, column_def->id());
+    BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
+}
+
+void IVFIndexInChunk::BuildIVFIndex(NewTxn *new_txn, SegmentMeta &segment_meta, SharedPtr<ColumnDef> column_def) {
+    RowID base_rowid(segment_meta.segment_id(), 0);
+    NewIVFDataAccessor data_accessor(new_txn, segment_meta, column_def->id());
+    SizeT row_count = 0;
+    Status status = segment_meta.GetRowCnt(row_count);
+    if (!status.ok()) {
+        UnrecoverableError("Get row count failed");
+    }
     BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
 }
 

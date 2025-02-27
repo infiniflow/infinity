@@ -31,6 +31,8 @@ namespace infinity {
 class IndexBase;
 struct SegmentEntry;
 class BufferManager;
+class SegmentMeta;
+class NewTxn;
 
 export class IVFDataAccessorBase {
 public:
@@ -55,10 +57,9 @@ public:
                        const SharedPtr<ColumnDef> &column_def,
                        BufferManager *buffer_mgr);
 
-    void BuildIVFIndex(RowID base_rowid,
-                       u32 row_count,
-                       IVFDataAccessorBase *data_accessor,
-                       const SharedPtr<ColumnDef> &column_def);
+    void BuildIVFIndex(NewTxn *new_txn, SegmentMeta &segment_meta, SharedPtr<ColumnDef> column_def);
+
+    void BuildIVFIndex(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def);
 
     void SaveIndexInner(LocalFileHandle &file_handle) const;
 
@@ -68,10 +69,7 @@ public:
 
 private:
     template <LogicalType column_t, EmbeddingDataType embedding_t>
-    void BuildIVFIndexT(RowID base_rowid,
-                        u32 row_count,
-                        IVFDataAccessorBase *data_accessor,
-                        const SharedPtr<ColumnDef> &column_def);
+    void BuildIVFIndexT(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def);
 };
 
 } // namespace infinity

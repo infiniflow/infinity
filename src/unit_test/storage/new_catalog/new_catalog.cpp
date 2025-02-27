@@ -7343,13 +7343,13 @@ TEST_P(NewCatalogTest, test_populate_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    // { // AA
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index3"), TransactionType::kNormal);
-    //     Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
-    //     EXPECT_TRUE(status.ok());
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-    // }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index3"), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
     append_a_block();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);

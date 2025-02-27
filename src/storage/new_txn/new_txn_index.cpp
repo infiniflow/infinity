@@ -286,6 +286,18 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                 buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
                 break;
             }
+            case IndexType::kIVF: {
+                auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+                auto index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                        MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                        index_dir,
+                                                                        std::move(ivf_index_file_name),
+                                                                        index_base,
+                                                                        column_def,
+                                                                        buffer_mgr->persistence_manager());
+                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
+                break;
+            }
             default: {
                 UnrecoverableError("Not implemented yet");
             }
@@ -512,12 +524,14 @@ Status NewTxn::PopulateIndex(const String &db_name,
             return status;
         }
     }
+    SharedPtr<ColumnDef> column_def;
     ColumnID column_id = 0;
     {
-        auto [column_def, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_def->column_name());
+        auto [column_def_, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_def->column_name());
         if (!status.ok()) {
             return status;
         }
+        column_def = column_def_;
         column_id = column_def->id();
     }
     Vector<ChunkID> old_chunk_ids;
@@ -531,7 +545,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
     }
     ChunkID new_chunk_id = 0;
     if (index_def->index_type_ == IndexType::kIVF) {
-        Status status = this->PopulateIvfIndexInner(index_def, *segment_index_meta, segment_meta, column_id, new_chunk_id);
+        Status status = this->PopulateIvfIndexInner(index_def, *segment_index_meta, segment_meta, column_def, new_chunk_id);
         if (!status.ok()) {
             return status;
         }
@@ -682,13 +696,11 @@ NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_def, SegmentIndexMeta &s
 Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_def,
                                      SegmentIndexMeta &segment_index_meta,
                                      SegmentMeta &segment_meta,
-                                     ColumnID column_id,
+                                     SharedPtr<ColumnDef> column_def,
                                      ChunkID &new_chunk_id) {
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     u32 row_count = 0;
     {
-        TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
-        SegmentMeta segment_meta(segment_index_meta.segment_id(), table_meta, table_meta.kv_instance());
         auto [rc, status] = segment_meta.GetRowCnt();
         if (!status.ok()) {
             return status;
@@ -717,9 +729,8 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_def,
     }
     {
         BufferHandle buffer_handle = buffer_obj->Load();
-        [[maybe_unused]] auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
-        // TODO
-        // data_ptr->BuildIVFIndex(base_row_id, row_count, segment_entry, column_def, buffer_mgr);
+        auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
+        data_ptr->BuildIVFIndex(this, segment_meta, column_def);
     }
     buffer_obj->Save();
     return Status::OK();
