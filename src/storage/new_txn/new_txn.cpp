@@ -718,11 +718,13 @@ Status NewTxn::UnlockTable(const String &db_name, const String &table_name) {
 
 // Index OPs
 
-bool NewTxn::CheckIndexExists(const String &db_name, const String &table_name, const String &index_name) {
-    String index_key;
-    String index_id;
-    String table_id;
-    String db_id;
+bool NewTxn::GetIndexKey(const String &db_name,
+                         const String &table_name,
+                         const String &index_name,
+                         String &index_key,
+                         String &index_id,
+                         String &table_id,
+                         String &db_id) {
     Status status = GetIndexID(db_name, table_name, index_name, index_key, index_id, table_id, db_id);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kDBNotExist && status.code() != ErrorCode::kTableNotExist && status.code() != ErrorCode::kIndexNotExist) {
@@ -743,7 +745,11 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
 
     this->CheckTxn(db_name);
 
-    bool index_exist = this->CheckIndexExists(db_name, table_name, *index_base->index_name_);
+    String index_key;
+    String index_id;
+    String table_id;
+    String db_id;
+    bool index_exist = this->GetIndexKey(db_name, table_name, *index_base->index_name_, index_key, index_id, table_id, db_id);
     if (index_exist && conflict_type == ConflictType::kError) {
         return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
     }
@@ -752,7 +758,9 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
     }
 
     SharedPtr<String> local_index_dir = DetermineRandomPath(*index_base->index_name_);
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdCreateIndex>(db_name, table_name, std::move(*local_index_dir), index_base);
+    SharedPtr<WalCmdCreateIndex> wal_command = MakeShared<WalCmdCreateIndex>(db_name, table_name, std::move(*local_index_dir), index_base);
+    wal_command->db_id_ = std::move(db_id);
+    wal_command->table_id_ = std::move(table_id);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -770,7 +778,11 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
 
     this->CheckTxnStatus();
 
-    bool index_exist = this->CheckIndexExists(db_name, table_name, index_name);
+    String index_key;
+    String index_id;
+    String table_id;
+    String db_id;
+    bool index_exist = this->GetIndexKey(db_name, table_name, index_name, index_key, index_id, table_id, db_id);
     if (!index_exist && conflict_type == ConflictType::kError) {
         return Status::IndexNotExist(index_name);
     }
@@ -779,7 +791,11 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         return Status::OK();
     }
 
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
+    SharedPtr<WalCmdDropIndex> wal_command = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
+    wal_command->db_id_ = std::move(db_id);
+    wal_command->table_id_ = std::move(table_id);
+    wal_command->index_id_ = std::move(index_id);
+    wal_command->index_key_ = std::move(index_key);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -1758,23 +1774,13 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
 }
 
 Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
-    String db_id_str;
-    String table_id_str;
-    String index_id_str;
-    String index_key;
-    Status status = GetIndexID(drop_index_cmd->db_name_,
-                               drop_index_cmd->table_name_,
-                               drop_index_cmd->index_name_,
-                               index_key,
-                               index_id_str,
-                               table_id_str,
-                               db_id_str);
-    if (!status.ok()) {
-        return status;
-    }
+    const String &db_id_str = drop_index_cmd->db_id_;
+    const String &table_id_str = drop_index_cmd->table_id_;
+    const String &index_id_str = drop_index_cmd->index_id_;
+    const String &index_key = drop_index_cmd->index_key_;
 
     // delete index key
-    status = kv_instance_->Delete(index_key);
+    Status status = kv_instance_->Delete(index_key);
     if (!status.ok()) {
         return status;
     }

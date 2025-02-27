@@ -257,24 +257,24 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
             case IndexType::kSecondary: {
                 auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
                 auto index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                         MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                         index_dir,
-                                                                         std::move(secondary_index_file_name),
-                                                                         index_base,
-                                                                         column_def,
-                                                                         row_count,
-                                                                         buffer_mgr->persistence_manager());
+                                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                              index_dir,
+                                                                              std::move(secondary_index_file_name),
+                                                                              index_base,
+                                                                              column_def,
+                                                                              row_count,
+                                                                              buffer_mgr->persistence_manager());
                 buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
                 break;
             }
             case IndexType::kFullText: {
                 auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
                 auto index_file_worker = MakeUnique<RawFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                              index_dir,
-                                                              std::move(column_length_file_name),
-                                                              row_count * sizeof(u32),
-                                                              buffer_mgr->persistence_manager());
+                                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                   index_dir,
+                                                                   std::move(column_length_file_name),
+                                                                   row_count * sizeof(u32),
+                                                                   buffer_mgr->persistence_manager());
                 buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
                 break;
             }
@@ -720,19 +720,12 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
     const String &db_name = create_index_cmd->db_name_;
     const String &table_name = create_index_cmd->table_name_;
     const String &index_name = *create_index_cmd->index_base_->index_name_;
-
-    // Get table ID
-    String db_id_str;
-    String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
-    if (!status.ok()) {
-        return status;
-    }
+    const String &db_id_str = create_index_cmd->db_id_;
+    const String &table_id_str = create_index_cmd->table_id_;
 
     // Get latest index id and lock the id
     String index_id_str;
-    status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
+    Status status = IncrLatestID(index_id_str, LATEST_INDEX_ID);
     if (!status.ok()) {
         return status;
     }

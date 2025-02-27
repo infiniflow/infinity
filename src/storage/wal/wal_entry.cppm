@@ -281,6 +281,8 @@ export struct WalCmdCreateIndex final : public WalCmd {
     String table_name_{};
     String index_dir_tail_{};
     SharedPtr<IndexBase> index_base_{};
+    String db_id_{};
+    String table_id_{};
 };
 
 export struct WalCmdDropIndex final : public WalCmd {
@@ -294,9 +296,13 @@ export struct WalCmdDropIndex final : public WalCmd {
     String ToString() const final;
     String CompactInfo() const final;
 
-    const String db_name_{};
-    const String table_name_{};
-    const String index_name_{};
+    String db_name_{};
+    String table_name_{};
+    String index_name_{};
+    String db_id_{};
+    String table_id_{};
+    String index_id_{};
+    String index_key_{};
 };
 
 export struct WalCmdImport final : public WalCmd {

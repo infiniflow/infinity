@@ -214,7 +214,13 @@ public:
     Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
     // Index OPs
-    bool CheckIndexExists(const String &db_name, const String &table_name, const String &index_name);
+    bool GetIndexKey(const String &db_name,
+                     const String &table_name,
+                     const String &index_name,
+                     String &index_key,
+                     String &index_id,
+                     String &table_id,
+                     String &db_id);
 
     Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
 
