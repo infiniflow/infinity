@@ -7247,7 +7247,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     }
 }
 
-TEST_P(NewCatalogTest, populate_index) {
+TEST_P(NewCatalogTest, test_populate_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -7343,7 +7343,7 @@ TEST_P(NewCatalogTest, populate_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    // {
+    // { // AA
     //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index3"), TransactionType::kNormal);
     //     Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
     //     EXPECT_TRUE(status.ok());

@@ -402,13 +402,26 @@ private:
                          TableIndexMeeta &table_index_meta,
                          SegmentMeta &segment_meta);
 
-    Status PopulateFtIndexInner(SharedPtr<IndexBase> index_def,
-                                SegmentIndexMeta &segment_index_meta,
-                                Vector<Tuple<RowID, ColumnVector, u32>> &row_col_offset);
+    Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id);
+
+    Status PopulateFtIndexInner(SharedPtr<IndexBase> index_def, SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id);
+
+    Status PopulateIvfIndexInner(SharedPtr<IndexBase> index_def,
+                                 SegmentIndexMeta &segment_index_meta,
+                                 SegmentMeta &segment_meta,
+                                 ColumnID column_id,
+                                 ChunkID &new_chunk_id);
 
     Status OptimizeFtIndex(SharedPtr<IndexBase> index_def, SegmentIndexMeta &segment_index_meta, RowID &base_rowid, u32 &row_cnt, String &base_name);
 
-    Status DumpMemIndexInner(const String &db_name, const String &table_name, const String &index_name, SegmentIndexMeta &segment_index_meta);
+    Status DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id);
+
+    Status AddChunkWal(const String &db_name,
+                       const String &table_name,
+                       const String &index_name,
+                       ChunkIndexMeta &chunk_index_meta,
+                       const Vector<ChunkID> &deprecate_ids,
+                       bool clear_mem_index);
 
 public:
     Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);
