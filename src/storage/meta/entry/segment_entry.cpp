@@ -144,6 +144,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     return segment_entry;
 }
 
+// TODO : add index replay
 SharedPtr<SegmentEntry>
 SegmentEntry::ApplySegmentSnapshot(TableEntry *table_entry, SegmentSnapshotInfo *segment_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
     SharedPtr<String> segment_dir = MakeShared<String>(segment_snapshot_info->segment_dir_);
@@ -804,6 +805,11 @@ SharedPtr<SegmentSnapshotInfo> SegmentEntry::GetSnapshotInfo() const {
     SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = MakeShared<SegmentSnapshotInfo>();
     segment_snapshot_info->segment_id_ = segment_id_;
     segment_snapshot_info->segment_dir_ = *segment_dir_;
+    segment_snapshot_info->deprecate_ts_ = deprecate_ts_;
+    segment_snapshot_info->status_ = status_;
+    segment_snapshot_info->first_delete_ts_ = first_delete_ts_;
+    segment_snapshot_info->row_count_ = row_count_;
+    segment_snapshot_info->actual_row_count_ = actual_row_count_;
 
     std::shared_lock lock(rw_locker_);
     SizeT block_count = block_entries_.size();

@@ -1927,7 +1927,8 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kTable;
     if($3->schema_name_ptr_ != nullptr) {
-        $$->schema_name_ = $3->schema_name_ptr_;
+        $$->schema_name
+        _ = $3->schema_name_ptr_;
         free($3->schema_name_ptr_);
     }
     $$->table_name_ = $3->table_name_ptr_;

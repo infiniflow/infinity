@@ -162,6 +162,7 @@ BlockEntry::ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *b
     auto block_entry = MakeUnique<BlockEntry>(segment_entry, block_snapshot_info->block_id_, 0);
 
     block_entry->checkpoint_row_count_ = block_snapshot_info->row_count_;
+    block_entry->block_row_count_ = block_snapshot_info->row_count_;
     block_entry->row_capacity_ = block_snapshot_info->row_capacity_;
     block_entry->block_dir_ = MakeShared<String>(block_snapshot_info->block_dir_);
 
@@ -170,8 +171,16 @@ BlockEntry::ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *b
         block_entry->columns_.emplace_back(std::move(column_entry));
     }
     // // Version file rewrite
-    nlohmann::json fast_rough_filter_json = nlohmann::json::parse(block_snapshot_info->fast_rough_filter_);
-    block_entry->GetFastRoughFilter()->LoadFromJsonFile(fast_rough_filter_json);
+    // Read version file and rewrite version file to write create / delete TS with current commit TS
+    auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_entry->block_dir(),
+                                                             BlockVersion::FileName(),
+                                                             block_snapshot_info->row_capacity_,
+                                                             buffer_mgr->persistence_manager());
+    block_entry->version_buffer_object_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+    block_entry->version_buffer_object_->AddObjRc();
 
     if (!block_snapshot_info->fast_rough_filter_.empty()) {
         nlohmann::json fast_rough_filter_json = nlohmann::json::parse(block_snapshot_info->fast_rough_filter_);
@@ -183,9 +192,9 @@ BlockEntry::ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *b
 SharedPtr<BlockSnapshotInfo> BlockEntry::GetSnapshotInfo() const {
     SharedPtr<BlockSnapshotInfo> block_snapshot_info = MakeShared<BlockSnapshotInfo>();
     block_snapshot_info->block_id_ = block_id_;
-    block_snapshot_info->row_count_ = checkpoint_row_count_;
-    block_snapshot_info->row_capacity_ = row_capacity_;
-    block_snapshot_info->block_dir_ = *block_dir_;
+    block_snapshot_info->row_count_ = this->row_count();
+    block_snapshot_info->row_capacity_ = this->row_capacity();
+    block_snapshot_info->block_dir_ = *this->block_dir();
 
     SizeT column_count = this->columns_.size();
     block_snapshot_info->column_block_snapshots_.reserve(column_count);
@@ -486,6 +495,12 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
             column->CommitColumn(txn_id, commit_ts);
         }
     }
+}
+
+void BlockEntry::CommitApplySnapshot(TxnTimeStamp commit_ts) {
+    this->commit_ts_ = commit_ts;
+    this->max_row_ts_ = commit_ts;
+    this->min_row_ts_ = commit_ts;
 }
 
 ColumnVector BlockEntry::GetCreateTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const {

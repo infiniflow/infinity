@@ -231,6 +231,10 @@ public:
 
     void DropTableStore(TableEntry *dropped_table_entry);
 
+    void AddTableToRestore(TableEntry *table_entry);
+
+    void AddDBToRestore(DBEntry *db_entry);
+
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
     TxnTableStore *GetExistTxnTableStore(TableEntry *table_entry) const;
@@ -275,6 +279,9 @@ private:
     HashMap<String, UniquePtr<TxnTableStore>> txn_tables_store_{};
 
     Vector<UniquePtr<std::binary_semaphore>> semas_{};
+
+    Vector<TableEntry *> to_restore_tables_ {};
+    Vector<DBEntry *> to_restore_dbs_ {};
 };
 
 } // namespace infinity

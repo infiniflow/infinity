@@ -69,6 +69,8 @@ nlohmann::json BlockSnapshotInfo::Serialize() {
     nlohmann::json json_res;
     json_res["block_id"] = block_id_;
     json_res["block_dir"] = block_dir_;
+    json_res["row_count"] = row_count_;
+    json_res["max_row_ts"] = max_row_ts_;
     for (const auto &column_block_snapshot : column_block_snapshots_) {
         json_res["columns"].emplace_back(column_block_snapshot->Serialize());
     }
@@ -79,6 +81,7 @@ SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(const nlohmann::json
     auto block_snapshot = MakeShared<BlockSnapshotInfo>();
     block_snapshot->block_id_ = block_json["block_id"];
     block_snapshot->block_dir_ = block_json["block_dir"];
+    block_snapshot->max_row_ts_ = block_json["max_row_ts"];
     for (const auto &column_block_json : block_json["columns"]) {
         auto column_block_snapshot = BlockColumnSnapshotInfo::Deserialize(column_block_json);
         block_snapshot->column_block_snapshots_.emplace_back(column_block_snapshot);
@@ -456,6 +459,19 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
     }
 
     //    LOG_INFO(table_snapshot->ToString());
+    //    LOG_INFO(fmt::format("Deserialize src data: {}/{}", snapshot_dir, snapshot_name));
+    Vector<String> original_files = table_snapshot->GetFiles();
+    Config *config = InfinityContext::instance().config();
+    String data_dir = config->DataDir();
+    for (const auto &file : original_files) {
+        String src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+        String dst_file_path = fmt::format("{}/{}", data_dir, file);
+        //        LOG_INFO(fmt::format("Copy from: {} to {}", src_file_path, dst_file_path));
+        Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
+        if (!copy_status.ok()) {
+            RecoverableError(copy_status);
+        }
+    }
 
     return {table_snapshot, Status::OK()};
 }
@@ -467,140 +483,5 @@ String TableSnapshotInfo::ToString() const {
                        snapshot_name_,
                        version_);
 }
-
-
-// Vector<String> DatabaseSnapshotInfo::GetFiles() const {
-//     Vector<String> files;
-//
-//     // 遍历所有表快照
-//     for (const auto &[table_name, table_snapshot] : table_snapshots_) {
-//         // 获取表快照中的所有文件
-//         Vector<String> table_files = table_snapshot->GetFiles();
-//         files.insert(files.end(), table_files.begin(), table_files.end());
-//     }
-//
-//     return files;
-// }
-//
-// void DatabaseSnapshotInfo::Serialize(const String &save_path) {
-//     // 创建保存路径
-//     if (!VirtualStore::Exists(save_path)) {
-//         VirtualStore::MakeDirectory(save_path);
-//     }
-//
-//     // 构建 JSON 数据
-//     nlohmann::json json_data;
-//     json_data["snapshot_name"] = snapshot_name_;
-//     json_data["db_name"] = db_name_;
-//     json_data["db_comment"] = db_comment_;
-//     json_data["txn_id"] = txn_id_;
-//     json_data["begin_ts"] = begin_ts_;
-//     json_data["commit_ts"] = commit_ts_;
-//     json_data["max_commit_ts"] = max_commit_ts_;
-//     json_data["db_entry_dir"] = db_entry_dir_;
-//     json_data["next_segment_id"] = next_segment_id_;
-//     json_data["table_count"] = table_count_;
-//
-//     // 序列化表快照信息
-//     nlohmann::json table_snapshots_json = nlohmann::json::object();
-//     for (const auto &[table_name, table_snapshot] : table_snapshots_) {
-//                 table_snapshots_json[table_name] = table_snapshot->Serialize(save_path);
-//     }
-//     json_data["table_snapshots"] = table_snapshots_json;
-//
-//     // 将 JSON 数据写入文件
-//     String json_string = json_data.dump(4); // 使用缩进格式化 JSON
-//     Path save_file_path = Path(save_path) / fmt::format("{}.json", snapshot_name_);
-//
-//     auto [file_handle, status] = VirtualStore::Open(save_file_path.string(), FileAccessMode::kWrite);
-//     if (!status.ok()) {
-//         LOG_ERROR(fmt::format("Failed to open file for writing: {}", status.message()));
-//         return;
-//     }
-//
-//     status = file_handle->Append(json_string.data(), json_string.size());
-//     if (!status.ok()) {
-//         LOG_ERROR(fmt::format("Failed to write snapshot data: {}", status.message()));
-//         return;
-//     }
-//
-//     file_handle->Sync();
-//     LOG_INFO(fmt::format("Database snapshot metadata saved to: {}", save_file_path.string()));
-//
-//     // 获取所有相关文件路径
-//     Vector<String> files = GetFiles();
-//
-//     // 复制文件到保存路径
-//     for (const auto &file : files) {
-//         String dst_file_path = fmt::format("{}/{}", save_path, Path(file).filename().string());
-//         String dst_dir = VirtualStore::GetParentPath(dst_file_path);
-//         if (!VirtualStore::Exists(dst_dir)) {
-//             VirtualStore::MakeDirectory(dst_dir);
-//         }
-//
-//         Status copy_status = VirtualStore::Copy(dst_file_path, file);
-//         if (!copy_status.ok()) {
-//             LOG_WARN(fmt::format("Failed to copy file {}: {}", file, copy_status.message()));
-//         }
-//     }
-//
-//     LOG_INFO(fmt::format("Database snapshot files copied to: {}", save_path));
-// }
-//
-// Tuple<SharedPtr<DatabaseSnapshotInfo>, Status> DatabaseSnapshotInfo::Deserialize(const String &snapshot_dir, const String &snapshot_name) {
-//     // 构建快照文件路径
-//     String snapshot_file_path = fmt::format("{}/{}.json", snapshot_dir, snapshot_name);
-//
-//     // 检查文件是否存在
-//     if (!VirtualStore::Exists(snapshot_file_path)) {
-//         return {nullptr, Status::FileNotFound(fmt::format("Snapshot file not found: {}", snapshot_file_path))};
-//     }
-//
-//     // 打开并读取文件内容
-//     auto [file_handle, status] = VirtualStore::Open(snapshot_file_path, FileAccessMode::kRead);
-//     if (!status.ok()) {
-//         return {nullptr, status};
-//     }
-//
-//     i64 file_size = file_handle->FileSize();
-//     String json_string(file_size, '\0');
-//     auto [n_bytes, read_status] = file_handle->Read(json_string.data(), file_size);
-//     if (!read_status.ok() || n_bytes != file_size) {
-//         return {nullptr, Status::FileCorrupted(fmt::format("Failed to read snapshot file: {}", snapshot_file_path))};
-//     }
-//
-//     // 解析 JSON 数据
-//     nlohmann::json json_data = nlohmann::json::parse(json_string);
-//
-//     // 创建 DatabaseSnapshotInfo 对象
-//     auto db_snapshot = std::make_shared<DatabaseSnapshotInfo>();
-//     db_snapshot->snapshot_name_ = json_data["snapshot_name"];
-//     db_snapshot->db_name_ = json_data["db_name"];
-//     db_snapshot->db_comment_ = json_data["db_comment"];
-//     db_snapshot->txn_id_ = json_data["txn_id"];
-//     db_snapshot->begin_ts_ = json_data["begin_ts"];
-//     db_snapshot->commit_ts_ = json_data["commit_ts"];
-//     db_snapshot->max_commit_ts_ = json_data["max_commit_ts"];
-//     db_snapshot->db_entry_dir_ = json_data["db_entry_dir"];
-//     db_snapshot->next_segment_id_ = json_data["next_segment_id"];
-//     db_snapshot->table_count_ = json_data["table_count"];
-//
-//     // 反序列化表快照信息
-//     const auto &table_snapshots_json = json_data["table_snapshots"];
-//     for (auto it = table_snapshots_json.begin(); it != table_snapshots_json.end(); ++it) {
-//         const auto &table_name = it.key();
-//         const auto &table_snapshot_json = it.value();
-//
-//         auto [table_snapshot, status] = TableSnapshotInfo::Deserialize(snapshot_dir, table_name);
-//         if (!status.ok()) {
-//             LOG_WARN(fmt::format("Failed to deserialize table snapshot {}: {}", table_name, status.message()));
-//             continue;
-//         }
-//         db_snapshot->table_snapshots_[table_name] = table_snapshot;
-//     }
-//
-//     return {db_snapshot, Status::OK()};
-// }
-
 
 } // namespace infinity

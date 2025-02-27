@@ -160,6 +160,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     return column_entry;
 }
 
+// TODO FIX
 UniquePtr<BlockColumnEntry> BlockColumnEntry::ApplyBlockColumnSnapshot(BlockEntry *block_entry,
                                                                        BlockColumnSnapshotInfo *block_column_snapshot_info,
                                                                        TransactionID txn_id,

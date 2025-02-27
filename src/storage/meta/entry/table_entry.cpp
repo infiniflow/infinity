@@ -220,6 +220,7 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
     return table_entry;
 }
 
+// TODO
 SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
                                                      const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
                                                      TransactionID txn_id,
@@ -251,49 +252,6 @@ SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
 
     return table_entry;
 }
-
-// SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
-//                                                      const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
-//                                                      TransactionID txn_id,
-//                                                      TxnTimeStamp begin_ts) {
-//     // 初始化表的基本信息
-//     SharedPtr<String> table_entry_dir_ptr = MakeShared<String>(table_snapshot_info->table_entry_dir_);
-//     SharedPtr<String> table_name_ptr = MakeShared<String>(table_snapshot_info->table_name_);
-//     SharedPtr<String> table_comment_ptr = MakeShared<String>(table_snapshot_info->table_comment_);
-//     auto table_entry = MakeShared<TableEntry>(false,
-//                                               std::move(table_entry_dir_ptr),
-//                                               std::move(table_name_ptr),
-//                                               std::move(table_comment_ptr),
-//                                               table_snapshot_info->columns_,
-//                                               TableEntryType::kTableEntry,
-//                                               table_meta,
-//                                               txn_id,
-//                                               begin_ts,
-//                                               table_snapshot_info->unsealed_id_,
-//                                               table_snapshot_info->next_segment_id_,
-//                                               table_snapshot_info->next_column_id_);
-//     table_entry->row_count_.store(table_snapshot_info->row_count_);
-//
-//     // restore segment data
-//     for (const auto &segment_pair : table_snapshot_info->segment_snapshots_) {
-//         SegmentID segment_id = segment_pair.first;
-//         SegmentSnapshotInfo *segment_snapshot = segment_pair.second.get();
-//         SharedPtr<SegmentEntry> segment_entry = SegmentEntry::ApplySegmentSnapshot(table_entry.get(), segment_snapshot, txn_id, begin_ts);
-//         table_entry->segment_map_.emplace(segment_id, segment_entry);
-//     }
-//
-//     // restore index data
-//     for (const auto &index_pair : table_snapshot_info->table_index_snapshots_) {
-//         const String &index_name = index_pair.first;
-//         const SharedPtr<TableIndexSnapshotInfo> &index_snapshot = index_pair.second;
-//
-//         // from table index
-//         SharedPtr<TableIndexEntry> index_entry = TableIndexEntry::ApplyTableIndexSnapshot(table_entry.get(), index_snapshot, txn_id, begin_ts);
-//         table_entry->index_map_.emplace(index_name, index_entry);
-//     }
-//
-//     return table_entry;
-// }
 
 SharedPtr<TableInfo> TableEntry::GetTableInfo(Txn *txn) {
     SharedPtr<TableInfo> table_info = MakeShared<TableInfo>();

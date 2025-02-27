@@ -148,16 +148,16 @@ public:
     void ToMmap();
 
 private:
-    const BlockEntry *block_entry_{nullptr};
-    ColumnID column_id_{};
-    SharedPtr<DataType> column_type_{};
-    BufferObj *buffer_{};
+        const BlockEntry *block_entry_{nullptr};
+        ColumnID column_id_{};
+        SharedPtr<DataType> column_type_{};
+        BufferObj *buffer_{};
 
-    SharedPtr<String> filename_{};
+        SharedPtr<String> filename_{};
 
-    mutable std::shared_mutex mutex_{};
-    Vector<BufferObj *> outline_buffers_;
-    u64 last_chunk_offset_{};
+        mutable std::shared_mutex mutex_{};
+        Vector<BufferObj *> outline_buffers_;
+        u64 last_chunk_offset_{};
 };
 
 } // namespace infinity

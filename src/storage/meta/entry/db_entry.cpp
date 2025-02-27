@@ -172,20 +172,20 @@ void DBEntry::CreateTableReplay(
 }
 
 
-Status DBEntry::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
-    auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, MakeShared<String>(table_snapshot_info->table_name_), this); };
-    LOG_TRACE(fmt::format("Adding new table entry: {}", table_snapshot_info->table_name_));
+    Status DBEntry::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn *txn_ptr) {
+        auto init_table_meta = [&]() { return TableMeta::NewTableMeta(this->db_entry_dir_, MakeShared<String>(table_snapshot_info->table_name_), this); };
+        LOG_TRACE(fmt::format("Adding new table entry: {}", table_snapshot_info->table_name_));
 
-    auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_snapshot_info->table_name_, std::move(init_table_meta));
+        auto [table_meta, r_lock] = this->table_meta_map_.GetMeta(table_snapshot_info->table_name_, std::move(init_table_meta));
 
-    auto restore_table_snapshot = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
-        return TableEntry::ApplyTableSnapshot(table_meta, table_snapshot_info, txn_id, begin_ts);
-    };
+        auto restore_table_snapshot = [&]() {
+            return TableEntry::ApplyTableSnapshot(table_meta, table_snapshot_info, txn_ptr->TxnID(),txn_ptr->BeginTS());
+        };
 
-    table_meta->ApplyTableSnapshot(restore_table_snapshot, txn_id, begin_ts);
+        table_meta->ApplyTableSnapshot(restore_table_snapshot, txn_ptr);
 
-    return Status::OK();
-}
+        return Status::OK();
+    }
 
 void DBEntry::UpdateTableReplay(
     const SharedPtr<String> &table_name,

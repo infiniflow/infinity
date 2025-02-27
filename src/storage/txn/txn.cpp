@@ -818,6 +818,7 @@ TxnTimeStamp Txn::Commit() {
         RecoverableError(Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("Txn conflict reason: {}.", *conflict_reason)));
     }
 
+
     // Put wal entry to the manager in the same order as commit_ts.
     wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
     txn_mgr_->SendToWAL(this);
