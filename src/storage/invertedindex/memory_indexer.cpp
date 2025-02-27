@@ -32,7 +32,7 @@ module;
 module memory_indexer;
 
 import stl;
-
+import status;
 import index_defines;
 import posting_writer;
 import column_vector;
@@ -349,6 +349,11 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
         tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
         tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
+    } else {
+        Status status = VirtualStore::MakeDirectory(index_dir_);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
     }
 
     SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(tmp_posting_file, 128000);
