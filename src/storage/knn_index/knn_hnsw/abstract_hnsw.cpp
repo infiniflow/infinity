@@ -226,7 +226,11 @@ HnswIndexInMem::~HnswIndexInMem() {
         },
         hnsw_);
     if (trace_) {
-        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+        auto *storage = InfinityContext::instance().storage();
+        if (storage == nullptr) {
+            return;
+        }
+        auto *memindex_tracer = storage->memindex_tracer();
         if (memindex_tracer != nullptr) {
             memindex_tracer->DecreaseMemUsed(mem_usage);
         }
@@ -274,6 +278,52 @@ void HnswIndexInMem::InsertVecs(SizeT block_offset,
                                                                                 buffer_manager,
                                                                                 row_offset,
                                                                                 row_count);
+                            InsertVecs(index, std::move(iter), config, mem_usage);
+                            break;
+                        }
+                        default: {
+                            UnrecoverableError(fmt::format("Unsupported column type for HNSW index: {}", column_data_type->ToString()));
+                            break;
+                        }
+                    }
+                    this->IncreaseMemoryUsageBase(mem_usage);
+                } else {
+                    UnrecoverableError("HnswIndexInMem::InsertVecs: index does not own memory");
+                }
+            }
+        },
+        hnsw_);
+}
+
+void HnswIndexInMem::InsertVecs(SegmentOffset block_offset,
+                                const ColumnVector &col,
+                                BlockOffset offset,
+                                BlockOffset row_count,
+                                const HnswInsertConfig &config) {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return;
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    using DataType = typename IndexT::DataType;
+                    SizeT mem_usage{};
+                    switch (const auto &column_data_type = col.data_type(); column_data_type->type()) {
+                        case LogicalType::kEmbedding: {
+                            // MemIndexInserterIter<DataType> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+                            MemIndexInserterIter1<DataType> iter(block_offset, col, offset, row_count);
+                            InsertVecs(index, std::move(iter), config, mem_usage);
+                            break;
+                        }
+                        case LogicalType::kMultiVector: {
+                            MemIndexInserterIter1<MultiVectorRef<DataType>> iter(block_offset, col, offset, row_count);
+                            // MemIndexInserterIter<MultiVectorRef<DataType>> iter(block_offset,
+                            //                                                     block_column_entry,
+                            //                                                     buffer_manager,
+                            //                                                     row_offset,
+                            //                                                     row_count);
                             InsertVecs(index, std::move(iter), config, mem_usage);
                             break;
                         }

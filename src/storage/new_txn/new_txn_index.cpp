@@ -52,6 +52,7 @@ import index_defines;
 import index_full_text;
 import column_index_reader;
 import column_index_merger;
+import abstract_hnsw;
 
 namespace infinity {
 
@@ -512,6 +513,22 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                 memory_ivf_index = mem_index->memory_ivf_index_;
             }
             memory_ivf_index->InsertBlockData(base_row_id.segment_offset_, col, offset, row_cnt);
+            break;
+        }
+        case IndexType::kHnsw: {
+            SharedPtr<HnswIndexInMem> memory_hnsw_index;
+            {
+                std::unique_lock<std::mutex> lock(mem_index->mtx_);
+                if (mem_index->memory_hnsw_index_.get() == nullptr) {
+                    auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    mem_index->memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_def.get(), column_def.get(), nullptr, true /*trace*/);
+                }
+                memory_hnsw_index = mem_index->memory_hnsw_index_;
+            }
+            memory_hnsw_index->InsertVecs(base_row_id.segment_offset_, col, offset, row_cnt);
             break;
         }
         default: {

@@ -49,6 +49,7 @@ class BufferManager;
 struct ChunkIndexEntry;
 struct SegmentIndexEntry;
 struct BlockColumnEntry;
+class ColumnVector;
 
 export using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset> *,
                                          KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset> *,
@@ -160,6 +161,12 @@ public:
                     BufferManager *buffer_manager,
                     SizeT row_offset,
                     SizeT row_count,
+                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
+
+    void InsertVecs(SegmentOffset block_offset,
+                    const ColumnVector &col,
+                    BlockOffset offset,
+                    BlockOffset row_count,
                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
     void InsertVecs(const SegmentEntry *segment_entry,
