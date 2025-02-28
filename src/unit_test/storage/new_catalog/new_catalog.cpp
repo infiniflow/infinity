@@ -7149,14 +7149,41 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         EXPECT_TRUE(status.ok());
     };
     dump_index(*index_name1);
-    merge_index(*index_name1);
-    check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_EQ(mem_index->memory_secondary_index_, nullptr); });
     dump_index(*index_name2);
-    merge_index(*index_name2);
-    check_index2(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_EQ(mem_index->memory_indexer_, nullptr); });
     dump_index(*index_name3);
+    dump_index(*index_name4);
+
+    append_a_block();
+
+    merge_index(*index_name1);
+    merge_index(*index_name2);
     merge_index(*index_name3);
-    check_index2(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_EQ(mem_index->memory_ivf_index_, nullptr); });
+    merge_index(*index_name4);
+
+    check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index2(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index2(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index2(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
 }
 
 TEST_P(NewCatalogTest, test_populate_index) {

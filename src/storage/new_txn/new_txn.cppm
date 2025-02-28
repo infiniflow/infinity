@@ -80,6 +80,7 @@ class TableMeeta;
 class ChunkIndexMeta;
 class SegmentIndexMeta;
 class TableIndexMeeta;
+struct MemIndex;
 
 export class NewTxnGetVisibleRangeState {
 public:
@@ -414,6 +415,13 @@ private:
                                  ChunkID &new_chunk_id);
 
     Status OptimizeFtIndex(SharedPtr<IndexBase> index_def, SegmentIndexMeta &segment_index_meta, RowID &base_rowid, u32 &row_cnt, String &base_name);
+
+    Status OptimizeVecIndex(SharedPtr<IndexBase> index_def,
+                            SharedPtr<ColumnDef> column_def,
+                            SegmentMeta &segment_meta,
+                            RowID base_rowid,
+                            u32 row_cnt,
+                            BufferObj *buffer_obj);
 
     Status DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id);
 

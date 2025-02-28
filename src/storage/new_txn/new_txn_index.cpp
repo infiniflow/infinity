@@ -54,6 +54,7 @@ import index_full_text;
 import column_index_reader;
 import column_index_merger;
 import abstract_hnsw;
+import index_hnsw;
 
 namespace infinity {
 
@@ -118,12 +119,15 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
         if (!status.ok()) {
             return status;
         }
+        if (old_chunk_ids_ptr->size() <= 1) {
+            return Status::OK();
+        }
     }
     RowID base_rowid;
     u32 row_cnt = 0;
-    Vector<Pair<u32, BufferObj *>> old_buffers;
+    Vector<SizeT> row_cnts;
+
     String base_name;
-    SizeT index_size = 0;
     SharedPtr<IndexBase> index_base;
     {
         Status status = table_index_meta.GetIndexDef(index_base);
@@ -153,15 +157,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             }
             last_rowid.segment_offset_ += chunk_info_ptr->row_cnt_;
             row_cnt += chunk_info_ptr->row_cnt_;
-
-            BufferObj *buffer_obj = nullptr;
-            {
-                Status status = this->GetChunkIndex(old_chunk_meta, buffer_obj);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-            old_buffers.emplace_back(chunk_info_ptr->row_cnt_, buffer_obj);
+            row_cnts.push_back(chunk_info_ptr->row_cnt_);
         }
     }
     Vector<ChunkID> deprecate_ids = *old_chunk_ids_ptr;
@@ -180,13 +176,28 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     BufferObj *buffer_obj = nullptr;
     {
         Status status =
-            this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, base_name, index_size, chunk_index_meta, buffer_obj);
+            this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, base_name, 0 /*index_size*/, chunk_index_meta, buffer_obj);
         if (!status.ok()) {
             return status;
         }
     }
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
+            Vector<Pair<u32, BufferObj *>> old_buffers;
+            for (SizeT i = 0; i < deprecate_ids.size(); ++i) {
+                ChunkID old_chunk_id = deprecate_ids[i];
+                ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta, segment_index_meta.kv_instance());
+
+                BufferObj *buffer_obj = nullptr;
+                {
+                    Status status = this->GetChunkIndex(old_chunk_meta, buffer_obj);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                }
+                old_buffers.emplace_back(row_cnts[i], buffer_obj);
+            }
+
             BufferHandle buffer_handle = buffer_obj->Load();
             auto *data_ptr = static_cast<SecondaryIndexData *>(buffer_handle.GetDataMut());
             data_ptr->InsertMergeData(old_buffers);
@@ -210,6 +221,22 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             BufferHandle buffer_handle = buffer_obj->Load();
             auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
             data_ptr->BuildIVFIndex(this, segment_meta, row_cnt, column_def);
+            break;
+        }
+        case IndexType::kHnsw: {
+            SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+            SharedPtr<ColumnDef> column_def;
+            {
+                auto [col_def, status] = table_index_meta.GetColumnDef();
+                if (!status.ok()) {
+                    return status;
+                }
+                column_def = std::move(col_def);
+            }
+            Status status = OptimizeVecIndex(index_base, column_def, segment_meta, base_rowid, row_cnt, buffer_obj);
+            if (!status.ok()) {
+                return status;
+            }
             break;
         }
         default: {
@@ -878,6 +905,61 @@ Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_def,
     // table_index_entry->UpdateFulltextSegmentTs(ts);
     LOG_INFO(fmt::format("done merging {} {}", *index_fulltext->index_name_, dst_base_name));
 
+    return Status::OK();
+}
+
+Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_def,
+                                SharedPtr<ColumnDef> column_def,
+                                SegmentMeta &segment_meta,
+                                RowID base_rowid,
+                                u32 total_row_cnt,
+                                BufferObj *buffer_obj) {
+    if (index_def->index_type_ == IndexType::kHnsw) {
+        const auto *index_hnsw = static_cast<const IndexHnsw *>(index_def.get());
+        if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
+            UnrecoverableError("Not implemented yet");
+        }
+
+        UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_def.get(), column_def.get(), nullptr);
+
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        {
+            Status status = segment_meta.GetBlockIDs(block_ids_ptr);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+            SizeT block_row_cnt = 0;
+            {
+                Status status = block_meta.GetRowCnt(block_row_cnt);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+            SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
+            total_row_cnt -= row_cnt;
+            ColumnVector col;
+            {
+                Status status = this->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            u32 offset = 0;
+            memory_hnsw_index->InsertVecs(base_rowid.segment_offset_, col, offset, row_cnt);
+        }
+
+        memory_hnsw_index->Dump(buffer_obj);
+        buffer_obj->Save();
+        if (buffer_obj->type() != BufferType::kMmap) {
+            buffer_obj->ToMmap();
+        }
+    } else {
+        UnrecoverableError("Not implemented yet");
+    }
     return Status::OK();
 }
 
