@@ -624,6 +624,8 @@ void TxnStore::DropTableStore(TableEntry *dropped_table_entry) {
 
 void TxnStore::AddTableToRestore(TableEntry *table_entry) { to_restore_tables_.emplace_back(table_entry); }
 
+void TxnStore::AddTableIndexToRestore(TableIndexEntry *table_index_entry) { to_restore_table_indexes_.emplace_back(table_index_entry); }
+
 void TxnStore::AddDBToRestore(DBEntry *db_entry) { to_restore_dbs_.emplace_back(db_entry); }
 
 TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
@@ -770,6 +772,11 @@ void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts) {
                 block_entry->CommitApplySnapshot(txn_id, commit_ts);
             }
         }
+    }
+
+    // Commit restored tables indexes
+    for (auto table_index_entry : to_restore_table_indexes_) {
+        table_index_entry->Commit(commit_ts);
     }
 
     // Commit restore databases

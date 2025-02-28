@@ -75,6 +75,7 @@ nlohmann::json BlockSnapshotInfo::Serialize() {
     json_res["row_count"] = row_count_;
     json_res["min_row_ts"] = min_row_ts_;
     json_res["max_row_ts"] = max_row_ts_;
+    json_res["row_capacity"] = row_capacity_;
     for (const auto &column_block_snapshot : column_block_snapshots_) {
         json_res["columns"].emplace_back(column_block_snapshot->Serialize());
     }
@@ -87,6 +88,7 @@ SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(const nlohmann::json
     block_snapshot->block_dir_ = block_json["block_dir"];
     block_snapshot->min_row_ts_ = block_json["min_row_ts"];
     block_snapshot->max_row_ts_ = block_json["max_row_ts"];
+    block_snapshot->row_capacity_ = block_json["row_capacity"];
     for (const auto &column_block_json : block_json["columns"]) {
         auto column_block_snapshot = BlockColumnSnapshotInfo::Deserialize(column_block_json);
         block_snapshot->column_block_snapshots_.emplace_back(column_block_snapshot);

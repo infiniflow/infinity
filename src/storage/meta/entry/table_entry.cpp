@@ -221,7 +221,6 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
     return table_entry;
 }
 
-// TODO (mayang) add index_meta :table_index_snapshots_{};
 SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn *txn_ptr) {
     TransactionID txn_id = txn_ptr->TxnID();
     TxnTimeStamp begin_ts = txn_ptr->BeginTS();
@@ -262,7 +261,6 @@ SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta, cons
 
         table_index_meta->ApplyTableIndexSnapshot(restore_table_index_snapshot, txn_ptr);
     }
-
 
     return table_entry;
 }

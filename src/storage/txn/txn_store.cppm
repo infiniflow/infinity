@@ -233,6 +233,8 @@ public:
 
     void AddTableToRestore(TableEntry *table_entry);
 
+    void AddTableIndexToRestore(TableIndexEntry *table_index_entry);
+
     void AddDBToRestore(DBEntry *db_entry);
 
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
@@ -281,6 +283,7 @@ private:
     Vector<UniquePtr<std::binary_semaphore>> semas_{};
 
     Vector<TableEntry *> to_restore_tables_ {};
+    Vector<TableIndexEntry *> to_restore_table_indexes_ {};
     Vector<DBEntry *> to_restore_dbs_ {};
 };
 

@@ -99,6 +99,8 @@ TableIndexMeta::CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(Table
 
 Status TableIndexMeta::ApplyTableIndexSnapshot(std::function<SharedPtr<TableIndexEntry>()> &&restore_entry, Txn *txn_ptr) {
     auto [entry, status] = index_entry_list_.ApplySnapshot(std::move(restore_entry), txn_ptr->TxnID(), txn_ptr->BeginTS());
+    //add entry to to_restore_table_indexes_ for commit ts
+    txn_ptr->txn_store()->AddTableIndexToRestore(entry);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
