@@ -226,7 +226,8 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             data_ptr->BuildIVFIndex(this, segment_meta, row_cnt, column_def);
             break;
         }
-        case IndexType::kHnsw: {
+        case IndexType::kHnsw:
+        case IndexType::kBMP: {
             SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
             SharedPtr<ColumnDef> column_def;
             {
@@ -947,6 +948,14 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_def,
                                 RowID base_rowid,
                                 u32 total_row_cnt,
                                 BufferObj *buffer_obj) {
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    {
+        Status status = segment_meta.GetBlockIDs(block_ids_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
     if (index_def->index_type_ == IndexType::kHnsw) {
         const auto *index_hnsw = static_cast<const IndexHnsw *>(index_def.get());
         if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
@@ -954,14 +963,6 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_def,
         }
 
         UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_def.get(), column_def.get(), nullptr);
-
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        {
-            Status status = segment_meta.GetBlockIDs(block_ids_ptr);
-            if (!status.ok()) {
-                return status;
-            }
-        }
         for (BlockID block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
@@ -986,6 +987,36 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_def,
         }
 
         memory_hnsw_index->Dump(buffer_obj);
+        buffer_obj->Save();
+        if (buffer_obj->type() != BufferType::kMmap) {
+            buffer_obj->ToMmap();
+        }
+    } else if (index_def->index_type_ == IndexType::kBMP) {
+        auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_def.get(), column_def.get(), nullptr);
+
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+            SizeT block_row_cnt = 0;
+            {
+                Status status = block_meta.GetRowCnt(block_row_cnt);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+            SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
+            total_row_cnt -= row_cnt;
+            ColumnVector col;
+            {
+                Status status = this->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            u32 offset = 0;
+            memory_bmp_index->AddDocs(base_rowid.segment_offset_, col, offset, row_cnt);
+        }
+        memory_bmp_index->Dump(buffer_obj);
         buffer_obj->Save();
         if (buffer_obj->type() != BufferType::kMmap) {
             buffer_obj->ToMmap();

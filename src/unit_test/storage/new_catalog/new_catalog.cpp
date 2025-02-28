@@ -7171,6 +7171,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     dump_index(*index_name2);
     dump_index(*index_name3);
     dump_index(*index_name4);
+    dump_index(*index_name5);
 
     append_a_block();
 
@@ -7178,6 +7179,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     merge_index(*index_name2);
     merge_index(*index_name3);
     merge_index(*index_name4);
+    merge_index(*index_name5);
 
     check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
@@ -7200,6 +7202,12 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     check_index2(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index2(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
         EXPECT_EQ(begin_id, RowID(0, 4));
         EXPECT_EQ(row_cnt, 2);
     });
