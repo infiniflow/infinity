@@ -751,8 +751,7 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         return Status::OK();
     }
 
-    SharedPtr<String> local_index_dir = DetermineRandomPath(*index_base->index_name_);
-    SharedPtr<WalCmdCreateIndex> wal_command = MakeShared<WalCmdCreateIndex>(db_name, table_name, std::move(*local_index_dir), index_base);
+    SharedPtr<WalCmdCreateIndex> wal_command = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_base);
     wal_command->db_id_ = std::move(db_id);
     wal_command->table_id_ = std::move(table_id);
     wal_entry_->cmds_.push_back(wal_command);

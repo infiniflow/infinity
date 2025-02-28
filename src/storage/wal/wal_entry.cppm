@@ -270,6 +270,9 @@ export struct WalCmdCreateIndex final : public WalCmd {
         assert(!std::filesystem::path(index_dir_tail_).is_absolute());
     }
 
+    WalCmdCreateIndex(String db_name, String table_name, SharedPtr<IndexBase> index_base)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_base_(std::move(index_base)) {}
+
     WalCommandType GetType() const final { return WalCommandType::CREATE_INDEX; }
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;

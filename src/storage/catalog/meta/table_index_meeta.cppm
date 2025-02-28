@@ -48,7 +48,7 @@ public:
 
     Status AddSegmentID(SegmentID segment_id);
 
-    Status InitSet(SharedPtr<IndexBase> index_def, const String &index_dir);
+    Status InitSet(SharedPtr<IndexBase> index_def);
 
 private:
     Status LoadIndexDef();
@@ -66,7 +66,6 @@ private:
     String index_id_str_;
 
     SharedPtr<IndexBase> index_def_;
-    SharedPtr<String> index_dir_;
     Optional<Vector<SegmentID>> segment_ids_;
 };
 

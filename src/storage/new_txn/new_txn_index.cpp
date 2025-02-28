@@ -1000,7 +1000,7 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
     TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance_);
     {
-        Status status = table_index_meta.InitSet(create_index_cmd->index_base_, create_index_cmd->index_dir_tail_);
+        Status status = table_index_meta.InitSet(create_index_cmd->index_base_);
         if (!status.ok()) {
             return status;
         }

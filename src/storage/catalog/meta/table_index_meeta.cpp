@@ -91,7 +91,7 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_def, const String &index_dir) {
+Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_def) {
     {
         Status status = SetSegmentIDs({});
         if (!status.ok()) {
