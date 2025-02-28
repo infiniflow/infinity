@@ -57,6 +57,7 @@ import abstract_hnsw;
 import index_hnsw;
 import abstract_bmp;
 import index_bmp;
+import bmp_index_file_worker;
 
 namespace infinity {
 
@@ -361,6 +362,19 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                 buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
                 break;
             }
+            case IndexType::kBMP: {
+                auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+                auto file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                  index_dir,
+                                                                  std::move(bmp_index_file_name),
+                                                                  index_base,
+                                                                  column_def,
+                                                                  buffer_mgr->persistence_manager(),
+                                                                  index_size);
+                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+                break;
+            }
             default: {
                 UnrecoverableError("Not implemented yet");
             }
@@ -647,7 +661,8 @@ Status NewTxn::PopulateIndex(const String &db_name,
     } else {
         switch (index_def->index_type_) {
             case IndexType::kSecondary:
-            case IndexType::kHnsw: {
+            case IndexType::kHnsw:
+            case IndexType::kBMP: {
                 Status status = this->PopulateIndexToMem(*segment_index_meta, segment_meta, column_id);
                 if (!status.ok()) {
                     return status;
@@ -1042,6 +1057,12 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
             index_size = mem_index->memory_hnsw_index_->GetSizeInBytes();
             break;
         }
+        case IndexType::kBMP: {
+            row_id = mem_index->memory_bmp_index_->GetBeginRowID();
+            row_count = mem_index->memory_bmp_index_->GetRowCount();
+            index_size = mem_index->memory_bmp_index_->GetSizeInBytes();
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -1075,9 +1096,16 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
             buffer_obj->Save();
             break;
         }
-        // case IndexType::kBMP:
         case IndexType::kHnsw: {
             mem_index->memory_hnsw_index_->Dump(buffer_obj);
+            buffer_obj->Save();
+            if (buffer_obj->type() != BufferType::kMmap) {
+                buffer_obj->ToMmap();
+            }
+            break;
+        }
+        case IndexType::kBMP: {
+            mem_index->memory_bmp_index_->Dump(buffer_obj);
             buffer_obj->Save();
             if (buffer_obj->type() != BufferType::kMmap) {
                 buffer_obj->ToMmap();
@@ -1133,7 +1161,8 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
     switch (index_base->index_type_) {
         case IndexType::kSecondary:
         case IndexType::kIVF:
-        case IndexType::kHnsw: {
+        case IndexType::kHnsw:
+        case IndexType::kBMP: {
             String index_file_name = IndexFileName(segment_id, chunk_id);
             String index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
             buffer_obj = buffer_mgr->GetBufferObject(index_filepath);

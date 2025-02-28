@@ -6964,8 +6964,8 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         {
             auto col4 = ColumnVector::Make(column_def4->type());
             col4->Initialize();
-            Pair<Vector<int32_t>, Vector<float>> vec{Vector<int32_t>{100, 1000, 10000, 100000}, Vector<float>{1.0, 2.0, 3.0, 4.0}};
-            Pair<Vector<int32_t>, Vector<float>> vec2{Vector<int32_t>{100, 2000, 10000, 200000}, Vector<float>{1.0, 2.0, 3.0, 4.0}};
+            Pair<Vector<float>, Vector<int32_t>> vec{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 1000, 10000, 20000}};
+            Pair<Vector<float>, Vector<int32_t>> vec2{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 2000, 10000, 20000}};
             col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
                                                 reinterpret_cast<const char *>(vec.second.data()),
                                                 vec.first.size(),
@@ -7000,6 +7000,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     dump_index(*index_name2);
     dump_index(*index_name3);
     dump_index(*index_name4);
+    dump_index(*index_name5);
     append_a_block();
     // new_txn_mgr->PrintAllKeyValue();
 
@@ -7093,6 +7094,12 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 2));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
         EXPECT_EQ(begin_id, RowID(0, 2));
         EXPECT_EQ(row_cnt, 2);
     });
@@ -7286,8 +7293,8 @@ TEST_P(NewCatalogTest, test_populate_index) {
         {
             auto col4 = ColumnVector::Make(column_def4->type());
             col4->Initialize();
-            Pair<Vector<int32_t>, Vector<float>> vec{Vector<int32_t>{100, 1000, 10000, 100000}, Vector<float>{1.0, 2.0, 3.0, 4.0}};
-            Pair<Vector<int32_t>, Vector<float>> vec2{Vector<int32_t>{100, 2000, 10000, 200000}, Vector<float>{1.0, 2.0, 3.0, 4.0}};
+            Pair<Vector<float>, Vector<int32_t>> vec{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 1000, 10000, 20000}};
+            Pair<Vector<float>, Vector<int32_t>> vec2{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 2000, 10000, 20000}};
             col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
                                                 reinterpret_cast<const char *>(vec.second.data()),
                                                 vec.first.size(),
@@ -7324,7 +7331,7 @@ TEST_P(NewCatalogTest, test_populate_index) {
     create_index(index_def2);
     create_index(index_def3);
     create_index(index_def4);
-    // create_index(index_def5);
+    create_index(index_def5);
     append_a_block();
 
     auto check_index = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
@@ -7400,6 +7407,12 @@ TEST_P(NewCatalogTest, test_populate_index) {
     check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
         EXPECT_EQ(begin_id, RowID(0, 4));
         EXPECT_EQ(row_cnt, 2);
     });
