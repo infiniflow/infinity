@@ -872,6 +872,11 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
             row_count = mem_index->memory_indexer_->GetDocCount();
             break;
         }
+        case IndexType::kIVF: {
+            row_id = mem_index->memory_ivf_index_->GetBeginRowID();
+            row_count = mem_index->memory_ivf_index_->GetRowCount();
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -898,6 +903,11 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
             if (!status.ok()) {
                 return status;
             }
+            break;
+        }
+        case IndexType::kIVF: {
+            mem_index->memory_ivf_index_->Dump(buffer_obj);
+            buffer_obj->Save();
             break;
         }
         // case IndexType::kHnsw:
@@ -971,6 +981,15 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
             }
             auto column_length_file_name = chunk_info_ptr->base_name_ + LENGTH_SUFFIX;
             String index_filepath = fmt::format("{}/{}", index_dir, column_length_file_name);
+            buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
+            if (buffer_obj == nullptr) {
+                return Status::BufferManagerError("GetBufferObject failed");
+            }
+            break;
+        }
+        case IndexType::kIVF: {
+            String ivf_index_file_name = IndexFileName(segment_id, chunk_id);
+            String index_filepath = fmt::format("{}/{}", index_dir, ivf_index_file_name);
             buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
             if (buffer_obj == nullptr) {
                 return Status::BufferManagerError("GetBufferObject failed");

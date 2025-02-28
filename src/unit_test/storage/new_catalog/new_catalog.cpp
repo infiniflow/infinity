@@ -6953,41 +6953,36 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         input_block->Finalize();
     }
     auto append_a_block = [&] {
-        {
-            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
-            Status status = txn->Append(*db_name, *table_name, input_block);
-            EXPECT_TRUE(status.ok());
-            status = new_txn_mgr->CommitTxn(txn);
-            EXPECT_TRUE(status.ok());
-        }
+        Status status = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
     };
-    append_a_block();
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index1"), TransactionType::kNormal);
+    auto dump_index = [&](const String &index_name) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
         SegmentID segment_id = 0;
-        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index2"), TransactionType::kNormal);
-        SegmentID segment_id = 0;
-        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name2, segment_id);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    };
+
     append_a_block();
-    new_txn_mgr->PrintAllKeyValue();
-    {
+    dump_index(*index_name1);
+    dump_index(*index_name2);
+    dump_index(*index_name3);
+    append_a_block();
+    // new_txn_mgr->PrintAllKeyValue();
+
+    auto check_index = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
         String index_key;
         String index_id_str;
         String table_id_str;
         String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, *index_name1, index_key, index_id_str, table_id_str, db_id_str);
+        Status status = txn->GetIndexID(*db_name, *table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
         TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 
@@ -7006,13 +7001,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
         EXPECT_TRUE(status.ok());
-
-        {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-            EXPECT_EQ(begin_id, RowID(0, 2));
-            EXPECT_EQ(row_cnt, 2);
-        }
+        check_mem_index(mem_index);
 
         // int32_t begin_val = 2;
         // int32_t end_val = 3;
@@ -7055,88 +7044,41 @@ TEST_P(NewCatalogTest, test_append_with_index) {
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index2"), TransactionType::kNormal);
+    };
+    check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 2));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+        EXPECT_EQ(begin_id, RowID(0, 2));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 2));
+        EXPECT_EQ(row_cnt, 2);
+    });
+
+    auto merge_index = [&](const String &index_name) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("merge index {}", index_name)), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->OptimizeIndex(*db_name, *table_name, index_name, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    auto check_index2 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check merged index {}", index_name)), TransactionType::kNormal);
         String index_key;
         String index_id_str;
         String table_id_str;
         String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, *index_name2, index_key, index_id_str, table_id_str, db_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
-
-        SegmentID segment_id = 0;
-        {
-            auto [segment_ids, status] = table_meta.GetSegmentIDs();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
-        }
-
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
-
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
-
-        {
-            RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
-            u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
-            EXPECT_EQ(begin_id, RowID(0, 2));
-            EXPECT_EQ(row_cnt, 2);
-        }
-
-        ChunkID chunk_id = 0;
-        {
-            Vector<ChunkID> *chunk_ids = nullptr;
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_ids->size(), 1);
-            chunk_id = chunk_ids->at(0);
-            EXPECT_EQ(chunk_id, 0);
-        }
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
-        {
-            ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_info->row_cnt_, 2);
-            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
-        }
-
-        BufferObj *buffer_obj = nullptr;
-        status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index1"), TransactionType::kNormal);
-        SegmentID segment_id = 0;
-        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("merge index1"), TransactionType::kNormal);
-        SegmentID segment_id = 0;
-        Status status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check merged index1"), TransactionType::kNormal);
-        String index_key;
-        String index_id_str;
-        String table_id_str;
-        String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, *index_name1, index_key, index_id_str, table_id_str, db_id_str);
+        Status status = txn->GetIndexID(*db_name, *table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
         SegmentID segment_id = 0;
 
@@ -7147,7 +7089,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(mem_index->memory_secondary_index_, nullptr);
+        check_mem_index(mem_index);
 
         ChunkID chunk_id = 0;
         {
@@ -7184,67 +7126,13 @@ TEST_P(NewCatalogTest, test_append_with_index) {
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("dump mem index2"), TransactionType::kNormal);
-        SegmentID segment_id = 0;
-        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name2, segment_id);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("merge index2"), TransactionType::kNormal);
-        SegmentID segment_id = 0;
-        Status status = txn->OptimizeIndex(*db_name, *table_name, *index_name2, segment_id);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check merged index2"), TransactionType::kNormal);
-        String index_key;
-        String index_id_str;
-        String table_id_str;
-        String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, *index_name2, index_key, index_id_str, table_id_str, db_id_str);
-        EXPECT_TRUE(status.ok());
-        SegmentID segment_id = 0;
-
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
-
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(mem_index->memory_secondary_index_, nullptr);
-
-        ChunkID chunk_id = 0;
-        {
-            Vector<ChunkID> *chunk_ids = nullptr;
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_ids->size(), 1);
-            chunk_id = chunk_ids->at(0);
-            EXPECT_EQ(chunk_id, 2);
-        }
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
-        {
-            ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_info->row_cnt_, 4);
-            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
-        }
-
-        BufferObj *buffer_obj = nullptr;
-        status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    };
+    dump_index(*index_name1);
+    merge_index(*index_name1);
+    check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_EQ(mem_index->memory_secondary_index_, nullptr); });
+    dump_index(*index_name2);
+    merge_index(*index_name2);
+    check_index2(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_EQ(mem_index->memory_secondary_index_, nullptr); });
 }
 
 TEST_P(NewCatalogTest, test_populate_index) {
@@ -7351,13 +7239,14 @@ TEST_P(NewCatalogTest, test_populate_index) {
         EXPECT_TRUE(status.ok());
     }
     append_a_block();
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
+
+    auto check_index = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
         String index_key;
         String index_id_str;
         String table_id_str;
         String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, *index_name1, index_key, index_id_str, table_id_str, db_id_str);
+        Status status = txn->GetIndexID(*db_name, *table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
         EXPECT_TRUE(status.ok());
         TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
 
@@ -7376,12 +7265,7 @@ TEST_P(NewCatalogTest, test_populate_index) {
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
         EXPECT_TRUE(status.ok());
-        {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-            EXPECT_EQ(begin_id, RowID(0, 4));
-            EXPECT_EQ(row_cnt, 2);
-        }
+        check_mem_index(mem_index);
 
         ChunkID chunk_id = 0;
         {
@@ -7401,60 +7285,29 @@ TEST_P(NewCatalogTest, test_populate_index) {
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
-        status = new_txn_mgr->CommitTxn(txn);
+        BufferObj *buffer_obj = nullptr;
+        status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
         EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index2"), TransactionType::kNormal);
-        String index_key;
-        String index_id_str;
-        String table_id_str;
-        String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, *index_name2, index_key, index_id_str, table_id_str, db_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
-
-        SegmentID segment_id = 0;
-        {
-            auto [segment_ids, status] = table_meta.GetSegmentIDs();
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
-        }
-
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
-
-        SharedPtr<MemIndex> mem_index;
-        status = segment_index_meta.GetMemIndex(mem_index);
-        EXPECT_TRUE(status.ok());
-        {
-            RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
-            u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
-            EXPECT_EQ(begin_id, RowID(0, 4));
-            EXPECT_EQ(row_cnt, 2);
-        }
-
-        ChunkID chunk_id = 0;
-        {
-            Vector<ChunkID> *chunk_ids = nullptr;
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_ids->size(), 1);
-            chunk_id = chunk_ids->at(0);
-            EXPECT_EQ(chunk_id, 0);
-        }
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
-        {
-            ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_info->row_cnt_, 4);
-            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
-        }
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-    }
+    };
+    check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
 }
