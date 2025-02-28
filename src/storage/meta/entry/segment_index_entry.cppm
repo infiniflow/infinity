@@ -245,6 +245,9 @@ public:
     SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo(Txn* txn_ptr) const;
 
     SharedPtr<SegmentIndexSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
+
+    static SharedPtr<SegmentIndexEntry> ApplySnapshotInfo(TableIndexEntry * table_index_entry,SegmentIndexSnapshotInfo *segment_index_snapshot_info,TransactionID txn_id, TxnTimeStamp begin_ts);
+
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id);
 

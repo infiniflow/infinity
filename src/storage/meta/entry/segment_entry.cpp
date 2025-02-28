@@ -144,7 +144,6 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     return segment_entry;
 }
 
-// TODO : add index replay
 SharedPtr<SegmentEntry>
 SegmentEntry::ApplySegmentSnapshot(TableEntry *table_entry, SegmentSnapshotInfo *segment_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts) {
     SharedPtr<String> segment_dir = MakeShared<String>(segment_snapshot_info->segment_dir_);

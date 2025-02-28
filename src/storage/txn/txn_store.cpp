@@ -767,7 +767,7 @@ void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts) {
         for (auto &segment_pair : table_entry->segment_map()) {
             segment_pair.second->Commit(commit_ts);
             for (auto &block_entry : segment_pair.second->block_entries()) {
-                block_entry->CommitApplySnapshot(commit_ts);
+                block_entry->CommitApplySnapshot(txn_id, commit_ts);
             }
         }
     }

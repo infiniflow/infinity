@@ -69,6 +69,7 @@ import expression_evaluator;
 import column_vector;
 import expression_state;
 import snapshot_info;
+import table_index_entry;
 
 namespace infinity {
 
@@ -220,12 +221,10 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
     return table_entry;
 }
 
-// TODO
-SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
-                                                     const SharedPtr<TableSnapshotInfo> &table_snapshot_info,
-                                                     TransactionID txn_id,
-                                                     TxnTimeStamp begin_ts) {
-
+// TODO (mayang) add index_meta :table_index_snapshots_{};
+SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn *txn_ptr) {
+    TransactionID txn_id = txn_ptr->TxnID();
+    TxnTimeStamp begin_ts = txn_ptr->BeginTS();
     SharedPtr<String> table_entry_dir_ptr = MakeShared<String>(table_snapshot_info->table_entry_dir_);
     SharedPtr<String> table_name_ptr = MakeShared<String>(table_snapshot_info->table_name_);
     SharedPtr<String> table_comment_ptr = MakeShared<String>(table_snapshot_info->table_comment_);
@@ -249,6 +248,21 @@ SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta,
         SharedPtr<SegmentEntry> segment_entry = SegmentEntry::ApplySegmentSnapshot(table_entry.get(), segment_snapshot, txn_id, begin_ts);
         table_entry->segment_map_.emplace(segment_id, segment_entry);
     }
+
+    for (const auto &index_pair : table_snapshot_info->table_index_snapshots_) {
+        SharedPtr<String> index_name_ptr = MakeShared<String>(index_pair.first);
+        TableIndexSnapshotInfo *table_index_snapshot_info = index_pair.second.get();
+        auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(table_entry.get(), index_name_ptr); };
+
+        auto [table_index_meta, r_lock] = table_entry->index_meta_map_.GetMeta(table_snapshot_info->table_name_, std::move(init_index_meta));
+
+        auto restore_table_index_snapshot = [&]() {
+            return TableIndexEntry::ApplySnapshotInfo(table_index_meta, table_index_snapshot_info, txn_id, begin_ts);
+        };
+
+        table_index_meta->ApplyTableIndexSnapshot(restore_table_index_snapshot, txn_ptr);
+    }
+
 
     return table_entry;
 }
@@ -993,7 +1007,7 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
                                                         buffer_manager,
                                                         nullptr);
                 }
-                //segment_index_entry->MemIndexWaitInflightTasks();
+                // segment_index_entry->MemIndexWaitInflightTasks();
                 InfinityContext::instance().storage()->catalog()->all_memindex_recover_segment_.push_back(segment_index_entry);
                 message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name, segment_id);
                 LOG_INFO(message);

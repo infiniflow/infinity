@@ -38,6 +38,7 @@ import block_version;
 import data_type;
 import parsed_expr;
 import segment_entry;
+import create_index_info;
 
 namespace infinity {
 
@@ -45,6 +46,7 @@ nlohmann::json BlockColumnSnapshotInfo::Serialize() {
     nlohmann::json json_res;
     json_res["column_id"] = column_id_;
     json_res["filename"] = filename_;
+    json_res["last_chunk_offset"] = last_chunk_offset_;
     for (const auto &outline_snapshot : outline_snapshots_) {
         json_res["outlines"].emplace_back(outline_snapshot->filename_);
     }
@@ -55,6 +57,7 @@ SharedPtr<BlockColumnSnapshotInfo> BlockColumnSnapshotInfo::Deserialize(const nl
     auto column_block_snapshot = MakeShared<BlockColumnSnapshotInfo>();
     column_block_snapshot->column_id_ = column_block_json["column_id"];
     column_block_snapshot->filename_ = column_block_json["filename"];
+    column_block_snapshot->last_chunk_offset_ = column_block_json["last_chunk_offset"];
     if (column_block_json.contains("outlines")) {
         for (const auto &outline_snapshot : column_block_json["outlines"]) {
             auto outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
@@ -70,6 +73,7 @@ nlohmann::json BlockSnapshotInfo::Serialize() {
     json_res["block_id"] = block_id_;
     json_res["block_dir"] = block_dir_;
     json_res["row_count"] = row_count_;
+    json_res["min_row_ts"] = min_row_ts_;
     json_res["max_row_ts"] = max_row_ts_;
     for (const auto &column_block_snapshot : column_block_snapshots_) {
         json_res["columns"].emplace_back(column_block_snapshot->Serialize());
@@ -81,6 +85,7 @@ SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(const nlohmann::json
     auto block_snapshot = MakeShared<BlockSnapshotInfo>();
     block_snapshot->block_id_ = block_json["block_id"];
     block_snapshot->block_dir_ = block_json["block_dir"];
+    block_snapshot->min_row_ts_ = block_json["min_row_ts"];
     block_snapshot->max_row_ts_ = block_json["max_row_ts"];
     for (const auto &column_block_json : block_json["columns"]) {
         auto column_block_snapshot = BlockColumnSnapshotInfo::Deserialize(column_block_json);
@@ -126,11 +131,21 @@ SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(const nlohmann::
 
 nlohmann::json ChunkIndexSnapshotInfo::Serialize() {
     nlohmann::json json_res;
+    json_res["chunk_id"] = chunk_id_;
+    json_res["base_name"] = base_name_;
+    for (const auto &file : files_) {
+        json_res["files"].emplace_back(file);
+    }
     return json_res;
 }
 
 SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexSnapshotInfo::Deserialize(const nlohmann::json &chunk_index_json) {
     auto chunk_index_snapshot = MakeShared<ChunkIndexSnapshotInfo>();
+    chunk_index_snapshot->chunk_id_ = chunk_index_json["chunk_id"];
+    chunk_index_snapshot->base_name_ = chunk_index_json["base_name"];
+    for (auto &file : chunk_index_snapshot->files_) {
+        chunk_index_snapshot->files_.emplace_back(file);
+    }
     return chunk_index_snapshot;
 }
 
@@ -356,13 +371,46 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
 
     for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
         for (const auto &segment_index_snapshot_pair : table_index_snapshot_pair.second->index_by_segment_) {
+            SegmentID segment_id=segment_index_snapshot_pair.second->segment_id_;
             for (const auto &chunk_index_snapshot : segment_index_snapshot_pair.second->chunk_index_snapshots_) {
-                if (chunk_index_snapshot->files_.empty()) {
-                    files.emplace_back(
-                        VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, chunk_index_snapshot->base_name_));
-                } else {
-                    files.insert(files.end(), chunk_index_snapshot->files_.cbegin(), chunk_index_snapshot->files_.cend());
+                IndexBase *index_base = table_index_snapshot_pair.second->index_base_.get();
+
+                switch (index_base->index_type_) {
+                    case IndexType::kIVF: {
+                        break;
+                    }
+                    case IndexType::kHnsw: {
+                        break;
+                    }
+                    case IndexType::kBMP: {
+                        break;
+                    }
+                    case IndexType::kFullText: {
+                        break;
+                    }
+                    case IndexType::kSecondary: {
+                        files.emplace_back(
+                VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,fmt::format("seg{}_chunk{}.idx", segment_id, chunk_index_snapshot->chunk_id_) ));
+                        break;
+                    }
+                    case IndexType::kEMVB: {
+                        break;
+                    }
+                    case IndexType::kDiskAnn: {
+                        break;
+                    }
+                    case IndexType::kInvalid: {
+                        UnrecoverableError("Invalid index type");
+                        break;
+                    }
                 }
+
+                // if (chunk_index_snapshot->files_.empty()) {
+                //     files.emplace_back(
+                //         VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, chunk_index_snapshot->index_filename_));
+                // } else {
+                //     files.insert(files.end(), chunk_index_snapshot->files_.cbegin(), chunk_index_snapshot->files_.cend());
+                // }
             }
         }
     }

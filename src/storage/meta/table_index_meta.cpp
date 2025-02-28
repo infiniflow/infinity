@@ -97,6 +97,14 @@ TableIndexMeta::CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(Table
     return entry;
 }
 
+Status TableIndexMeta::ApplyTableIndexSnapshot(std::function<SharedPtr<TableIndexEntry>()> &&restore_entry, Txn *txn_ptr) {
+    auto [entry, status] = index_entry_list_.ApplySnapshot(std::move(restore_entry), txn_ptr->TxnID(), txn_ptr->BeginTS());
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    return Status::OK();
+}
+
 void TableIndexMeta::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     auto [entry, status] = index_entry_list_.GetEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
