@@ -6987,6 +6987,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     dump_index(*index_name1);
     dump_index(*index_name2);
     dump_index(*index_name3);
+    dump_index(*index_name4);
     append_a_block();
     // new_txn_mgr->PrintAllKeyValue();
 
@@ -7074,6 +7075,12 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 2));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
         EXPECT_EQ(begin_id, RowID(0, 2));
         EXPECT_EQ(row_cnt, 2);
     });
@@ -7175,12 +7182,19 @@ TEST_P(NewCatalogTest, test_populate_index) {
     Vector<InitParameter *> index3_parameters;
     index3_parameters.emplace_back(new InitParameter("metric", "l2"));
     index3_parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
+    auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index3_parameters);
+    auto index_name4 = std::make_shared<std::string>("index4");
+    Vector<InitParameter *> index4_parameters;
+    index4_parameters.emplace_back(new InitParameter("metric", "l2"));
+    auto index_def4 = IndexHnsw::Make(index_name4, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index4_parameters);
     DeferFn defer_fn([&] {
         for (auto *parameter : index3_parameters) {
             delete parameter;
         }
+        for (auto *parameter : index4_parameters) {
+            delete parameter;
+        }
     });
-    auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index3_parameters);
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -7255,6 +7269,13 @@ TEST_P(NewCatalogTest, test_populate_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index4"), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def4, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
     append_a_block();
 
     auto check_index = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
@@ -7324,6 +7345,12 @@ TEST_P(NewCatalogTest, test_populate_index) {
     check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+        EXPECT_EQ(begin_id, RowID(0, 4));
+        EXPECT_EQ(row_cnt, 2);
+    });
+    check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
         EXPECT_EQ(begin_id, RowID(0, 4));
         EXPECT_EQ(row_cnt, 2);
     });

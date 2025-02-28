@@ -34,6 +34,7 @@ import infinity_exception;
 import secondary_index_file_worker;
 import ivf_index_file_worker;
 import raw_file_worker;
+import hnsw_file_worker;
 import column_def;
 import internal_types;
 import file_worker;
@@ -122,6 +123,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     u32 row_cnt = 0;
     Vector<Pair<u32, BufferObj *>> old_buffers;
     String base_name;
+    SizeT index_size = 0;
     SharedPtr<IndexBase> index_base;
     {
         Status status = table_index_meta.GetIndexDef(index_base);
@@ -177,7 +179,8 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, base_name, chunk_index_meta, buffer_obj);
+        Status status =
+            this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, base_name, index_size, chunk_index_meta, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -253,6 +256,7 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                 RowID base_row_id,
                                 SizeT row_count,
                                 const String &base_name,
+                                SizeT index_size,
                                 Optional<ChunkIndexMeta> &chunk_index_meta,
                                 BufferObj *&buffer_obj) {
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
@@ -312,6 +316,19 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                                                         index_base,
                                                                         column_def,
                                                                         buffer_mgr->persistence_manager());
+                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
+                break;
+            }
+            case IndexType::kHnsw: {
+                auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+                auto index_file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                    MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                    index_dir,
+                                                                    std::move(hnsw_index_file_name),
+                                                                    index_base,
+                                                                    column_def,
+                                                                    buffer_mgr->persistence_manager(),
+                                                                    index_size);
                 buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
                 break;
             }
@@ -584,7 +601,8 @@ Status NewTxn::PopulateIndex(const String &db_name,
         }
     } else {
         switch (index_def->index_type_) {
-            case IndexType::kSecondary: {
+            case IndexType::kSecondary:
+            case IndexType::kHnsw: {
                 Status status = this->PopulateIndexToMem(*segment_index_meta, segment_meta, column_id);
                 if (!status.ok()) {
                     return status;
@@ -755,7 +773,14 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_def,
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, base_row_id, row_count, "" /*base_name*/, chunk_index_meta, buffer_obj);
+        Status status = this->AddNewChunkIndex(segment_index_meta,
+                                               chunk_id,
+                                               base_row_id,
+                                               row_count,
+                                               "" /*base_name*/,
+                                               0 /*index_size*/,
+                                               chunk_index_meta,
+                                               buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -891,6 +916,7 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
     RowID row_id{};
     u32 row_count = 0;
     String base_name;
+    SizeT index_size = 0;
 
     // dump mem index only happens in parallel with read, not write, so no lock is needed.
     switch (index_base->index_type_) {
@@ -910,6 +936,12 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
             row_count = mem_index->memory_ivf_index_->GetRowCount();
             break;
         }
+        case IndexType::kHnsw: {
+            row_id = mem_index->memory_hnsw_index_->GetBeginRowID();
+            row_count = mem_index->memory_hnsw_index_->GetRowCount();
+            index_size = mem_index->memory_hnsw_index_->GetSizeInBytes();
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -917,7 +949,7 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, row_id, row_count, base_name, chunk_index_meta, buffer_obj);
+        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, row_id, row_count, base_name, index_size, chunk_index_meta, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -943,11 +975,15 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
             buffer_obj->Save();
             break;
         }
-        // case IndexType::kHnsw:
-        // case IndexType::kBMP: {
-        //     buffer_obj->ToMmap();
-        //     break;
-        // }
+        // case IndexType::kBMP:
+        case IndexType::kHnsw: {
+            mem_index->memory_hnsw_index_->Dump(buffer_obj);
+            buffer_obj->Save();
+            if (buffer_obj->type() != BufferType::kMmap) {
+                buffer_obj->ToMmap();
+            }
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -995,9 +1031,11 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
     SegmentID segment_id = chunk_index_meta.segment_index_meta().segment_id();
     ChunkID chunk_id = chunk_index_meta.chunk_id();
     switch (index_base->index_type_) {
-        case IndexType::kSecondary: {
-            String secondary_index_file_name = IndexFileName(segment_id, chunk_id);
-            String index_filepath = fmt::format("{}/{}", index_dir, secondary_index_file_name);
+        case IndexType::kSecondary:
+        case IndexType::kIVF:
+        case IndexType::kHnsw: {
+            String index_file_name = IndexFileName(segment_id, chunk_id);
+            String index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
             buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
             if (buffer_obj == nullptr) {
                 return Status::BufferManagerError("GetBufferObject failed");
@@ -1014,15 +1052,6 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
             }
             auto column_length_file_name = chunk_info_ptr->base_name_ + LENGTH_SUFFIX;
             String index_filepath = fmt::format("{}/{}", index_dir, column_length_file_name);
-            buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
-            if (buffer_obj == nullptr) {
-                return Status::BufferManagerError("GetBufferObject failed");
-            }
-            break;
-        }
-        case IndexType::kIVF: {
-            String ivf_index_file_name = IndexFileName(segment_id, chunk_id);
-            String index_filepath = fmt::format("{}/{}", index_dir, ivf_index_file_name);
             buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
             if (buffer_obj == nullptr) {
                 return Status::BufferManagerError("GetBufferObject failed");

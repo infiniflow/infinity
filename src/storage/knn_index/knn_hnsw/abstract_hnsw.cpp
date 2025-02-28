@@ -250,6 +250,24 @@ SizeT HnswIndexInMem::GetRowCount() const {
         hnsw_);
 }
 
+SizeT HnswIndexInMem::GetSizeInBytes() const {
+    return std::visit(
+        [](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return SizeT(0);
+            } else {
+                using IndexT = typename std::remove_pointer_t<T>;
+                if constexpr (IndexT::kOwnMem) {
+                    return index->GetSizeInBytes();
+                } else {
+                    return SizeT(0);
+                }
+            }
+        },
+        hnsw_);
+}
+
 void HnswIndexInMem::InsertVecs(SizeT block_offset,
                                 BlockColumnEntry *block_column_entry,
                                 BufferManager *buffer_manager,
@@ -442,6 +460,35 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Dump(SegmentIndexEntry *segment_index
     own_memory_ = false;
     chunk_handle_ = std::move(handle);
     return new_chunk_indey_entry;
+}
+
+void HnswIndexInMem::Dump(BufferObj *buffer_obj, SizeT *dump_size_ptr) {
+    trace_ = false;
+    if (dump_size_ptr != nullptr) {
+        SizeT dump_size = 0;
+        std::visit(
+            [&](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                    return;
+                } else {
+                    using IndexT = typename std::remove_pointer_t<T>;
+                    if constexpr (IndexT::kOwnMem) {
+                        dump_size = index->mem_usage();
+                    } else {
+                        UnrecoverableError("HnswIndexInMem::Dump: index does not own memory");
+                    }
+                }
+            },
+            hnsw_);
+        *dump_size_ptr = dump_size;
+    }
+
+    BufferHandle handle = buffer_obj->Load();
+    auto *data_ptr = static_cast<AbstractHnsw *>(handle.GetDataMut());
+    *data_ptr = hnsw_;
+    own_memory_ = false;
+    chunk_handle_ = std::move(handle);
 }
 
 TableIndexEntry *HnswIndexInMem::table_index_entry() const { return segment_index_entry_->table_index_entry(); }

@@ -381,6 +381,7 @@ private:
                             RowID base_row_id,
                             SizeT row_count,
                             const String &base_name,
+                            SizeT index_size,
                             Optional<ChunkIndexMeta> &chunk_index_meta,
                             BufferObj *&buffer_obj);
 
