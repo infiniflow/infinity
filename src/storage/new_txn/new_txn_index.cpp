@@ -192,6 +192,22 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             // Skip here. merge finished in `OptimizeFtIndex`
             break;
         }
+        case IndexType::kIVF: {
+            SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+            SharedPtr<ColumnDef> column_def;
+            {
+                auto [col_def, status] = table_index_meta.GetColumnDef();
+                if (!status.ok()) {
+                    return status;
+                }
+                column_def = std::move(col_def);
+            }
+
+            BufferHandle buffer_handle = buffer_obj->Load();
+            auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
+            data_ptr->BuildIVFIndex(this, segment_meta, row_cnt, column_def);
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -730,7 +746,7 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_def,
     {
         BufferHandle buffer_handle = buffer_obj->Load();
         auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
-        data_ptr->BuildIVFIndex(this, segment_meta, column_def);
+        data_ptr->BuildIVFIndex(this, segment_meta, row_count, column_def);
     }
     buffer_obj->Save();
     return Status::OK();

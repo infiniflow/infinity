@@ -146,14 +146,9 @@ void IVFIndexInChunk::BuildIVFIndex(const RowID base_rowid,
     BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
 }
 
-void IVFIndexInChunk::BuildIVFIndex(NewTxn *new_txn, SegmentMeta &segment_meta, SharedPtr<ColumnDef> column_def) {
+void IVFIndexInChunk::BuildIVFIndex(NewTxn *new_txn, SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def) {
     RowID base_rowid(segment_meta.segment_id(), 0);
     NewIVFDataAccessor data_accessor(new_txn, segment_meta, column_def->id());
-    SizeT row_count = 0;
-    Status status = segment_meta.GetRowCnt(row_count);
-    if (!status.ok()) {
-        UnrecoverableError("Get row count failed");
-    }
     BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
 }
 

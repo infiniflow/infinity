@@ -7132,7 +7132,10 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_EQ(mem_index->memory_secondary_index_, nullptr); });
     dump_index(*index_name2);
     merge_index(*index_name2);
-    check_index2(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_EQ(mem_index->memory_secondary_index_, nullptr); });
+    check_index2(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_EQ(mem_index->memory_indexer_, nullptr); });
+    dump_index(*index_name3);
+    merge_index(*index_name3);
+    check_index2(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_EQ(mem_index->memory_ivf_index_, nullptr); });
 }
 
 TEST_P(NewCatalogTest, test_populate_index) {
