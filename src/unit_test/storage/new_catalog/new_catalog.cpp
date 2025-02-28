@@ -34,6 +34,8 @@ import index_ivf;
 import index_full_text;
 import index_hnsw;
 import embedding_info;
+import sparse_info;
+import index_bmp;
 import internal_types;
 import defer_op;
 import statement_common;
@@ -6874,8 +6876,11 @@ TEST_P(NewCatalogTest, test_append_with_index) {
                                     std::make_shared<DataType>(LogicalType::kEmbedding, MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4)),
                                     "col3",
                                     std::set<ConstraintType>());
+    auto column4_typeinfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
+    auto column_def4 =
+        std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kSparse, column4_typeinfo), "col4", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3, column_def4});
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<String>("index2");
@@ -6889,11 +6894,19 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     Vector<InitParameter *> index4_parameters;
     index4_parameters.emplace_back(new InitParameter("metric", "l2"));
     auto index_def4 = IndexHnsw::Make(index_name4, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index4_parameters);
+    auto index_name5 = std::make_shared<std::string>("index5");
+    Vector<InitParameter *> index5_parameters;
+    index5_parameters.emplace_back(new InitParameter("block_size", "16"));
+    index5_parameters.emplace_back(new InitParameter("compress_type", "compress"));
+    auto index_def5 = IndexBMP::Make(index_name5, MakeShared<String>(), "file_name", Vector<String>{column_def4->name()}, index5_parameters);
     DeferFn defer_fn([&] {
         for (auto *parameter : index3_parameters) {
             delete parameter;
         }
         for (auto *parameter : index4_parameters) {
+            delete parameter;
+        }
+        for (auto *parameter : index5_parameters) {
             delete parameter;
         }
     });
@@ -6911,34 +6924,18 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index1"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+    auto create_index = [&](const SharedPtr<IndexBase> &index_def) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_def->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index2"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index3"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index4"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def4, ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    };
+    create_index(index_def1);
+    create_index(index_def2);
+    create_index(index_def3);
+    create_index(index_def4);
+    create_index(index_def5);
 
     auto input_block = MakeShared<DataBlock>();
     {
@@ -6963,6 +6960,21 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             col3->AppendValue(Value::MakeEmbedding(Vector<float>{1.0, 2.0, 3.0, 4.0}));
             col3->AppendValue(Value::MakeEmbedding(Vector<float>{5.0, 6.0, 7.0, 8.0}));
             input_block->InsertVector(col3, 2);
+        }
+        {
+            auto col4 = ColumnVector::Make(column_def4->type());
+            col4->Initialize();
+            Pair<Vector<int32_t>, Vector<float>> vec{Vector<int32_t>{100, 1000, 10000, 100000}, Vector<float>{1.0, 2.0, 3.0, 4.0}};
+            Pair<Vector<int32_t>, Vector<float>> vec2{Vector<int32_t>{100, 2000, 10000, 200000}, Vector<float>{1.0, 2.0, 3.0, 4.0}};
+            col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                                reinterpret_cast<const char *>(vec.second.data()),
+                                                vec.first.size(),
+                                                column4_typeinfo));
+            col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec2.first.data()),
+                                                reinterpret_cast<const char *>(vec2.second.data()),
+                                                vec2.first.size(),
+                                                column4_typeinfo));
+            input_block->InsertVector(col4, 3);
         }
         input_block->Finalize();
     }
@@ -7199,8 +7211,11 @@ TEST_P(NewCatalogTest, test_populate_index) {
                                     std::make_shared<DataType>(LogicalType::kEmbedding, MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4)),
                                     "col3",
                                     std::set<ConstraintType>());
+    auto column4_typeinfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
+    auto column_def4 =
+        std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kSparse, column4_typeinfo), "col4", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3, column_def4});
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<String>("idx2");
@@ -7214,11 +7229,19 @@ TEST_P(NewCatalogTest, test_populate_index) {
     Vector<InitParameter *> index4_parameters;
     index4_parameters.emplace_back(new InitParameter("metric", "l2"));
     auto index_def4 = IndexHnsw::Make(index_name4, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index4_parameters);
+    auto index_name5 = std::make_shared<std::string>("index5");
+    Vector<InitParameter *> index5_parameters;
+    index5_parameters.emplace_back(new InitParameter("block_size", "16"));
+    index5_parameters.emplace_back(new InitParameter("compress_type", "compress"));
+    auto index_def5 = IndexBMP::Make(index_name5, MakeShared<String>(), "file_name", Vector<String>{column_def4->name()}, index5_parameters);
     DeferFn defer_fn([&] {
         for (auto *parameter : index3_parameters) {
             delete parameter;
         }
         for (auto *parameter : index4_parameters) {
+            delete parameter;
+        }
+        for (auto *parameter : index5_parameters) {
             delete parameter;
         }
     });
@@ -7260,6 +7283,21 @@ TEST_P(NewCatalogTest, test_populate_index) {
             col3->AppendValue(Value::MakeEmbedding(Vector<float>{5.0, 6.0, 7.0, 8.0}));
             input_block->InsertVector(col3, 2);
         }
+        {
+            auto col4 = ColumnVector::Make(column_def4->type());
+            col4->Initialize();
+            Pair<Vector<int32_t>, Vector<float>> vec{Vector<int32_t>{100, 1000, 10000, 100000}, Vector<float>{1.0, 2.0, 3.0, 4.0}};
+            Pair<Vector<int32_t>, Vector<float>> vec2{Vector<int32_t>{100, 2000, 10000, 200000}, Vector<float>{1.0, 2.0, 3.0, 4.0}};
+            col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                                reinterpret_cast<const char *>(vec.second.data()),
+                                                vec.first.size(),
+                                                column4_typeinfo));
+            col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec2.first.data()),
+                                                reinterpret_cast<const char *>(vec2.second.data()),
+                                                vec2.first.size(),
+                                                column4_typeinfo));
+            input_block->InsertVector(col4, 3);
+        }
         input_block->Finalize();
     }
     auto append_a_block = [&] {
@@ -7275,34 +7313,18 @@ TEST_P(NewCatalogTest, test_populate_index) {
     for (int i = 0; i < 2; ++i) {
         append_a_block();
     }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index1"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+    auto create_index = [&](const SharedPtr<IndexBase> &index_def) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_def->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index2"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def2, ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index3"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def3, ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index4"), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def4, ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
+    };
+    create_index(index_def1);
+    create_index(index_def2);
+    create_index(index_def3);
+    create_index(index_def4);
+    // create_index(index_def5);
     append_a_block();
 
     auto check_index = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {

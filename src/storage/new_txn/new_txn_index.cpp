@@ -55,6 +55,8 @@ import column_index_reader;
 import column_index_merger;
 import abstract_hnsw;
 import index_hnsw;
+import abstract_bmp;
+import index_bmp;
 
 namespace infinity {
 
@@ -573,6 +575,22 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                 memory_hnsw_index = mem_index->memory_hnsw_index_;
             }
             memory_hnsw_index->InsertVecs(base_row_id.segment_offset_, col, offset, row_cnt);
+            break;
+        }
+        case IndexType::kBMP: {
+            SharedPtr<BMPIndexInMem> memory_bmp_index;
+            {
+                std::unique_lock<std::mutex> lock(mem_index->mtx_);
+                if (mem_index->memory_bmp_index_.get() == nullptr) {
+                    auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    mem_index->memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_def.get(), column_def.get(), nullptr);
+                }
+                memory_bmp_index = mem_index->memory_bmp_index_;
+            }
+            memory_bmp_index->AddDocs(base_row_id.segment_offset_, col, offset, row_cnt);
             break;
         }
         default: {

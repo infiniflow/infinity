@@ -257,6 +257,8 @@ private:
 export template <typename DataType, typename IdxType>
 class MemIndexInserterIter1<SparseVecRef<DataType, IdxType>> {
 public:
+    using ValueType = SparseVecRef<DataType, IdxType>;
+
     MemIndexInserterIter1(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt)
         : block_offset_(block_offset), col_(col), ele_size_(col.data_type()->Size()), cur_(offset), end_(offset + row_cnt) {}
 

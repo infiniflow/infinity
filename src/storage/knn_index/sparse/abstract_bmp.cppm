@@ -40,6 +40,7 @@ class BufferManager;
 struct ChunkIndexEntry;
 struct SegmentIndexEntry;
 struct BlockColumnEntry;
+class ColumnVector;
 
 export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
                                         BMPAlg<f32, i32, BMPCompressType::kRaw> *,
@@ -150,6 +151,8 @@ public:
     SizeT GetRowCount() const;
 
     void AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count);
+
+    void AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
 
     void AddDocs(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts);
 

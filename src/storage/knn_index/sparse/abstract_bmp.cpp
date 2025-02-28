@@ -149,6 +149,30 @@ void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_e
         bmp_);
 }
 
+void BMPIndexInMem::AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return;
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                if constexpr (IndexT::kOwnMem) {
+                    using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+                    SizeT mem_before = index->MemoryUsage();
+                    MemIndexInserterIter1<SparseRefT> iter(block_offset, col, offset, row_count);
+                    index->AddDocs(std::move(iter));
+                    SizeT mem_after = index->MemoryUsage();
+                    IncreaseMemoryUsageBase(mem_after - mem_before);
+                    LOG_INFO(fmt::format("before : {} -> after : {}, add mem_used : {}", mem_before, mem_after, mem_after - mem_before));
+                } else {
+                    UnrecoverableError("BMPIndexInMem::AddDocs: index does not own memory");
+                }
+            }
+        },
+        bmp_);
+}
+
 void BMPIndexInMem::AddDocs(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts) {
     std::visit(
         [&](auto &&index) {
