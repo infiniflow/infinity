@@ -36,7 +36,7 @@ public:
 
     const String &index_id_str() const { return index_id_str_; }
 
-    Status GetIndexDef(SharedPtr<IndexBase> &index_def);
+    Tuple<SharedPtr<IndexBase>, Status> GetIndexBase();
 
     SharedPtr<String> GetTableIndexDir();
 
@@ -48,7 +48,7 @@ public:
 
     Status AddSegmentID(SegmentID segment_id);
 
-    Status InitSet(SharedPtr<IndexBase> index_def);
+    Status InitSet(SharedPtr<IndexBase> index_base);
 
 private:
     Status LoadIndexDef();

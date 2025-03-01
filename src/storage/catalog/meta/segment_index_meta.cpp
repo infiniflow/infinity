@@ -154,18 +154,17 @@ Status SegmentIndexMeta::InitSet() {
         }
     }
     {
-        Status status = SetNoMemIndex ();
+        Status status = SetNoMemIndex();
         if (!status.ok()) {
             return status;
         }
     }
     {
-        SharedPtr<IndexBase> index_def;
-        Status status = table_index_meta_.GetIndexDef(index_def);
+        auto [index_base, status] = table_index_meta_.GetIndexBase();
         if (!status.ok()) {
             return status;
         }
-        if (index_def->index_type_ == IndexType::kFullText) {
+        if (index_base->index_type_ == IndexType::kFullText) {
             SegmentIndexFtInfo ft_info{};
             Status status = this->SetFtInfo(ft_info);
             if (!status.ok()) {

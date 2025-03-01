@@ -264,19 +264,16 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
         }
         for (const String &index_id_str : *index_id_strs) {
             TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
-            SharedPtr<IndexBase> index_def;
-            {
-                Status status = table_index_meta.GetIndexDef(index_def);
-                if (!status.ok()) {
-                    UnrecoverableError("GetIndexDef failed");
-                }
+            auto [index_base, index_status] = table_index_meta.GetIndexBase();
+            if (!index_status.ok()) {
+                UnrecoverableError("Fail to get index definition");
             }
-            if (index_def->index_type_ != IndexType::kFullText) {
+            if (index_base->index_type_ != IndexType::kFullText) {
                 // non-fulltext index
                 continue;
             }
 
-            String column_name = index_def->column_name();
+            String column_name = index_base->column_name();
             auto [column_def, col_def_status] = table_index_meta.GetColumnDef();
             u64 column_id = column_def->id();
             if (index_reader->column_index_readers_->find(column_id) == index_reader->column_index_readers_->end()) {
@@ -288,7 +285,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
             if (auto &target_ts = cache_column_ts[column_id]; target_ts < begin_ts) {
                 // need update result
                 target_ts = begin_ts;
-                const IndexFullText *index_full_text = reinterpret_cast<const IndexFullText *>(index_def.get());
+                const IndexFullText *index_full_text = reinterpret_cast<const IndexFullText *>(index_base.get());
                 // update column2analyzer_
                 // (*result.column2analyzer_)[column_name] = index_full_text->analyzer_;
                 if (auto it = cache_column_ts_.find(column_id); it != cache_column_ts_.end() and it->second == begin_ts) {

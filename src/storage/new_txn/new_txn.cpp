@@ -832,7 +832,7 @@ Status NewTxn::GetIndexDefByName(const String &db_name, const String &table_name
         return status;
     }
 
-    String index_def_key = KeyEncode::CatalogIndexTagKey(db_id, table_id, index_id, "index_def");
+    String index_def_key = KeyEncode::CatalogIndexTagKey(db_id, table_id, index_id, "index_base");
     String index_def_str;
     status = kv_instance_->Get(index_def_key, index_def_str);
     if (!status.ok()) {
@@ -1727,7 +1727,7 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
     }
 
     // delete index index def
-    String index_comment_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_def");
+    String index_comment_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_base");
     status = kv_instance_->Delete(index_comment_key);
     if (!status.ok()) {
         return status;

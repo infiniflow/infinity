@@ -22,21 +22,21 @@ import kv_store;
 import table_meeta;
 import kv_code;
 import third_party;
+import logger;
 
 namespace infinity {
 
 TableIndexMeeta::TableIndexMeeta(String index_id_str, TableMeeta &table_meta, KVInstance &kv_instance)
     : kv_instance_(kv_instance), table_meta_(table_meta), index_id_str_(std::move(index_id_str)) {}
 
-Status TableIndexMeeta::GetIndexDef(SharedPtr<IndexBase> &index_def) {
+Tuple<SharedPtr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
     if (!index_def_) {
         Status status = LoadIndexDef();
         if (!status.ok()) {
-            return status;
+            return {nullptr, status};
         }
     }
-    index_def = index_def_;
-    return Status::OK();
+    return {index_def_, Status::OK()};
 }
 
 SharedPtr<String> TableIndexMeeta::GetTableIndexDir() {
@@ -44,15 +44,12 @@ SharedPtr<String> TableIndexMeeta::GetTableIndexDir() {
 }
 
 Tuple<SharedPtr<ColumnDef>, Status> TableIndexMeeta::GetColumnDef() {
-    SharedPtr<IndexBase> index_def;
-    {
-        Status status = GetIndexDef(index_def);
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
+    auto [index_base, status] = GetIndexBase();
+    if (!status.ok()) {
+        return {nullptr, status};
     }
 
-    return table_meta_.GetColumnDefByColumnName(index_def->column_name());
+    return table_meta_.GetColumnDefByColumnName(index_base->column_name());
 }
 
 Status TableIndexMeeta::GetSegmentIDs(Vector<SegmentID> *&segment_ids) {
@@ -91,7 +88,7 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_def) {
+Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_base) {
     {
         Status status = SetSegmentIDs({});
         if (!status.ok()) {
@@ -99,8 +96,8 @@ Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_def) {
         }
     }
     {
-        String index_def_key = GetTableIndexTag("index_def");
-        Status status = kv_instance_.Put(index_def_key, index_def->Serialize().dump());
+        String index_def_key = GetTableIndexTag("index_base");
+        Status status = kv_instance_.Put(index_def_key, index_base->Serialize().dump());
         if (!status.ok()) {
             return status;
         }
@@ -109,10 +106,11 @@ Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_def) {
 }
 
 Status TableIndexMeeta::LoadIndexDef() {
-    String index_def_key = GetTableIndexTag("index_def");
+    String index_def_key = GetTableIndexTag("index_base");
     String index_def_str;
     Status status = kv_instance_.Get(index_def_key, index_def_str);
     if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to get index definition from kv store, key: {}, cause: {}", index_def_key, status.message()));
         return status;
     }
     nlohmann::json index_def_json = nlohmann::json::parse(index_def_str);

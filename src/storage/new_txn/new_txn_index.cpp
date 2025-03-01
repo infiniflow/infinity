@@ -131,12 +131,10 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     Vector<SizeT> row_cnts;
 
     String base_name;
-    SharedPtr<IndexBase> index_base;
-    {
-        Status status = table_index_meta.GetIndexDef(index_base);
-        if (!status.ok()) {
-            return status;
-        }
+
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
     }
     if (index_base->index_type_ == IndexType::kFullText) {
         Status status = this->OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, base_name);
@@ -293,13 +291,11 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     SegmentID segment_id = segment_index_meta.segment_id();
 
-    SharedPtr<IndexBase> index_base;
-    {
-        Status status = table_index_meta.GetIndexDef(index_base);
-        if (!status.ok()) {
-            return status;
-        }
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
     }
+
     SharedPtr<ColumnDef> column_def;
     {
         auto [col_def, status] = table_index_meta.GetColumnDef();
@@ -405,16 +401,13 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
 }
 
 Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const AppendState *append_state) {
-    SharedPtr<IndexBase> index_def;
-    {
-        Status status = table_index_meta.GetIndexDef(index_def);
-        if (!status.ok()) {
-            return status;
-        }
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
     }
     ColumnID column_id = 0;
     {
-        auto [column_def, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_def->column_name());
+        auto [column_def, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_base->column_name());
         if (!status.ok()) {
             return status;
         }
@@ -492,12 +485,9 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const AppendState 
 
 Status
 NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt) {
-    SharedPtr<IndexBase> index_def;
-    {
-        Status status = segment_index_meta.table_index_meta().GetIndexDef(index_def);
-        if (!status.ok()) {
-            return status;
-        }
+    auto [index_base, index_status] = segment_index_meta.table_index_meta().GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
     }
     SharedPtr<MemIndex> mem_index;
     {
@@ -506,7 +496,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
             return status;
         }
     }
-    switch (index_def->index_type_) {
+    switch (index_base->index_type_) {
         case IndexType::kSecondary: {
             SharedPtr<SecondaryIndexInMem> memory_secondary_index;
             {
@@ -524,7 +514,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
             break;
         }
         case IndexType::kFullText: {
-            const auto *index_fulltext = static_cast<const IndexFullText *>(index_def.get());
+            const auto *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
             SharedPtr<MemoryIndexer> memory_indexer;
             {
                 std::unique_lock<std::mutex> lock(mem_index->mtx_);
@@ -569,7 +559,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_ivf_index_ = IVFIndexInMem::NewIVFIndexInMem(column_def.get(), index_def.get(), base_row_id, nullptr);
+                    mem_index->memory_ivf_index_ = IVFIndexInMem::NewIVFIndexInMem(column_def.get(), index_base.get(), base_row_id, nullptr);
                 }
                 memory_ivf_index = mem_index->memory_ivf_index_;
             }
@@ -585,7 +575,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_def.get(), column_def.get(), nullptr, true /*trace*/);
+                    mem_index->memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_base.get(), column_def.get(), nullptr, true /*trace*/);
                 }
                 memory_hnsw_index = mem_index->memory_hnsw_index_;
             }
@@ -601,7 +591,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                     if (!status.ok()) {
                         return status;
                     }
-                    mem_index->memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_def.get(), column_def.get(), nullptr);
+                    mem_index->memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base.get(), column_def.get(), nullptr);
                 }
                 memory_bmp_index = mem_index->memory_bmp_index_;
             }
@@ -627,17 +617,14 @@ Status NewTxn::PopulateIndex(const String &db_name,
             return status;
         }
     }
-    SharedPtr<IndexBase> index_def;
-    {
-        Status status = table_index_meta.GetIndexDef(index_def);
-        if (!status.ok()) {
-            return status;
-        }
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
     }
     SharedPtr<ColumnDef> column_def;
     ColumnID column_id = 0;
     {
-        auto [column_def_, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_def->column_name());
+        auto [column_def_, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_base->column_name());
         if (!status.ok()) {
             return status;
         }
@@ -654,13 +641,13 @@ Status NewTxn::PopulateIndex(const String &db_name,
         old_chunk_ids = *old_chunk_ids_ptr;
     }
     ChunkID new_chunk_id = 0;
-    if (index_def->index_type_ == IndexType::kIVF) {
-        Status status = this->PopulateIvfIndexInner(index_def, *segment_index_meta, segment_meta, column_def, new_chunk_id);
+    if (index_base->index_type_ == IndexType::kIVF) {
+        Status status = this->PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_id);
         if (!status.ok()) {
             return status;
         }
     } else {
-        switch (index_def->index_type_) {
+        switch (index_base->index_type_) {
             case IndexType::kSecondary:
             case IndexType::kHnsw:
             case IndexType::kBMP: {
@@ -671,7 +658,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
                 break;
             }
             case IndexType::kFullText: {
-                Status status = this->PopulateFtIndexInner(index_def, *segment_index_meta, segment_meta, column_id);
+                Status status = this->PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id);
                 if (!status.ok()) {
                     return status;
                 }
@@ -737,11 +724,11 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
 }
 
 Status
-NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_def, SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id) {
-    if (index_def->index_type_ != IndexType::kFullText) {
+NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id) {
+    if (index_base->index_type_ != IndexType::kFullText) {
         UnrecoverableError("Invalid index type");
     }
-    const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_def.get());
+    const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
     String full_path;
@@ -805,7 +792,7 @@ NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_def, SegmentIndexMeta &s
     return Status::OK();
 }
 
-Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_def,
+Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
                                      SegmentIndexMeta &segment_index_meta,
                                      SegmentMeta &segment_meta,
                                      SharedPtr<ColumnDef> column_def,
@@ -855,12 +842,12 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_def,
     return Status::OK();
 }
 
-Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_def,
+Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_base,
                                SegmentIndexMeta &segment_index_meta,
                                RowID &base_rowid_out,
                                u32 &row_cnt_out,
                                String &base_name_out) {
-    const auto *index_fulltext = static_cast<const IndexFullText *>(index_def.get());
+    const auto *index_fulltext = static_cast<const IndexFullText *>(index_base.get());
 
     Vector<ChunkID> chunk_ids;
     {
@@ -942,7 +929,7 @@ Status NewTxn::OptimizeFtIndex(SharedPtr<IndexBase> index_def,
     return Status::OK();
 }
 
-Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_def,
+Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
                                 SharedPtr<ColumnDef> column_def,
                                 SegmentMeta &segment_meta,
                                 RowID base_rowid,
@@ -956,13 +943,13 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_def,
         }
     }
 
-    if (index_def->index_type_ == IndexType::kHnsw) {
-        const auto *index_hnsw = static_cast<const IndexHnsw *>(index_def.get());
+    if (index_base->index_type_ == IndexType::kHnsw) {
+        const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base.get());
         if (index_hnsw->build_type_ == HnswBuildType::kLSG) {
             UnrecoverableError("Not implemented yet");
         }
 
-        UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_def.get(), column_def.get(), nullptr);
+        UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def.get(), nullptr);
         for (BlockID block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
@@ -991,8 +978,8 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_def,
         if (buffer_obj->type() != BufferType::kMmap) {
             buffer_obj->ToMmap();
         }
-    } else if (index_def->index_type_ == IndexType::kBMP) {
-        auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_def.get(), column_def.get(), nullptr);
+    } else if (index_base->index_type_ == IndexType::kBMP) {
+        auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base.get(), column_def.get(), nullptr);
 
         for (BlockID block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
@@ -1029,12 +1016,9 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_def,
 
 Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id) {
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
-    SharedPtr<IndexBase> index_base;
-    {
-        Status status = table_index_meta.GetIndexDef(index_base);
-        if (!status.ok()) {
-            return status;
-        }
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
     }
     SharedPtr<MemIndex> mem_index;
     {
@@ -1180,12 +1164,9 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
     String index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), table_index_meta.GetTableIndexDir()->c_str());
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
-    SharedPtr<IndexBase> index_base;
-    {
-        Status status = table_index_meta.GetIndexDef(index_base);
-        if (!status.ok()) {
-            return status;
-        }
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
     }
     SegmentID segment_id = chunk_index_meta.segment_index_meta().segment_id();
     ChunkID chunk_id = chunk_index_meta.chunk_id();

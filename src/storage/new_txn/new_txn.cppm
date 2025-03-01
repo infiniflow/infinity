@@ -406,17 +406,17 @@ private:
 
     Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id);
 
-    Status PopulateFtIndexInner(SharedPtr<IndexBase> index_def, SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id);
+    Status PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id);
 
-    Status PopulateIvfIndexInner(SharedPtr<IndexBase> index_def,
+    Status PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
                                  SegmentIndexMeta &segment_index_meta,
                                  SegmentMeta &segment_meta,
                                  SharedPtr<ColumnDef> column_def,
                                  ChunkID &new_chunk_id);
 
-    Status OptimizeFtIndex(SharedPtr<IndexBase> index_def, SegmentIndexMeta &segment_index_meta, RowID &base_rowid, u32 &row_cnt, String &base_name);
+    Status OptimizeFtIndex(SharedPtr<IndexBase> index_base, SegmentIndexMeta &segment_index_meta, RowID &base_rowid, u32 &row_cnt, String &base_name);
 
-    Status OptimizeVecIndex(SharedPtr<IndexBase> index_def,
+    Status OptimizeVecIndex(SharedPtr<IndexBase> index_base,
                             SharedPtr<ColumnDef> column_def,
                             SegmentMeta &segment_meta,
                             RowID base_rowid,

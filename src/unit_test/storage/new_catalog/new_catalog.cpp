@@ -3541,7 +3541,7 @@ TEST_P(NewCatalogTest, index_test1) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
     auto index_name = std::make_shared<String>("idx1");
-    auto index_def = IndexSecondary::Make(index_name, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_base = IndexSecondary::Make(index_name, MakeShared<String>(), "file_name", {column_def1->name()});
 
     {
         // create db1
@@ -3562,7 +3562,7 @@ TEST_P(NewCatalogTest, index_test1) {
     {
         // create index idx1
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
-        Status status = txn3->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
+        Status status = txn3->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
@@ -3577,7 +3577,7 @@ TEST_P(NewCatalogTest, index_test1) {
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3_1);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_def1, *index_def);
+        EXPECT_EQ(*index_def1, *index_base);
     }
     {
         // list and drop index
@@ -6924,9 +6924,9 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    auto create_index = [&](const SharedPtr<IndexBase> &index_def) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_def->index_name_)), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -7328,9 +7328,9 @@ TEST_P(NewCatalogTest, test_populate_index) {
     for (int i = 0; i < 2; ++i) {
         append_a_block();
     }
-    auto create_index = [&](const SharedPtr<IndexBase> &index_def) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_def->index_name_)), TransactionType::kNormal);
-        Status status = txn->CreateIndex(*db_name, *table_name, index_def, ConflictType::kIgnore);
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
