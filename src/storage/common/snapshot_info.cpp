@@ -184,9 +184,11 @@ SharedPtr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(const nloh
     auto table_index_snapshot = MakeShared<TableIndexSnapshotInfo>();
     table_index_snapshot->index_dir_ = MakeShared<String>(table_index_json["index_dir"]);
     table_index_snapshot->index_base_ = IndexBase::Deserialize(table_index_json["index_base"]);
-    for (const auto &segment_index_json : table_index_json["segment_indexes"]) {
-        auto segment_index_snapshot = SegmentIndexSnapshotInfo::Deserialize(segment_index_json);
-        table_index_snapshot->index_by_segment_.emplace(segment_index_snapshot->segment_id_, segment_index_snapshot);
+    if (table_index_json.count("segment_index") > 0) {
+        for (const auto &segment_index_json : table_index_json["segment_indexes"]) {
+            auto segment_index_snapshot = SegmentIndexSnapshotInfo::Deserialize(segment_index_json);
+            table_index_snapshot->index_by_segment_.emplace(segment_index_snapshot->segment_id_, segment_index_snapshot);
+        }
     }
     return table_index_snapshot;
 }
@@ -375,37 +377,40 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
         for (const auto &segment_index_snapshot_pair : table_index_snapshot_pair.second->index_by_segment_) {
             SegmentID segment_id=segment_index_snapshot_pair.second->segment_id_;
             for (const auto &chunk_index_snapshot : segment_index_snapshot_pair.second->chunk_index_snapshots_) {
-                IndexBase *index_base = table_index_snapshot_pair.second->index_base_.get();
+                // IndexBase *index_base = table_index_snapshot_pair.second->index_base_.get();
 
-                switch (index_base->index_type_) {
-                    case IndexType::kIVF: {
-                        break;
-                    }
-                    case IndexType::kHnsw: {
-                        break;
-                    }
-                    case IndexType::kBMP: {
-                        break;
-                    }
-                    case IndexType::kFullText: {
-                        break;
-                    }
-                    case IndexType::kSecondary: {
-                        files.emplace_back(
+                // switch (index_base->index_type_) {
+                //     case IndexType::kIVF: {
+                //         break;
+                //     }
+                //     case IndexType::kHnsw: {
+                //         break;
+                //     }
+                //     case IndexType::kBMP: {
+                //         break;
+                //     }
+                //     case IndexType::kFullText: {
+                //         break;
+                //     }
+                //     case IndexType::kSecondary: {
+                //         files.emplace_back(
+                // VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,fmt::format("seg{}_chunk{}.idx", segment_id, chunk_index_snapshot->chunk_id_) ));
+                //         break;
+                //     }
+                //     case IndexType::kEMVB: {
+                //         break;
+                //     }
+                //     case IndexType::kDiskAnn: {
+                //         break;
+                //     }
+                //     case IndexType::kInvalid: {
+                //         UnrecoverableError("Invalid index type");
+                //         break;
+                //     }
+                // }
+                //
+                files.emplace_back(
                 VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,fmt::format("seg{}_chunk{}.idx", segment_id, chunk_index_snapshot->chunk_id_) ));
-                        break;
-                    }
-                    case IndexType::kEMVB: {
-                        break;
-                    }
-                    case IndexType::kDiskAnn: {
-                        break;
-                    }
-                    case IndexType::kInvalid: {
-                        UnrecoverableError("Invalid index type");
-                        break;
-                    }
-                }
 
                 // if (chunk_index_snapshot->files_.empty()) {
                 //     files.emplace_back(
