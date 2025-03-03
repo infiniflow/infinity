@@ -414,6 +414,12 @@ private:
                                  SharedPtr<ColumnDef> column_def,
                                  ChunkID &new_chunk_id);
 
+    Status PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
+                                  SegmentIndexMeta &segment_index_meta,
+                                  SegmentMeta &segment_meta,
+                                  SharedPtr<ColumnDef> column_def,
+                                  ChunkID &new_chunk_id);
+
     Status OptimizeFtIndex(SharedPtr<IndexBase> index_base, SegmentIndexMeta &segment_index_meta, RowID &base_rowid, u32 &row_cnt, String &base_name);
 
     Status OptimizeVecIndex(SharedPtr<IndexBase> index_base,

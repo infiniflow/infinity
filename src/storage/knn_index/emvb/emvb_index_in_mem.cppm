@@ -32,6 +32,8 @@ class EMVBIndex;
 struct BlockIndex;
 class ColumnVector;
 class NewTxn;
+class BufferObj;
+class KVInstance;
 
 using EMVBInMemQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
 
@@ -78,9 +80,11 @@ public:
 
     void Insert(BlockEntry *block_entry, SizeT column_idx, BufferManager *buffer_manager, u32 row_offset, u32 row_count);
 
-    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, NewTxn *txn);
+    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, NewTxn *txn, KVInstance &kv_instance);
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
+
+    void Dump(BufferObj *buffer_obj);
 
     // return id: offset in the segment
     std::variant<Pair<u32, u32>, EMVBInMemQueryResultType> SearchWithBitmask(const f32 *query_ptr,

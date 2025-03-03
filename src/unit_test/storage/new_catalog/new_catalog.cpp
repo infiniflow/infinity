@@ -6903,7 +6903,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     auto index_def5 = IndexBMP::Make(index_name5, MakeShared<String>(), "file_name", Vector<String>{column_def4->name()}, index5_parameters);
     auto index_name6 = std::make_shared<std::string>("index6");
     Vector<InitParameter *> index6_parameters;
-    index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "32"));
+    index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "4"));
     index6_parameters.emplace_back(new InitParameter("pq_subspace_bits", "8"));
     auto index_def6 = IndexEMVB::Make(index_name6, MakeShared<String>(), "file_name", Vector<String>{column_def5->name()}, index6_parameters);
     DeferFn defer_fn([&] {
@@ -6948,28 +6948,32 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     create_index(index_def5);
     create_index(index_def6);
 
+    u32 block_row_cnt = 8192;
     auto input_block = MakeShared<DataBlock>();
     {
+        auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+            for (u32 i = 0; i < block_row_cnt; i += 2) {
+                col.AppendValue(v1);
+                col.AppendValue(v2);
+            }
+        };
         // Initialize input block
         {
             auto col1 = ColumnVector::Make(column_def1->type());
             col1->Initialize();
-            col1->AppendValue(Value::MakeInt(1));
-            col1->AppendValue(Value::MakeInt(2));
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
             input_block->InsertVector(col1, 0);
         }
         {
             auto col2 = ColumnVector::Make(column_def2->type());
             col2->Initialize();
-            col2->AppendValue(Value::MakeVarchar("abc"));
-            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             input_block->InsertVector(col2, 1);
         }
         {
             auto col3 = ColumnVector::Make(column_def3->type());
             col3->Initialize();
-            col3->AppendValue(Value::MakeEmbedding(Vector<float>{1.0, 2.0, 3.0, 4.0}));
-            col3->AppendValue(Value::MakeEmbedding(Vector<float>{5.0, 6.0, 7.0, 8.0}));
+            append_to_col(*col3, Value::MakeEmbedding(Vector<float>{1.0, 2.0, 3.0, 4.0}), Value::MakeEmbedding(Vector<float>{5.0, 6.0, 7.0, 8.0}));
             input_block->InsertVector(col3, 2);
         }
         {
@@ -6977,34 +6981,36 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             col4->Initialize();
             Pair<Vector<float>, Vector<int32_t>> vec{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 1000, 10000, 20000}};
             Pair<Vector<float>, Vector<int32_t>> vec2{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 2000, 10000, 20000}};
-            col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
-                                                reinterpret_cast<const char *>(vec.second.data()),
-                                                vec.first.size(),
-                                                column4_typeinfo));
-            col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec2.first.data()),
-                                                reinterpret_cast<const char *>(vec2.second.data()),
-                                                vec2.first.size(),
-                                                column4_typeinfo));
+            auto v1 = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                        reinterpret_cast<const char *>(vec.second.data()),
+                                        vec.first.size(),
+                                        column4_typeinfo);
+            auto v2 = Value::MakeSparse(reinterpret_cast<const char *>(vec2.first.data()),
+                                        reinterpret_cast<const char *>(vec2.second.data()),
+                                        vec2.first.size(),
+                                        column4_typeinfo);
+            append_to_col(*col4, std::move(v1), std::move(v2));
             input_block->InsertVector(col4, 3);
         }
         {
-            Vector<float> v1 = {1.0, 2.0, 3.0, 4.0};
-            Vector<float> v2 = {5.0, 6.0, 7.0, 8.0};
-            Vector<float> v3 = {9.0, 10.0, 11.0, 12.0};
+            Vector<float> vec1 = {1.0, 2.0, 3.0, 4.0};
+            Vector<float> vec2 = {5.0, 6.0, 7.0, 8.0};
+            Vector<float> vec3 = {9.0, 10.0, 11.0, 12.0};
             auto col5 = ColumnVector::Make(column_def5->type());
             col5->Initialize();
-            {
-                Vector<Pair<ptr_t, SizeT>> embedding_data;
-                embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v1.data()), v1.size() * sizeof(*v1.data())));
-                embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v2.data()), v2.size() * sizeof(*v2.data())));
-                col5->AppendValue(Value::MakeTensor(embedding_data, column3_type_info));
-            }
-            {
-                Vector<Pair<ptr_t, SizeT>> embedding_data;
-                embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v1.data()), v1.size() * sizeof(*v1.data())));
-                embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v3.data()), v3.size() * sizeof(*v3.data())));
-                col5->AppendValue(Value::MakeTensor(embedding_data, column3_type_info));
-            }
+
+            Vector<Pair<ptr_t, SizeT>> embedding_data1;
+            embedding_data1.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(vec1.data()), vec1.size() * sizeof(*vec1.data())));
+            embedding_data1.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(vec2.data()), vec2.size() * sizeof(*vec2.data())));
+            Value v1 = Value::MakeTensor(embedding_data1, column3_type_info);
+
+            Vector<Pair<ptr_t, SizeT>> embedding_data2;
+            embedding_data2.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(vec1.data()), vec1.size() * sizeof(*vec1.data())));
+            embedding_data2.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(vec3.data()), vec3.size() * sizeof(*vec3.data())));
+            Value v2 = Value::MakeTensor(embedding_data2, column3_type_info);
+
+            append_to_col(*col5, std::move(v1), std::move(v2));
+
             input_block->InsertVector(col5, 4);
         }
         input_block->Finalize();
@@ -7036,7 +7042,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     append_a_block();
     // new_txn_mgr->PrintAllKeyValue();
 
-    auto check_index = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
+    auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
         String index_key;
         String index_id_str;
@@ -7061,7 +7067,11 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
         EXPECT_TRUE(status.ok());
-        check_mem_index(mem_index);
+        {
+            auto [row_id, row_cnt] = check_mem_index(mem_index);
+            EXPECT_EQ(row_id, RowID(0, block_row_cnt));
+            EXPECT_EQ(row_cnt, block_row_cnt);
+        }
 
         // int32_t begin_val = 2;
         // int32_t end_val = 3;
@@ -7086,7 +7096,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             ChunkIndexMetaInfo *chunk_info = nullptr;
             Status status = chunk_index_meta.GetChunkInfo(chunk_info);
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_info->row_cnt_, 2);
+            EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
@@ -7108,32 +7118,27 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 2));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
         u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
-        EXPECT_EQ(begin_id, RowID(0, 2));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 2));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 2));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 2));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     // check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
     //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
@@ -7150,7 +7155,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     };
-    auto check_index2 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
+    auto check_index2 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check merged index {}", index_name)), TransactionType::kNormal);
         String index_key;
         String index_id_str;
@@ -7167,7 +7172,11 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
         EXPECT_TRUE(status.ok());
-        check_mem_index(mem_index);
+        {
+            auto [row_id, row_cnt] = check_mem_index(mem_index);
+            EXPECT_EQ(row_id, RowID(0, 2 * block_row_cnt));
+            EXPECT_EQ(row_cnt, block_row_cnt);
+        }
 
         ChunkID chunk_id = 0;
         {
@@ -7183,7 +7192,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             ChunkIndexMetaInfo *chunk_info = nullptr;
             Status status = chunk_index_meta.GetChunkInfo(chunk_info);
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_info->row_cnt_, 4);
+            EXPECT_EQ(chunk_info->row_cnt_, 2 * block_row_cnt);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
@@ -7224,32 +7233,27 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
         u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index2(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     // check_index2(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
     //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
@@ -7276,7 +7280,7 @@ TEST_P(NewCatalogTest, test_populate_index) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto column_def5 =
         std::make_shared<ColumnDef>(4, std::make_shared<DataType>(LogicalType::kTensor, column3_type_info), "col5", std::set<ConstraintType>());
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3, column_def4});
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3, column_def4, column_def5});
 
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
@@ -7298,7 +7302,7 @@ TEST_P(NewCatalogTest, test_populate_index) {
     auto index_def5 = IndexBMP::Make(index_name5, MakeShared<String>(), "file_name", Vector<String>{column_def4->name()}, index5_parameters);
     auto index_name6 = std::make_shared<std::string>("index6");
     Vector<InitParameter *> index6_parameters;
-    index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "32"));
+    index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "4"));
     index6_parameters.emplace_back(new InitParameter("pq_subspace_bits", "8"));
     auto index_def6 = IndexEMVB::Make(index_name6, MakeShared<String>(), "file_name", Vector<String>{column_def5->name()}, index6_parameters);
     DeferFn defer_fn([&] {
@@ -7329,28 +7333,32 @@ TEST_P(NewCatalogTest, test_populate_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    u32 block_row_cnt = 8192;
     auto input_block = MakeShared<DataBlock>();
     {
+        auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+            for (u32 i = 0; i < block_row_cnt; i += 2) {
+                col.AppendValue(v1);
+                col.AppendValue(v2);
+            }
+        };
         // Initialize input block
         {
             auto col1 = ColumnVector::Make(column_def1->type());
             col1->Initialize();
-            col1->AppendValue(Value::MakeInt(1));
-            col1->AppendValue(Value::MakeInt(2));
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
             input_block->InsertVector(col1, 0);
         }
         {
             auto col2 = ColumnVector::Make(column_def2->type());
             col2->Initialize();
-            col2->AppendValue(Value::MakeVarchar("abc"));
-            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             input_block->InsertVector(col2, 1);
         }
         {
             auto col3 = ColumnVector::Make(column_def3->type());
             col3->Initialize();
-            col3->AppendValue(Value::MakeEmbedding(Vector<float>{1.0, 2.0, 3.0, 4.0}));
-            col3->AppendValue(Value::MakeEmbedding(Vector<float>{5.0, 6.0, 7.0, 8.0}));
+            append_to_col(*col3, Value::MakeEmbedding(Vector<float>{1.0, 2.0, 3.0, 4.0}), Value::MakeEmbedding(Vector<float>{5.0, 6.0, 7.0, 8.0}));
             input_block->InsertVector(col3, 2);
         }
         {
@@ -7358,36 +7366,38 @@ TEST_P(NewCatalogTest, test_populate_index) {
             col4->Initialize();
             Pair<Vector<float>, Vector<int32_t>> vec{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 1000, 10000, 20000}};
             Pair<Vector<float>, Vector<int32_t>> vec2{Vector<float>{1.0, 2.0, 3.0, 4.0}, Vector<int32_t>{100, 2000, 10000, 20000}};
-            col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
-                                                reinterpret_cast<const char *>(vec.second.data()),
-                                                vec.first.size(),
-                                                column4_typeinfo));
-            col4->AppendValue(Value::MakeSparse(reinterpret_cast<const char *>(vec2.first.data()),
-                                                reinterpret_cast<const char *>(vec2.second.data()),
-                                                vec2.first.size(),
-                                                column4_typeinfo));
+            auto v1 = Value::MakeSparse(reinterpret_cast<const char *>(vec.first.data()),
+                                        reinterpret_cast<const char *>(vec.second.data()),
+                                        vec.first.size(),
+                                        column4_typeinfo);
+            auto v2 = Value::MakeSparse(reinterpret_cast<const char *>(vec2.first.data()),
+                                        reinterpret_cast<const char *>(vec2.second.data()),
+                                        vec2.first.size(),
+                                        column4_typeinfo);
+            append_to_col(*col4, std::move(v1), std::move(v2));
             input_block->InsertVector(col4, 3);
         }
-        // {
-        //     Vector<float> v1 = {1.0, 2.0, 3.0, 4.0};
-        //     Vector<float> v2 = {5.0, 6.0, 7.0, 8.0};
-        //     Vector<float> v3 = {9.0, 10.0, 11.0, 12.0};
-        //     auto col5 = ColumnVector::Make(column_def5->type());
-        //     col5->Initialize();
-        //     {
-        //         Vector<Pair<ptr_t, SizeT>> embedding_data;
-        //         embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v1.data()), v1.size() * sizeof(*v1.data())));
-        //         embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v2.data()), v2.size() * sizeof(*v2.data())));
-        //         col5->AppendValue(Value::MakeTensor(embedding_data, column3_type_info));
-        //     }
-        //     {
-        //         Vector<Pair<ptr_t, SizeT>> embedding_data;
-        //         embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v1.data()), v1.size() * sizeof(*v1.data())));
-        //         embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v3.data()), v3.size() * sizeof(*v3.data())));
-        //         col5->AppendValue(Value::MakeTensor(embedding_data, column3_type_info));
-        //     }
-        //     input_block->InsertVector(col5, 4);
-        // }
+        {
+            Vector<float> vec1 = {1.0, 2.0, 3.0, 4.0};
+            Vector<float> vec2 = {5.0, 6.0, 7.0, 8.0};
+            Vector<float> vec3 = {9.0, 10.0, 11.0, 12.0};
+            auto col5 = ColumnVector::Make(column_def5->type());
+            col5->Initialize();
+
+            Vector<Pair<ptr_t, SizeT>> embedding_data1;
+            embedding_data1.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(vec1.data()), vec1.size() * sizeof(*vec1.data())));
+            embedding_data1.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(vec2.data()), vec2.size() * sizeof(*vec2.data())));
+            Value v1 = Value::MakeTensor(embedding_data1, column3_type_info);
+
+            Vector<Pair<ptr_t, SizeT>> embedding_data2;
+            embedding_data2.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(vec1.data()), vec1.size() * sizeof(*vec1.data())));
+            embedding_data2.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(vec3.data()), vec3.size() * sizeof(*vec3.data())));
+            Value v2 = Value::MakeTensor(embedding_data2, column3_type_info);
+
+            append_to_col(*col5, std::move(v1), std::move(v2));
+
+            input_block->InsertVector(col5, 4);
+        }
         input_block->Finalize();
     }
     auto append_a_block = [&] {
@@ -7415,10 +7425,10 @@ TEST_P(NewCatalogTest, test_populate_index) {
     create_index(index_def3);
     create_index(index_def4);
     create_index(index_def5);
-    // create_index(index_def6);
+    create_index(index_def6);
     append_a_block();
 
-    auto check_index = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
+    auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
         String index_key;
         String index_id_str;
@@ -7443,7 +7453,11 @@ TEST_P(NewCatalogTest, test_populate_index) {
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
         EXPECT_TRUE(status.ok());
-        check_mem_index(mem_index);
+        {
+            auto [row_id, row_cnt] = check_mem_index(mem_index);
+            EXPECT_EQ(row_id, RowID(0, 2 * block_row_cnt));
+            EXPECT_EQ(row_cnt, block_row_cnt);
+        }
 
         ChunkID chunk_id = 0;
         {
@@ -7459,7 +7473,7 @@ TEST_P(NewCatalogTest, test_populate_index) {
             ChunkIndexMetaInfo *chunk_info = nullptr;
             Status status = chunk_index_meta.GetChunkInfo(chunk_info);
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_info->row_cnt_, 4);
+            EXPECT_EQ(chunk_info->row_cnt_, 2 * block_row_cnt);
             EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
         }
 
@@ -7473,37 +7487,31 @@ TEST_P(NewCatalogTest, test_populate_index) {
     check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
         u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
     check_index(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
         u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
-        EXPECT_EQ(begin_id, RowID(0, 4));
-        EXPECT_EQ(row_cnt, 2);
+        return std::make_pair(begin_id, row_cnt);
     });
-    // check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
-    //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
-    //     u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
-    //     EXPECT_EQ(begin_id, RowID(0, 4));
-    //     EXPECT_EQ(row_cnt, 2);
-    // });
+    check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+        return std::make_pair(begin_id, row_cnt);
+    });
 }

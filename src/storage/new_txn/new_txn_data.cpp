@@ -292,12 +292,20 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
         }
         SizeT actual_append = std::min(to_append_rows, block_meta.block_capacity() - block_row_count);
 
-        SegmentID segment_id = block_meta.segment_meta().segment_id();
-        BlockID block_id = block_meta.block_id();
-        AppendRange range(segment_id, block_id, block_row_count, actual_append, append_state->current_block_, append_state->current_block_offset_);
-        append_state->append_ranges_.push_back(range);
+        if (actual_append) {
+            SegmentID segment_id = block_meta.segment_meta().segment_id();
+            BlockID block_id = block_meta.block_id();
+            AppendRange range(segment_id,
+                              block_id,
+                              block_row_count,
+                              actual_append,
+                              append_state->current_block_,
+                              append_state->current_block_offset_);
+            append_state->append_ranges_.push_back(range);
 
-        block_meta.SetRowCnt(block_row_count + actual_append);
+            block_meta.SetRowCnt(block_row_count + actual_append);
+        }
+
         block_full = block_row_count + actual_append >= block_meta.block_capacity();
 
         SizeT segment_row_count = 0;
@@ -307,12 +315,19 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
                 return status;
             }
         }
-        block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
+        if (actual_append) {
+            block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
+        }
         segment_full = segment_row_count + actual_append >= block_meta.segment_meta().segment_capacity();
 
-        append_state->current_block_++;
-        append_state->current_count_ += actual_append;
-        append_state->current_block_offset_ += actual_append;
+        if (actual_append) {
+            append_state->current_count_ += actual_append;
+            append_state->current_block_offset_ += actual_append;
+            if (append_state->current_block_offset_ == input_block->row_count()) {
+                ++append_state->current_block_;
+                append_state->current_block_offset_ = 0;
+            }
+        }
         break;
     }
     return Status::OK();

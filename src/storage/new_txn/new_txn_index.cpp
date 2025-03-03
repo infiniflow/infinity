@@ -59,6 +59,8 @@ import abstract_bmp;
 import index_bmp;
 import bmp_index_file_worker;
 import emvb_index_in_mem;
+import emvb_index;
+import emvb_index_file_worker;
 
 namespace infinity {
 
@@ -373,6 +375,20 @@ Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                 buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker));
                 break;
             }
+            case IndexType::kEMVB: {
+                auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+                const auto segment_start_offset = base_row_id.segment_offset_;
+                auto file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                   index_dir,
+                                                                   std::move(emvb_index_file_name),
+                                                                   index_base,
+                                                                   column_def,
+                                                                   segment_start_offset,
+                                                                   buffer_mgr->persistence_manager());
+                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+                break;
+            }
             default: {
                 UnrecoverableError("Not implemented yet");
             }
@@ -609,10 +625,12 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                         return status;
                     }
                     mem_index->memory_emvb_index_ = EMVBIndexInMem::NewEMVBIndexInMem(index_base, column_def, base_row_id);
+                    TableMeeta &table_meta = segment_index_meta.table_index_meta().table_meta();
+                    mem_index->memory_emvb_index_->SetSegmentID(table_meta.db_id_str(), table_meta.table_id_str(), segment_index_meta.segment_id());
                 }
                 memory_emvb_index = mem_index->memory_emvb_index_;
             }
-            memory_emvb_index->Insert(col, offset, row_cnt, this);
+            memory_emvb_index->Insert(col, offset, row_cnt, this, segment_index_meta.kv_instance());
             break;
         }
         default: {
@@ -660,6 +678,11 @@ Status NewTxn::PopulateIndex(const String &db_name,
     ChunkID new_chunk_id = 0;
     if (index_base->index_type_ == IndexType::kIVF) {
         Status status = this->PopulateIvfIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+    } else if (index_base->index_type_ == IndexType::kEMVB) {
+        Status status = this->PopulateEmvbIndexInner(index_base, *segment_index_meta, segment_meta, column_def, new_chunk_id);
         if (!status.ok()) {
             return status;
         }
@@ -854,6 +877,56 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
         BufferHandle buffer_handle = buffer_obj->Load();
         auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
         data_ptr->BuildIVFIndex(this, segment_meta, row_count, column_def);
+    }
+    buffer_obj->Save();
+    return Status::OK();
+}
+
+Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
+                                      SegmentIndexMeta &segment_index_meta,
+                                      SegmentMeta &segment_meta,
+                                      SharedPtr<ColumnDef> column_def,
+                                      ChunkID &new_chunk_id) {
+    RowID base_row_id(segment_index_meta.segment_id(), 0);
+    u32 row_count = 0;
+    {
+        auto [rc, status] = segment_meta.GetRowCnt();
+        if (!status.ok()) {
+            return status;
+        }
+        row_count = rc;
+    }
+    ChunkID chunk_id = 0;
+    {
+        Status status = segment_index_meta.GetNextChunkID(chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    new_chunk_id = chunk_id;
+    Optional<ChunkIndexMeta> chunk_index_meta;
+    BufferObj *buffer_obj = nullptr;
+    {
+        Status status = this->AddNewChunkIndex(segment_index_meta,
+                                               chunk_id,
+                                               base_row_id,
+                                               row_count,
+                                               "" /*base_name*/,
+                                               0 /*index_size*/,
+                                               chunk_index_meta,
+                                               buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        BufferHandle buffer_handle = buffer_obj->Load();
+        auto *data_ptr = static_cast<EMVBIndex *>(buffer_handle.GetDataMut());
+        data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def, this);
     }
     buffer_obj->Save();
     return Status::OK();
@@ -1095,6 +1168,11 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
             index_size = mem_index->memory_bmp_index_->GetSizeInBytes();
             break;
         }
+        case IndexType::kEMVB: {
+            row_id = mem_index->memory_emvb_index_->GetBeginRowID();
+            row_count = mem_index->memory_emvb_index_->GetRowCount();
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -1144,6 +1222,11 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
             }
             break;
         }
+        case IndexType::kEMVB: {
+            mem_index->memory_emvb_index_->Dump(buffer_obj);
+            buffer_obj->Save();
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -1191,7 +1274,8 @@ Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffe
         case IndexType::kSecondary:
         case IndexType::kIVF:
         case IndexType::kHnsw:
-        case IndexType::kBMP: {
+        case IndexType::kBMP:
+        case IndexType::kEMVB: {
             String index_file_name = IndexFileName(segment_id, chunk_id);
             String index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
             buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
