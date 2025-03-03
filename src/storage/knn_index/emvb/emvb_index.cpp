@@ -41,6 +41,11 @@ import buffer_manager;
 import default_values;
 import block_index;
 
+import new_txn;
+import segment_meta;
+import block_meta;
+import column_meta;
+
 namespace infinity {
 
 extern template class EMVBSharedVec<u32>;
@@ -202,6 +207,178 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 }
             }
             auto [raw_data, embedding_num] = column_vector->GetTensorRaw(block_offset);
+            AddOneDocEmbeddings(reinterpret_cast<const f32 *>(raw_data.data()), embedding_num);
+        }
+        {
+            const auto time_5 = std::chrono::high_resolution_clock::now();
+            const auto total_add_time = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_5 - time_4);
+            const auto avg_add_time = total_add_time / row_count;
+            std::ostringstream oss;
+            oss << "EMVBIndex::BuildEMVBIndex: Add data, total row count: " << row_count << ", total time cost: " << total_add_time
+                << ", avg time cost: " << avg_add_time;
+            LOG_INFO(std::move(oss).str());
+        }
+    }
+}
+
+void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, SegmentMeta &segment_meta, const SharedPtr<ColumnDef> &column_def, NewTxn *txn) {
+    const auto time_0 = std::chrono::high_resolution_clock::now();
+    {
+        const SegmentID expected_segment_id = base_rowid.segment_id_;
+        if (const SegmentID segment_id = segment_meta.segment_id(); segment_id != expected_segment_id) {
+            const auto error_msg = fmt::format("EMVBIndex::BuildEMVBIndex: segment_id mismatch: expect {}, got {}.", expected_segment_id, segment_id);
+            UnrecoverableError(error_msg);
+        }
+    }
+    const SegmentOffset start_segment_offset = base_rowid.segment_offset_;
+    const ColumnID column_id = column_def->id();
+    u64 embedding_count = 0;
+    Deque<Pair<u32, u32>> all_embedding_pos;
+    {
+        // read the segment to get total embedding count
+        BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
+        BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
+
+        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+        ColumnVector column_vector;
+        u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
+        Status status = txn->GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vector);
+        if (!status.ok()) {
+            UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
+        }
+
+        const TensorT *tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
+        for (u32 i = 0; i < row_count; ++i) {
+            {
+                const SegmentOffset new_segment_offset = start_segment_offset + i;
+                block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
+                if (const BlockID new_block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY; new_block_id != block_id) {
+                    block_id = new_block_id;
+                    u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
+
+                    BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+                    ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+                    Status status = txn->GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vector);
+                    if (!status.ok()) {
+                        UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
+                    }
+                    tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
+                }
+            }
+            const auto [embedding_num, chunk_offset] = tensor_ptr[block_offset];
+            embedding_count += embedding_num;
+            for (u32 j = 0; j < embedding_num; ++j) {
+                all_embedding_pos.emplace_back(i, j);
+            }
+        }
+    }
+    const auto time_1 = std::chrono::high_resolution_clock::now();
+    {
+        std::ostringstream oss;
+        oss << "EMVBIndex::BuildEMVBIndex: Read segment data, total row count: " << row_count << ", total embedding count: " << embedding_count
+            << ", total time cost: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_1 - time_0);
+        LOG_INFO(std::move(oss).str());
+    }
+    // prepare centroid count
+    const u64 sqrt_embedding_num = std::sqrt(embedding_count);
+    const u64 centroid_count_before_8 = std::min<u64>(sqrt_embedding_num, embedding_count / 32ul);
+    const u64 centroid_count = (centroid_count_before_8 + 7ul) & (~(7ul));
+    // prepare training data
+    if (centroid_count > std::numeric_limits<u32>::max()) {
+        const auto error_msg = "EMVBIndex::BuildEMVBIndex: centroid_count exceeds u32 limit!";
+        LOG_ERROR(error_msg);
+        UnrecoverableError(error_msg);
+    }
+    n_centroids_ = static_cast<u32>(centroid_count);
+    const auto least_training_data_num = ExpectLeastTrainingDataNum();
+    if (embedding_count < least_training_data_num) {
+        const auto error_msg =
+            fmt::format("EMVBIndex::BuildEMVBIndex: embedding_count must be at least {}, got {} instead.", least_training_data_num, embedding_count);
+        UnrecoverableError(error_msg);
+    }
+    // train the index
+    {
+        const auto training_embedding_num = std::min<u64>(embedding_count, 8ul * least_training_data_num);
+        const auto training_data = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension_);
+        // prepare training data
+        {
+            Vector<Pair<u32, u32>> sample_result;
+            sample_result.reserve(training_embedding_num);
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::ranges::sample(all_embedding_pos, std::back_inserter(sample_result), training_embedding_num, gen);
+            if (sample_result.size() != training_embedding_num) {
+                const auto error_msg = fmt::format("EMVBIndex::BuildEMVBIndex: sample failed to get {} samples.", training_embedding_num);
+                UnrecoverableError(error_msg);
+            }
+            for (u64 i = 0; i < training_embedding_num; ++i) {
+                const auto [sample_row, sample_id] = sample_result[i];
+                const SegmentOffset new_segment_offset = start_segment_offset + sample_row;
+                const BlockID block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY;
+                const BlockOffset block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
+                BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+                ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+                ColumnVector column_vector;
+                u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
+                Status status = txn->GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vector);
+                if (!status.ok()) {
+                    UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
+                }
+                auto [raw_data, embedding_num] = column_vector.GetTensorRaw(block_offset);
+                std::copy_n(reinterpret_cast<const f32 *>(raw_data.data()) + sample_id * embedding_dimension_,
+                            embedding_dimension_,
+                            training_data.get() + i * embedding_dimension_);
+            }
+        }
+        const auto time_2 = std::chrono::high_resolution_clock::now();
+        {
+            std::ostringstream oss;
+            oss << "EMVBIndex::BuildEMVBIndex: Prepare training data, training embedding num: " << training_embedding_num
+                << ", time cost: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_2 - time_1);
+            LOG_INFO(std::move(oss).str());
+        }
+        // call train
+        Train(centroid_count, training_data.get(), training_embedding_num, 20);
+        const auto time_3 = std::chrono::high_resolution_clock::now();
+        {
+            std::ostringstream oss;
+            oss << "EMVBIndex::BuildEMVBIndex: Train index, time cost: "
+                << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_3 - time_2);
+            LOG_INFO(std::move(oss).str());
+        }
+    }
+    // add data
+    {
+        const auto time_4 = std::chrono::high_resolution_clock::now();
+        BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
+        BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
+
+        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+
+        u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
+        ColumnVector column_vector;
+        Status status = txn->GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vector);
+        if (!status.ok()) {
+            UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
+        }
+
+        for (u32 i = 0; i < row_count; ++i) {
+            {
+                const SegmentOffset new_segment_offset = start_segment_offset + i;
+                block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
+                if (const BlockID new_block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY; new_block_id != block_id) {
+                    block_id = new_block_id;
+
+                    BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+                    ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+
+                    u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
+                    Status status = txn->GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vector);
+                }
+            }
+            auto [raw_data, embedding_num] = column_vector.GetTensorRaw(block_offset);
             AddOneDocEmbeddings(reinterpret_cast<const f32 *>(raw_data.data()), embedding_num);
         }
         {

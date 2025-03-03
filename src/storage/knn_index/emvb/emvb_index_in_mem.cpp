@@ -45,6 +45,10 @@ import emvb_product_quantization;
 import column_vector;
 import block_index;
 
+import table_meeta;
+import segment_meta;
+import new_txn;
+
 namespace infinity {
 
 EMVBIndexInMem::EMVBIndexInMem(const u32 residual_pq_subspace_num,
@@ -93,6 +97,37 @@ void EMVBIndexInMem::Insert(BlockEntry *block_entry, SizeT column_idx, BufferMan
             emvb_index_ =
                 MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
             emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_entry_, column_def_, buffer_manager);
+            if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {
+                UnrecoverableError("EMVBIndexInMem Insert doc num or embedding num not consistent!");
+            }
+            is_built_.test_and_set(std::memory_order_release);
+        }
+    }
+}
+
+void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, NewTxn *txn) {
+    std::unique_lock lock(rw_mutex_);
+    if (is_built_.test(std::memory_order_acquire)) {
+        for (u32 i = 0; i < row_count; ++i) {
+            auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
+            emvb_index_->AddOneDocEmbeddings(reinterpret_cast<const f32 *>(raw_data.data()), embedding_num);
+            ++row_count_;
+            embedding_count_ += embedding_num;
+        }
+    } else {
+        for (u32 i = 0; i < row_count; ++i) {
+            auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
+            ++row_count_;
+            embedding_count_ += embedding_num;
+        }
+        // build index if have enough data
+        if (embedding_count_ >= build_index_threshold_) {
+            emvb_index_ =
+                MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
+
+            TableMeeta table_meta(db_id_str_, table_id_str_, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id_, table_meta, table_meta.kv_instance());
+            emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_meta, column_def_, txn);
             if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {
                 UnrecoverableError("EMVBIndexInMem Insert doc num or embedding num not consistent!");
             }

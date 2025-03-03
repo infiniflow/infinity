@@ -58,6 +58,7 @@ import index_hnsw;
 import abstract_bmp;
 import index_bmp;
 import bmp_index_file_worker;
+import emvb_index_in_mem;
 
 namespace infinity {
 
@@ -596,6 +597,22 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                 memory_bmp_index = mem_index->memory_bmp_index_;
             }
             memory_bmp_index->AddDocs(base_row_id.segment_offset_, col, offset, row_cnt);
+            break;
+        }
+        case IndexType::kEMVB: {
+            SharedPtr<EMVBIndexInMem> memory_emvb_index;
+            {
+                std::unique_lock<std::mutex> lock(mem_index->mtx_);
+                if (mem_index->memory_emvb_index_.get() == nullptr) {
+                    auto [column_def, status] = segment_index_meta.table_index_meta().GetColumnDef();
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    mem_index->memory_emvb_index_ = EMVBIndexInMem::NewEMVBIndexInMem(index_base, column_def, base_row_id);
+                }
+                memory_emvb_index = mem_index->memory_emvb_index_;
+            }
+            memory_emvb_index->Insert(col, offset, row_cnt, this);
             break;
         }
         default: {

@@ -62,6 +62,7 @@ import chunk_index_meta;
 import mem_index;
 import roaring_bitmap;
 import index_filter_evaluators;
+import index_emvb;
 
 using namespace infinity;
 
@@ -6871,16 +6872,17 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column3_type_info = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4);
     auto column_def3 =
-        std::make_shared<ColumnDef>(2,
-                                    std::make_shared<DataType>(LogicalType::kEmbedding, MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4)),
-                                    "col3",
-                                    std::set<ConstraintType>());
+        std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kEmbedding, column3_type_info), "col3", std::set<ConstraintType>());
     auto column4_typeinfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
     auto column_def4 =
         std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kSparse, column4_typeinfo), "col4", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
-    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3, column_def4});
+    auto column_def5 =
+        std::make_shared<ColumnDef>(4, std::make_shared<DataType>(LogicalType::kTensor, column3_type_info), "col5", std::set<ConstraintType>());
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3, column_def4, column_def5});
+
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
     auto index_name2 = std::make_shared<String>("index2");
@@ -6899,6 +6901,11 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     index5_parameters.emplace_back(new InitParameter("block_size", "16"));
     index5_parameters.emplace_back(new InitParameter("compress_type", "compress"));
     auto index_def5 = IndexBMP::Make(index_name5, MakeShared<String>(), "file_name", Vector<String>{column_def4->name()}, index5_parameters);
+    auto index_name6 = std::make_shared<std::string>("index6");
+    Vector<InitParameter *> index6_parameters;
+    index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "32"));
+    index6_parameters.emplace_back(new InitParameter("pq_subspace_bits", "8"));
+    auto index_def6 = IndexEMVB::Make(index_name6, MakeShared<String>(), "file_name", Vector<String>{column_def5->name()}, index6_parameters);
     DeferFn defer_fn([&] {
         for (auto *parameter : index3_parameters) {
             delete parameter;
@@ -6907,6 +6914,9 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             delete parameter;
         }
         for (auto *parameter : index5_parameters) {
+            delete parameter;
+        }
+        for (auto *parameter : index6_parameters) {
             delete parameter;
         }
     });
@@ -6936,6 +6946,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     create_index(index_def3);
     create_index(index_def4);
     create_index(index_def5);
+    create_index(index_def6);
 
     auto input_block = MakeShared<DataBlock>();
     {
@@ -6976,6 +6987,26 @@ TEST_P(NewCatalogTest, test_append_with_index) {
                                                 column4_typeinfo));
             input_block->InsertVector(col4, 3);
         }
+        {
+            Vector<float> v1 = {1.0, 2.0, 3.0, 4.0};
+            Vector<float> v2 = {5.0, 6.0, 7.0, 8.0};
+            Vector<float> v3 = {9.0, 10.0, 11.0, 12.0};
+            auto col5 = ColumnVector::Make(column_def5->type());
+            col5->Initialize();
+            {
+                Vector<Pair<ptr_t, SizeT>> embedding_data;
+                embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v1.data()), v1.size() * sizeof(*v1.data())));
+                embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v2.data()), v2.size() * sizeof(*v2.data())));
+                col5->AppendValue(Value::MakeTensor(embedding_data, column3_type_info));
+            }
+            {
+                Vector<Pair<ptr_t, SizeT>> embedding_data;
+                embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v1.data()), v1.size() * sizeof(*v1.data())));
+                embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v3.data()), v3.size() * sizeof(*v3.data())));
+                col5->AppendValue(Value::MakeTensor(embedding_data, column3_type_info));
+            }
+            input_block->InsertVector(col5, 4);
+        }
         input_block->Finalize();
     }
     auto append_a_block = [&] {
@@ -7001,6 +7032,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     dump_index(*index_name3);
     dump_index(*index_name4);
     dump_index(*index_name5);
+    // dump_index(*index_name6);
     append_a_block();
     // new_txn_mgr->PrintAllKeyValue();
 
@@ -7103,6 +7135,12 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         EXPECT_EQ(begin_id, RowID(0, 2));
         EXPECT_EQ(row_cnt, 2);
     });
+    // check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+    //     EXPECT_EQ(begin_id, RowID(0, 2));
+    //     EXPECT_EQ(row_cnt, 2);
+    // });
 
     auto merge_index = [&](const String &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("merge index {}", index_name)), TransactionType::kNormal);
@@ -7172,6 +7210,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     dump_index(*index_name3);
     dump_index(*index_name4);
     dump_index(*index_name5);
+    // dump_index(*index_name6);
 
     append_a_block();
 
@@ -7180,6 +7219,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     merge_index(*index_name3);
     merge_index(*index_name4);
     merge_index(*index_name5);
+    // merge_index(*index_name6);
 
     check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
@@ -7211,6 +7251,12 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         EXPECT_EQ(begin_id, RowID(0, 4));
         EXPECT_EQ(row_cnt, 2);
     });
+    // check_index2(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+    //     EXPECT_EQ(begin_id, RowID(0, 4));
+    //     EXPECT_EQ(row_cnt, 2);
+    // });
 }
 
 TEST_P(NewCatalogTest, test_populate_index) {
@@ -7221,19 +7267,20 @@ TEST_P(NewCatalogTest, test_populate_index) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column3_type_info = MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4);
     auto column_def3 =
-        std::make_shared<ColumnDef>(2,
-                                    std::make_shared<DataType>(LogicalType::kEmbedding, MakeShared<EmbeddingInfo>(EmbeddingDataType::kElemFloat, 4)),
-                                    "col3",
-                                    std::set<ConstraintType>());
+        std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kEmbedding, column3_type_info), "col3", std::set<ConstraintType>());
     auto column4_typeinfo = MakeShared<SparseInfo>(EmbeddingDataType::kElemFloat, EmbeddingDataType::kElemInt32, 30000, SparseStoreType::kSort);
     auto column_def4 =
         std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kSparse, column4_typeinfo), "col4", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
+    auto column_def5 =
+        std::make_shared<ColumnDef>(4, std::make_shared<DataType>(LogicalType::kTensor, column3_type_info), "col5", std::set<ConstraintType>());
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2, column_def3, column_def4});
+
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-    auto index_name2 = std::make_shared<String>("idx2");
+    auto index_name2 = std::make_shared<String>("index2");
     auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
     auto index_name3 = std::make_shared<std::string>("index3");
     Vector<InitParameter *> index3_parameters;
@@ -7249,6 +7296,11 @@ TEST_P(NewCatalogTest, test_populate_index) {
     index5_parameters.emplace_back(new InitParameter("block_size", "16"));
     index5_parameters.emplace_back(new InitParameter("compress_type", "compress"));
     auto index_def5 = IndexBMP::Make(index_name5, MakeShared<String>(), "file_name", Vector<String>{column_def4->name()}, index5_parameters);
+    auto index_name6 = std::make_shared<std::string>("index6");
+    Vector<InitParameter *> index6_parameters;
+    index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "32"));
+    index6_parameters.emplace_back(new InitParameter("pq_subspace_bits", "8"));
+    auto index_def6 = IndexEMVB::Make(index_name6, MakeShared<String>(), "file_name", Vector<String>{column_def5->name()}, index6_parameters);
     DeferFn defer_fn([&] {
         for (auto *parameter : index3_parameters) {
             delete parameter;
@@ -7257,6 +7309,9 @@ TEST_P(NewCatalogTest, test_populate_index) {
             delete parameter;
         }
         for (auto *parameter : index5_parameters) {
+            delete parameter;
+        }
+        for (auto *parameter : index6_parameters) {
             delete parameter;
         }
     });
@@ -7313,6 +7368,26 @@ TEST_P(NewCatalogTest, test_populate_index) {
                                                 column4_typeinfo));
             input_block->InsertVector(col4, 3);
         }
+        // {
+        //     Vector<float> v1 = {1.0, 2.0, 3.0, 4.0};
+        //     Vector<float> v2 = {5.0, 6.0, 7.0, 8.0};
+        //     Vector<float> v3 = {9.0, 10.0, 11.0, 12.0};
+        //     auto col5 = ColumnVector::Make(column_def5->type());
+        //     col5->Initialize();
+        //     {
+        //         Vector<Pair<ptr_t, SizeT>> embedding_data;
+        //         embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v1.data()), v1.size() * sizeof(*v1.data())));
+        //         embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v2.data()), v2.size() * sizeof(*v2.data())));
+        //         col5->AppendValue(Value::MakeTensor(embedding_data, column3_type_info));
+        //     }
+        //     {
+        //         Vector<Pair<ptr_t, SizeT>> embedding_data;
+        //         embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v1.data()), v1.size() * sizeof(*v1.data())));
+        //         embedding_data.emplace_back(std::make_pair(reinterpret_cast<ptr_t>(v3.data()), v3.size() * sizeof(*v3.data())));
+        //         col5->AppendValue(Value::MakeTensor(embedding_data, column3_type_info));
+        //     }
+        //     input_block->InsertVector(col5, 4);
+        // }
         input_block->Finalize();
     }
     auto append_a_block = [&] {
@@ -7340,6 +7415,7 @@ TEST_P(NewCatalogTest, test_populate_index) {
     create_index(index_def3);
     create_index(index_def4);
     create_index(index_def5);
+    // create_index(index_def6);
     append_a_block();
 
     auto check_index = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
@@ -7424,4 +7500,10 @@ TEST_P(NewCatalogTest, test_populate_index) {
         EXPECT_EQ(begin_id, RowID(0, 4));
         EXPECT_EQ(row_cnt, 2);
     });
+    // check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+    //     EXPECT_EQ(begin_id, RowID(0, 4));
+    //     EXPECT_EQ(row_cnt, 2);
+    // });
 }

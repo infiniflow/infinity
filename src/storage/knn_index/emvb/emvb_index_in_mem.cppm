@@ -30,6 +30,8 @@ struct SegmentEntry;
 class IndexBase;
 class EMVBIndex;
 struct BlockIndex;
+class ColumnVector;
+class NewTxn;
 
 using EMVBInMemQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
 
@@ -42,6 +44,11 @@ export class EMVBIndexInMem {
     const RowID begin_row_id_ = {};
     const SharedPtr<ColumnDef> column_def_;
     const SegmentEntry *segment_entry_ = nullptr;
+
+    String db_id_str_;
+    String table_id_str_;
+    SegmentID segment_id_ = -1;
+
     u32 row_count_ = 0;       // row of tensors
     u32 embedding_count_ = 0; // count of total embeddings
     UniquePtr<EMVBIndex> emvb_index_;
@@ -59,9 +66,19 @@ public:
                    RowID begin_row_id,
                    SharedPtr<ColumnDef> column_def);
 
+    void SetSegmentID(String db_id_str, String table_id_str, SegmentID segment_id) {
+        db_id_str_ = std::move(db_id_str);
+        table_id_str_ = std::move(table_id_str);
+        segment_id_ = segment_id;
+    }
+
+    RowID GetBeginRowID() const { return begin_row_id_; }
+
     u32 GetRowCount() const;
 
     void Insert(BlockEntry *block_entry, SizeT column_idx, BufferManager *buffer_manager, u32 row_offset, u32 row_count);
+
+    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, NewTxn *txn);
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
 
