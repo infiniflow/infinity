@@ -591,8 +591,6 @@ Status Storage::UnInitFromWriter() {
     }
 
     catalog_.reset();
-    kv_store_->Uninit();
-    kv_store_.reset();
 
     memory_index_tracer_.reset();
 
@@ -628,6 +626,8 @@ Status Storage::UnInitFromWriter() {
         new_txn_mgr_->Stop();
         new_txn_mgr_.reset();
     }
+    kv_store_->Uninit();
+    kv_store_.reset();
 
     if (buffer_mgr_ != nullptr) {
         buffer_mgr_->Stop();
