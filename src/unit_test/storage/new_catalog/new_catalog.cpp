@@ -7038,7 +7038,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     dump_index(*index_name3);
     dump_index(*index_name4);
     dump_index(*index_name5);
-    // dump_index(*index_name6);
+    dump_index(*index_name6);
     append_a_block();
     // new_txn_mgr->PrintAllKeyValue();
 
@@ -7140,12 +7140,11 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
-    // check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
-    //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
-    //     u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
-    //     EXPECT_EQ(begin_id, RowID(0, 2));
-    //     EXPECT_EQ(row_cnt, 2);
-    // });
+    check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+        return std::make_pair(begin_id, row_cnt);
+    });
 
     auto merge_index = [&](const String &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("merge index {}", index_name)), TransactionType::kNormal);
@@ -7219,7 +7218,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     dump_index(*index_name3);
     dump_index(*index_name4);
     dump_index(*index_name5);
-    // dump_index(*index_name6);
+    dump_index(*index_name6);
 
     append_a_block();
 
@@ -7228,7 +7227,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     merge_index(*index_name3);
     merge_index(*index_name4);
     merge_index(*index_name5);
-    // merge_index(*index_name6);
+    merge_index(*index_name6);
 
     check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
         RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
@@ -7255,12 +7254,11 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
-    // check_index2(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
-    //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
-    //     u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
-    //     EXPECT_EQ(begin_id, RowID(0, 4));
-    //     EXPECT_EQ(row_cnt, 2);
-    // });
+    check_index2(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+        return std::make_pair(begin_id, row_cnt);
+    });
 }
 
 TEST_P(NewCatalogTest, test_populate_index) {

@@ -731,7 +731,9 @@ void WalManager::UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size) {
                                            max_commit_ts_,
                                            wal_size,
                                            wal_size_);
-        UnrecoverableError(error_message);
+        // UnrecoverableError(error_message);
+        LOG_ERROR(error_message);
+        return;
     }
     max_commit_ts_ = commit_ts;
     wal_size_ = wal_size;

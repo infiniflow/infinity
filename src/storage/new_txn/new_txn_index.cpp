@@ -244,6 +244,22 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             }
             break;
         }
+        case IndexType::kEMVB: {
+            SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+            SharedPtr<ColumnDef> column_def;
+            {
+                auto [col_def, status] = table_index_meta.GetColumnDef();
+                if (!status.ok()) {
+                    return status;
+                }
+                column_def = std::move(col_def);
+            }
+
+            BufferHandle buffer_handle = buffer_obj->Load();
+            auto *data_ptr = static_cast<EMVBIndex *>(buffer_handle.GetDataMut());
+            data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, column_def, this);
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
