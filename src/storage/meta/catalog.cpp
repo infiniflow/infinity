@@ -1172,7 +1172,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Save catalog to tmp file.
     // FIXME: Temp implementation, will be replaced by async task.
-        auto [catalog_file_handle, status] = VirtualStore::Open(catalog_tmp_path, FileAccessMode::kWrite);
+    auto [catalog_file_handle, status] = VirtualStore::Open(catalog_tmp_path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("{}: {}", catalog_tmp_path, status.message()));
     }
@@ -1336,7 +1336,7 @@ void Catalog::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
             db_entry->MemIndexRecover(buffer_manager, ts);
         }
     }
-    for(auto& segment_index_entry:all_memindex_recover_segment_){
+    for (auto &segment_index_entry : all_memindex_recover_segment_) {
         segment_index_entry->MemIndexWaitInflightTasks();
     }
     all_memindex_recover_segment_.clear();

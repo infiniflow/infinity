@@ -14,7 +14,6 @@
 
 module;
 
-#include <arrow/compute/row/grouper.h>
 #include <cassert>
 #include <vector>
 
