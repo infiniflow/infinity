@@ -444,7 +444,7 @@ export struct WalCmdCheckpoint final : public WalCmd {
 };
 
 export struct WalCmdCompact final : public WalCmd {
-    WalCmdCompact(String &&db_name, String &&table_name, Vector<WalSegmentInfo> &&new_segment_infos, Vector<SegmentID> &&deprecated_segment_ids)
+    WalCmdCompact(String db_name, String table_name, Vector<WalSegmentInfo> new_segment_infos, Vector<SegmentID> deprecated_segment_ids)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), new_segment_infos_(std::move(new_segment_infos)),
           deprecated_segment_ids_(std::move(deprecated_segment_ids)) {}
 
@@ -459,6 +459,9 @@ export struct WalCmdCompact final : public WalCmd {
     const String table_name_{};
     Vector<WalSegmentInfo> new_segment_infos_{};
     const Vector<SegmentID> deprecated_segment_ids_{};
+
+    String db_id_str_;
+    String table_id_str_;
 };
 
 export struct WalCmdOptimize final : public WalCmd {

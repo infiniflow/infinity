@@ -43,6 +43,89 @@ import table_index_meeta;
 
 namespace infinity {
 
+struct NewTxnCompactState {
+    NewTxnCompactState(SegmentID segment_id, TableMeeta &table_meta) : new_segment_meta_(segment_id, table_meta, table_meta.kv_instance()) {
+        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            UnrecoverableError("Failed to get column defs");
+        }
+        column_cnt_ = column_defs_ptr->size();
+    }
+
+    SizeT column_cnt() const { return column_cnt_; }
+
+    Status NextBlock(NewTxn *txn) {
+        Status status;
+
+        if (block_meta_) {
+            status = block_meta_->SetRowCnt(cur_block_row_cnt_);
+            if (!status.ok()) {
+                return status;
+            }
+            block_meta_.reset();
+        }
+
+        BlockID block_id = 0;
+        {
+            status = new_segment_meta_.GetNextBlockID(block_id);
+            if (!status.ok()) {
+                return status;
+            }
+            status = new_segment_meta_.SetNextBlockID(block_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        block_meta_.emplace(block_id, new_segment_meta_, new_segment_meta_.kv_instance());
+        status = txn->AddNewBlock(&new_segment_meta_, block_id, &*block_meta_);
+        if (!status.ok()) {
+            return status;
+        }
+        cur_block_row_cnt_ = 0;
+
+        column_vectors_.clear();
+        column_vectors_.resize(column_cnt_);
+
+        for (SizeT i = 0; i < column_cnt_; ++i) {
+            ColumnMeta column_meta(i, *block_meta_, block_meta_->kv_instance());
+            status = txn->GetColumnVector(column_meta, 0, ColumnVectorTipe::kReadWrite, column_vectors_[i]);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        return status;
+    }
+
+    Status FinalizeBlock() {
+        if (block_meta_) {
+            Status status = block_meta_->SetRowCnt(cur_block_row_cnt_);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        block_meta_.reset();
+        return Status::OK();
+    }
+
+    Status Finalize() {
+        if (block_meta_) {
+            Status status = block_meta_->SetRowCnt(cur_block_row_cnt_);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        Status status = new_segment_meta_.SetRowCnt(segment_row_cnt_);
+        return status;
+    }
+
+    SegmentMeta new_segment_meta_;
+    Optional<BlockMeta> block_meta_;
+    SizeT segment_row_cnt_ = 0;
+    BlockOffset cur_block_row_cnt_ = 0;
+    Vector<ColumnVector> column_vectors_;
+    SizeT column_cnt_ = 0;
+};
+
 void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts) {
     block_lock_ = std::move(block_lock);
     version_buffer_handle_ = std::move(version_buffer_handle);
@@ -277,6 +360,101 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     auto delete_status = table_store->Delete(row_ids);
     if (!delete_status.ok()) {
         return delete_status;
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::Compact(const String &db_name, const String &table_name) {
+    Status status;
+
+    this->CheckTxn(db_name);
+
+    String db_id_str;
+    String table_id_str;
+    {
+        String table_key;
+        Status status = this->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
+
+    SegmentID new_segment_id = 0;
+    {
+        std::tie(new_segment_id, status) = table_meta.GetLatestSegmentID();
+        if (!status.ok()) {
+            return status;
+        }
+        new_segment_id += 1;
+        status = table_meta.SetLatestSegmentID(new_segment_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    NewTxnCompactState compact_state(new_segment_id, table_meta);
+
+    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+
+        SharedPtr<Vector<BlockID>> block_ids_ptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs();
+        if (!status.ok()) {
+            return status;
+        }
+
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+            status = this->CompactBlock(block_meta, compact_state);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+    status = compact_state.Finalize();
+    if (!status.ok()) {
+        return status;
+    }
+
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Vector<String> *index_name_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+        const String &index_id_str = (*index_id_strs_ptr)[i];
+        const String &index_name = (*index_name_ptr)[i];
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+
+        status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, compact_state.new_segment_meta_);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    status = table_meta.SetSegmentIDs(Vector<SegmentID>{new_segment_id});
+    if (!status.ok()) {
+        return status;
+    }
+    {
+        Vector<SegmentID> deprecated_segment_ids = *segment_ids_ptr;
+        Vector<WalSegmentInfo> segment_infos;
+        segment_infos.emplace_back(compact_state.new_segment_meta_);
+        auto compact_command = MakeShared<WalCmdCompact>(db_name, table_name, std::move(segment_infos), std::move(deprecated_segment_ids));
+        wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
+        txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
+        compact_command->db_id_str_ = db_id_str;
+        compact_command->table_id_str_ = table_id_str;
     }
 
     return Status::OK();
@@ -542,6 +720,69 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &b
             block_version->Delete(block_offset, commit_ts);
         }
     }
+    return Status::OK();
+}
+
+Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state) {
+    Status status;
+
+    NewTxnGetVisibleRangeState range_state;
+    status = this->GetBlockVisibleRange(block_meta, range_state);
+    if (!status.ok()) {
+        return status;
+    }
+
+    SizeT block_row_cnt = range_state.block_offset_end();
+
+    SizeT column_cnt = compact_state.column_cnt();
+    Vector<ColumnVector> column_vectors;
+    column_vectors.resize(column_cnt);
+    for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
+        ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+
+        status = this->GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vectors[column_id]);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    Pair<BlockOffset, BlockOffset> range;
+    BlockOffset offset = 0;
+    while (range_state.Next(offset, range)) {
+        if (range.second == range.first) {
+            offset = range.second;
+            continue;
+        }
+        SizeT append_size = 0;
+        while (true) {
+            if (!compact_state.block_meta_) {
+                status = compact_state.NextBlock(this);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            append_size = std::min(SizeT(range.second - range.first), compact_state.block_meta_->block_capacity() - compact_state.cur_block_row_cnt_);
+            if (append_size == 0) {
+                status = compact_state.FinalizeBlock();
+                if (!status.ok()) {
+                    return status;
+                }
+                status = compact_state.NextBlock(this);
+                if (!status.ok()) {
+                    return status;
+                }
+            } else {
+                break;
+            }
+        }
+
+        for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
+            compact_state.column_vectors_[column_id].AppendWith(column_vectors[column_id], range.first, append_size);
+        }
+        compact_state.cur_block_row_cnt_ += append_size;
+        offset = range.first + append_size;
+    }
+
     return Status::OK();
 }
 
@@ -832,6 +1073,55 @@ Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd) {
             return status;
         }
     }
+    return Status::OK();
+}
+
+Status NewTxn::CommitCompact(const WalCmdCompact *compact_cmd) {
+    const String &db_id_str = compact_cmd->db_id_str_;
+    const String &table_id_str = compact_cmd->table_id_str_;
+
+    const Vector<WalSegmentInfo> &segment_infos = compact_cmd->new_segment_infos_;
+    if (segment_infos.empty()) {
+        return Status::OK();
+    }
+    if (segment_infos.size() > 1) {
+        UnrecoverableError("Not implemented");
+    }
+    const WalSegmentInfo &segment_info = segment_infos[0];
+
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
+    SegmentMeta segment_meta(segment_info.segment_id_, table_meta, table_meta.kv_instance());
+
+    Status status = this->CommitSegmentVersion(segment_info, segment_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Status NewTxn::CommitSegmentVersion(const WalSegmentInfo &segment_info, SegmentMeta &segment_meta) {
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+        BlockMeta block_meta(block_info.block_id_, segment_meta, segment_meta.kv_instance());
+        SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
+
+        BufferObj *version_buffer = nullptr;
+        {
+            String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+            version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+            if (version_buffer == nullptr) {
+                return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+            }
+        }
+        BufferHandle buffer_handle = version_buffer->Load();
+        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+
+        block_version->Append(commit_ts, block_info.row_count_);
+        version_buffer->Save(VersionFileWorkerSaveCtx(commit_ts));
+    }
+
     return Status::OK();
 }
 

@@ -64,6 +64,7 @@ struct WalCmdDropIndex;
 struct WalCmdImport;
 struct WalCmdAppend;
 struct WalCmdDelete;
+struct WalCmdCompact;
 struct WalCmdDumpIndex;
 struct WalChunkIndexInfo;
 struct WalSegmentInfo;
@@ -83,6 +84,8 @@ class ChunkIndexMeta;
 class SegmentIndexMeta;
 class TableIndexMeeta;
 struct MemIndex;
+
+struct NewTxnCompactState;
 
 export class NewTxnGetVisibleRangeState {
 public:
@@ -283,6 +286,8 @@ public:
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
 
+    Status Compact(const String &db_name, const String &table_name);
+
     Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
     Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
@@ -370,6 +375,8 @@ public:
                       String &db_id);
 
 private:
+    friend struct NewTxnCompactState;
+
     Status GetColumnDefs(const String &db_id, const String &table_id, Vector<SharedPtr<ColumnDef>> &column_defs);
 
     // DML
@@ -469,6 +476,7 @@ private:
     Status CommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitDelete(const WalCmdDelete *delete_cmd);
+    Status CommitCompact(const WalCmdCompact *compact_cmd);
     Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd);
 
     Status CommitSegmentVersion(const WalSegmentInfo &segment_info, SegmentMeta &segment_meta);

@@ -41,6 +41,8 @@ public:
 
     Status SetLatestSegmentID(SegmentID next_segment_id);
 
+    Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
+
     Status AddSegmentID(SegmentID segment_id);
 
     Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
@@ -59,8 +61,6 @@ private:
     Status LoadLatestSegmentID();
 
     String GetTableTag(const String &tag) const;
-
-    Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
 private:
     KVInstance &kv_instance_;

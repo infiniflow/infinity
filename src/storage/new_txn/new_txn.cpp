@@ -1278,6 +1278,14 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::COMPACT: {
+                auto *compact_cmd = static_cast<WalCmdCompact *>(command.get());
+                Status status = CommitCompact(compact_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             default: {
                 UnrecoverableError(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
                 break;
