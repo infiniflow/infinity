@@ -6608,6 +6608,141 @@ TEST_P(NewCatalogTest, test_block_lock) {
     }
 }
 
+TEST_P(NewCatalogTest, test_import) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    u32 block_row_cnt = 8192;
+    auto make_input_block = [&] {
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+            for (u32 i = 0; i < block_row_cnt; i += 2) {
+                col.AppendValue(v1);
+                col.AppendValue(v2);
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+    for (int i = 0; i < 2; ++i) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        Status status = txn->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        String table_key;
+        String table_id_str;
+        String db_id_str;
+        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        EXPECT_TRUE(status.ok());
+
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({1, 2}));
+
+        auto check_block = [&](BlockMeta &block_meta) {
+            NewTxnGetVisibleRangeState state;
+            Status status = txn->GetBlockVisibleRange(block_meta, state);
+            EXPECT_TRUE(status.ok());
+
+            BlockOffset offset = 0;
+            Pair<BlockOffset, BlockOffset> range;
+            bool next = state.Next(offset, range);
+            EXPECT_TRUE(next);
+            EXPECT_EQ(range.first, 0);
+            EXPECT_EQ(range.second, block_row_cnt);
+            offset = range.second;
+            next = state.Next(offset, range);
+            EXPECT_FALSE(next);
+
+            SizeT row_count = state.block_offset_end();
+            {
+                SizeT column_idx = 0;
+                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnVector col;
+
+                Status status = txn->GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            }
+            {
+                SizeT column_idx = 1;
+                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnVector col;
+
+                Status status = txn->GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            }
+        };
+
+        auto check_segment = [&](SegmentMeta &segment_meta) {
+            Vector<BlockID> *block_ids{};
+            status = segment_meta.GetBlockIDs(block_ids);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
+
+            for (auto block_id : *block_ids) {
+                BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                check_block(block_meta);
+            }
+        };
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            check_segment(segment_meta);
+        }
+    }
+}
+
 TEST_P(NewCatalogTest, test_append) {
     using namespace infinity;
 

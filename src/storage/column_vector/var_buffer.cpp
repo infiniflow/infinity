@@ -138,6 +138,17 @@ SizeT VarBufferManager::Append(const char *data, SizeT size, bool *free_success)
     return Append(std::move(buffer), size, free_success);
 }
 
+void VarBufferManager::SetToCatalog(BufferObj *outline_buffer_obj) {
+    if (type_ != BufferType::kBuffer) {
+        UnrecoverableError("Cannot convert to new catalog");
+    }
+    type_ = BufferType::kNewCatalog;
+    outline_buffer_obj_ = outline_buffer_obj;
+    outline_buffer_obj_->SetData(mem_buffer_.release());
+
+    buffer_handle_ = outline_buffer_obj_->Load();
+}
+
 void VarBufferManager::InitBuffer() {
     switch (type_) {
         case BufferType::kBuffer: {

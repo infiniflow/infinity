@@ -204,6 +204,21 @@ void VectorBuffer::Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_o
     capacity_ = capacity;
 }
 
+void VectorBuffer::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj) {
+    if (!std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+        UnrecoverableError("Cannot convert to new catalog");
+    }
+
+    void *src_ptr = std::get<UniquePtr<char[]>>(ptr_).release();
+    buffer_obj->SetData(src_ptr);
+
+    BufferHandle buffer_handle = buffer_obj->Load();
+    ptr_ = buffer_handle;
+    if (buffer_type_ == VectorBufferType::kVarBuffer) {
+        var_buffer_mgr_->SetToCatalog(outline_buffer_obj);
+    }
+}
+
 void VectorBuffer::ResetToInit(VectorBufferType type) {
     if (type == VectorBufferType::kVarBuffer) {
         if (var_buffer_mgr_.get() != nullptr) {

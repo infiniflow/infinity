@@ -43,6 +43,17 @@ public:
         buffers_ = buffer;
     }
 
+    VarBuffer(VarBuffer &&other) : buffers_(std::move(other.buffers_)), buffer_size_prefix_sum_(std::move(other.buffer_size_prefix_sum_)), buffer_obj_(other.buffer_obj_) {}
+
+    VarBuffer &operator=(VarBuffer &&other) {
+        if (this != &other) {
+            buffers_ = std::move(other.buffers_);
+            buffer_size_prefix_sum_ = std::move(other.buffer_size_prefix_sum_);
+            buffer_obj_ = other.buffer_obj_;
+        }
+        return *this;
+    }
+
 public:
     SizeT Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success = nullptr);
 
@@ -84,6 +95,8 @@ public:
     SizeT Write(char *ptr, SizeT offset, SizeT size) { return GetInner()->Write(ptr, offset, size); }
 
     SizeT TotalSize() { return GetInner()->TotalSize(); }
+
+    void SetToCatalog(BufferObj *outline_buffer_obj);
 
 private:
     void InitBuffer();

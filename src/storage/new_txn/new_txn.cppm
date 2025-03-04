@@ -61,10 +61,12 @@ struct WalCmdAddColumns;
 struct WalCmdDropColumns;
 struct WalCmdCreateIndex;
 struct WalCmdDropIndex;
+struct WalCmdImport;
 struct WalCmdAppend;
 struct WalCmdDelete;
 struct WalCmdDumpIndex;
 struct WalChunkIndexInfo;
+struct WalSegmentInfo;
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
@@ -271,6 +273,8 @@ public:
     // DML
     Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
 
+    Status Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks);
+
     Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
 
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
@@ -394,6 +398,8 @@ private:
 
     Status DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets);
 
+    Status CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state);
+
     Status AppendIndex(TableIndexMeeta &table_index_meta, const AppendState *append_state);
 
     Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
@@ -438,6 +444,8 @@ private:
                        const Vector<ChunkID> &deprecate_ids,
                        bool clear_mem_index);
 
+    Status GetBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj);
+
 public:
     Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);
 
@@ -457,10 +465,13 @@ private:
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
+    Status CommitImport(const WalCmdImport *import_cmd);
     Status CommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitAppend(const WalCmdAppend *append_cmd);
     Status PostCommitDelete(const WalCmdDelete *delete_cmd);
     Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd);
+
+    Status CommitSegmentVersion(const WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 

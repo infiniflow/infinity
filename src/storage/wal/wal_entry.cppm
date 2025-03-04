@@ -37,6 +37,8 @@ struct SegmentEntry;
 struct ChunkIndexEntry;
 enum class SegmentStatus;
 class ChunkIndexMeta;
+class BlockMeta;
+class SegmentMeta;
 
 export enum class WalCommandType : i8 {
     INVALID = 0,
@@ -97,6 +99,8 @@ export struct WalBlockInfo {
 
     explicit WalBlockInfo(BlockEntry *block_entry);
 
+    explicit WalBlockInfo(BlockMeta &block_meta);
+
     bool operator==(const WalBlockInfo &other) const;
 
     [[nodiscard]] i32 GetSizeInBytes() const;
@@ -119,6 +123,8 @@ export struct WalSegmentInfo {
     WalSegmentInfo() = default;
 
     explicit WalSegmentInfo(SegmentEntry *segment_entry);
+
+    explicit WalSegmentInfo(SegmentMeta &segment_meta);
 
     bool operator==(const WalSegmentInfo &other) const;
 
@@ -322,6 +328,9 @@ export struct WalCmdImport final : public WalCmd {
     String db_name_{};
     String table_name_{};
     WalSegmentInfo segment_info_;
+
+    String db_id_str_{};
+    String table_id_str_{};
 };
 
 export struct WalCmdAppend final : public WalCmd {

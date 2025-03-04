@@ -43,6 +43,10 @@ import persistence_manager;
 import infinity_context;
 import virtual_store;
 import chunk_index_meta;
+import table_meeta;
+import segment_meta;
+import block_meta;
+import column_meta;
 import default_values;
 import status;
 
@@ -60,6 +64,46 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
     }
     String version_file_path = fmt::format("{}/{}", *block_entry->block_dir(), *BlockVersion::FileName());
     paths_.push_back(version_file_path);
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
+#ifdef INFINITY_DEBUG
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
+#endif
+}
+
+WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_id()) {
+    Status status;
+
+    SizeT row_count = 0;
+    status = block_meta.GetRowCnt(row_count);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    row_count_ = row_count;
+
+    row_capacity_ = block_meta.block_capacity();
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    outline_infos_.resize(column_defs_ptr->size());
+    for (SizeT i = 0; i < column_defs_ptr->size(); i++) {
+        ColumnID column_id = (*column_defs_ptr)[i]->id();
+        ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+        SizeT chunk_offset = 0;
+        status = column_meta.GetChunkOffset(chunk_offset);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        outline_infos_[i] = {1, chunk_offset};
+
+        // TODO
+    }
+
     auto *pm = InfinityContext::instance().persistence_manager();
     addr_serializer_.Initialize(pm, paths_);
 #ifdef INFINITY_DEBUG
@@ -157,6 +201,40 @@ WalSegmentInfo::WalSegmentInfo(SegmentEntry *segment_entry)
     for (auto &block_entry : segment_entry->block_entries_) {
         block_infos_.push_back(WalBlockInfo(block_entry.get()));
     }
+}
+
+WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta) : segment_id_(segment_meta.segment_id()) {
+    Status status;
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    std::tie(column_defs_ptr, status) = segment_meta.table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    column_count_ = column_defs_ptr->size();
+
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    status = segment_meta.GetBlockIDs(block_ids_ptr);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    SizeT row_count = 0;
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        block_infos_.emplace_back(block_meta);
+
+        SizeT block_row_cnt = 0;
+        status = block_meta.GetRowCnt(block_row_cnt);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        row_count += block_row_cnt;
+    }
+
+    row_count_ = row_count;
+    actual_row_count_ = -1; // TODO
+    row_capacity_ = segment_meta.segment_capacity();
 }
 
 bool WalSegmentInfo::operator==(const WalSegmentInfo &other) const {

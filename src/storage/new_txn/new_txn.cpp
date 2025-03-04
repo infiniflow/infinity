@@ -1270,8 +1270,16 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::DELETE: {
                 break;
             }
+            case WalCommandType::IMPORT: {
+                auto *import_cmd = static_cast<WalCmdImport *>(command.get());
+                Status status = CommitImport(import_cmd);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
             default: {
-                LOG_WARN(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
+                UnrecoverableError(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
                 break;
             }
         }

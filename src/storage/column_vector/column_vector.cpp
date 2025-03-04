@@ -202,6 +202,29 @@ void ColumnVector::Initialize(BufferObj *buffer_obj,
     tail_index_ = current_row_count;
 }
 
+void ColumnVector::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorTipe vector_tipe) {
+    if (buffer_.get() == nullptr) {
+        UnrecoverableError("Column vector is not initialized.");
+    }
+
+    if (vector_type_ == ColumnVectorType::kConstant) {
+        UnrecoverableError("Constant column vector cannot be set to catalog.");
+    } else {
+        buffer_->SetToCatalog(buffer_obj, outline_buffer_obj);
+    }
+    switch (vector_tipe) {
+        case ColumnVectorTipe::kReadWrite: {
+            data_ptr_ = buffer_->GetDataMut();
+            break;
+        }
+        case ColumnVectorTipe::kReadOnly: {
+            data_ptr_ = const_cast<ptr_t>(buffer_->GetData());
+            break;
+        }
+    }
+}
+
+
 void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
     ColumnVectorType vector_type = other.vector_type_;
     Initialize(vector_type, vector_type == ColumnVectorType::kConstant ? other.capacity() : DEFAULT_VECTOR_SIZE);

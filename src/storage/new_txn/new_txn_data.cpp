@@ -74,6 +74,125 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
     return block_offset_begin < row_idx;
 }
 
+Status NewTxn::Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks) {
+    this->CheckTxn(db_name);
+
+    Status status;
+
+    String db_id_str;
+    String table_id_str;
+    String table_key;
+    status = this->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
+
+    SegmentID segment_id = 0;
+    {
+        std::tie(segment_id, status) = table_meta.GetLatestSegmentID();
+        if (!status.ok()) {
+            return status;
+        }
+        segment_id += 1;
+        status = table_meta.SetLatestSegmentID(segment_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    Optional<SegmentMeta> segment_meta;
+    status = this->AddNewSegment(table_meta, segment_id, segment_meta);
+    if (!status.ok()) {
+        return status;
+    }
+
+    SizeT segment_row_cnt = 0;
+    for (SizeT j = 0; j < input_blocks.size(); ++j) {
+        const SharedPtr<DataBlock> &input_block = input_blocks[j];
+        if (!input_block->Finalized()) {
+            UnrecoverableError("Attempt to import unfinalized data block");
+        }
+        u32 row_cnt = input_block->row_count();
+
+        BlockID block_id = 0;
+        {
+            status = segment_meta->GetNextBlockID(block_id);
+            if (!status.ok()) {
+                return status;
+            }
+            status = segment_meta->SetNextBlockID(block_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        BlockMeta block_meta(block_id, *segment_meta, segment_meta->kv_instance());
+        status = this->AddNewBlock(&*segment_meta, block_id, &block_meta);
+        if (!status.ok()) {
+            return status;
+        }
+
+        if (j < input_blocks.size() - 1 && row_cnt != block_meta.block_capacity()) {
+            UnrecoverableError("Attempt to import data block with different capacity");
+        }
+
+        for (SizeT i = 0; i < input_block->column_count(); ++i) {
+            SharedPtr<ColumnVector> col = input_block->column_vectors[i];
+
+            ColumnMeta column_meta(i, block_meta, block_meta.kv_instance());
+
+            BufferObj *buffer_obj = nullptr;
+            BufferObj *outline_buffer_obj = nullptr;
+
+            status = this->GetBufferObj(column_meta, buffer_obj, outline_buffer_obj);
+            if (!status.ok()) {
+                return status;
+            }
+            col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorTipe::kReadWrite);
+
+            buffer_obj->Save();
+            if (outline_buffer_obj) {
+                outline_buffer_obj->Save();
+            }
+        }
+
+        status = block_meta.SetRowCnt(row_cnt);
+        if (!status.ok()) {
+            return status;
+        }
+        segment_row_cnt += row_cnt;
+    }
+    status = segment_meta->SetRowCnt(segment_row_cnt);
+    if (!status.ok()) {
+        return status;
+    }
+
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Vector<String> *index_names_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+        const String &index_id_str = (*index_id_strs_ptr)[i];
+        const String &index_name = (*index_names_ptr)[i];
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+
+        status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *segment_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta));
+    wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(import_command));
+    txn_context_ptr_->AddOperation(MakeShared<String>(import_command->ToString()));
+    import_command->db_id_str_ = db_id_str;
+    import_command->table_id_str_ = table_id_str;
+
+    return Status::OK();
+}
+
 Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
     this->CheckTxn(db_name);
     NewTxnTableStore1 *table_store = nullptr;
@@ -426,7 +545,7 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &b
     return Status::OK();
 }
 
-Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector) {
+Status NewTxn::GetBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj) {
     SharedPtr<String> block_dir_ptr = column_meta.block_meta().GetBlockDir();
     const ColumnDef *col_def = nullptr;
     {
@@ -439,7 +558,6 @@ Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnV
     }
 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    BufferObj *buffer_obj = nullptr;
     {
         String col_filename = std::to_string(column_meta.column_idx()) + ".col";
         String col_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + col_filename;
@@ -448,7 +566,6 @@ Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnV
             return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", col_filepath));
         }
     }
-    BufferObj *outline_buffer_obj = nullptr;
     [[maybe_unused]] SizeT chunk_offset = 0;
     {
         VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
@@ -468,6 +585,27 @@ Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnV
             }
         }
     }
+    return Status::OK();
+}
+
+Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector) {
+    const ColumnDef *col_def = nullptr;
+    {
+        TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
+        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
+    }
+
+    BufferObj *buffer_obj = nullptr;
+    BufferObj *outline_buffer_obj = nullptr;
+    Status status = this->GetBufferObj(column_meta, buffer_obj, outline_buffer_obj);
+    if (!status.ok()) {
+        return status;
+    }
+
     column_vector = ColumnVector(col_def->type());
     column_vector.Initialize(buffer_obj, outline_buffer_obj, row_count, tipe);
     return Status::OK();
@@ -495,6 +633,23 @@ Status NewTxn::GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRange
         }
     }
     state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts);
+    return Status::OK();
+}
+
+Status NewTxn::CommitImport(const WalCmdImport *import_cmd) {
+    const String &db_id_str = import_cmd->db_id_str_;
+    const String &table_id_str = import_cmd->table_id_str_;
+
+    const WalSegmentInfo &segment_info = import_cmd->segment_info_;
+
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
+    SegmentMeta segment_meta(segment_info.segment_id_, table_meta, table_meta.kv_instance());
+
+    Status status = this->CommitSegmentVersion(segment_info, segment_meta);
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 

@@ -223,6 +223,8 @@ public:
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,
                     SizeT capacity = DEFAULT_VECTOR_SIZE);
 
+    void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorTipe vector_tipe);
+
     void Initialize(const ColumnVector &other, const Selection &input_select);
 
     void Initialize(ColumnVectorType vector_type, const ColumnVector &other, SizeT start_idx, SizeT end_idx);

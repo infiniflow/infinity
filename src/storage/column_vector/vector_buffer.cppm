@@ -76,6 +76,8 @@ public:
 
     void Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT type_size, SizeT capacity);
 
+    void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj);
+
     void ResetToInit(VectorBufferType type);
 
     void Copy(ptr_t input, SizeT size);
