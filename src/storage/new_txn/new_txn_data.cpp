@@ -177,7 +177,17 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         if (!status.ok()) {
             return status;
         }
-        segment_id += 1;
+        if (segment_id == 0) {
+            auto [segment_ids, status] = table_meta.GetSegmentIDs();
+            if (!status.ok()) {
+                return status;
+            }
+            if (!segment_ids->empty()) {
+                segment_id += 1;
+            }
+        } else {
+            segment_id += 1;
+        }
         status = table_meta.SetLatestSegmentID(segment_id);
         if (!status.ok()) {
             return status;
@@ -387,8 +397,18 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         if (!status.ok()) {
             return status;
         }
-        new_segment_id += 1;
-        status = table_meta.SetLatestSegmentID(new_segment_id + 1);
+        if (new_segment_id == 0) {
+            auto [segment_ids, status] = table_meta.GetSegmentIDs();
+            if (!status.ok()) {
+                return status;
+            }
+            if (!segment_ids->empty()) {
+                new_segment_id += 1;
+            }
+        } else {
+            new_segment_id += 1;
+        }
+        status = table_meta.SetLatestSegmentID(new_segment_id);
         if (!status.ok()) {
             return status;
         }

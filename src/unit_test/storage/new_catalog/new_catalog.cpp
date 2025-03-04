@@ -6678,7 +6678,7 @@ TEST_P(NewCatalogTest, test_import) {
 
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({1, 2}));
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
         auto check_block = [&](BlockMeta &block_meta) {
             NewTxnGetVisibleRangeState state;
@@ -7010,6 +7010,11 @@ TEST_P(NewCatalogTest, test_compact) {
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_name2 = std::make_shared<String>("index2");
+    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -7024,6 +7029,15 @@ TEST_P(NewCatalogTest, test_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    create_index(index_def1);
+    create_index(index_def2);
 
     u32 block_row_cnt = 8192;
     auto make_input_block = [&] {
@@ -7062,7 +7076,7 @@ TEST_P(NewCatalogTest, test_compact) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
         Vector<RowID> row_ids;
         for (u32 i = 1; i < block_row_cnt; i += 2) {
-            row_ids.push_back(RowID(1, i));
+            row_ids.push_back(RowID(0, i));
         }
         Status status = txn->Delete(*db_name, *table_name, row_ids);
         EXPECT_TRUE(status.ok());
@@ -7089,7 +7103,7 @@ TEST_P(NewCatalogTest, test_compact) {
 
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({3}));
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
         SegmentMeta segment_meta((*segment_ids)[0], table_meta, *txn->kv_instance());
         Vector<BlockID> *block_ids{};
