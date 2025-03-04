@@ -1810,6 +1810,7 @@ SharedPtr<TableSnapshotInfo> TableEntry::GetSnapshotInfo(Txn *txn_ptr) const {
     SharedPtr<TableSnapshotInfo> table_snapshot_info = MakeShared<TableSnapshotInfo>();
     table_snapshot_info->db_name_ = *GetDBName();
     table_snapshot_info->table_name_ = *table_name_;
+    table_snapshot_info->table_entry_dir_ = *table_entry_dir_;
     table_snapshot_info->table_comment_ = *table_comment_;
     table_snapshot_info->txn_id_ = txn_id_;
     table_snapshot_info->begin_ts_ = begin_ts_;
