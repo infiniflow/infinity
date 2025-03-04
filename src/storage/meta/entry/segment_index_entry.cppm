@@ -102,7 +102,7 @@ public:
 
     void Cleanup(CleanupInfoTracer *info_tracer = nullptr, bool dropped = true) final;
 
-    Vector<String> GetFilePath(Txn* txn) const final;
+    Vector<String> GetFilePath(Txn *txn) const final;
 
     void PickCleanup(CleanupScanner *scanner) final;
 
@@ -118,7 +118,12 @@ public:
     SharedPtr<String> index_dir() const { return index_dir_; }
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
-    void MemIndexInsert(SharedPtr<BlockEntry> block_entry, u32 row_offset, u32 row_count, TxnTimeStamp commit_ts, BufferManager *buffer_manager, TxnStore *txn_store);
+    void MemIndexInsert(SharedPtr<BlockEntry> block_entry,
+                        u32 row_offset,
+                        u32 row_count,
+                        TxnTimeStamp commit_ts,
+                        BufferManager *buffer_manager,
+                        TxnStore *txn_store);
 
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();
@@ -242,11 +247,14 @@ public:
         return ts >= deprecate_ts;
     }
 
-    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo(Txn* txn_ptr) const;
+    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo(Txn *txn_ptr) const;
 
     SharedPtr<SegmentIndexSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
 
-    static SharedPtr<SegmentIndexEntry> ApplySnapshotInfo(TableIndexEntry * table_index_entry,SegmentIndexSnapshotInfo *segment_index_snapshot_info,TransactionID txn_id, TxnTimeStamp begin_ts);
+    static SharedPtr<SegmentIndexEntry> ApplySnapshotInfo(TableIndexEntry *table_index_entry,
+                                                          SegmentIndexSnapshotInfo *segment_index_snapshot_info,
+                                                          TransactionID txn_id,
+                                                          TxnTimeStamp begin_ts);
 
 private:
     explicit SegmentIndexEntry(TableIndexEntry *table_index_entry, SegmentID segment_id);

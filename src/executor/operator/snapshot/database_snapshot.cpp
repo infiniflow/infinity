@@ -32,12 +32,12 @@
 //     Txn *txn_ptr = query_context->GetTxn();
 //     const String &db_name = query_context->schema_name();
 //
-//     // 创建 DatabaseSnapshotInfo 对象
+//
 //     SharedPtr<DatabaseSnapshotInfo> db_snapshot;
 //     db_snapshot->snapshot_name_ = snapshot_name;
 //     db_snapshot->db_name_ = db_name;
 //
-//     // 获取数据库中所有表的快照信息
+//
 //     Vector<String> table_names = txn_ptr->GetTableNames();
 //     for (const auto &table_name : table_names) {
 //         SharedPtr<TableSnapshotInfo> table_snapshot;
@@ -47,11 +47,11 @@
 //             LOG_WARN(fmt::format("Failed to get table snapshot {}: {}", table_name, status.message()));
 //             continue;
 //         }
-//         table_snapshot->snapshot_name_ = snapshot_name; // 设置表快照名称
+//         table_snapshot->snapshot_name_ = snapshot_name;
 //         db_snapshot->table_snapshots_[table_name] = table_snapshot;
 //     }
 //
-//     // 序列化数据库快照
+//
 //     String snapshot_dir = query_context->global_config()->SnapshotDir();
 //     db_snapshot->Serialize(snapshot_dir);
 //
@@ -61,14 +61,14 @@
 // void RestoreDatabaseSnapshot(QueryContext *query_context, const String &snapshot_name) {
 //     auto snapshot_dir = query_context->global_config()->SnapshotDir();
 //
-//     // 反序列化数据库快照
+//
 //     auto [db_snapshot, status] = DatabaseSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
 //     if (!status.ok()) {
 //         LOG_ERROR(fmt::format("Failed to deserialize database snapshot: {}", status.message()));
 //         return;
 //     }
 //
-//     // 应用数据库快照
+//
 //     for (const auto &[table_name, table_snapshot] : db_snapshot->table_snapshots_) {
 //         auto txn = query_context->GetTxn();
 //         txn->ApplyTableSnapshot(table_snapshot);

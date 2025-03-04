@@ -130,7 +130,7 @@ public:
 
     virtual void PickCleanup(CleanupScanner *scanner) override {}
 
-    Vector<String> GetFilePath(Txn* txn) const override;
+    Vector<String> GetFilePath(Txn *txn) const override;
 
     void SaveIndexFile();
 
@@ -147,10 +147,10 @@ public:
 
     SharedPtr<ChunkIndexSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
 
-    static SharedPtr<ChunkIndexEntry> ApplySnapshotInfo(SegmentIndexEntry *segment_index_entry,ChunkIndexSnapshotInfo *chunk_index_snapshot_info,TransactionID txn_id,
-                                                                TxnTimeStamp begin_ts);
-
-
+    static SharedPtr<ChunkIndexEntry> ApplySnapshotInfo(SegmentIndexEntry *segment_index_entry,
+                                                        ChunkIndexSnapshotInfo *chunk_index_snapshot_info,
+                                                        TransactionID txn_id,
+                                                        TxnTimeStamp begin_ts);
 
 public:
     ChunkID chunk_id_;
