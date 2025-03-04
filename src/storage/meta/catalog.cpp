@@ -1172,7 +1172,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     // Save catalog to tmp file.
     // FIXME: Temp implementation, will be replaced by async task.
-    auto [catalog_file_handle, status] = VirtualStore::Open(catalog_tmp_path, FileAccessMode::kWrite);
+        auto [catalog_file_handle, status] = VirtualStore::Open(catalog_tmp_path, FileAccessMode::kWrite);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("{}: {}", catalog_tmp_path, status.message()));
     }

@@ -253,7 +253,7 @@ SharedPtr<TableEntry> TableEntry::ApplyTableSnapshot(TableMeta *table_meta, cons
         TableIndexSnapshotInfo *table_index_snapshot_info = index_pair.second.get();
         auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(table_entry.get(), index_name_ptr); };
 
-        auto [table_index_meta, r_lock] = table_entry->index_meta_map_.GetMeta(table_snapshot_info->table_name_, std::move(init_index_meta));
+        auto [table_index_meta, r_lock] = table_entry->index_meta_map_.GetMeta(*index_name_ptr, std::move(init_index_meta));
 
         auto restore_table_index_snapshot = [&]() {
             return TableIndexEntry::ApplySnapshotInfo(table_index_meta, table_index_snapshot_info, txn_id, begin_ts);

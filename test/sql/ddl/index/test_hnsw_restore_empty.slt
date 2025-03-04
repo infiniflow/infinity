@@ -1,0 +1,47 @@
+# name: test/sql/ddl/index/test_hnsw.sql
+# description: Test create empty hnsw index and snapshot backup
+# group: [ddl, test_hnsw]
+
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_hnsw;
+
+# Expecting IDENTIFIER or PRIMARY or UNIQUE
+statement ok
+CREATE TABLE sqllogic_test_hnsw (col1 embedding(float,128));
+
+statement ok
+CREATE INDEX idx1 ON sqllogic_test_hnsw (col1) USING Hnsw WITH (M = 16, ef_construction = 50, metric = l2);
+
+statement ok
+CREATE SNAPSHOT sqllogic_test_hnsw_backup ON TABLE sqllogic_test_hnsw;
+
+statement ok
+DROP TABLE sqllogic_test_hnsw;
+
+statement ok
+RESTORE TABLE SNAPSHOT sqllogic_test_hnsw_backup;
+
+statement ok
+SELECT * FROM sqllogic_test_hnsw LIMIT 1;
+
+statement ok
+SHOW TABLE sqllogic_test_hnsw INDEX idx1;
+
+#drop and restore again
+statement ok
+DROP TABLE sqllogic_test_hnsw;
+
+statement ok
+RESTORE TABLE SNAPSHOT sqllogic_test_hnsw_backup;
+
+statement ok
+SHOW TABLE sqllogic_test_hnsw INDEX idx1;
+
+statement ok
+DROP INDEX idx1 ON sqllogic_test_hnsw;
+
+statement ok
+DROP TABLE sqllogic_test_hnsw;
+
+#statement ok
+#DROP SNAPSHOT sqllogic_test_hnsw_backup;

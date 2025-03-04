@@ -1,0 +1,35 @@
+# test empty table
+
+statement ok
+DROP TABLE IF EXISTS test_table;
+
+statement ok
+CREATE TABLE test_table (c1 int);
+
+statement ok
+CREATE SNAPSHOT test_table_backup ON TABLE test_table;
+
+statement ok
+DROP TABLE test_table;
+
+statement ok
+RESTORE TABLE SNAPSHOT test_table_backup;
+
+query I
+SELECT COUNT(*) FROM test_table;
+----
+0
+
+statement ok
+DROP TABLE test_table;
+
+statement ok
+RESTORE TABLE SNAPSHOT test_table_backup;
+
+query I
+SELECT COUNT(*) FROM test_table;
+----
+0
+
+statement ok
+DROP TABLE test_table;

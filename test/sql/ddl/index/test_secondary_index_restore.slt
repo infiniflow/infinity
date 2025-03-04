@@ -1,0 +1,45 @@
+statement ok
+DROP TABLE IF EXISTS test_secondary_index;
+
+statement ok
+CREATE TABLE test_secondary_index (c1 integer, c2 boolean);
+
+statement ok
+COPY test_secondary_index FROM '/var/infinity/test_data/test_big_top.csv' WITH ( DELIMITER ',', FORMAT CSV );
+
+statement ok
+CREATE INDEX idx_c1 ON test_secondary_index (c1);
+
+statement ok
+SHOW TABLE test_secondary_index INDEX idx_c1;
+
+statement ok
+CREATE SNAPSHOT secondary_index_backup ON TABLE test_secondary_index;
+
+statement ok
+DROP TABLE test_secondary_index;
+
+statement ok
+RESTORE TABLE SNAPSHOT secondary_index_backup;
+
+statement ok
+SHOW TABLE test_secondary_index INDEX idx_c1;
+
+#drop and restore again
+statement ok
+DROP TABLE test_secondary_index;
+
+statement ok
+RESTORE TABLE SNAPSHOT secondary_index_backup;
+
+statement ok
+SELECT * FROM test_secondary_index LIMIT 1;
+
+statement ok
+SHOW TABLE test_secondary_index INDEX idx_c1;
+
+statement ok
+DROP TABLE test_secondary_index;
+
+#statement ok
+#DROP SNAPSHOT secondary_index_backup;

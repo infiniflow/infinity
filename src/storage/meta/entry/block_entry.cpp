@@ -501,6 +501,7 @@ void BlockEntry::CommitApplySnapshot(TransactionID txn_id, TxnTimeStamp commit_t
     this->commit_ts_ = commit_ts;
     this->max_row_ts_ = commit_ts;
     this->min_row_ts_ = commit_ts;
+    this->checkpoint_ts_ = commit_ts;
     for (auto &column : columns_) {
         column->CommitColumn(txn_id, commit_ts);
     }
