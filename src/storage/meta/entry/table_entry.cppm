@@ -115,8 +115,7 @@ public:
                                                   SegmentID next_segment_id,
                                                   ColumnID next_column_id) noexcept;
 
-    static SharedPtr<TableEntry>
-    ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
+    static SharedPtr<TableEntry> ApplyTableSnapshot(TableMeta *table_meta, const SharedPtr<TableSnapshotInfo> &table_snapshot_info, Txn *txn_ptr);
 
 public:
     SharedPtr<TableInfo> GetTableInfo(Txn *txn);

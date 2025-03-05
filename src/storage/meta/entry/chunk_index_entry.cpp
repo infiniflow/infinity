@@ -492,6 +492,8 @@ SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexEntry::GetSnapshotInfo(Txn *txn_ptr)
     SharedPtr<ChunkIndexSnapshotInfo> chunk_index_snapshot_info = MakeShared<ChunkIndexSnapshotInfo>();
     chunk_index_snapshot_info->chunk_id_ = chunk_id_;
     chunk_index_snapshot_info->base_name_ = base_name_;
+    chunk_index_snapshot_info->base_rowid_ = base_rowid_;
+    chunk_index_snapshot_info->row_count_ = row_count_;
 
     TableIndexEntry *table_index_entry = segment_index_entry_->table_index_entry();
     const auto &index_dir = segment_index_entry_->index_dir();
@@ -506,8 +508,22 @@ SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexEntry::GetSnapshotInfo(Txn *txn_ptr)
         chunk_index_snapshot_info->files_.push_back(dict_file);
         chunk_index_snapshot_info->files_.push_back(len_file);
     }
-    chunk_index_snapshot_info->base_name_ = base_name_;
+    chunk_index_snapshot_info->index_filename_ = IndexFileName(segment_index_entry_->segment_id(),chunk_id_);
     return chunk_index_snapshot_info;
+}
+
+SharedPtr<ChunkIndexEntry> ChunkIndexEntry::ApplySnapshotInfo(SegmentIndexEntry * segment_index_entry,ChunkIndexSnapshotInfo *chunk_index_snapshot_info,TransactionID txn_id,
+                                                                TxnTimeStamp begin_ts)  {
+    auto chunk_index_entry = MakeShared<ChunkIndexEntry>(
+        chunk_index_snapshot_info->chunk_id_,
+        segment_index_entry,
+        chunk_index_snapshot_info->base_name_,
+        chunk_index_snapshot_info->base_rowid_,
+        chunk_index_snapshot_info->row_count_
+    );
+
+    chunk_index_entry->index_filename_ = chunk_index_snapshot_info->index_filename_;
+    return chunk_index_entry;
 }
 
 } // namespace infinity

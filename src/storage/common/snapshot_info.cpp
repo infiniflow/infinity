@@ -38,6 +38,7 @@ import block_version;
 import data_type;
 import parsed_expr;
 import segment_entry;
+import create_index_info;
 
 namespace infinity {
 
@@ -45,6 +46,7 @@ nlohmann::json BlockColumnSnapshotInfo::Serialize() {
     nlohmann::json json_res;
     json_res["column_id"] = column_id_;
     json_res["filename"] = filename_;
+    json_res["last_chunk_offset"] = last_chunk_offset_;
     for (const auto &outline_snapshot : outline_snapshots_) {
         json_res["outlines"].emplace_back(outline_snapshot->filename_);
     }
@@ -55,6 +57,7 @@ SharedPtr<BlockColumnSnapshotInfo> BlockColumnSnapshotInfo::Deserialize(const nl
     auto column_block_snapshot = MakeShared<BlockColumnSnapshotInfo>();
     column_block_snapshot->column_id_ = column_block_json["column_id"];
     column_block_snapshot->filename_ = column_block_json["filename"];
+    column_block_snapshot->last_chunk_offset_ = column_block_json["last_chunk_offset"];
     if (column_block_json.contains("outlines")) {
         for (const auto &outline_snapshot : column_block_json["outlines"]) {
             auto outline_snapshot_info = MakeShared<OutlineSnapshotInfo>();
@@ -69,6 +72,10 @@ nlohmann::json BlockSnapshotInfo::Serialize() {
     nlohmann::json json_res;
     json_res["block_id"] = block_id_;
     json_res["block_dir"] = block_dir_;
+    json_res["row_count"] = row_count_;
+    json_res["min_row_ts"] = min_row_ts_;
+    json_res["max_row_ts"] = max_row_ts_;
+    json_res["row_capacity"] = row_capacity_;
     for (const auto &column_block_snapshot : column_block_snapshots_) {
         json_res["columns"].emplace_back(column_block_snapshot->Serialize());
     }
@@ -79,6 +86,9 @@ SharedPtr<BlockSnapshotInfo> BlockSnapshotInfo::Deserialize(const nlohmann::json
     auto block_snapshot = MakeShared<BlockSnapshotInfo>();
     block_snapshot->block_id_ = block_json["block_id"];
     block_snapshot->block_dir_ = block_json["block_dir"];
+    block_snapshot->min_row_ts_ = block_json["min_row_ts"];
+    block_snapshot->max_row_ts_ = block_json["max_row_ts"];
+    block_snapshot->row_capacity_ = block_json["row_capacity"];
     for (const auto &column_block_json : block_json["columns"]) {
         auto column_block_snapshot = BlockColumnSnapshotInfo::Deserialize(column_block_json);
         block_snapshot->column_block_snapshots_.emplace_back(column_block_snapshot);
@@ -123,11 +133,21 @@ SharedPtr<SegmentSnapshotInfo> SegmentSnapshotInfo::Deserialize(const nlohmann::
 
 nlohmann::json ChunkIndexSnapshotInfo::Serialize() {
     nlohmann::json json_res;
+    json_res["chunk_id"] = chunk_id_;
+    json_res["base_name"] = base_name_;
+    for (const auto &file : files_) {
+        json_res["files"].emplace_back(file);
+    }
     return json_res;
 }
 
 SharedPtr<ChunkIndexSnapshotInfo> ChunkIndexSnapshotInfo::Deserialize(const nlohmann::json &chunk_index_json) {
     auto chunk_index_snapshot = MakeShared<ChunkIndexSnapshotInfo>();
+    chunk_index_snapshot->chunk_id_ = chunk_index_json["chunk_id"];
+    chunk_index_snapshot->base_name_ = chunk_index_json["base_name"];
+    for (auto &file : chunk_index_snapshot->files_) {
+        chunk_index_snapshot->files_.emplace_back(file);
+    }
     return chunk_index_snapshot;
 }
 
@@ -164,14 +184,16 @@ SharedPtr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(const nloh
     auto table_index_snapshot = MakeShared<TableIndexSnapshotInfo>();
     table_index_snapshot->index_dir_ = MakeShared<String>(table_index_json["index_dir"]);
     table_index_snapshot->index_base_ = IndexBase::Deserialize(table_index_json["index_base"]);
-    for (const auto &segment_index_json : table_index_json["segment_indexes"]) {
-        auto segment_index_snapshot = SegmentIndexSnapshotInfo::Deserialize(segment_index_json);
-        table_index_snapshot->index_by_segment_.emplace(segment_index_snapshot->segment_id_, segment_index_snapshot);
+    if (table_index_json.count("segment_index") > 0) {
+        for (const auto &segment_index_json : table_index_json["segment_indexes"]) {
+            auto segment_index_snapshot = SegmentIndexSnapshotInfo::Deserialize(segment_index_json);
+            table_index_snapshot->index_by_segment_.emplace(segment_index_snapshot->segment_id_, segment_index_snapshot);
+        }
     }
     return table_index_snapshot;
 }
 
-void TableSnapshotInfo::Serialize(const String &save_dir) {
+Status TableSnapshotInfo::Serialize(const String &save_dir) {
 
     Config *config = InfinityContext::instance().config();
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
@@ -179,6 +201,13 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     // Create compressed file
     //    String compressed_filename = fmt::format("{}/{}.lz4", save_dir, snapshot_name_);
     //    std::ofstream output_stream = VirtualStore::BeginCompress(compressed_filename);
+    String snapshot_meta = fmt::format("{}/{}.json", save_dir, snapshot_name_);
+    if (VirtualStore::Exists(snapshot_meta)) {
+        return Status::DuplicatedFile(snapshot_meta);
+    } else {
+        String snapshot_dir = fmt::format("{}/{}", save_dir, snapshot_name_);
+        VirtualStore::MakeDirectory(snapshot_dir);
+    }
 
     // Get files
     Vector<String> original_files = GetFiles();
@@ -315,14 +344,9 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
 
     String json_string = json_res.dump();
 
-    Path save_path = Path(save_dir) / fmt::format("{}.json", snapshot_name_);
-
-    if (!VirtualStore::Exists(save_dir)) {
-        VirtualStore::MakeDirectory(save_dir);
-    }
-    auto [snapshot_file_handle, status] = VirtualStore::Open(save_path.string(), FileAccessMode::kWrite);
+    auto [snapshot_file_handle, status] = VirtualStore::Open(snapshot_meta, FileAccessMode::kWrite);
     if (!status.ok()) {
-        UnrecoverableError(fmt::format("{}: {}", save_path.string(), status.message()));
+        UnrecoverableError(fmt::format("{}: {}", snapshot_meta, status.message()));
     }
 
     status = snapshot_file_handle->Append(json_string.data(), json_string.size());
@@ -332,6 +356,8 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
     snapshot_file_handle->Sync();
 
     LOG_INFO(fmt::format("{}", json_res.dump()));
+
+    return Status::OK();
 }
 
 Vector<String> TableSnapshotInfo::GetFiles() const {
@@ -351,13 +377,50 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
 
     for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
         for (const auto &segment_index_snapshot_pair : table_index_snapshot_pair.second->index_by_segment_) {
+            SegmentID segment_id = segment_index_snapshot_pair.second->segment_id_;
             for (const auto &chunk_index_snapshot : segment_index_snapshot_pair.second->chunk_index_snapshots_) {
-                if (chunk_index_snapshot->files_.empty()) {
-                    files.emplace_back(
-                        VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, chunk_index_snapshot->base_name_));
-                } else {
-                    files.insert(files.end(), chunk_index_snapshot->files_.cbegin(), chunk_index_snapshot->files_.cend());
-                }
+                // IndexBase *index_base = table_index_snapshot_pair.second->index_base_.get();
+
+                // switch (index_base->index_type_) {
+                //     case IndexType::kIVF: {
+                //         break;
+                //     }
+                //     case IndexType::kHnsw: {
+                //         break;
+                //     }
+                //     case IndexType::kBMP: {
+                //         break;
+                //     }
+                //     case IndexType::kFullText: {
+                //         break;
+                //     }
+                //     case IndexType::kSecondary: {
+                //         files.emplace_back(
+                // VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,fmt::format("seg{}_chunk{}.idx", segment_id,
+                // chunk_index_snapshot->chunk_id_) ));
+                //         break;
+                //     }
+                //     case IndexType::kEMVB: {
+                //         break;
+                //     }
+                //     case IndexType::kDiskAnn: {
+                //         break;
+                //     }
+                //     case IndexType::kInvalid: {
+                //         UnrecoverableError("Invalid index type");
+                //         break;
+                //     }
+                // }
+                //
+                files.emplace_back(VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,
+                                                                 fmt::format("seg{}_chunk{}.idx", segment_id, chunk_index_snapshot->chunk_id_)));
+
+                // if (chunk_index_snapshot->files_.empty()) {
+                //     files.emplace_back(
+                //         VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_, chunk_index_snapshot->index_filename_));
+                // } else {
+                //     files.insert(files.end(), chunk_index_snapshot->files_.cbegin(), chunk_index_snapshot->files_.cend());
+                // }
             }
         }
     }
@@ -454,6 +517,19 @@ Tuple<SharedPtr<TableSnapshotInfo>, Status> TableSnapshotInfo::Deserialize(const
     }
 
     //    LOG_INFO(table_snapshot->ToString());
+    //    LOG_INFO(fmt::format("Deserialize src data: {}/{}", snapshot_dir, snapshot_name));
+    Vector<String> original_files = table_snapshot->GetFiles();
+    Config *config = InfinityContext::instance().config();
+    String data_dir = config->DataDir();
+    for (const auto &file : original_files) {
+        String src_file_path = fmt::format("{}/{}/{}", snapshot_dir, snapshot_name, file);
+        String dst_file_path = fmt::format("{}/{}", data_dir, file);
+        //        LOG_INFO(fmt::format("Copy from: {} to {}", src_file_path, dst_file_path));
+        Status copy_status = VirtualStore::Copy(dst_file_path, src_file_path);
+        if (!copy_status.ok()) {
+            RecoverableError(copy_status);
+        }
+    }
 
     return {table_snapshot, Status::OK()};
 }

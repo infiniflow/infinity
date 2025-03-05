@@ -14,6 +14,7 @@
 
 module;
 
+#include <type/complex/row_id.h>
 export module snapshot_info;
 
 import stl;
@@ -54,6 +55,8 @@ export struct BlockSnapshotInfo {
     String block_dir_;
     Vector<SharedPtr<BlockColumnSnapshotInfo>> column_block_snapshots_;
     String fast_rough_filter_;
+    TxnTimeStamp min_row_ts_{0};
+    TxnTimeStamp max_row_ts_{0};
 
     nlohmann::json Serialize();
     static SharedPtr<BlockSnapshotInfo> Deserialize(const nlohmann::json &block_json);
@@ -76,6 +79,9 @@ export struct SegmentSnapshotInfo {
 export struct ChunkIndexSnapshotInfo {
     ChunkID chunk_id_;
     String base_name_;
+    RowID base_rowid_;
+    u32 row_count_;
+    String index_filename_;
     Vector<String> files_;
     nlohmann::json Serialize();
     static SharedPtr<ChunkIndexSnapshotInfo> Deserialize(const nlohmann::json &chunk_index_json);
@@ -115,7 +121,7 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     Map<String, SharedPtr<TableIndexSnapshotInfo>> table_index_snapshots_{};
 
     Vector<String> GetFiles() const;
-    void Serialize(const String &save_path);
+    Status Serialize(const String &save_path);
     String ToString() const;
     static Tuple<SharedPtr<TableSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
 };

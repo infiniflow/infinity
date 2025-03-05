@@ -32,13 +32,14 @@ namespace infinity {
 
 void PrintTransactionHistory() {
     TxnManager *txn_manager = InfinityContext::instance().storage()->txn_manager();
+    if (txn_manager != nullptr) {
+        Vector<SharedPtr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
 
-    Vector<SharedPtr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
-
-    SizeT history_count = txn_contexts.size();
-    for (SizeT idx = 0; idx < history_count; ++idx) {
-        SharedPtr<TxnContext> txn_history = txn_contexts[idx];
-        LOG_CRITICAL(txn_history->ToString());
+        SizeT history_count = txn_contexts.size();
+        for (SizeT idx = 0; idx < history_count; ++idx) {
+            SharedPtr<TxnContext> txn_history = txn_contexts[idx];
+            LOG_CRITICAL(txn_history->ToString());
+        }
     }
 }
 

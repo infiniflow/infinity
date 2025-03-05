@@ -804,6 +804,11 @@ SharedPtr<SegmentSnapshotInfo> SegmentEntry::GetSnapshotInfo() const {
     SharedPtr<SegmentSnapshotInfo> segment_snapshot_info = MakeShared<SegmentSnapshotInfo>();
     segment_snapshot_info->segment_id_ = segment_id_;
     segment_snapshot_info->segment_dir_ = *segment_dir_;
+    segment_snapshot_info->deprecate_ts_ = deprecate_ts_;
+    segment_snapshot_info->status_ = status_;
+    segment_snapshot_info->first_delete_ts_ = first_delete_ts_;
+    segment_snapshot_info->row_count_ = row_count_;
+    segment_snapshot_info->actual_row_count_ = actual_row_count_;
 
     std::shared_lock lock(rw_locker_);
     SizeT block_count = block_entries_.size();

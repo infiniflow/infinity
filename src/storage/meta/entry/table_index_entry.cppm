@@ -186,6 +186,8 @@ public:
 
     SharedPtr<TableIndexSnapshotInfo> GetSnapshotInfo(Txn *txn_ptr) const;
 
+    static SharedPtr<TableIndexEntry> ApplySnapshotInfo(TableIndexMeta *table_index_meta,TableIndexSnapshotInfo *table_index_snapshot_info,TransactionID txn_id, TxnTimeStamp begin_ts);
+
     SharedPtr<TableIndexInfo> GetTableIndexInfo(Txn *txn_ptr);
 };
 

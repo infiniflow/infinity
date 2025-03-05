@@ -229,6 +229,7 @@ add_library(infinity_core
         ${common_cpp}
         ${admin_cpp}
         ${network_cpp}
+        executor/operator/snapshot/database_snapshot.cpp
 )
 
 target_sources(infinity_core

@@ -1356,4 +1356,16 @@ SharedPtr<SegmentIndexSnapshotInfo> SegmentIndexEntry::GetSnapshotInfo(Txn *txn_
     return segment_index_snapshot;
 }
 
+SharedPtr<SegmentIndexEntry> SegmentIndexEntry::ApplySnapshotInfo(TableIndexEntry *table_index_entry,SegmentIndexSnapshotInfo *segment_index_snapshot_info,TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_index_snapshot_info->segment_id_));
+
+    for (const auto &chunk_index_snapshot : segment_index_snapshot_info->chunk_index_snapshots_) {
+        auto chunk_index_entry = ChunkIndexEntry::ApplySnapshotInfo(segment_index_entry.get(), chunk_index_snapshot.get(), txn_id, begin_ts);
+        segment_index_entry->chunk_index_entries_.push_back(chunk_index_entry);
+    }
+    segment_index_entry->next_chunk_id_ = segment_index_entry->chunk_index_entries_.size();
+
+    return segment_index_entry;
+}
+
 } // namespace infinity

@@ -596,6 +596,23 @@ SharedPtr<TableIndexSnapshotInfo> TableIndexEntry::GetSnapshotInfo(Txn *txn_ptr)
     return snapshot_info;
 }
 
+SharedPtr<TableIndexEntry> TableIndexEntry::ApplySnapshotInfo(TableIndexMeta *table_index_meta,TableIndexSnapshotInfo *table_index_snapshot_info,TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto table_index_entry = MakeShared<TableIndexEntry>(table_index_snapshot_info->index_base_,
+        false,
+        table_index_meta,
+        table_index_snapshot_info->index_dir_,
+        txn_id,
+        begin_ts
+        );
+    for (const auto &segment_index_snapshot_pair : table_index_snapshot_info->index_by_segment_) {
+        SegmentID segment_id=segment_index_snapshot_pair.first;
+        auto segmemt_index_entry = SegmentIndexEntry::ApplySnapshotInfo(table_index_entry.get(), segment_index_snapshot_pair.second.get(), txn_id, begin_ts);
+        table_index_entry->index_by_segment_.emplace(segment_id, segmemt_index_entry);
+    }
+
+    return table_index_entry;
+}
+
 SharedPtr<TableIndexInfo> TableIndexEntry::GetTableIndexInfo(Txn *txn_ptr) {
     std::shared_lock lock(rw_locker_);
     SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
