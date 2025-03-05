@@ -28,3 +28,6 @@ SHOW TABLE test_secondary_index INDEX idx_c1;
 
 statement ok
 DROP TABLE test_secondary_index;
+
+statement error
+DROP TABLE test_secondary_index;

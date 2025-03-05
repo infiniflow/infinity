@@ -43,5 +43,8 @@ SHOW TABLE test_ivf INDEX idx1;
 statement ok
 DROP TABLE test_ivf;
 
-#statement ok
-#DROP SNAPSHOT empty_test_ivf_backup;
+statement ok
+DROP SNAPSHOT empty_test_ivf_backup;
+
+statement error
+DROP SNAPSHOT empty_test_ivf_backup;

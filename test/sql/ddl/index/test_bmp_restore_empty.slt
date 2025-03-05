@@ -44,5 +44,8 @@ DROP INDEX idx1 ON sqllogic_test_bmp;
 statement ok
 DROP TABLE sqllogic_test_bmp;
 
-#statement ok
-#DROP SNAPSHOT sqllogic_test_bmp_backup;
+statement ok
+DROP SNAPSHOT sqllogic_test_bmp_backup;
+
+statement error
+DROP SNAPSHOT sqllogic_test_bmp_backup;

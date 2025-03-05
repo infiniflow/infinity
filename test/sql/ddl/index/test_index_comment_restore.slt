@@ -52,5 +52,8 @@ DROP INDEX IF EXISTS idx1 ON sqllogic_test_index_comment;
 statement ok
 DROP TABLE sqllogic_test_index_comment;
 
-#statement ok
-#DROP SNAPSHOT sqllogic_test_index_comment_backup;
+statement ok
+DROP SNAPSHOT sqllogic_test_index_comment_backup;
+
+statement error
+DROP SNAPSHOT sqllogic_test_index_comment_backup;
