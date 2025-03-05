@@ -121,7 +121,7 @@ export struct TableSnapshotInfo : public SnapshotInfo {
     Map<String, SharedPtr<TableIndexSnapshotInfo>> table_index_snapshots_{};
 
     Vector<String> GetFiles() const;
-    void Serialize(const String &save_path);
+    Status Serialize(const String &save_path);
     String ToString() const;
     static Tuple<SharedPtr<TableSnapshotInfo>, Status> Deserialize(const String &snapshot_dir, const String &snapshot_name);
 };

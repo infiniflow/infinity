@@ -193,7 +193,7 @@ SharedPtr<TableIndexSnapshotInfo> TableIndexSnapshotInfo::Deserialize(const nloh
     return table_index_snapshot;
 }
 
-void TableSnapshotInfo::Serialize(const String &save_dir) {
+Status TableSnapshotInfo::Serialize(const String &save_dir) {
 
     Config *config = InfinityContext::instance().config();
     PersistenceManager *persistence_manager = InfinityContext::instance().persistence_manager();
@@ -339,7 +339,9 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
 
     Path save_path = Path(save_dir) / fmt::format("{}.json", snapshot_name_);
 
-    if (!VirtualStore::Exists(save_dir)) {
+    if (VirtualStore::Exists(save_dir)) {
+        return Status::DuplicatedFile(save_path.string());
+    } else {
         VirtualStore::MakeDirectory(save_dir);
     }
     auto [snapshot_file_handle, status] = VirtualStore::Open(save_path.string(), FileAccessMode::kWrite);
@@ -355,7 +357,7 @@ void TableSnapshotInfo::Serialize(const String &save_dir) {
 
     LOG_INFO(fmt::format("{}", json_res.dump()));
 
-    // return json_res;
+    return Status::OK();
 }
 
 Vector<String> TableSnapshotInfo::GetFiles() const {

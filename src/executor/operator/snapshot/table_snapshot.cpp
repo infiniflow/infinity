@@ -40,11 +40,13 @@ Status Snapshot::CreateTableSnapshot(QueryContext *query_context, const String &
     }
     table_snapshot->snapshot_name_ = snapshot_name;
     String snapshot_dir = query_context->global_config()->SnapshotDir();
-    table_snapshot->Serialize(snapshot_dir);
+    status = table_snapshot->Serialize(snapshot_dir);
+    if (!status.ok()) {
+        return status;
+    }
 
     return Status::OK();
 }
-
 
 Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String &snapshot_name) {
     Txn *txn_ptr = query_context->GetTxn();
@@ -53,7 +55,7 @@ Status Snapshot::RestoreTableSnapshot(QueryContext *query_context, const String 
     SharedPtr<TableSnapshotInfo> table_snapshot;
     Status status;
     std::tie(table_snapshot, status) = TableSnapshotInfo::Deserialize(snapshot_dir, snapshot_name);
-    if(!status.ok()) {
+    if (!status.ok()) {
         return status;
     }
     txn_ptr->ApplyTableSnapshot(table_snapshot);

@@ -33,10 +33,16 @@ namespace infinity {
 Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapshot_name) {
 
     String snapshot_dir = query_context->global_config()->SnapshotDir();
-    bool found = false;
+    bool meta_found = false;
+    bool directory_found = false;
     for (const auto &entry : std::filesystem::directory_iterator(snapshot_dir)) {
         if (entry.is_directory()) {
             // Don't search the directory recursively
+            LOG_INFO("Check snapshot directory: {}" + entry.path().string());
+            if (entry.path().stem() == snapshot_name) {
+                VirtualStore::RemoveDirectory(entry.path().string());
+                directory_found = true;
+            }
         } else {
             // Just the file base name
             if (entry.path().stem() == snapshot_name) {
@@ -44,7 +50,7 @@ Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapsho
                 if (extension == ".json" or extension == ".lz4") {
                     LOG_INFO(fmt::format("Delete file: {}", entry.path().string()));
                     VirtualStore::DeleteFile(entry.path().string());
-                    found = true;
+                    meta_found = true;
                 }
             } else {
                 String filename = entry.path().filename();
@@ -53,8 +59,12 @@ Status Snapshot::DropSnapshot(QueryContext *query_context, const String &snapsho
         }
     }
 
-    if (!found) {
-        return Status::NotFound(fmt::format("Snapshot: {} not found", snapshot_name));
+    if (!meta_found) {
+        return Status::NotFound(fmt::format("Snapshot meta: {} not found", snapshot_name));
+    }
+
+    if (!directory_found) {
+        return Status::NotFound(fmt::format("Snapshot directory: {} not found", snapshot_name));
     }
 
     return Status::OK();
