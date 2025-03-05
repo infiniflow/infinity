@@ -966,6 +966,10 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             if (!status.ok()) {
                 return status;
             }
+            status = table_meta.SetUnsealedSegmentID(next_segment_id);
+            if (!status.ok()) {
+                return status;
+            }
             ++next_segment_id;
             status = table_meta.SetNextSegmentID(next_segment_id);
             if (!status.ok()) {
