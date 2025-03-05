@@ -76,8 +76,7 @@ struct NewTxnCompactState {
                 return status;
             }
         }
-        block_meta_.emplace(block_id, new_segment_meta_, new_segment_meta_.kv_instance());
-        status = txn->AddNewBlock(&new_segment_meta_, block_id, &*block_meta_);
+        status = txn->AddNewBlock(new_segment_meta_, block_id, block_meta_);
         if (!status.ok()) {
             return status;
         }
@@ -172,27 +171,11 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
 
     SegmentID segment_id = 0;
-    {
-        std::tie(segment_id, status) = table_meta.GetLatestSegmentID();
-        if (!status.ok()) {
-            return status;
-        }
-        if (segment_id == 0) {
-            auto [segment_ids, status] = table_meta.GetSegmentIDs();
-            if (!status.ok()) {
-                return status;
-            }
-            if (!segment_ids->empty()) {
-                segment_id += 1;
-            }
-        } else {
-            segment_id += 1;
-        }
-        status = table_meta.SetLatestSegmentID(segment_id);
-        if (!status.ok()) {
-            return status;
-        }
+    status = table_meta.GetNextSegmentID(segment_id);
+    if (!status.ok()) {
+        return status;
     }
+    status = table_meta.SetNextSegmentID(segment_id + 1);
 
     Optional<SegmentMeta> segment_meta;
     status = this->AddNewSegment(table_meta, segment_id, segment_meta);
@@ -219,20 +202,20 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
                 return status;
             }
         }
-        BlockMeta block_meta(block_id, *segment_meta, segment_meta->kv_instance());
-        status = this->AddNewBlock(&*segment_meta, block_id, &block_meta);
+        Optional<BlockMeta> block_meta;
+        status = this->AddNewBlock(*segment_meta, block_id, block_meta);
         if (!status.ok()) {
             return status;
         }
 
-        if (j < input_blocks.size() - 1 && row_cnt != block_meta.block_capacity()) {
+        if (j < input_blocks.size() - 1 && row_cnt != block_meta->block_capacity()) {
             UnrecoverableError("Attempt to import data block with different capacity");
         }
 
         for (SizeT i = 0; i < input_block->column_count(); ++i) {
             SharedPtr<ColumnVector> col = input_block->column_vectors[i];
 
-            ColumnMeta column_meta(i, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(i, *block_meta, block_meta->kv_instance());
 
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
@@ -249,7 +232,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             }
         }
 
-        status = block_meta.SetRowCnt(row_cnt);
+        status = block_meta->SetRowCnt(row_cnt);
         if (!status.ok()) {
             return status;
         }
@@ -392,27 +375,11 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
 
     SegmentID new_segment_id = 0;
-    {
-        std::tie(new_segment_id, status) = table_meta.GetLatestSegmentID();
-        if (!status.ok()) {
-            return status;
-        }
-        if (new_segment_id == 0) {
-            auto [segment_ids, status] = table_meta.GetSegmentIDs();
-            if (!status.ok()) {
-                return status;
-            }
-            if (!segment_ids->empty()) {
-                new_segment_id += 1;
-            }
-        } else {
-            new_segment_id += 1;
-        }
-        status = table_meta.SetLatestSegmentID(new_segment_id);
-        if (!status.ok()) {
-            return status;
-        }
+    status = table_meta.GetNextSegmentID(new_segment_id);
+    if (!status.ok()) {
+        return status;
     }
+    status = table_meta.SetNextSegmentID(new_segment_id + 1);
 
     NewTxnCompactState compact_state(new_segment_id, table_meta);
 
@@ -497,14 +464,14 @@ Status NewTxn::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optio
     return Status::OK();
 }
 
-Status NewTxn::AddNewBlock(SegmentMeta *segment_meta, BlockID block_id, BlockMeta *block_meta) {
+Status NewTxn::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta) {
     {
-        Status status = segment_meta->AddBlockID(block_id);
+        Status status = segment_meta.AddBlockID(block_id);
         if (!status.ok()) {
             return status;
         }
     }
-    //    block_meta.emplace(block_id, segment_meta, segment_meta.kv_instance());
+    block_meta.emplace(block_id, segment_meta, segment_meta.kv_instance());
     {
         Status status = block_meta->InitSet();
         if (!status.ok()) {
@@ -526,7 +493,7 @@ Status NewTxn::AddNewBlock(SegmentMeta *segment_meta, BlockID block_id, BlockMet
     }
     SizeT column_num = 0;
     {
-        TableMeeta &table_meta = segment_meta->table_meta();
+        TableMeeta &table_meta = segment_meta.table_meta();
         auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
         if (!status.ok()) {
             return status;
@@ -927,37 +894,55 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     }
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
-    {
-        Status status = table_meta.Init();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    SegmentID latest_segment_id = 0;
-    {
-        auto [segment_id, status] = table_meta.GetLatestSegmentID();
-        if (!status.ok()) {
-            return status;
-        }
-        latest_segment_id = segment_id;
-    }
 
-    UniquePtr<SegmentMeta> segment_meta = MakeUnique<SegmentMeta>(latest_segment_id, table_meta, *kv_instance_);
-    segment_meta->Init();
-    BlockID latest_block_id = 0;
-    {
-        auto [block_id, status] = segment_meta->GetLatestBlockID();
+    Status status;
+
+    SegmentID next_segment_id = 0;
+
+    status = table_meta.GetNextSegmentID(next_segment_id);
+    if (!status.ok()) {
+        return status;
+    }
+    Optional<SegmentMeta> segment_meta;
+    if (next_segment_id == 0) {
+        SegmentID segment_id = 0;
+
+        status = this->AddNewSegment(table_meta, segment_id, segment_meta);
         if (!status.ok()) {
             return status;
         }
-        latest_block_id = block_id;
+        status = table_meta.SetNextSegmentID(segment_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+    } else {
+        SegmentID segment_id = next_segment_id - 1;
+        segment_meta.emplace(segment_id, table_meta, *kv_instance_.get());
     }
-    UniquePtr<BlockMeta> block_meta = MakeUnique<BlockMeta>(latest_block_id, *segment_meta, *kv_instance_);
-    this->AddNewBlock(segment_meta.get(), latest_block_id, block_meta.get());
+    BlockID next_block_id = 0;
+    status = segment_meta->GetNextBlockID(next_block_id);
+    if (!status.ok()) {
+        return status;
+    }
+    Optional<BlockMeta> block_meta;
+    if (next_block_id == 0) {
+        BlockID block_id = 0;
+        status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+        if (!status.ok()) {
+            return status;
+        }
+        status = segment_meta->SetNextBlockID(block_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+    } else {
+        BlockID block_id = next_block_id - 1;
+        block_meta.emplace(block_id, segment_meta.value(), *kv_instance_.get());
+    }
     while (true) {
         bool block_full = false;
         bool segment_full = false;
-        Status status = this->PrepareAppendInBlock(*block_meta, append_state, block_full, segment_full);
+        status = this->PrepareAppendInBlock(*block_meta, append_state, block_full, segment_full);
         if (!status.ok()) {
             return status;
         }
@@ -965,38 +950,40 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             break;
         }
         if (segment_full) {
-            ++latest_segment_id;
-            SegmentID segment_id = latest_segment_id;
-            // Update latest segment meta;
-            Status status = table_meta.AddSegmentID(segment_id);
+            SegmentID segment_id = next_segment_id;
+            status = this->AddNewSegment(table_meta, segment_id, segment_meta);
             if (!status.ok()) {
                 return status;
             }
-
-            status = table_meta.SetLatestSegmentID(segment_id);
+            ++next_segment_id;
+            status = table_meta.SetNextSegmentID(next_segment_id);
             if (!status.ok()) {
                 return status;
             }
-
-            segment_meta = MakeUnique<SegmentMeta>(segment_id, table_meta, *kv_instance_);
-            segment_meta->Init();
-
             BlockID block_id = 0;
-            status = this->AddNewBlock(segment_meta.get(), block_id, block_meta.get());
+            status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+            if (!status.ok()) {
+                return status;
+            }
+            next_block_id = 1;
+            status = segment_meta->SetNextBlockID(next_block_id);
             if (!status.ok()) {
                 return status;
             }
         } else if (block_full) {
-            ++latest_block_id;
-            BlockID block_id = latest_block_id;
-            segment_meta->SetLatestBlockID(block_id);
-            block_meta = MakeUnique<BlockMeta>(block_id, *segment_meta, *kv_instance_);
-            status = this->AddNewBlock(segment_meta.get(), block_id, block_meta.get());
+            BlockID block_id = next_block_id;
+            status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+            if (!status.ok()) {
+                return status;
+            }
+            ++next_block_id;
+            status = segment_meta->SetNextBlockID(next_block_id);
             if (!status.ok()) {
                 return status;
             }
         }
     }
+
     return Status::OK();
 }
 

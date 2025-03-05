@@ -1560,7 +1560,7 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
     }
 
     // Create table segment id;
-    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_SEGMENT_ID.data());
+    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "next_segment_id");
     status = kv_instance_->Put(table_latest_segment_id_key, "0");
     if (!status.ok()) {
         return status;
@@ -1609,7 +1609,7 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
     }
 
     // delete table segment id;
-    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_SEGMENT_ID.data());
+    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "next_segment_id");
     status = kv_instance_->Delete(table_latest_segment_id_key);
     if (!status.ok()) {
         return status;

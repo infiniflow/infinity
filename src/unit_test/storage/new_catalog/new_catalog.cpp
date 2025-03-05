@@ -7838,3 +7838,9 @@ TEST_P(NewCatalogTest, test_populate_index) {
         return std::make_pair(begin_id, row_cnt);
     });
 }
+
+TEST_P(NewCatalogTest, test_insert_and_import) {
+    // using namespace infintiy;
+
+    // NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+}

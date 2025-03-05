@@ -184,39 +184,6 @@ Status SegmentMeta::Init() {
     return Status::OK();
 }
 
-Status SegmentMeta::LoadLatestBlockID() {
-    String latest_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
-    String latest_block_id_str;
-    Status status = kv_instance_.Get(latest_block_id_key, latest_block_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    latest_block_id_ = std::stoull(latest_block_id_str);
-    return Status::OK();
-}
-
-Tuple<BlockID, Status> SegmentMeta::GetLatestBlockID() {
-    if (!latest_block_id_) {
-        Status status = LoadLatestBlockID();
-        if (!status.ok()) {
-            return {INVALID_BLOCK_ID, status};
-        }
-    }
-
-    return {*latest_block_id_, Status::OK()};
-}
-
-Status SegmentMeta::SetLatestBlockID(BlockID latest_block_id) {
-    latest_block_id_ = latest_block_id;
-    String latest_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
-    String latest_block_id_str = fmt::format("{}", latest_block_id);
-    Status status = kv_instance_.Put(latest_block_id_key, latest_block_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status SegmentMeta::AddBlockID(BlockID block_id) {
     if (!block_ids_) {
         Status status = LoadBlockIDs();

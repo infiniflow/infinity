@@ -37,9 +37,31 @@ public:
 
     Status Init();
 
-    Tuple<SegmentID, Status> GetLatestSegmentID();
+    Status GetNextSegmentID(SegmentID &next_segment_id) {
+        if (!next_segment_id_) {
+            Status status = LoadNextSegmentID();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        next_segment_id = *next_segment_id_;
+        return Status::OK();
+    }
 
-    Status SetLatestSegmentID(SegmentID next_segment_id);
+    Status SetNextSegmentID(SegmentID next_segment_id);
+
+    Status GetUnsealedSegmentID(SegmentID &unsealed_segment_id) {
+        if (!unsealed_segment_id_) {
+            Status status = LoadUnsealedSegmentID();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        unsealed_segment_id = *unsealed_segment_id_;
+        return Status::OK();
+    }
+
+    Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
@@ -58,7 +80,9 @@ private:
 
     Status LoadIndexIDs();
 
-    Status LoadLatestSegmentID();
+    Status LoadNextSegmentID();
+
+    Status LoadUnsealedSegmentID();
 
     String GetTableTag(const String &tag) const;
 
@@ -71,7 +95,9 @@ private:
     Optional<Vector<SegmentID>> segment_ids_;
     Optional<Vector<String>> index_id_strs_;
     Optional<Vector<String>> index_names_;
-    Optional<SegmentID> latest_segment_id_;
+    // Optional<SegmentID> latest_segment_id_;
+    Optional<SegmentID> next_segment_id_;
+    Optional<SegmentID> unsealed_segment_id_;
     Set<SegmentID> segment_id_set_;
 };
 

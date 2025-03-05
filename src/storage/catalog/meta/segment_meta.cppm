@@ -64,8 +64,6 @@ public:
 
     Status SetBlockIDs(const Vector<BlockID> &block_ids);
 
-//    Status AddBlockID(BlockID block_id);
-
     Status SetNextBlockID(BlockID next_block_id);
 
     Status SetRowCnt(SizeT row_cnt);
@@ -74,8 +72,6 @@ public:
 
     // New
     Status Init();
-    Tuple<BlockID, Status> GetLatestBlockID();
-    Status SetLatestBlockID(BlockID next_block_id);
     Status AddBlockID(BlockID block_id);
     Tuple<SharedPtr<String>, Status> GetSegmentDir();
     Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
@@ -85,8 +81,6 @@ private:
     Status LoadBlockIDs();
 
     Status LoadNextBlockID();
-
-    Status LoadLatestBlockID();
 
     Status LoadRowCnt();
 
@@ -102,7 +96,7 @@ private:
     Optional<BlockID> next_block_id_;
     Optional<SizeT> row_cnt_;
 
-    Optional<BlockID> latest_block_id_;
+    // Optional<BlockID> latest_block_id_;
     Set<BlockID> block_id_set_;
 };
 

@@ -382,7 +382,7 @@ private:
     // DML
     Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 
-    Status AddNewBlock(SegmentMeta *segment_meta, BlockID block_id, BlockMeta *block_meta);
+    Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
     Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
 

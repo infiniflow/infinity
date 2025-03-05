@@ -82,7 +82,8 @@ TEST_P(TableMeetaTest, table_meeta) {
     table_meta.Init();
 
     {
-        auto [segment_id, segment_status] = table_meta.GetLatestSegmentID();
+        SegmentID segment_id = 0;
+        auto segment_status = table_meta.GetNextSegmentID(segment_id);
         EXPECT_TRUE(segment_status.ok());
         EXPECT_EQ(segment_id, 0);
         {
@@ -90,7 +91,8 @@ TEST_P(TableMeetaTest, table_meeta) {
             segment_meta.Init();
             segment_meta.SetRowCnt(1048);
             {
-                auto [block_id, block_status] = segment_meta.GetLatestBlockID();
+                BlockID block_id = 0;
+                auto block_status = segment_meta.GetNextBlockID(block_id);
                 EXPECT_TRUE(block_status.ok());
                 EXPECT_EQ(block_id, 0);
             }
@@ -105,12 +107,13 @@ TEST_P(TableMeetaTest, table_meeta) {
                 block_status = segment_meta.AddBlockID(1);
                 EXPECT_TRUE(block_status.ok());
 
-                block_status = segment_meta.SetLatestBlockID(1);
+                block_status = segment_meta.SetNextBlockID(1);
                 EXPECT_TRUE(block_status.ok());
             }
 
             {
-                auto [block_id, block_status] = segment_meta.GetLatestBlockID();
+                BlockID block_id = 0;
+                auto block_status = segment_meta.GetNextBlockID(block_id);
                 EXPECT_TRUE(block_status.ok());
                 EXPECT_EQ(block_id, 1);
             }
@@ -128,19 +131,20 @@ TEST_P(TableMeetaTest, table_meeta) {
     }
 
     {
-        Status status = table_meta.SetLatestSegmentID(1);
+        Status status = table_meta.SetNextSegmentID(1);
         EXPECT_TRUE(status.ok());
 
         status = table_meta.AddSegmentID(1);
         EXPECT_TRUE(status.ok());
 
-        status = table_meta.SetLatestSegmentID(2);
+        status = table_meta.SetNextSegmentID(2);
         EXPECT_TRUE(status.ok());
 
         status = table_meta.AddSegmentID(2);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_id, segment_status] = table_meta.GetLatestSegmentID();
+        SegmentID segment_id = 0;
+        auto segment_status = table_meta.GetNextSegmentID(segment_id);
         EXPECT_TRUE(segment_status.ok());
         EXPECT_EQ(segment_id, 2);
     }
