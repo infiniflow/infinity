@@ -23,6 +23,7 @@ import column_def;
 namespace infinity {
 
 class KVInstance;
+class TableDef;
 
 export class TableMeeta {
 public:
@@ -35,7 +36,9 @@ public:
 
     Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
 
-    Status Init();
+    Status InitSet(SharedPtr<TableDef> table_def);
+
+    Status UninitSet();
 
     Status GetNextSegmentID(SegmentID &next_segment_id) {
         if (!next_segment_id_) {

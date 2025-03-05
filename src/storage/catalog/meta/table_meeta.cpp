@@ -25,6 +25,7 @@ import column_def;
 import third_party;
 import default_values;
 import logger;
+import table_def;
 
 namespace infinity {
 
@@ -88,8 +89,91 @@ Status TableMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
-Status TableMeeta::Init() {
-    //    AddSegmentID(0);
+Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
+    Status status;
+
+    // Create table comment;
+    if (table_def->table_comment() != nullptr and !table_def->table_comment()->empty()) {
+        String &table_comment = *table_def->table_comment();
+        String table_comment_key = GetTableTag("comment");
+        status = kv_instance_.Put(table_comment_key, table_comment);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    // Create table column id;
+    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    status = kv_instance_.Put(table_latest_column_id_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Create table segment id;
+    String table_latest_segment_id_key = GetTableTag("next_segment_id");
+    status = kv_instance_.Put(table_latest_segment_id_key, "0");
+    if (!status.ok()) {
+        return status;
+    }
+
+    {
+        // Create segment ids
+        String table_segment_ids_key = GetTableTag("segment_ids");
+        String table_segment_ids_str = nlohmann::json::array().dump();
+        Status status = kv_instance_.Put(table_segment_ids_key, table_segment_ids_str);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    for (const auto &column : table_def->columns()) {
+        String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name());
+        Status status = kv_instance_.Put(column_key, column->ToJson().dump());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+
+Status TableMeeta::UninitSet() {
+    Status status;
+
+    // delete table segment id;
+    String table_latest_segment_id_key = GetTableTag("next_segment_id");
+    status = kv_instance_.Delete(table_latest_segment_id_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Delete table column id;
+    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    status = kv_instance_.Delete(table_latest_column_id_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    // Delete table comment
+    String table_comment_key = GetTableTag("comment");
+    status = kv_instance_.Delete(table_comment_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
+    auto iter2 = kv_instance_.GetIterator();
+    iter2->Seek(table_column_prefix);
+
+    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
+        String table_column_key = iter2->Key().ToString();
+        Status status = kv_instance_.Delete(table_column_key);
+        if (!status.ok()) {
+            return status;
+        }
+        iter2->Next();
+    }
+
     return Status::OK();
 }
 

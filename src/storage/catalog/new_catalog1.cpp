@@ -87,6 +87,67 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
     return block_offset_begin < row_idx;
 }
 
+Status NewCatalog::CleanTable(TableMeeta &table_meta) {
+    Status status;
+
+    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        status = NewCatalog::CleanSegment(segment_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    Vector<String> *index_id_strs_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &index_id_str : *index_id_strs_ptr) {
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+        status = NewCatalog::CleanTableIndex(table_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    status = table_meta.UninitSet();
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
+    Status status;
+
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
+        status = NewCatalog::CleanSegmentIndex(segment_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    status = table_index_meta.UninitSet();
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
 Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
     {
         Status status = table_meta.AddSegmentID(segment_id);
@@ -263,7 +324,10 @@ Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta) {
     if (outline_buffer_obj) {
         outline_buffer_obj->PickForCleanup();
     }
-    column_meta.UninitSet();
+    status = column_meta.UninitSet();
+    if (!status.ok()) {
+        return status;
+    }
 
     return Status::OK();
 }
@@ -282,6 +346,29 @@ Status NewCatalog::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, Segment
             return status;
         }
     }
+    return Status::OK();
+}
+
+Status NewCatalog::CleanSegmentIndex(SegmentIndexMeta &segment_index_meta) {
+    Status status;
+
+    Vector<ChunkID> *chunk_ids_ptr = nullptr;
+    status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (ChunkID chunk_id : *chunk_ids_ptr) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
+        status = NewCatalog::CleanChunkIndex(chunk_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    status = segment_index_meta.UninitSet();
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -415,6 +502,23 @@ Status NewCatalog::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
         if (!status.ok()) {
             return status;
         }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta) {
+    Status status;
+
+    BufferObj *buffer_obj = nullptr;
+    status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
+    if (!status.ok()) {
+        return status;
+    }
+    buffer_obj->PickForCleanup();
+
+    status = chunk_index_meta.UninitSet();
+    if (!status.ok()) {
+        return status;
     }
     return Status::OK();
 }

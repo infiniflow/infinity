@@ -50,6 +50,8 @@ public:
 
     Status InitSet(SharedPtr<IndexBase> index_base);
 
+    Status UninitSet();
+
 private:
     Status LoadIndexDef();
 

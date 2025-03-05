@@ -53,6 +53,17 @@ Status ChunkIndexMeta::InitSet(const ChunkIndexMetaInfo &chunk_info) {
     return Status::OK();
 }
 
+Status ChunkIndexMeta::UninitSet() {
+    {
+        String chunk_info_key = GetChunkIndexTag("chunk_info");
+        Status status = kv_instance_.Delete(chunk_info_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status ChunkIndexMeta::LoadChunkInfo() {
     String chunk_info_key = GetChunkIndexTag("chunk_info");
     String chunk_info_str;

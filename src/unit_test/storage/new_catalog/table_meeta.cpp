@@ -79,7 +79,6 @@ TEST_P(TableMeetaTest, table_meeta) {
 
     UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
     TableMeeta table_meta(table_info->db_id_, table_info->table_id_, *kv_instance);
-    table_meta.Init();
 
     {
         SegmentID segment_id = 0;

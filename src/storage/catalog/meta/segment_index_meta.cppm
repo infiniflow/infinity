@@ -92,6 +92,8 @@ public:
 
     Status InitSet();
 
+    Status UninitSet();
+
     Status GetMemIndex(SharedPtr<MemIndex> &mem_index);
 
     // write mem index should use this function

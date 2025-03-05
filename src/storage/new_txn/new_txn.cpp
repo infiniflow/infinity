@@ -68,6 +68,9 @@ import version_file_worker;
 import block_version;
 import extra_command;
 
+import table_meeta;
+import table_index_meeta;
+
 namespace infinity {
 
 NewTxn::NewTxn(NewTxnManager *txn_manager,
@@ -1542,56 +1545,12 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
         return status;
     }
 
-    // Create table comment;
-    if (create_table_cmd->table_def_->table_comment() != nullptr and !create_table_cmd->table_def_->table_comment()->empty()) {
-        String &table_comment = *create_table_cmd->table_def_->table_comment();
-        String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");
-        status = kv_instance_->Put(table_comment_key, table_comment);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    // Create table column id;
-    String table_latest_column_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_COLUMN_ID.data());
-    status = kv_instance_->Put(table_latest_column_id_key, "0");
+    TableMeeta table_meeta(db_id_str, table_id_str, *kv_instance_);
+    status = table_meeta.InitSet(create_table_cmd->table_def_);
     if (!status.ok()) {
         return status;
     }
 
-    // Create table segment id;
-    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "next_segment_id");
-    status = kv_instance_->Put(table_latest_segment_id_key, "0");
-    if (!status.ok()) {
-        return status;
-    }
-
-    {
-        // Create segment ids
-        String table_segment_ids_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "segment_ids");
-        String table_segment_ids_str = nlohmann::json::array().dump();
-        Status status = kv_instance_->Put(table_segment_ids_key, table_segment_ids_str);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    status = CommitCreateTableDef(create_table_cmd->table_def_.get(), db_id_str, table_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-
-    return Status::OK();
-}
-
-Status NewTxn::CommitCreateTableDef(const TableDef *table_def, const String &db_id, const String &table_id) {
-    for (const auto &column : table_def->columns()) {
-        String column_key = KeyEncode::TableColumnKey(db_id, table_id, column->name());
-        Status status = kv_instance_->Put(column_key, column->ToJson().dump());
-        if (!status.ok()) {
-            return status;
-        }
-    }
     return Status::OK();
 }
 
@@ -1608,47 +1567,10 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
         return status;
     }
 
-    // delete table segment id;
-    String table_latest_segment_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "next_segment_id");
-    status = kv_instance_->Delete(table_latest_segment_id_key);
+    TableMeeta table_meeta(db_id_str, table_id_str, *kv_instance_);
+    status = table_meeta.UninitSet();
     if (!status.ok()) {
         return status;
-    }
-
-    // Delete table column id;
-    String table_latest_column_id_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, LATEST_COLUMN_ID.data());
-    status = kv_instance_->Delete(table_latest_column_id_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // Delete table comment
-    String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");
-    status = kv_instance_->Delete(table_comment_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    status = CommitDropTableDef(db_id_str, table_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-
-    return Status::OK();
-}
-
-Status NewTxn::CommitDropTableDef(const String &db_id, const String &table_id) {
-    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id, table_id);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(table_column_prefix);
-
-    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
-        String table_column_key = iter2->Key().ToString();
-        Status status = kv_instance_->Delete(table_column_key);
-        if (!status.ok()) {
-            return status;
-        }
-        iter2->Next();
     }
 
     return Status::OK();

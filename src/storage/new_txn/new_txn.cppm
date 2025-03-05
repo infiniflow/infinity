@@ -422,9 +422,7 @@ private:
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
     Status CommitCreateTable(const WalCmdCreateTable *create_table_cmd);
-    Status CommitCreateTableDef(const TableDef *table_def, const String &db_id, const String &table_id);
     Status CommitDropTable(const WalCmdDropTable *drop_table_cmd);
-    Status CommitDropTableDef(const String &db_id, const String &table_id);
     Status CommitRenameTable(const WalCmdRenameTable *create_table_cmd);
     Status CommitAddColumns(const WalCmdAddColumns *add_columns_cmd);
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);

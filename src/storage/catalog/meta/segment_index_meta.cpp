@@ -175,6 +175,50 @@ Status SegmentIndexMeta::InitSet() {
     return Status::OK();
 }
 
+Status SegmentIndexMeta::UninitSet() {
+    {
+        String chunk_ids_key = GetSegmentIndexTag("chunk_ids");
+        Status status = kv_instance_.Delete(chunk_ids_key);
+        if (!status.ok()) {
+            return status;
+        }
+        chunk_ids_.reset();
+    }
+    {
+        String next_chunk_id_key = GetSegmentIndexTag("next_chunk_id");
+        Status status = kv_instance_.Delete(next_chunk_id_key);
+        if (!status.ok()) {
+            return status;
+        }
+        next_chunk_id_.reset();
+    }
+    {
+        String mem_index_key = GetSegmentIndexTag("mem_index");
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        Status status = new_catalog->DropMemIndexByMemIndexKey(mem_index_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        String has_mem_index_key = GetSegmentIndexTag("has_mem_index");
+        Status status = kv_instance_.Delete(has_mem_index_key);
+        if (!status.ok()) {
+            return status;
+        }
+        has_mem_index_.reset();
+    }
+    {
+        String ft_info_key = GetSegmentIndexTag("ft_info");
+        Status status = kv_instance_.Delete(ft_info_key);
+        if (!status.ok()) {
+            return status;
+        }
+        ft_info_.reset();
+    }
+    return Status::OK();
+}
+
 Status SegmentIndexMeta::GetMemIndex(SharedPtr<MemIndex> &mem_index) {
     mem_index.reset();
     bool has_mem_index = false;

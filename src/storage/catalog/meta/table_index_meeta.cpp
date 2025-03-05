@@ -105,6 +105,24 @@ Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_base) {
     return Status::OK();
 }
 
+Status TableIndexMeeta::UninitSet() {
+    Status status;
+
+    String segment_ids_key = GetTableIndexTag("segment_ids");
+    status = kv_instance_.Delete(segment_ids_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String index_def_key = GetTableIndexTag("index_base");
+    status = kv_instance_.Delete(index_def_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
 Status TableIndexMeeta::LoadIndexDef() {
     String index_def_key = GetTableIndexTag("index_base");
     String index_def_str;

@@ -57,6 +57,8 @@ public:
 
     Status InitSet(const ChunkIndexMetaInfo &chunk_info);
 
+    Status UninitSet();
+
 private:
     Status LoadChunkInfo();
 

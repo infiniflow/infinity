@@ -167,6 +167,10 @@ private:
     MultiMap<TxnTimeStamp, String> cleaned_meta_{};
 
 public:
+    static Status CleanTable(TableMeeta &table_meta);
+
+    static Status CleanTableIndex(TableIndexMeeta &table_index_meta);
+
     static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 
     static Status CleanSegment(SegmentMeta &segment_meta);
@@ -181,6 +185,8 @@ public:
 
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
+    static Status CleanSegmentIndex(SegmentIndexMeta &segment_index_meta);
+
     static Status AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                    ChunkID chunk_id,
                                    RowID base_row_id,
@@ -189,6 +195,8 @@ public:
                                    SizeT index_size,
                                    Optional<ChunkIndexMeta> &chunk_index_meta,
                                    BufferObj *&buffer_obj);
+
+    static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta);
 
     static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector);
 
