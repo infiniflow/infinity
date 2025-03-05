@@ -95,9 +95,6 @@ private:
     Optional<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;
     Optional<SizeT> row_cnt_;
-
-    // Optional<BlockID> latest_block_id_;
-    Set<BlockID> block_id_set_;
 };
 
 } // namespace infinity

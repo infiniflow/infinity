@@ -80,11 +80,6 @@ Status TableMeeta::AddSegmentID(SegmentID segment_id) {
         }
     }
 
-    if (segment_id_set_.contains(segment_id)) {
-        LOG_ERROR(fmt::format("Attempt to add a duplicate segment id into table meta: {}", segment_id));
-        return Status::DuplicateEntry(fmt::format("Duplicated segment id: {}", segment_id));
-    }
-    segment_id_set_.insert(segment_id);
     segment_ids_->emplace_back(segment_id);
     Status status = SetSegmentIDs(*segment_ids_);
     if (!status.ok()) {
@@ -126,10 +121,6 @@ Status TableMeeta::LoadSegmentIDs() {
         return status;
     }
     segment_ids_ = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
-    segment_id_set_.clear();
-    for (SegmentID segment_id : *segment_ids_) {
-        segment_id_set_.insert(segment_id);
-    }
     return Status::OK();
 }
 

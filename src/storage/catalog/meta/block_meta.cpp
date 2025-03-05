@@ -53,22 +53,10 @@ Status BlockMeta::SetRowCnt(SizeT row_cnt) {
 
 Status BlockMeta::InitSet() {
     {
-        String block_row_cnt_key = GetBlockTag("row_cnt");
-        String block_row_cnt_str;
-        Status status = kv_instance_.Get(block_row_cnt_key, block_row_cnt_str);
+        Status status = SetRowCnt(0);
         if (!status.ok()) {
-            if (status.code() != ErrorCode::kNotFound) {
-                return status;
-            }
-
-            Status status = kv_instance_.Put(block_row_cnt_key, "0");
-            if (!status.ok()) {
-                return status;
-            }
+            return status;
         }
-    }
-    {
-        segment_meta_.AddBlockID(block_id_);
     }
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {

@@ -44,7 +44,8 @@ import table_index_meeta;
 namespace infinity {
 
 struct NewTxnCompactState {
-    NewTxnCompactState(SegmentID segment_id, TableMeeta &table_meta) : new_segment_meta_(segment_id, table_meta, table_meta.kv_instance()) {
+    NewTxnCompactState(SegmentID segment_id, TableMeeta &table_meta, NewTxn *txn) {
+        txn->AddNewSegment(table_meta, segment_id, new_segment_meta_);
         auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
         if (!status.ok()) {
             UnrecoverableError("Failed to get column defs");
@@ -67,16 +68,16 @@ struct NewTxnCompactState {
 
         BlockID block_id = 0;
         {
-            status = new_segment_meta_.GetNextBlockID(block_id);
+            status = new_segment_meta_->GetNextBlockID(block_id);
             if (!status.ok()) {
                 return status;
             }
-            status = new_segment_meta_.SetNextBlockID(block_id + 1);
+            status = new_segment_meta_->SetNextBlockID(block_id + 1);
             if (!status.ok()) {
                 return status;
             }
         }
-        status = txn->AddNewBlock(new_segment_meta_, block_id, block_meta_);
+        status = txn->AddNewBlock(*new_segment_meta_, block_id, block_meta_);
         if (!status.ok()) {
             return status;
         }
@@ -113,11 +114,11 @@ struct NewTxnCompactState {
                 return status;
             }
         }
-        Status status = new_segment_meta_.SetRowCnt(segment_row_cnt_);
+        Status status = new_segment_meta_->SetRowCnt(segment_row_cnt_);
         return status;
     }
 
-    SegmentMeta new_segment_meta_;
+    Optional<SegmentMeta> new_segment_meta_;
     Optional<BlockMeta> block_meta_;
     SizeT segment_row_cnt_ = 0;
     BlockOffset cur_block_row_cnt_ = 0;
@@ -220,7 +221,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
 
-            status = this->GetBufferObj(column_meta, buffer_obj, outline_buffer_obj);
+            status = this->GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
             if (!status.ok()) {
                 return status;
             }
@@ -381,7 +382,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     }
     status = table_meta.SetNextSegmentID(new_segment_id + 1);
 
-    NewTxnCompactState compact_state(new_segment_id, table_meta);
+    NewTxnCompactState compact_state(new_segment_id, table_meta, this);
 
     SharedPtr<Vector<SegmentID>> segment_ids_ptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
@@ -423,7 +424,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         const String &index_name = (*index_name_ptr)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
 
-        status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, compact_state.new_segment_meta_);
+        status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *compact_state.new_segment_meta_);
         if (!status.ok()) {
             return status;
         }
@@ -436,7 +437,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     {
         Vector<SegmentID> deprecated_segment_ids = *segment_ids_ptr;
         Vector<WalSegmentInfo> segment_infos;
-        segment_infos.emplace_back(compact_state.new_segment_meta_);
+        segment_infos.emplace_back(*compact_state.new_segment_meta_);
         auto compact_command = MakeShared<WalCmdCompact>(db_name, table_name, std::move(segment_infos), std::move(deprecated_segment_ids));
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
         txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
@@ -773,7 +774,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     return Status::OK();
 }
 
-Status NewTxn::GetBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj) {
+Status NewTxn::GetColumnBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj) {
     SharedPtr<String> block_dir_ptr = column_meta.block_meta().GetBlockDir();
     const ColumnDef *col_def = nullptr;
     {
@@ -816,6 +817,19 @@ Status NewTxn::GetBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, Buf
     return Status::OK();
 }
 
+Status NewTxn::GetVersionBufferObj(BlockMeta &block_meta, BufferObj *&version_buffer) {
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
+    String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+    version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+    if (version_buffer == nullptr) {
+        return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector) {
     const ColumnDef *col_def = nullptr;
     {
@@ -829,7 +843,7 @@ Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnV
 
     BufferObj *buffer_obj = nullptr;
     BufferObj *outline_buffer_obj = nullptr;
-    Status status = this->GetBufferObj(column_meta, buffer_obj, outline_buffer_obj);
+    Status status = this->GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
     if (!status.ok()) {
         return status;
     }
@@ -840,15 +854,10 @@ Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnV
 }
 
 Status NewTxn::GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRangeState &state) {
-    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     BufferObj *version_buffer = nullptr;
-    {
-        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
-        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
-        if (version_buffer == nullptr) {
-            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
-        }
+    Status status = this->GetVersionBufferObj(block_meta, version_buffer);
+    if (!status.ok()) {
+        return status;
     }
 
     BufferHandle buffer_handle = version_buffer->Load();

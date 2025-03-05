@@ -95,10 +95,8 @@ private:
     Optional<Vector<SegmentID>> segment_ids_;
     Optional<Vector<String>> index_id_strs_;
     Optional<Vector<String>> index_names_;
-    // Optional<SegmentID> latest_segment_id_;
     Optional<SegmentID> next_segment_id_;
     Optional<SegmentID> unsealed_segment_id_;
-    Set<SegmentID> segment_id_set_;
 };
 
 } // namespace infinity

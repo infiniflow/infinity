@@ -451,7 +451,9 @@ private:
                        const Vector<ChunkID> &deprecate_ids,
                        bool clear_mem_index);
 
-    Status GetBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj);
+    Status GetColumnBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj);
+
+    Status GetVersionBufferObj(BlockMeta &block_meta, BufferObj *&buffer_obj);
 
 public:
     Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);

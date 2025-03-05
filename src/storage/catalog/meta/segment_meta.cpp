@@ -107,10 +107,6 @@ Status SegmentMeta::LoadBlockIDs() {
         return status;
     }
     block_ids_ = nlohmann::json::parse(block_ids_str).get<Vector<BlockID>>();
-    block_id_set_.clear();
-    for (BlockID block_id : *block_ids_) {
-        block_id_set_.insert(block_id);
-    }
     return Status::OK();
 }
 
@@ -188,26 +184,10 @@ Status SegmentMeta::AddBlockID(BlockID block_id) {
     if (!block_ids_) {
         Status status = LoadBlockIDs();
         if (!status.ok()) {
-            if (status.code() == ErrorCode::kNotFound) {
-                String block_ids_key = GetSegmentTag("block_ids");
-                String block_ids_str = nlohmann::json(Vector<BlockID>{}).dump();
-                status = kv_instance_.Put(block_ids_key, block_ids_str);
-                if (!status.ok()) {
-                    return status;
-                }
-            } else {
                 return status;
             }
         }
-    }
 
-    if (block_id_set_.contains(block_id)) {
-        return Status::OK();
-    }
-    block_id_set_.insert(block_id);
-    if (block_ids_ == std::nullopt) {
-        block_ids_ = Vector<BlockID>();
-    }
     block_ids_->push_back(block_id);
     String block_ids_key = GetSegmentTag("block_ids");
     String block_ids_str = nlohmann::json(block_ids_.value()).dump();
