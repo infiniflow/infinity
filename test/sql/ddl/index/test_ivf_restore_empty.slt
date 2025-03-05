@@ -13,13 +13,13 @@ statement ok
 CREATE INDEX idx1 ON test_ivf (col1) USING IVF WITH (metric = l2);
 
 statement ok
-CREATE SNAPSHOT test_ivf_backup ON TABLE test_ivf;
+CREATE SNAPSHOT empty_test_ivf_backup ON TABLE test_ivf;
 
 statement ok
 DROP TABLE test_ivf;
 
 statement ok
-RESTORE TABLE SNAPSHOT test_ivf_backup;
+RESTORE TABLE SNAPSHOT empty_test_ivf_backup;
 
 statement ok
 SELECT * FROM test_ivf LIMIT 1;
@@ -32,7 +32,7 @@ statement ok
 DROP TABLE test_ivf;
 
 statement ok
-RESTORE TABLE SNAPSHOT test_ivf_backup;
+RESTORE TABLE SNAPSHOT empty_test_ivf_backup;
 
 statement ok
 SELECT * FROM test_ivf LIMIT 1;
@@ -44,4 +44,4 @@ statement ok
 DROP TABLE test_ivf;
 
 #statement ok
-#DROP SNAPSHOT test_ivf_backup;
+#DROP SNAPSHOT empty_test_ivf_backup;

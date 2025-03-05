@@ -12,13 +12,13 @@ statement ok
 CREATE INDEX idx1 ON sqllogic_test_diskann (col1) USING DiskAnn WITH (R = 16, L = 50, num_pq_chunks = 4, num_parts = 10, metric = l2);
 
 statement ok
-CREATE SNAPSHOT sqllogic_test_diskann_backup ON TABLE sqllogic_test_diskann;
+CREATE SNAPSHOT empty_sqllogic_test_diskann_backup ON TABLE sqllogic_test_diskann;
 
 statement ok
 DROP TABLE sqllogic_test_diskann;
 
 statement ok
-RESTORE TABLE SNAPSHOT sqllogic_test_diskann_backup;
+RESTORE TABLE SNAPSHOT empty_sqllogic_test_diskann_backup;
 
 statement ok
 SELECT * FROM sqllogic_test_diskann LIMIT 1;
@@ -31,7 +31,7 @@ statement ok
 DROP TABLE sqllogic_test_diskann;
 
 statement ok
-RESTORE TABLE SNAPSHOT sqllogic_test_diskann_backup;
+RESTORE TABLE SNAPSHOT empty_sqllogic_test_diskann_backup;
 
 statement ok
 SHOW TABLE sqllogic_test_diskann INDEX idx1;

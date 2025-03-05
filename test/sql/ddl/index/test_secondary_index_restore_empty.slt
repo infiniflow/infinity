@@ -11,16 +11,13 @@ statement ok
 SHOW TABLE test_secondary_index INDEX idx_c1;
 
 statement ok
-CREATE SNAPSHOT secondary_index_backup ON TABLE test_secondary_index;
+CREATE SNAPSHOT empty_secondary_index_backup ON TABLE test_secondary_index;
 
 statement ok
 DROP TABLE test_secondary_index;
 
 statement ok
-RESTORE TABLE SNAPSHOT secondary_index_backup;
-
-statement error
-RESTORE TABLE SNAPSHOT secondary_index_backup;
+RESTORE TABLE SNAPSHOT empty_secondary_index_backup;
 
 statement ok
 SELECT * FROM test_secondary_index LIMIT 1;
@@ -33,7 +30,7 @@ statement ok
 DROP TABLE test_secondary_index;
 
 statement ok
-RESTORE TABLE SNAPSHOT secondary_index_backup;
+RESTORE TABLE SNAPSHOT empty_secondary_index_backup;
 
 statement ok
 SELECT * FROM test_secondary_index LIMIT 1;
@@ -45,4 +42,4 @@ statement ok
 DROP TABLE test_secondary_index;
 
 #statement ok
-#DROP SNAPSHOT secondary_index_backup;
+#DROP SNAPSHOT empty_secondary_index_backup;

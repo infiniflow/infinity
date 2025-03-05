@@ -15,13 +15,13 @@ statement ok
 SHOW TABLE sqllogic_test_index_comment INDEX idx1;
 
 statement ok
-CREATE SNAPSHOT sqllogic_test_index_comment_backup ON TABLE sqllogic_test_index_comment;
+CREATE SNAPSHOT empty_sqllogic_test_index_comment_backup ON TABLE sqllogic_test_index_comment;
 
 statement ok
 DROP TABLE sqllogic_test_index_comment;
 
 statement ok
-RESTORE TABLE SNAPSHOT sqllogic_test_index_comment_backup;
+RESTORE TABLE SNAPSHOT empty_sqllogic_test_index_comment_backup;
 
 statement ok
 SELECT * FROM sqllogic_test_index_comment LIMIT 1;
@@ -34,7 +34,7 @@ statement ok
 DROP TABLE sqllogic_test_index_comment;
 
 statement ok
-RESTORE TABLE SNAPSHOT sqllogic_test_index_comment_backup;
+RESTORE TABLE SNAPSHOT empty_sqllogic_test_index_comment_backup;
 
 statement ok
 SELECT * FROM sqllogic_test_index_comment LIMIT 1;
@@ -49,4 +49,4 @@ statement ok
 DROP TABLE sqllogic_test_index_comment;
 
 #statement ok
-#DROP SNAPSHOT sqllogic_test_index_comment_backup;
+#DROP SNAPSHOT empty_sqllogic_test_index_comment_backup;
