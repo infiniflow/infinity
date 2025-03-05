@@ -31,13 +31,8 @@ import infinity_context;
 import buffer_manager;
 import third_party;
 import infinity_exception;
-import secondary_index_file_worker;
-import ivf_index_file_worker;
-import raw_file_worker;
-import hnsw_file_worker;
 import column_def;
 import internal_types;
-import file_worker;
 import create_index_info;
 import buffer_obj;
 import mem_index;
@@ -49,7 +44,6 @@ import default_values;
 import ivf_index_data_in_mem;
 import ivf_index_data;
 import memory_indexer;
-import index_defines;
 import index_full_text;
 import column_index_reader;
 import column_index_merger;
@@ -57,18 +51,10 @@ import abstract_hnsw;
 import index_hnsw;
 import abstract_bmp;
 import index_bmp;
-import bmp_index_file_worker;
 import emvb_index_in_mem;
 import emvb_index;
-import emvb_index_file_worker;
 
 namespace infinity {
-
-namespace {
-
-String IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
-
-} // namespace
 
 Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
     String db_id_str;
@@ -179,8 +165,14 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status =
-            this->AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, base_name, 0 /*index_size*/, chunk_index_meta, buffer_obj);
+        Status status = NewCatalog::AddNewChunkIndex(segment_index_meta,
+                                                     chunk_id,
+                                                     base_rowid,
+                                                     row_cnt,
+                                                     base_name,
+                                                     0 /*index_size*/,
+                                                     chunk_index_meta,
+                                                     buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -194,7 +186,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
 
                 BufferObj *buffer_obj = nullptr;
                 {
-                    Status status = this->GetChunkIndex(old_chunk_meta, buffer_obj);
+                    Status status = NewCatalog::GetChunkIndex(old_chunk_meta, buffer_obj);
                     if (!status.ok()) {
                         return status;
                     }
@@ -224,7 +216,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
 
             BufferHandle buffer_handle = buffer_obj->Load();
             auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
-            data_ptr->BuildIVFIndex(this, segment_meta, row_cnt, column_def);
+            data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def);
             break;
         }
         case IndexType::kHnsw:
@@ -257,7 +249,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
 
             BufferHandle buffer_handle = buffer_obj->Load();
             auto *data_ptr = static_cast<EMVBIndex *>(buffer_handle.GetDataMut());
-            data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, column_def, this);
+            data_ptr->BuildEMVBIndex(base_rowid, row_cnt, segment_meta, column_def);
             break;
         }
         default: {
@@ -278,157 +270,6 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
 
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
         txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
-    }
-    return Status::OK();
-}
-
-Status NewTxn::AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta) {
-    {
-        Status status = table_index_meta.AddSegmentID(segment_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        segment_index_meta.emplace(segment_id, table_index_meta, table_index_meta.kv_instance());
-        Status status = segment_index_meta->InitSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
-Status NewTxn::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
-                                ChunkID chunk_id,
-                                RowID base_row_id,
-                                SizeT row_count,
-                                const String &base_name,
-                                SizeT index_size,
-                                Optional<ChunkIndexMeta> &chunk_index_meta,
-                                BufferObj *&buffer_obj) {
-    TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
-    SegmentID segment_id = segment_index_meta.segment_id();
-
-    auto [index_base, index_status] = table_index_meta.GetIndexBase();
-    if (!index_status.ok()) {
-        return index_status;
-    }
-
-    SharedPtr<ColumnDef> column_def;
-    {
-        auto [col_def, status] = table_index_meta.GetColumnDef();
-        if (!status.ok()) {
-            return status;
-        }
-        column_def = std::move(col_def);
-    }
-
-    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
-    ChunkIndexMetaInfo chunk_info;
-    {
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        switch (index_base->index_type_) {
-            case IndexType::kSecondary: {
-                auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                              index_dir,
-                                                                              std::move(secondary_index_file_name),
-                                                                              index_base,
-                                                                              column_def,
-                                                                              row_count,
-                                                                              buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kFullText: {
-                auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
-                auto index_file_worker = MakeUnique<RawFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                   index_dir,
-                                                                   std::move(column_length_file_name),
-                                                                   row_count * sizeof(u32),
-                                                                   buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kIVF: {
-                auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                        MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                        index_dir,
-                                                                        std::move(ivf_index_file_name),
-                                                                        index_base,
-                                                                        column_def,
-                                                                        buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kHnsw: {
-                auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto index_file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                    MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                    index_dir,
-                                                                    std::move(hnsw_index_file_name),
-                                                                    index_base,
-                                                                    column_def,
-                                                                    buffer_mgr->persistence_manager(),
-                                                                    index_size);
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kBMP: {
-                auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                  index_dir,
-                                                                  std::move(bmp_index_file_name),
-                                                                  index_base,
-                                                                  column_def,
-                                                                  buffer_mgr->persistence_manager(),
-                                                                  index_size);
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-                break;
-            }
-            case IndexType::kEMVB: {
-                auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                const auto segment_start_offset = base_row_id.segment_offset_;
-                auto file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                   index_dir,
-                                                                   std::move(emvb_index_file_name),
-                                                                   index_base,
-                                                                   column_def,
-                                                                   segment_start_offset,
-                                                                   buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-                break;
-            }
-            default: {
-                UnrecoverableError("Not implemented yet");
-            }
-        }
-        if (buffer_obj == nullptr) {
-            return Status::BufferManagerError("AllocateBufferObject failed");
-        }
-        buffer_obj->AddObjRc();
-    }
-    chunk_info.base_name_ = base_name;
-    chunk_info.base_row_id_ = base_row_id;
-    chunk_info.row_cnt_ = row_count;
-    {
-        chunk_index_meta.emplace(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
-        Status status = chunk_index_meta->InitSet(chunk_info);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        Status status = segment_index_meta.AddChunkID(chunk_id);
-        if (!status.ok()) {
-            return status;
-        }
     }
     return Status::OK();
 }
@@ -456,7 +297,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const AppendState 
     auto append_in_column = [&]() {
         ColumnVector col;
         {
-            Status status = this->GetColumnVector(*column_meta, cur_offset + cur_row_cnt, ColumnVectorTipe::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(*column_meta, cur_offset + cur_row_cnt, ColumnVectorTipe::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -484,7 +325,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const AppendState 
                 }
                 auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), range.segment_id_);
                 if (iter == segment_ids_ptr->end()) {
-                    status = this->AddNewSegmentIndex(table_index_meta, range.segment_id_, segment_index_meta);
+                    status = NewCatalog::AddNewSegmentIndex(table_index_meta, range.segment_id_, segment_index_meta);
                     if (!status.ok()) {
                         return status;
                     }
@@ -646,7 +487,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
                 }
                 memory_emvb_index = mem_index->memory_emvb_index_;
             }
-            memory_emvb_index->Insert(col, offset, row_cnt, this, segment_index_meta.kv_instance());
+            memory_emvb_index->Insert(col, offset, row_cnt, segment_index_meta.kv_instance());
             break;
         }
         default: {
@@ -663,7 +504,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
                              SegmentMeta &segment_meta) {
     Optional<SegmentIndexMeta> segment_index_meta;
     {
-        Status status = this->AddNewSegmentIndex(table_index_meta, segment_meta.segment_id(), segment_index_meta);
+        Status status = NewCatalog::AddNewSegmentIndex(table_index_meta, segment_meta.segment_id(), segment_index_meta);
         if (!status.ok()) {
             return status;
         }
@@ -763,7 +604,7 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
         }
         ColumnVector col;
         {
-            Status status = this->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -823,7 +664,7 @@ NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &
         }
         ColumnVector col;
         {
-            Status status = this->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+            Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
             if (!status.ok()) {
                 return status;
             }
@@ -877,14 +718,14 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = this->AddNewChunkIndex(segment_index_meta,
-                                               chunk_id,
-                                               base_row_id,
-                                               row_count,
-                                               "" /*base_name*/,
-                                               0 /*index_size*/,
-                                               chunk_index_meta,
-                                               buffer_obj);
+        Status status = NewCatalog::AddNewChunkIndex(segment_index_meta,
+                                                     chunk_id,
+                                                     base_row_id,
+                                                     row_count,
+                                                     "" /*base_name*/,
+                                                     0 /*index_size*/,
+                                                     chunk_index_meta,
+                                                     buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -892,7 +733,7 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
     {
         BufferHandle buffer_handle = buffer_obj->Load();
         auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
-        data_ptr->BuildIVFIndex(this, segment_meta, row_count, column_def);
+        data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
     }
     buffer_obj->Save();
     return Status::OK();
@@ -927,14 +768,14 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = this->AddNewChunkIndex(segment_index_meta,
-                                               chunk_id,
-                                               base_row_id,
-                                               row_count,
-                                               "" /*base_name*/,
-                                               0 /*index_size*/,
-                                               chunk_index_meta,
-                                               buffer_obj);
+        Status status = NewCatalog::AddNewChunkIndex(segment_index_meta,
+                                                     chunk_id,
+                                                     base_row_id,
+                                                     row_count,
+                                                     "" /*base_name*/,
+                                                     0 /*index_size*/,
+                                                     chunk_index_meta,
+                                                     buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -942,7 +783,7 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
     {
         BufferHandle buffer_handle = buffer_obj->Load();
         auto *data_ptr = static_cast<EMVBIndex *>(buffer_handle.GetDataMut());
-        data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def, this);
+        data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_meta, column_def);
     }
     buffer_obj->Save();
     return Status::OK();
@@ -1070,7 +911,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             total_row_cnt -= row_cnt;
             ColumnVector col;
             {
-                Status status = this->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1101,7 +942,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             total_row_cnt -= row_cnt;
             ColumnVector col;
             {
-                Status status = this->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1196,7 +1037,8 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = this->AddNewChunkIndex(segment_index_meta, chunk_id, row_id, row_count, base_name, index_size, chunk_index_meta, buffer_obj);
+        Status status =
+            NewCatalog::AddNewChunkIndex(segment_index_meta, chunk_id, row_id, row_count, base_name, index_size, chunk_index_meta, buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -1270,56 +1112,6 @@ Status NewTxn::AddChunkWal(const String &db_name,
 
     wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
     txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
-
-    return Status::OK();
-}
-
-Status NewTxn::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffer_obj) {
-    TableIndexMeeta &table_index_meta = chunk_index_meta.segment_index_meta().table_index_meta();
-
-    String index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), table_index_meta.GetTableIndexDir()->c_str());
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-
-    auto [index_base, index_status] = table_index_meta.GetIndexBase();
-    if (!index_status.ok()) {
-        return index_status;
-    }
-    SegmentID segment_id = chunk_index_meta.segment_index_meta().segment_id();
-    ChunkID chunk_id = chunk_index_meta.chunk_id();
-    switch (index_base->index_type_) {
-        case IndexType::kSecondary:
-        case IndexType::kIVF:
-        case IndexType::kHnsw:
-        case IndexType::kBMP:
-        case IndexType::kEMVB: {
-            String index_file_name = IndexFileName(segment_id, chunk_id);
-            String index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
-            buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
-            if (buffer_obj == nullptr) {
-                return Status::BufferManagerError("GetBufferObject failed");
-            }
-            break;
-        }
-        case IndexType::kFullText: {
-            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-            {
-                Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-            auto column_length_file_name = chunk_info_ptr->base_name_ + LENGTH_SUFFIX;
-            String index_filepath = fmt::format("{}/{}", index_dir, column_length_file_name);
-            buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
-            if (buffer_obj == nullptr) {
-                return Status::BufferManagerError("GetBufferObject failed");
-            }
-            break;
-        }
-        default: {
-            UnrecoverableError("Not implemented yet");
-        }
-    }
 
     return Status::OK();
 }

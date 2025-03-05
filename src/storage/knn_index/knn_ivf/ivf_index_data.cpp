@@ -41,7 +41,7 @@ import ivf_index_util_func;
 import column_meta;
 import block_meta;
 import segment_meta;
-import new_txn;
+import new_catalog;
 
 namespace infinity {
 
@@ -87,8 +87,7 @@ private:
 
 class NewIVFDataAccessor : public IVFDataAccessorBase {
 public:
-    NewIVFDataAccessor(NewTxn *new_txn, SegmentMeta &segment_meta, ColumnID column_id)
-        : new_txn_(new_txn), segment_meta_(segment_meta), column_id_(column_id) {}
+    NewIVFDataAccessor(SegmentMeta &segment_meta, ColumnID column_id) : segment_meta_(segment_meta), column_id_(column_id) {}
 
     const_ptr_t GetEmbedding(SizeT offset) override {
         SizeT block_offset = UpdateColumnVector(offset);
@@ -114,7 +113,7 @@ private:
             }
 
             ColumnMeta column_meta(column_id_, block_meta, block_meta.kv_instance());
-            status = new_txn_->GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, cur_column_vector_);
+            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, cur_column_vector_);
             if (!status.ok()) {
                 UnrecoverableError("Get column vector failed");
             }
@@ -123,7 +122,6 @@ private:
     }
 
 private:
-    NewTxn *new_txn_;
     SegmentMeta &segment_meta_;
     ColumnID column_id_;
 
@@ -146,9 +144,9 @@ void IVFIndexInChunk::BuildIVFIndex(const RowID base_rowid,
     BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
 }
 
-void IVFIndexInChunk::BuildIVFIndex(NewTxn *new_txn, SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def) {
+void IVFIndexInChunk::BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def) {
     RowID base_rowid(segment_meta.segment_id(), 0);
-    NewIVFDataAccessor data_accessor(new_txn, segment_meta, column_def->id());
+    NewIVFDataAccessor data_accessor(segment_meta, column_def->id());
     BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
 }
 

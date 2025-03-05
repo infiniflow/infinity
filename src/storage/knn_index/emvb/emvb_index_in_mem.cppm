@@ -31,7 +31,6 @@ class IndexBase;
 class EMVBIndex;
 struct BlockIndex;
 class ColumnVector;
-class NewTxn;
 class BufferObj;
 class KVInstance;
 
@@ -80,7 +79,7 @@ public:
 
     void Insert(BlockEntry *block_entry, SizeT column_idx, BufferManager *buffer_manager, u32 row_offset, u32 row_count);
 
-    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, NewTxn *txn, KVInstance &kv_instance);
+    void Insert(const ColumnVector &col, u32 row_offset, u32 row_count, KVInstance &kv_instance);
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
 

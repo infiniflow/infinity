@@ -32,7 +32,6 @@ class IndexBase;
 struct SegmentEntry;
 class BufferManager;
 class SegmentMeta;
-class NewTxn;
 
 export class IVFDataAccessorBase {
 public:
@@ -57,7 +56,7 @@ public:
                        const SharedPtr<ColumnDef> &column_def,
                        BufferManager *buffer_mgr);
 
-    void BuildIVFIndex(NewTxn *new_txn, SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def);
+    void BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def);
 
     void BuildIVFIndex(RowID base_rowid, u32 row_count, IVFDataAccessorBase *data_accessor, const SharedPtr<ColumnDef> &column_def);
 

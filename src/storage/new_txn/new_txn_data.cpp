@@ -26,8 +26,6 @@ import buffer_obj;
 import infinity_exception;
 import infinity_context;
 import version_file_worker;
-import data_file_worker;
-import var_file_worker;
 import block_version;
 import buffer_handle;
 import vector_buffer;
@@ -44,8 +42,11 @@ import table_index_meeta;
 namespace infinity {
 
 struct NewTxnCompactState {
-    NewTxnCompactState(SegmentID segment_id, TableMeeta &table_meta, NewTxn *txn) {
-        txn->AddNewSegment(table_meta, segment_id, new_segment_meta_);
+    NewTxnCompactState(SegmentID segment_id, TableMeeta &table_meta) {
+        Status status1 = NewCatalog::AddNewSegment(table_meta, segment_id, new_segment_meta_);
+        if (!status1.ok()) {
+            UnrecoverableError("Failed to add new segment");
+        }
         auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
         if (!status.ok()) {
             UnrecoverableError("Failed to get column defs");
@@ -55,7 +56,7 @@ struct NewTxnCompactState {
 
     SizeT column_cnt() const { return column_cnt_; }
 
-    Status NextBlock(NewTxn *txn) {
+    Status NextBlock() {
         Status status;
 
         if (block_meta_) {
@@ -77,7 +78,7 @@ struct NewTxnCompactState {
                 return status;
             }
         }
-        status = txn->AddNewBlock(*new_segment_meta_, block_id, block_meta_);
+        status = NewCatalog::AddNewBlock(*new_segment_meta_, block_id, block_meta_);
         if (!status.ok()) {
             return status;
         }
@@ -88,7 +89,7 @@ struct NewTxnCompactState {
 
         for (SizeT i = 0; i < column_cnt_; ++i) {
             ColumnMeta column_meta(i, *block_meta_, block_meta_->kv_instance());
-            status = txn->GetColumnVector(column_meta, 0, ColumnVectorTipe::kReadWrite, column_vectors_[i]);
+            status = NewCatalog::GetColumnVector(column_meta, 0, ColumnVectorTipe::kReadWrite, column_vectors_[i]);
             if (!status.ok()) {
                 return status;
             }
@@ -126,37 +127,6 @@ struct NewTxnCompactState {
     SizeT column_cnt_ = 0;
 };
 
-void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts) {
-    block_lock_ = std::move(block_lock);
-    version_buffer_handle_ = std::move(version_buffer_handle);
-    begin_ts_ = begin_ts;
-    {
-        std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
-        const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
-        block_offset_end_ = block_version->GetRowCount(begin_ts_);
-    }
-}
-
-bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<BlockOffset, BlockOffset> &visible_range) {
-    if (block_offset_begin == block_offset_end_) {
-        return false;
-    }
-    [[maybe_unused]] const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
-
-    std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
-    while (block_offset_begin < block_offset_end_ && block_version->CheckDelete(block_offset_begin, begin_ts_)) {
-        ++block_offset_begin;
-    }
-    BlockOffset row_idx;
-    for (row_idx = block_offset_begin; row_idx < block_offset_end_; ++row_idx) {
-        if (block_version->CheckDelete(row_idx, begin_ts_)) {
-            break;
-        }
-    }
-    visible_range = {block_offset_begin, row_idx};
-    return block_offset_begin < row_idx;
-}
-
 Status NewTxn::Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks) {
     this->CheckTxn(db_name);
 
@@ -179,7 +149,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     status = table_meta.SetNextSegmentID(segment_id + 1);
 
     Optional<SegmentMeta> segment_meta;
-    status = this->AddNewSegment(table_meta, segment_id, segment_meta);
+    status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
     if (!status.ok()) {
         return status;
     }
@@ -204,7 +174,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             }
         }
         Optional<BlockMeta> block_meta;
-        status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+        status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
         if (!status.ok()) {
             return status;
         }
@@ -221,7 +191,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
 
-            status = this->GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
+            status = NewCatalog::GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
             if (!status.ok()) {
                 return status;
             }
@@ -382,7 +352,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     }
     status = table_meta.SetNextSegmentID(new_segment_id + 1);
 
-    NewTxnCompactState compact_state(new_segment_id, table_meta, this);
+    NewTxnCompactState compact_state(new_segment_id, table_meta);
 
     SharedPtr<Vector<SegmentID>> segment_ids_ptr;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
@@ -445,117 +415,6 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         compact_command->table_id_str_ = table_id_str;
     }
 
-    return Status::OK();
-}
-
-Status NewTxn::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
-    {
-        Status status = table_meta.AddSegmentID(segment_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    segment_meta.emplace(segment_id, table_meta, table_meta.kv_instance());
-    {
-        Status status = segment_meta->InitSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
-Status NewTxn::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta) {
-    {
-        Status status = segment_meta.AddBlockID(block_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    block_meta.emplace(block_id, segment_meta, segment_meta.kv_instance());
-    {
-        Status status = block_meta->InitSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    SharedPtr<String> block_dir_ptr = block_meta->GetBlockDir();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    BufferObj *version_buffer = nullptr;
-    {
-        auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                 MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                 block_dir_ptr,
-                                                                 BlockVersion::FileName(),
-                                                                 block_meta->block_capacity(),
-                                                                 buffer_mgr->persistence_manager());
-        version_buffer = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
-        version_buffer->AddObjRc();
-    }
-    SizeT column_num = 0;
-    {
-        TableMeeta &table_meta = segment_meta.table_meta();
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        column_num = column_defs_ptr->size();
-    }
-    for (SizeT column_idx = 0; column_idx < column_num; ++column_idx) {
-        [[maybe_unused]] Optional<ColumnMeta> column_meta;
-        Status status = this->AddNewBlockColumn(*block_meta, column_idx, column_meta);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
-Status NewTxn::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta) {
-    const ColumnDef *col_def = nullptr;
-    {
-        TableMeeta &table_meta = block_meta.segment_meta().table_meta();
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        col_def = (*column_defs_ptr)[column_idx].get();
-    }
-
-    column_meta.emplace(column_idx, block_meta, block_meta.kv_instance());
-    {
-        Status status = column_meta->InitSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    BufferObj *buffer = nullptr;
-    {
-        auto filename = MakeShared<String>(fmt::format("{}.col", column_idx));
-        SizeT total_data_size = block_meta.block_capacity() * col_def->type()->Size();
-        auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                      block_dir_ptr,
-                                                      filename,
-                                                      total_data_size,
-                                                      buffer_mgr->persistence_manager());
-        buffer = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-        buffer->AddObjRc();
-    }
-    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
-    if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_idx));
-        auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                             block_dir_ptr,
-                                                             filename,
-                                                             0, /*buffer_size*/
-                                                             buffer_mgr->persistence_manager());
-        [[maybe_unused]] BufferObj *outline_buffer = buffer_mgr->AllocateBufferObject(std::move(outline_file_worker));
-        // outline_buffer->AddObjRc();
-    }
     return Status::OK();
 }
 
@@ -663,7 +522,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
 Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset) {
     ColumnVector dest_vec;
     {
-        Status status = this->GetColumnVector(column_meta, dest_offset, ColumnVectorTipe::kReadWrite, dest_vec);
+        Status status = NewCatalog::GetColumnVector(column_meta, dest_offset, ColumnVectorTipe::kReadWrite, dest_vec);
         if (!status.ok()) {
             return status;
         }
@@ -715,7 +574,8 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     Status status;
 
     NewTxnGetVisibleRangeState range_state;
-    status = this->GetBlockVisibleRange(block_meta, range_state);
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, range_state);
     if (!status.ok()) {
         return status;
     }
@@ -728,7 +588,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
-        status = this->GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vectors[column_id]);
+        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vectors[column_id]);
         if (!status.ok()) {
             return status;
         }
@@ -744,7 +604,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
         SizeT append_size = 0;
         while (true) {
             if (!compact_state.block_meta_) {
-                status = compact_state.NextBlock(this);
+                status = compact_state.NextBlock();
                 if (!status.ok()) {
                     return status;
                 }
@@ -755,7 +615,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
                 if (!status.ok()) {
                     return status;
                 }
-                status = compact_state.NextBlock(this);
+                status = compact_state.NextBlock();
                 if (!status.ok()) {
                     return status;
                 }
@@ -771,105 +631,6 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
         offset = range.first + append_size;
     }
 
-    return Status::OK();
-}
-
-Status NewTxn::GetColumnBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj) {
-    SharedPtr<String> block_dir_ptr = column_meta.block_meta().GetBlockDir();
-    const ColumnDef *col_def = nullptr;
-    {
-        TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
-    }
-
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    {
-        String col_filename = std::to_string(column_meta.column_idx()) + ".col";
-        String col_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + col_filename;
-        buffer_obj = buffer_mgr->GetBufferObject(col_filepath);
-        if (buffer_obj == nullptr) {
-            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", col_filepath));
-        }
-    }
-    [[maybe_unused]] SizeT chunk_offset = 0;
-    {
-        VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
-        if (buffer_type == VectorBufferType::kVarBuffer) {
-            String outline_filename = fmt::format("col_{}_out_0", column_meta.column_idx());
-            String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
-            BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-            outline_buffer_obj = buffer_mgr->GetBufferObject(outline_filepath);
-            if (outline_buffer_obj == nullptr) {
-                return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
-            }
-            {
-                Status status = column_meta.GetChunkOffset(chunk_offset);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-        }
-    }
-    return Status::OK();
-}
-
-Status NewTxn::GetVersionBufferObj(BlockMeta &block_meta, BufferObj *&version_buffer) {
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-
-    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
-    String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
-    version_buffer = buffer_mgr->GetBufferObject(version_filepath);
-    if (version_buffer == nullptr) {
-        return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
-    }
-
-    return Status::OK();
-}
-
-Status NewTxn::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector) {
-    const ColumnDef *col_def = nullptr;
-    {
-        TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
-    }
-
-    BufferObj *buffer_obj = nullptr;
-    BufferObj *outline_buffer_obj = nullptr;
-    Status status = this->GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
-    if (!status.ok()) {
-        return status;
-    }
-
-    column_vector = ColumnVector(col_def->type());
-    column_vector.Initialize(buffer_obj, outline_buffer_obj, row_count, tipe);
-    return Status::OK();
-}
-
-Status NewTxn::GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRangeState &state) {
-    BufferObj *version_buffer = nullptr;
-    Status status = this->GetVersionBufferObj(block_meta, version_buffer);
-    if (!status.ok()) {
-        return status;
-    }
-
-    BufferHandle buffer_handle = version_buffer->Load();
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
-    SharedPtr<BlockLock> block_lock;
-    {
-        Status status = block_meta.GetBlockLock(block_lock);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts);
     return Status::OK();
 }
 
@@ -927,7 +688,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             return status;
         }
 
-        status = this->AddNewSegment(table_meta, unsealed_segment_id, segment_meta);
+        status = NewCatalog::AddNewSegment(table_meta, unsealed_segment_id, segment_meta);
         if (!status.ok()) {
             return status;
         }
@@ -943,7 +704,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     Optional<BlockMeta> block_meta;
     if (next_block_id == 0) {
         BlockID block_id = 0;
-        status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+        status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
         if (!status.ok()) {
             return status;
         }
@@ -971,7 +732,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             if (!status.ok()) {
                 return status;
             }
-            status = this->AddNewSegment(table_meta, next_segment_id, segment_meta);
+            status = NewCatalog::AddNewSegment(table_meta, next_segment_id, segment_meta);
             if (!status.ok()) {
                 return status;
             }
@@ -985,7 +746,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
                 return status;
             }
             BlockID block_id = 0;
-            status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+            status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
             if (!status.ok()) {
                 return status;
             }
@@ -996,7 +757,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             }
         } else if (block_full) {
             BlockID block_id = next_block_id;
-            status = this->AddNewBlock(*segment_meta, block_id, block_meta);
+            status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
             if (!status.ok()) {
                 return status;
             }

@@ -69,6 +69,25 @@ Status BlockMeta::InitSet() {
     return Status::OK();
 }
 
+Status BlockMeta::UninitSet() {
+    {
+        String block_row_cnt_key = GetBlockTag("row_cnt");
+        Status status = kv_instance_.Delete(block_row_cnt_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    {
+        String block_lock_key = GetBlockTag("lock");
+        Status status = new_catalog->DropBlockLockByBlockKey(block_lock_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 SharedPtr<String> BlockMeta::GetBlockDir() {
     if (block_dir_ == nullptr) {
         TableMeeta &table_meta = segment_meta_.table_meta();

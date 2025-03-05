@@ -70,6 +70,8 @@ public:
 
     Status InitSet();
 
+    Status UninitSet();
+
     // New
     Status Init();
     Status AddBlockID(BlockID block_id);

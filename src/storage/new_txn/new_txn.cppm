@@ -87,23 +87,6 @@ struct MemIndex;
 
 struct NewTxnCompactState;
 
-export class NewTxnGetVisibleRangeState {
-public:
-    NewTxnGetVisibleRangeState() = default;
-
-    void Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts);
-
-    bool Next(BlockOffset block_offset_begin, Pair<BlockOffset, BlockOffset> &visible_range);
-
-    BlockOffset block_offset_end() const { return block_offset_end_; }
-
-private:
-    SharedPtr<BlockLock> block_lock_;
-    BufferHandle version_buffer_handle_;
-    TxnTimeStamp begin_ts_ = 0;
-    BlockOffset block_offset_end_ = 0;
-};
-
 export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
     // For new txn
@@ -380,22 +363,6 @@ private:
     Status GetColumnDefs(const String &db_id, const String &table_id, Vector<SharedPtr<ColumnDef>> &column_defs);
 
     // DML
-    Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
-
-    Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
-
-    Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
-
-    Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
-
-    Status AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
-                            ChunkID chunk_id,
-                            RowID base_row_id,
-                            SizeT row_count,
-                            const String &base_name,
-                            SizeT index_size,
-                            Optional<ChunkIndexMeta> &chunk_index_meta,
-                            BufferObj *&buffer_obj);
 
     Status PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full);
 
@@ -450,17 +417,6 @@ private:
                        ChunkIndexMeta &chunk_index_meta,
                        const Vector<ChunkID> &deprecate_ids,
                        bool clear_mem_index);
-
-    Status GetColumnBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj);
-
-    Status GetVersionBufferObj(BlockMeta &block_meta, BufferObj *&buffer_obj);
-
-public:
-    Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, ColumnVectorTipe tipe, ColumnVector &column_vector);
-
-    Status GetBlockVisibleRange(BlockMeta &block_meta, NewTxnGetVisibleRangeState &state);
-
-    Status GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffer_obj);
 
 private:
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);

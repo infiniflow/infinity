@@ -49,6 +49,8 @@ public:
 
     Status InitSet();
 
+    Status UninitSet();
+
 private:
     Status LoadChunkOffset();
 

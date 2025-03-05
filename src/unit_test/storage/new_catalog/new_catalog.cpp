@@ -6668,6 +6668,7 @@ TEST_P(NewCatalogTest, test_import) {
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
         String table_key;
         String table_id_str;
         String db_id_str;
@@ -6682,7 +6683,7 @@ TEST_P(NewCatalogTest, test_import) {
 
         auto check_block = [&](BlockMeta &block_meta) {
             NewTxnGetVisibleRangeState state;
-            Status status = txn->GetBlockVisibleRange(block_meta, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
@@ -6701,7 +6702,7 @@ TEST_P(NewCatalogTest, test_import) {
                 ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
                 ColumnVector col;
 
-                Status status = txn->GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
@@ -6714,7 +6715,7 @@ TEST_P(NewCatalogTest, test_import) {
                 ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
                 ColumnVector col;
 
-                Status status = txn->GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
@@ -6825,6 +6826,7 @@ TEST_P(NewCatalogTest, test_append) {
     // Check the appended data.
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
 
         String table_key;
         String table_id_str;
@@ -6851,7 +6853,7 @@ TEST_P(NewCatalogTest, test_append) {
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
 
         NewTxnGetVisibleRangeState state;
-        status = txn->GetBlockVisibleRange(block_meta, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;
@@ -6872,7 +6874,7 @@ TEST_P(NewCatalogTest, test_append) {
             ColumnMeta column_meta(column_idx, block_meta, *txn->kv_instance());
             ColumnVector col;
 
-            status = txn->GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
             EXPECT_TRUE(status.ok());
 
             Value v1 = col.GetValue(0);
@@ -6885,7 +6887,7 @@ TEST_P(NewCatalogTest, test_append) {
             SizeT column_idx = 1;
             ColumnMeta column_meta(column_idx, block_meta, *txn->kv_instance());
             ColumnVector col;
-            status = txn->GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+            status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
 
             EXPECT_TRUE(status.ok());
             Value v1 = col.GetValue(0);
@@ -6963,6 +6965,7 @@ TEST_P(NewCatalogTest, test_delete) {
     // Check data
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
 
         String table_key;
         String table_id_str;
@@ -6979,7 +6982,7 @@ TEST_P(NewCatalogTest, test_delete) {
         SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
 
-        status = txn->GetBlockVisibleRange(block_meta, state);
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
         EXPECT_TRUE(status.ok());
         {
             Pair<BlockOffset, BlockOffset> range;
@@ -7093,6 +7096,8 @@ TEST_P(NewCatalogTest, test_compact) {
     new_txn_mgr->PrintAllKeyValue();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
         String table_key;
         String table_id_str;
         String db_id_str;
@@ -7114,7 +7119,7 @@ TEST_P(NewCatalogTest, test_compact) {
         {
             BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
             NewTxnGetVisibleRangeState state;
-            Status status = txn->GetBlockVisibleRange(block_meta, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
@@ -7133,7 +7138,7 @@ TEST_P(NewCatalogTest, test_compact) {
                 ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
                 ColumnVector col;
 
-                Status status = txn->GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
@@ -7149,7 +7154,7 @@ TEST_P(NewCatalogTest, test_compact) {
         for (BlockID block_id = 1; block_id < 4; ++block_id) {
             BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
             NewTxnGetVisibleRangeState state;
-            Status status = txn->GetBlockVisibleRange(block_meta, state);
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
 
             BlockOffset offset = 0;
@@ -7172,7 +7177,7 @@ TEST_P(NewCatalogTest, test_compact) {
                 ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
                 ColumnVector col;
 
-                Status status = txn->GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
+                Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
 
                 EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
@@ -7426,7 +7431,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
+        status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -7524,7 +7529,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         // int32_t end_val = 3;
 
         BufferObj *buffer_obj = nullptr;
-        status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
+        status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -7801,7 +7806,7 @@ TEST_P(NewCatalogTest, test_populate_index) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = txn->GetChunkIndex(chunk_index_meta, buffer_obj);
+        status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);

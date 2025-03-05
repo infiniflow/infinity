@@ -106,7 +106,7 @@ void EMVBIndexInMem::Insert(BlockEntry *block_entry, SizeT column_idx, BufferMan
     }
 }
 
-void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, NewTxn *txn, KVInstance &kv_instance) {
+void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, KVInstance &kv_instance) {
     std::unique_lock lock(rw_mutex_);
     if (is_built_.test(std::memory_order_acquire)) {
         for (u32 i = 0; i < row_count; ++i) {
@@ -128,7 +128,7 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u
 
             TableMeeta table_meta(db_id_str_, table_id_str_, kv_instance);
             SegmentMeta segment_meta(segment_id_, table_meta, table_meta.kv_instance());
-            emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_meta, column_def_, txn);
+            emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_meta, column_def_);
             if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {
                 UnrecoverableError("EMVBIndexInMem Insert doc num or embedding num not consistent!");
             }

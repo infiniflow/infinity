@@ -48,6 +48,16 @@ Status ColumnMeta::InitSet() {
     return Status::OK();
 }
 
+Status ColumnMeta::UninitSet() {
+    String chunk_offset_key = GetColumnTag("last_chunk_offset");
+    Status status = kv_instance_.Delete(chunk_offset_key);
+    if (!status.ok()) {
+        return status;
+    }
+    chunk_offset_.reset();
+    return Status::OK();
+}
+
 Status ColumnMeta::LoadChunkOffset() {
     String chunk_offset_key = GetColumnTag("last_chunk_offset");
     String chunk_offset_str;

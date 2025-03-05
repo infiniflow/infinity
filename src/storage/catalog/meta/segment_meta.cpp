@@ -99,6 +99,31 @@ Status SegmentMeta::InitSet() {
     return Status::OK();
 }
 
+Status SegmentMeta::UninitSet() {
+    {
+        String block_ids_key = GetSegmentTag("block_ids");
+        Status status = kv_instance_.Delete(block_ids_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        String next_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
+        Status status = kv_instance_.Delete(next_block_id_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    {
+        String row_cnt_key = GetSegmentTag("row_cnt");
+        Status status = kv_instance_.Delete(row_cnt_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status SegmentMeta::LoadBlockIDs() {
     String block_ids_key = GetSegmentTag("block_ids");
     String block_ids_str;
@@ -184,9 +209,9 @@ Status SegmentMeta::AddBlockID(BlockID block_id) {
     if (!block_ids_) {
         Status status = LoadBlockIDs();
         if (!status.ok()) {
-                return status;
-            }
+            return status;
         }
+    }
 
     block_ids_->push_back(block_id);
     String block_ids_key = GetSegmentTag("block_ids");

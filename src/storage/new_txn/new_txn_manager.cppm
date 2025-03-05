@@ -112,6 +112,8 @@ public:
 
     KVStore *kv_store() const { return kv_store_; }
 
+    void Cleanup();
+
 private:
     mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};

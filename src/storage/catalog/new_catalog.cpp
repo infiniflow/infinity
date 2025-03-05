@@ -567,4 +567,20 @@ Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const String &ft_index_cach
     return Status::OK();
 }
 
+void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, String meta) {
+    std::unique_lock lock(cleaned_meta_mtx_);
+
+    cleaned_meta_.emplace(ts, std::move(meta));
+}
+
+void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<String> &metas) {
+    std::unique_lock lock(cleaned_meta_mtx_);
+
+    auto iter = cleaned_meta_.lower_bound(ts);
+    for (auto it = cleaned_meta_.begin(); it != iter; ++it) {
+        metas.push_back(it->second);
+    }
+    cleaned_meta_.erase(cleaned_meta_.begin(), iter);
+}
+
 } // namespace infinity
