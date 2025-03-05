@@ -144,6 +144,9 @@ void VarBufferManager::SetToCatalog(BufferObj *outline_buffer_obj) {
     }
     type_ = BufferType::kNewCatalog;
     outline_buffer_obj_ = outline_buffer_obj;
+    if (!mem_buffer_) {
+        mem_buffer_ = MakeUnique<VarBuffer>();
+    }
     outline_buffer_obj_->SetData(mem_buffer_.release());
 
     buffer_handle_ = outline_buffer_obj_->Load();

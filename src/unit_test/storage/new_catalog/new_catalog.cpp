@@ -7840,7 +7840,155 @@ TEST_P(NewCatalogTest, test_populate_index) {
 }
 
 TEST_P(NewCatalogTest, test_insert_and_import) {
-    // using namespace infintiy;
+    using namespace infinity;
 
-    // NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    u32 block_row_cnt = 8192;
+    auto make_input_block = [&](Value v1, Value v2) {
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, Value v) {
+            for (u32 i = 0; i < block_row_cnt; ++i) {
+                col.AppendValue(std::move(v));
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, v1);
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, v2);
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {
+            make_input_block(Value::MakeInt(1), Value::MakeVarchar("abc")),
+            make_input_block(Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
+        };
+        Status status = txn->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        auto input_block = make_input_block(Value::MakeInt(3), Value::MakeVarchar("xyz"));
+        Status status = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        String table_key;
+        String table_id_str;
+        String db_id_str;
+        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        EXPECT_TRUE(status.ok());
+
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import2"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {
+            make_input_block(Value::MakeInt(4), Value::MakeVarchar("abc")),
+            make_input_block(Value::MakeInt(5), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
+        };
+        Status status = txn->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append2"), TransactionType::kNormal);
+        auto input_block = make_input_block(Value::MakeInt(6), Value::MakeVarchar("xyz"));
+        Status status = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        String table_key;
+        String table_id_str;
+        String db_id_str;
+        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        EXPECT_TRUE(status.ok());
+
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1, 2}));
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        Status status = txn->Compact(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        String table_key;
+        String table_id_str;
+        String db_id_str;
+        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        EXPECT_TRUE(status.ok());
+
+        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({3}));
+
+        SegmentMeta segment_meta(3, table_meta, table_meta.kv_instance());
+        Vector<BlockID> *block_ids;
+        auto blk_status = segment_meta.GetBlockIDs(block_ids);
+        EXPECT_TRUE(blk_status.ok());
+        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3, 4, 5}));
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
 }
