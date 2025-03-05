@@ -18,6 +18,7 @@ This example is about connecting to the local infinity instance, creating table,
 
 # import infinity_embedded as infinity
 import infinity
+from infinity.table import ExplainType
 import sys
 
 try:
@@ -65,6 +66,9 @@ try:
     print(res)
     if extra_result is not None:
         print(extra_result)
+
+    res = table_instance.output(["num", "body", "vec"]).explain(ExplainType.Pipeline)
+    print(res)
 
     infinity_instance.disconnect()
 
