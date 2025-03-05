@@ -201,6 +201,13 @@ Status TableSnapshotInfo::Serialize(const String &save_dir) {
     // Create compressed file
     //    String compressed_filename = fmt::format("{}/{}.lz4", save_dir, snapshot_name_);
     //    std::ofstream output_stream = VirtualStore::BeginCompress(compressed_filename);
+    String snapshot_meta = fmt::format("{}/{}.json", save_dir, snapshot_name_);
+    if (VirtualStore::Exists(snapshot_meta)) {
+        return Status::DuplicatedFile(snapshot_meta);
+    } else {
+        String snapshot_dir = fmt::format("{}/{}", save_dir, snapshot_name_);
+        VirtualStore::MakeDirectory(snapshot_dir);
+    }
 
     // Get files
     Vector<String> original_files = GetFiles();
@@ -337,16 +344,9 @@ Status TableSnapshotInfo::Serialize(const String &save_dir) {
 
     String json_string = json_res.dump();
 
-    Path save_path = Path(save_dir) / fmt::format("{}.json", snapshot_name_);
-
-    if (VirtualStore::Exists(save_dir)) {
-        return Status::DuplicatedFile(save_path.string());
-    } else {
-        VirtualStore::MakeDirectory(save_dir);
-    }
-    auto [snapshot_file_handle, status] = VirtualStore::Open(save_path.string(), FileAccessMode::kWrite);
+    auto [snapshot_file_handle, status] = VirtualStore::Open(snapshot_meta, FileAccessMode::kWrite);
     if (!status.ok()) {
-        UnrecoverableError(fmt::format("{}: {}", save_path.string(), status.message()));
+        UnrecoverableError(fmt::format("{}: {}", snapshot_meta, status.message()));
     }
 
     status = snapshot_file_handle->Append(json_string.data(), json_string.size());
@@ -377,7 +377,7 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
 
     for (const auto &table_index_snapshot_pair : table_index_snapshots_) {
         for (const auto &segment_index_snapshot_pair : table_index_snapshot_pair.second->index_by_segment_) {
-            SegmentID segment_id=segment_index_snapshot_pair.second->segment_id_;
+            SegmentID segment_id = segment_index_snapshot_pair.second->segment_id_;
             for (const auto &chunk_index_snapshot : segment_index_snapshot_pair.second->chunk_index_snapshots_) {
                 // IndexBase *index_base = table_index_snapshot_pair.second->index_base_.get();
 
@@ -396,7 +396,8 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
                 //     }
                 //     case IndexType::kSecondary: {
                 //         files.emplace_back(
-                // VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,fmt::format("seg{}_chunk{}.idx", segment_id, chunk_index_snapshot->chunk_id_) ));
+                // VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,fmt::format("seg{}_chunk{}.idx", segment_id,
+                // chunk_index_snapshot->chunk_id_) ));
                 //         break;
                 //     }
                 //     case IndexType::kEMVB: {
@@ -411,8 +412,8 @@ Vector<String> TableSnapshotInfo::GetFiles() const {
                 //     }
                 // }
                 //
-                files.emplace_back(
-                VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,fmt::format("seg{}_chunk{}.idx", segment_id, chunk_index_snapshot->chunk_id_) ));
+                files.emplace_back(VirtualStore::ConcatenatePath(*table_index_snapshot_pair.second->index_dir_,
+                                                                 fmt::format("seg{}_chunk{}.idx", segment_id, chunk_index_snapshot->chunk_id_)));
 
                 // if (chunk_index_snapshot->files_.empty()) {
                 //     files.emplace_back(
