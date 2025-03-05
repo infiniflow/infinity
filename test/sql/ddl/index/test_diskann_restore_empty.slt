@@ -40,7 +40,7 @@ statement ok
 DROP TABLE sqllogic_test_diskann;
 
 statement ok
-DROP SNAPSHOT sqllogic_test_diskann_backup;
+DROP SNAPSHOT empty_sqllogic_test_diskann_backup;
 
 statement error
-DROP SNAPSHOT sqllogic_test_diskann_backup;
+DROP SNAPSHOT empty_sqllogic_test_diskann_backup;
