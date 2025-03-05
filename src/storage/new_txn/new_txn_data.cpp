@@ -897,28 +897,35 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
 
     Status status;
 
-    SegmentID next_segment_id = 0;
-
-    status = table_meta.GetNextSegmentID(next_segment_id);
-    if (!status.ok()) {
-        return status;
-    }
+    // SegmentID next_segment_id = 0;
     Optional<SegmentMeta> segment_meta;
-    if (next_segment_id == 0) {
-        SegmentID segment_id = 0;
 
-        status = this->AddNewSegment(table_meta, segment_id, segment_meta);
+    SegmentID unsealed_segment_id = 0;
+    status = table_meta.GetUnsealedSegmentID(unsealed_segment_id);
+    if (!status.ok()) {
+        SegmentID next_segment_id = 0;
+        status = table_meta.GetNextSegmentID(next_segment_id);
         if (!status.ok()) {
             return status;
         }
-        status = table_meta.SetNextSegmentID(segment_id + 1);
+        unsealed_segment_id = next_segment_id;
+        status = table_meta.SetUnsealedSegmentID(next_segment_id);
+        if (!status.ok()) {
+            return status;
+        }
+        status = table_meta.SetNextSegmentID(next_segment_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+
+        status = this->AddNewSegment(table_meta, unsealed_segment_id, segment_meta);
         if (!status.ok()) {
             return status;
         }
     } else {
-        SegmentID segment_id = next_segment_id - 1;
-        segment_meta.emplace(segment_id, table_meta, *kv_instance_.get());
+        segment_meta.emplace(unsealed_segment_id, table_meta, *kv_instance_.get());
     }
+
     BlockID next_block_id = 0;
     status = segment_meta->GetNextBlockID(next_block_id);
     if (!status.ok()) {
@@ -950,8 +957,12 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             break;
         }
         if (segment_full) {
-            SegmentID segment_id = next_segment_id;
-            status = this->AddNewSegment(table_meta, segment_id, segment_meta);
+            SegmentID next_segment_id = 0;
+            status = table_meta.GetNextSegmentID(next_segment_id);
+            if (!status.ok()) {
+                return status;
+            }
+            status = this->AddNewSegment(table_meta, next_segment_id, segment_meta);
             if (!status.ok()) {
                 return status;
             }
