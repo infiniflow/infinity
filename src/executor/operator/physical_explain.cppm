@@ -28,6 +28,7 @@ import internal_types;
 import explain_statement;
 import data_type;
 import logger;
+import plan_fragment;
 
 namespace infinity {
 
@@ -43,13 +44,15 @@ public:
 
     ~PhysicalExplain() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     void SetExplainText(SharedPtr<Vector<SharedPtr<String>>> text) { texts_ = std::move(text); }
 
     void SetExplainTaskText(SharedPtr<Vector<SharedPtr<String>>> text) { task_texts_ = std::move(text); }
+
+    void SetPlanFragment(PlanFragment *plan_fragment_ptr);
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
@@ -66,6 +69,8 @@ private:
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+
+    PlanFragment *plan_fragment_ptr_;
 };
 
 } // namespace infinity

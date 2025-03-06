@@ -32,6 +32,7 @@ import status;
 import infinity_exception;
 import logical_type;
 import logger;
+import plan_fragment;
 
 namespace infinity {
 
@@ -171,5 +172,7 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     operator_state->SetComplete();
     return true;
 }
+
+void PhysicalExplain::SetPlanFragment(PlanFragment *plan_fragment_ptr) { plan_fragment_ptr_ = plan_fragment_ptr; }
 
 } // namespace infinity

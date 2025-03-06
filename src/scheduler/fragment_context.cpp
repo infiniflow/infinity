@@ -633,6 +633,7 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
             if (explain_op->explain_type() == ExplainType::kPipeline or explain_op->explain_type() == ExplainType::kAnalyze) {
                 CollectTasks(result, plan_fragment_ptr->Children()[0].get());
                 explain_op->SetExplainTaskText(MakeShared<Vector<SharedPtr<String>>>(result));
+                explain_op->SetPlanFragment(plan_fragment_ptr->Children()[0].get());
                 break;
             }
         }
@@ -1114,8 +1115,8 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         }
         case PhysicalOperatorType::kLimit: {
             // if (fragment_type_ != FragmentType::kParallelStream) {
-            //     String error_message = fmt::format("{} should in parallel stream fragment", PhysicalOperatorToString(last_operator->operator_type()));
-            //     UnrecoverableError(error_message);
+            //     String error_message = fmt::format("{} should in parallel stream fragment",
+            //     PhysicalOperatorToString(last_operator->operator_type())); UnrecoverableError(error_message);
             // }
 
             if ((i64)tasks_.size() != parallel_count) {
