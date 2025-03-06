@@ -46,7 +46,7 @@ void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<
     }
 }
 
-void PhysicalExplain::Init(QueryContext* query_context) {
+void PhysicalExplain::Init(QueryContext *query_context) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     output_names_ = MakeShared<Vector<String>>();
@@ -54,9 +54,9 @@ void PhysicalExplain::Init(QueryContext* query_context) {
 
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
-            output_names_->emplace_back("Query Analyze");
-            Status status = Status::NotSupport("Not implement: Query analyze");
-            RecoverableError(status);
+            output_names_->emplace_back("Pipeline");
+            output_names_->emplace_back("Task cost");
+            break;
         }
         case ExplainType::kAst: {
             output_names_->emplace_back("Abstract Syntax Tree");
@@ -90,7 +90,7 @@ void PhysicalExplain::Init(QueryContext* query_context) {
     }
     output_types_->emplace_back(varchar_type);
 
-    if (explain_type_ == ExplainType::kPipeline) {
+    if (explain_type_ == ExplainType::kPipeline or explain_type_ == ExplainType::kAnalyze) {
         output_types_->emplace_back(varchar_type);
     }
 }
@@ -105,8 +105,8 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
 
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
-            Status status = Status::NotSupport("Not implement: Query analyze");
-            RecoverableError(status);
+            title = "Analyze";
+            break;
         }
         case ExplainType::kAst: {
             title = "Abstract Syntax Tree";
@@ -143,7 +143,7 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
     task_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
 
-    if (explain_type_ == ExplainType::kPipeline) {
+    if (explain_type_ == ExplainType::kPipeline or explain_type_ == ExplainType::kAnalyze) {
         AlignParagraphs(*this->texts_, *this->task_texts_);
         for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
             column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
@@ -161,7 +161,7 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     column_vectors.reserve(2);
 
     column_vectors.push_back(column_vector_ptr);
-    if (explain_type_ == ExplainType::kPipeline) {
+    if (explain_type_ == ExplainType::kPipeline or explain_type_ == ExplainType::kAnalyze) {
         column_vectors.push_back(task_vector_ptr);
     }
     output_data_block->Init(column_vectors);

@@ -630,7 +630,7 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
             Vector<SharedPtr<String>> result;
             PhysicalExplain *explain_op = (PhysicalExplain *)fragment_operators[0];
 
-            if (explain_op->explain_type() == ExplainType::kPipeline) {
+            if (explain_op->explain_type() == ExplainType::kPipeline or explain_op->explain_type() == ExplainType::kAnalyze) {
                 CollectTasks(result, plan_fragment_ptr->Children()[0].get());
                 explain_op->SetExplainTaskText(MakeShared<Vector<SharedPtr<String>>>(result));
                 break;

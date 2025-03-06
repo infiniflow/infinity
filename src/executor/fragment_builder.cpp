@@ -38,21 +38,19 @@ import explain_statement;
 
 namespace infinity {
 
-SharedPtr<PlanFragment> FragmentBuilder::BuildFragment(const Vector<PhysicalOperator *> &phys_ops) {
+SharedPtr<PlanFragment> FragmentBuilder::BuildFragment(PhysicalOperator *phys_op) {
     SharedPtr<PlanFragment> result = nullptr;
-    for (auto *phys_op : phys_ops) {
-        auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
-        plan_fragment->SetSinkNode(query_context_ptr_, SinkType::kResult, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
-        BuildFragments(phys_op, plan_fragment.get());
-        if (plan_fragment->GetSourceNode() == nullptr) {
-            plan_fragment->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
-        }
-        if (result.get() == nullptr) {
-            result = std::move(plan_fragment);
-        } else {
-            PlanFragment::AddNext(result, plan_fragment.get());
-            result = std::move(plan_fragment);
-        }
+    auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+    plan_fragment->SetSinkNode(query_context_ptr_, SinkType::kResult, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+    BuildFragments(phys_op, plan_fragment.get());
+    if (plan_fragment->GetSourceNode() == nullptr) {
+        plan_fragment->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+    }
+    if (result.get() == nullptr) {
+        result = std::move(plan_fragment);
+    } else {
+        PlanFragment::AddNext(result, plan_fragment.get());
+        result = std::move(plan_fragment);
     }
     return result;
 }
@@ -62,10 +60,6 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
     PhysicalExplain *explain_op = (PhysicalExplain *)phys_op;
     switch (explain_op->explain_type()) {
 
-        case ExplainType::kAnalyze: {
-            Status status = Status::NotSupport("Not implement: Query analyze");
-            RecoverableError(status);
-        }
         case ExplainType::kAst:
         case ExplainType::kUnOpt:
         case ExplainType::kOpt:
@@ -73,12 +67,12 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             current_fragment_ptr->AddOperator(phys_op);
             break;
         }
+        case ExplainType::kAnalyze:
         case ExplainType::kFragment:
         case ExplainType::kPipeline: {
             // Build explain pipeline fragment
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            Vector<PhysicalOperator *> phys_ops{phys_op->left()};
-            auto explain_child_fragment = this->BuildFragment(phys_ops);
+            auto explain_child_fragment = this->BuildFragment(phys_op->left());
 
             // Generate explain context of the child fragment
             ExplainFragment::Explain(explain_child_fragment.get(), texts_ptr);
@@ -88,7 +82,7 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             // Set texts to explain physical operator
             current_fragment_ptr->AddOperator(phys_op);
 
-            if (explain_op->explain_type() == ExplainType::kPipeline) {
+            if (explain_op->explain_type() == ExplainType::kPipeline or explain_op->explain_type() == ExplainType::kAnalyze) {
                 current_fragment_ptr->AddChild(std::move(explain_child_fragment));
             }
             break;
