@@ -38,6 +38,7 @@ import block_meta;
 import segment_meta;
 import table_meeta;
 import table_index_meeta;
+import meta_key;
 
 namespace infinity {
 
@@ -887,6 +888,35 @@ Status NewTxn::CommitCompact(const WalCmdCompact *compact_cmd) {
     Status status = this->CommitSegmentVersion(segment_info, segment_meta);
     if (!status.ok()) {
         return status;
+    }
+
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    const Vector<SegmentID> &deprecated_ids = compact_cmd->deprecated_segment_ids_;
+
+    for (SegmentID segment_id : deprecated_ids) {
+        new_catalog->AddCleanedMeta(commit_ts, MakeUnique<SegmentMetaKey>(db_id_str, table_id_str, segment_id));
+    }
+    {
+        Vector<String> *index_id_strs_ptr = nullptr;
+        status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (const String &index_id_str : *index_id_strs_ptr) {
+            TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+            Vector<SegmentID> *segment_ids_ptr = nullptr;
+            status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+            if (!status.ok()) {
+                return status;
+            }
+            for (SegmentID segment_id : *segment_ids_ptr) {
+                auto iter = std::find(deprecated_ids.begin(), deprecated_ids.end(), segment_id);
+                if (iter != deprecated_ids.end()) {
+                    new_catalog->AddCleanedMeta(commit_ts, MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
+                }
+            }
+        }
     }
     return Status::OK();
 }

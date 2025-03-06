@@ -53,6 +53,7 @@ import abstract_bmp;
 import index_bmp;
 import emvb_index_in_mem;
 import emvb_index;
+import meta_key;
 
 namespace infinity {
 
@@ -1176,16 +1177,19 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
 Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd) {
     KVStore *kv_store = txn_mgr_->kv_store();
     UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+    const String &db_id_str = dump_index_cmd->db_id_str_;
+    const String &table_id_str = dump_index_cmd->table_id_str_;
+    const String &index_id_str = dump_index_cmd->index_id_str_;
+    SegmentID segment_id = dump_index_cmd->segment_id_;
 
     if (dump_index_cmd->clear_mem_index_) {
-        const String &db_id_str_ = dump_index_cmd->db_id_str_;
-        const String &table_id_str_ = dump_index_cmd->table_id_str_;
-        TableMeeta table_meta(db_id_str_, table_id_str_, *kv_instance);
+
+        TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
 
         const String &index_id_str_ = dump_index_cmd->index_id_str_;
         TableIndexMeeta table_index_meta(index_id_str_, table_meta, table_meta.kv_instance());
 
-        SegmentIndexMeta segment_index_meta(dump_index_cmd->segment_id_, table_index_meta, table_index_meta.kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
         SharedPtr<MemIndex> mem_index;
         Status status = segment_index_meta.GetMemIndex(mem_index);
         if (!status.ok()) {
@@ -1197,6 +1201,12 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd) {
         if (!status.ok()) {
             return status;
         }
+    }
+
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    for (ChunkID deprecate_id : dump_index_cmd->deprecate_ids_) {
+        new_catalog->AddCleanedMeta(commit_ts, MakeUnique<ChunkIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id, deprecate_id));
     }
     return Status::OK();
 }
