@@ -123,6 +123,7 @@ public:
     [[nodiscard]] inline Optimizer *optimizer() const { return optimizer_.get(); }
     [[nodiscard]] inline PhysicalPlanner *physical_planner() const { return physical_planner_.get(); }
     [[nodiscard]] inline FragmentBuilder *fragment_builder() const { return fragment_builder_.get(); }
+    [[nodiscard]] inline QueryProfiler *query_profiler() const { return query_profiler_.get(); }
 
     [[nodiscard]] BaseSession *current_session() const { return session_ptr_; }
 

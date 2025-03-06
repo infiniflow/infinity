@@ -458,6 +458,8 @@ Status Status::AlreadyLocked(const String &detail) { return Status(ErrorCode::kA
 
 Status Status::NotLocked(const String &detail) { return Status(ErrorCode::kNotLocked, MakeUnique<String>(detail)); }
 
+Status Status::InvalidParameter(const String &detail) { return Status(ErrorCode::kInvalidParameter, MakeUnique<String>(detail)); }
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));
