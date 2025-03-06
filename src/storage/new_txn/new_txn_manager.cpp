@@ -37,6 +37,7 @@ import global_resource_usage;
 import bg_task;
 import kv_store;
 import new_catalog;
+import meta_key;
 
 namespace infinity {
 
@@ -450,24 +451,25 @@ void NewTxnManager::PrintAllKeyValue() const {
     std::cout << String(" -------------- ") << std::endl;
 }
 
-void NewTxnManager::Cleanup() {
-    TxnTimeStamp ts = this->GetCleanupScanTS();
-
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-
-    Vector<String> metas;
-    new_catalog->GetCleanedMeta(ts, metas);
-
-    [[maybe_unused]] UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
-
-    for (const String &meta : metas) {
-        LOG_INFO(fmt::format("Cleanup meta: {}", meta));
+Status NewTxnManager::Cleanup(TxnTimeStamp ts) {
+    if (ts == UNCOMMIT_TS) {
+        ts = this->GetCleanupScanTS();
     }
 
-    Status status = kv_instance->Commit();
+    UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
+
+    Status status;
+
+    status = NewTxn::Cleanup(ts, kv_instance.get());
     if (!status.ok()) {
-        UnrecoverableError("Commit failed");
+        return status;
     }
+
+    status = kv_instance->Commit();
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
 }
 
 } // namespace infinity

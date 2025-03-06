@@ -40,6 +40,7 @@ class SegmentIndexMeta;
 class ChunkIndexMeta;
 class BufferObj;
 class ColumnVector;
+struct MetaKey;
 
 enum class ColumnVectorTipe;
 
@@ -75,7 +76,7 @@ private:
 export struct NewCatalog {
 public:
     explicit NewCatalog(KVStore *kv_store);
-    ~NewCatalog() = default;
+    ~NewCatalog();
 
 public:
     // Database related functions
@@ -158,13 +159,13 @@ private:
     HashMap<String, SharedPtr<TableIndexReaderCache>> ft_index_cache_map_{};
 
 public:
-    void AddCleanedMeta(TxnTimeStamp ts, String meta);
+    void AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta);
 
-    void GetCleanedMeta(TxnTimeStamp ts, Vector<String> &metas);
+    void GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas);
 
 private:
     std::mutex cleaned_meta_mtx_{};
-    MultiMap<TxnTimeStamp, String> cleaned_meta_{};
+    MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
 
 public:
     static Status CleanTable(TableMeeta &table_meta);

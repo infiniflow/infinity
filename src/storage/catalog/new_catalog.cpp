@@ -30,10 +30,13 @@ import infinity_exception;
 import default_values;
 import mem_index;
 import column_index_reader;
+import meta_key;
 
 namespace infinity {
 
 NewCatalog::NewCatalog(KVStore *kv_store) : kv_store_(kv_store) {}
+
+NewCatalog::~NewCatalog() = default;
 
 Status NewCatalog::CreateDatabase(const SharedPtr<String> &db_name, const SharedPtr<String> &comment, NewTxn *new_txn, ConflictType conflict_type) {
     KVInstance *kv_instance = new_txn->kv_instance();
@@ -567,18 +570,18 @@ Status NewCatalog::DropFtIndexCacheByFtIndexCacheKey(const String &ft_index_cach
     return Status::OK();
 }
 
-void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, String meta) {
+void NewCatalog::AddCleanedMeta(TxnTimeStamp ts, UniquePtr<MetaKey> meta) {
     std::unique_lock lock(cleaned_meta_mtx_);
 
     cleaned_meta_.emplace(ts, std::move(meta));
 }
 
-void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<String> &metas) {
+void NewCatalog::GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas) {
     std::unique_lock lock(cleaned_meta_mtx_);
 
     auto iter = cleaned_meta_.lower_bound(ts);
     for (auto it = cleaned_meta_.begin(); it != iter; ++it) {
-        metas.push_back(it->second);
+        metas.push_back(std::move(it->second));
     }
     cleaned_meta_.erase(cleaned_meta_.begin(), iter);
 }

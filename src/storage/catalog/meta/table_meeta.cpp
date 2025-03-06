@@ -161,6 +161,20 @@ Status TableMeeta::UninitSet() {
         return status;
     }
 
+    String segment_ids_key = GetTableTag("segment_ids");
+    status = kv_instance_.Delete(segment_ids_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    String unsealed_seg_id_key = GetTableTag("unsealed_segment_id");
+    status = kv_instance_.Delete(unsealed_seg_id_key);
+    if (!status.ok()) {
+        if (status.code() != ErrorCode::kNotFound) {
+            return status;
+        }
+    }
+
     String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
     auto iter2 = kv_instance_.GetIterator();
     iter2->Seek(table_column_prefix);

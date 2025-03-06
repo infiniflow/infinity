@@ -112,7 +112,7 @@ public:
 
     KVStore *kv_store() const { return kv_store_; }
 
-    void Cleanup();
+    Status Cleanup(TxnTimeStamp ts = UNCOMMIT_TS);
 
 private:
     mutable std::mutex locker_{};

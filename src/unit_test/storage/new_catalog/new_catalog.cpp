@@ -6796,7 +6796,6 @@ TEST_P(NewCatalogTest, test_append) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    new_txn_mgr->PrintAllKeyValue();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append again"), TransactionType::kNormal);
 
@@ -6821,7 +6820,6 @@ TEST_P(NewCatalogTest, test_append) {
         EXPECT_TRUE(status2.ok());
     }
     SizeT total_row_count = 8;
-    new_txn_mgr->PrintAllKeyValue();
 
     // Check the appended data.
     {
@@ -6950,7 +6948,6 @@ TEST_P(NewCatalogTest, test_delete) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    new_txn_mgr->PrintAllKeyValue();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
         Vector<RowID> row_ids;
@@ -7093,7 +7090,6 @@ TEST_P(NewCatalogTest, test_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    new_txn_mgr->PrintAllKeyValue();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
@@ -7996,4 +7992,97 @@ TEST_P(NewCatalogTest, test_insert_and_import) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+}
+
+TEST_P(NewCatalogTest, test_cleanup) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_name2 = std::make_shared<String>("index2");
+    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    auto input_block = MakeShared<DataBlock>();
+    {
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            col1->AppendValue(Value::MakeInt(1));
+            col1->AppendValue(Value::MakeInt(2));
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            col2->AppendValue(Value::MakeVarchar("abc"));
+            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+    }
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    create_index(index_def1);
+    create_index(index_def2);
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+
+        Status status = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    new_txn_mgr->PrintAllKeyValue();
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index1"), TransactionType::kNormal);
+        Status status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        EXPECT_TRUE(status.ok());
+    }
+    new_txn_mgr->PrintAllKeyValue();
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        EXPECT_TRUE(status.ok());
+    }
+    new_txn_mgr->PrintAllKeyValue();
 }

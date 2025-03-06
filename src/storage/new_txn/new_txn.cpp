@@ -69,7 +69,13 @@ import block_version;
 import extra_command;
 
 import table_meeta;
+import segment_meta;
+import block_meta;
+import column_meta;
 import table_index_meeta;
+import segment_index_meta;
+import chunk_index_meta;
+import meta_key;
 
 namespace infinity {
 
@@ -1567,11 +1573,8 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
         return status;
     }
 
-    TableMeeta table_meeta(db_id_str, table_id_str, *kv_instance_);
-    status = table_meeta.UninitSet();
-    if (!status.ok()) {
-        return status;
-    }
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableMetaKey>(db_id_str, table_id_str));
 
     return Status::OK();
 }
@@ -1664,15 +1667,8 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
         return status;
     }
 
-    // delete index index def
-    String index_comment_key = KeyEncode::CatalogIndexTagKey(db_id_str, table_id_str, index_id_str, "index_base");
-    status = kv_instance_->Delete(index_comment_key);
-    if (!status.ok()) {
-        return status;
-    }
-
-    // delete index tags
-    // ...
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str));
 
     return Status::OK();
 }
@@ -1964,6 +1960,100 @@ void NewTxn::AddWriteTxnNum(TableEntry *table_entry) {
     const String &table_name = *table_entry->GetTableName();
     NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
     table_store->AddWriteTxnNum();
+}
+
+Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+
+    Vector<UniquePtr<MetaKey>> metas;
+    new_catalog->GetCleanedMeta(ts, metas);
+
+    for (auto &meta : metas) {
+        switch (meta->type_) {
+            case MetaKey::Type::kDB: {
+                [[maybe_unused]] auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
+                UnrecoverableError("Not implemented");
+                break;
+            }
+            case MetaKey::Type::kTable: {
+                auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
+                TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance);
+                Status status = NewCatalog::CleanTable(table_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaKey::Type::kSegment: {
+                auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
+                TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance);
+                SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta, *kv_instance);
+                Status status = NewCatalog::CleanSegment(segment_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaKey::Type::kBlock: {
+                auto *block_meta_key = static_cast<BlockMetaKey *>(meta.get());
+                TableMeeta table_meta(block_meta_key->db_id_str_, block_meta_key->table_id_str_, *kv_instance);
+                SegmentMeta segment_meta(block_meta_key->segment_id_, table_meta, *kv_instance);
+                BlockMeta block_meta(block_meta_key->block_id_, segment_meta, *kv_instance);
+                Status status = NewCatalog::CleanBlock(block_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaKey::Type::kColumn: {
+                auto *column_meta_key = static_cast<ColumnMetaKey *>(meta.get());
+                TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance);
+                SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta, *kv_instance);
+                BlockMeta block_meta(column_meta_key->block_id_, segment_meta, *kv_instance);
+                ColumnMeta column_meta(column_meta_key->column_idx_, block_meta, *kv_instance);
+                Status status = NewCatalog::CleanBlockColumn(column_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaKey::Type::kTableIndex: {
+                auto *table_index_meta_key = static_cast<TableIndexMetaKey *>(meta.get());
+                TableMeeta table_meta(table_index_meta_key->db_id_str_, table_index_meta_key->table_id_str_, *kv_instance);
+                TableIndexMeeta table_index_meta(table_index_meta_key->index_id_str_, table_meta, *kv_instance);
+                Status status = NewCatalog::CleanTableIndex(table_index_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaKey::Type::kSegmentIndex: {
+                auto *segment_index_meta_key = static_cast<SegmentIndexMetaKey *>(meta.get());
+                TableMeeta table_meta(segment_index_meta_key->db_id_str_, segment_index_meta_key->table_id_str_, *kv_instance);
+                TableIndexMeeta table_index_meta(segment_index_meta_key->index_id_str_, table_meta, *kv_instance);
+                SegmentIndexMeta segment_index_meta(segment_index_meta_key->segment_id_, table_index_meta, *kv_instance);
+                Status status = NewCatalog::CleanSegmentIndex(segment_index_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+            case MetaKey::Type::kChunkIndex: {
+                auto *chunk_index_meta_key = static_cast<ChunkIndexMetaKey *>(meta.get());
+                TableMeeta table_meta(chunk_index_meta_key->db_id_str_, chunk_index_meta_key->table_id_str_, *kv_instance);
+                TableIndexMeeta table_index_meta(chunk_index_meta_key->index_id_str_, table_meta, *kv_instance);
+                SegmentIndexMeta segment_index_meta(chunk_index_meta_key->segment_id_, table_index_meta, *kv_instance);
+                ChunkIndexMeta chunk_index_meta(chunk_index_meta_key->chunk_id_, segment_index_meta, *kv_instance);
+                Status status = NewCatalog::CleanChunkIndex(chunk_index_meta);
+                if (!status.ok()) {
+                    return status;
+                }
+                break;
+            }
+        }
+    }
+
+    return Status::OK();
 }
 
 } // namespace infinity

@@ -304,8 +304,8 @@ Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Op
                                                              filename,
                                                              0, /*buffer_size*/
                                                              buffer_mgr->persistence_manager());
-        [[maybe_unused]] BufferObj *outline_buffer = buffer_mgr->AllocateBufferObject(std::move(outline_file_worker));
-        // outline_buffer->AddObjRc();
+        BufferObj *outline_buffer = buffer_mgr->AllocateBufferObject(std::move(outline_file_worker));
+        outline_buffer->AddObjRc();
     }
     return Status::OK();
 }

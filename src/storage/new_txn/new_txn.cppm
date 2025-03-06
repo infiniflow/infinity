@@ -439,6 +439,9 @@ private:
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 
+public:
+    static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
+
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};
