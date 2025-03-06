@@ -68,6 +68,7 @@ import version_file_worker;
 import block_version;
 import extra_command;
 
+import db_meeta;
 import table_meeta;
 import segment_meta;
 import block_meta;
@@ -385,10 +386,15 @@ Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_tabl
 }
 
 bool NewTxn::CheckTableExists(const String &db_name, const String &table_name) {
-    String table_key;
     String table_id;
     String db_id;
-    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id);
+    if (status.ok()) {
+        DBMeeta db_meta(db_id, *kv_instance_);
+        status = db_meta.GetTableID(table_name, table_key, table_id);
+    }
+
     if (!status.ok()) {
         if (status.code() != ErrorCode::kDBNotExist && status.code() != ErrorCode::kTableNotExist) {
             UnrecoverableError(status.message());
@@ -438,8 +444,13 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
     // Get table id
     String db_id_str;
     String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -490,8 +501,13 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     // Get table id
     String db_id_str;
     String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -601,8 +617,13 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
 
     String db_id_str;
     String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -635,8 +656,13 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
 
     String db_id_str;
     String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, old_table_name, table_key, table_id_str, db_id_str);
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(old_table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -683,10 +709,16 @@ Status NewTxn::ListTable(const String &db_name, Vector<String> &table_list) {
 Status NewTxn::LockTable(const String &db_name, const String &table_name) {
     this->CheckTxnStatus();
 
+    String db_id_str;
+    String table_id_str;
     String table_key;
-    String table_id;
-    String db_id;
-    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    String db_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -702,10 +734,15 @@ Status NewTxn::LockTable(const String &db_name, const String &table_name) {
 Status NewTxn::UnlockTable(const String &db_name, const String &table_name) {
     this->CheckTxnStatus();
 
-    String table_key;
-    String table_id;
-    String db_id;
-    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    String db_id_str;
+    String table_id_str;
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -808,10 +845,15 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
 Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector<String> &index_list) {
     this->CheckTxnStatus();
 
-    String table_key;
     String table_id;
     String db_id;
-    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id);
     if (!status.ok()) {
         return status;
     }
@@ -970,8 +1012,13 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
     table_info->table_name_ = MakeShared<String>(table_name);
     String db_id_str;
     String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return {nullptr, status};
     }
@@ -1339,49 +1386,6 @@ Status NewTxn::GetDbID(const String &db_name, String &db_key, String &db_id) {
     return Status::OK();
 }
 
-Status NewTxn::GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id_str, String &db_id_str) {
-
-    // Get db_id
-    String db_key;
-    Status status = GetDbID(db_name, db_key, db_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-
-    String table_key_prefix = KeyEncode::CatalogTablePrefix(db_id_str, table_name);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(table_key_prefix);
-    SizeT found_count = 0;
-
-    Vector<String> error_table_keys;
-    while (iter2->Valid() && iter2->Key().starts_with(table_key_prefix)) {
-        table_key = iter2->Key().ToString();
-        table_id_str = iter2->Value().ToString();
-        if (found_count > 0) {
-            // Error branch
-            error_table_keys.push_back(table_key);
-        }
-        iter2->Next();
-        ++found_count;
-    }
-
-    if (found_count == 0) {
-        // No table, ignore it.
-        return Status::TableNotExist(table_name);
-    }
-
-    if (!error_table_keys.empty()) {
-        // join error_table_keys
-        String error_table_keys_str =
-            std::accumulate(std::next(error_table_keys.begin()), error_table_keys.end(), error_table_keys.front(), [](String a, String b) {
-                return a + ", " + b;
-            });
-        UnrecoverableError(fmt::format("Found multiple table keys: {}", error_table_keys_str));
-    }
-
-    return Status::OK();
-}
-
 Status NewTxn::GetIndexID(const String &db_name,
                           const String &table_name,
                           const String &index_name,
@@ -1389,8 +1393,16 @@ Status NewTxn::GetIndexID(const String &db_name,
                           String &index_id,
                           String &table_id,
                           String &db_id) {
+    Status status;
+
+    String db_key;
+    status = this->GetDbID(db_name, db_key, db_id);
+    if (!status.ok()) {
+        return status;
+    }
     String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id, db_id);
+    DBMeeta db_meta(db_id, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id);
     if (!status.ok()) {
         return status;
     }
@@ -1487,26 +1499,6 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
     if (!status.ok()) {
         return status;
     }
-
-    // All tables in dropped DB will be cleanup by background thread
-    //    // Find all tables of this database to drop
-    //    String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id_str);
-    //    auto iter2 = kv_instance_->GetIterator();
-    //    iter2->Seek(db_table_prefix);
-    //
-    //    while (iter2->Valid() && iter2->Key().starts_with(db_table_prefix)) {
-    //        String table_key = iter2->Key().ToString();
-    //        // extract table name
-    //        size_t start = db_table_prefix.size();
-    //        size_t end = table_key.find('|', start);
-    //        String table_name = table_key.substr(start, end - start);
-    //        LOG_TRACE(fmt::format("Drop table: {}.{}", drop_db_cmd->db_name_, table_name));
-    //        Status status = CommitDropTable(drop_db_cmd->db_name_, table_name);
-    //        if (!status.ok()) {
-    //            return status;
-    //        }
-    //        iter2->Next();
-    //    }
 
     LOG_TRACE(fmt::format("Drop database: {}", drop_db_cmd->db_name_));
     status = kv_instance_->Delete(db_key);
@@ -1605,8 +1597,13 @@ Status NewTxn::CommitAddColumns(const WalCmdAddColumns *add_columns_cmd) {
 
     String db_id_str;
     String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -1633,8 +1630,13 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
 
     String db_id_str;
     String table_id_str;
-    String table_key;
-    Status status = GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -1972,7 +1974,11 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
         switch (meta->type_) {
             case MetaKey::Type::kDB: {
                 [[maybe_unused]] auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
-                UnrecoverableError("Not implemented");
+                DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
+                Status status = NewCatalog::CleanDB(db_meta);
+                if (!status.ok()) {
+                    return status;
+                }
                 break;
             }
             case MetaKey::Type::kTable: {

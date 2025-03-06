@@ -59,6 +59,7 @@ import table_meeta;
 import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;
+import db_meeta;
 import mem_index;
 import roaring_bitmap;
 import index_filter_evaluators;
@@ -6669,13 +6670,15 @@ TEST_P(NewCatalogTest, test_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
-        String table_key;
-        String table_id_str;
         String db_id_str;
-        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        String table_id_str;
+        String db_key, table_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
         EXPECT_TRUE(status.ok());
-
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
@@ -6826,13 +6829,15 @@ TEST_P(NewCatalogTest, test_append) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        String table_key;
-        String table_id_str;
         String db_id_str;
-        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        String table_id_str;
+        String db_key, table_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
         EXPECT_TRUE(status.ok());
-
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
@@ -6964,17 +6969,20 @@ TEST_P(NewCatalogTest, test_delete) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        String table_key;
-        String table_id_str;
         String db_id_str;
-        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        String table_id_str;
+        String db_key, table_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
+        EXPECT_TRUE(status.ok());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
         BlockID block_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
         SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
@@ -7094,13 +7102,15 @@ TEST_P(NewCatalogTest, test_compact) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        String table_key;
-        String table_id_str;
         String db_id_str;
-        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        String table_id_str;
+        String db_key, table_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
         EXPECT_TRUE(status.ok());
-
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
@@ -7912,13 +7922,16 @@ TEST_P(NewCatalogTest, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        String table_key;
-        String table_id_str;
         String db_id_str;
-        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        String table_id_str;
+        String db_key, table_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
+        EXPECT_TRUE(status.ok());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
         EXPECT_TRUE(status.ok());
 
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
@@ -7948,13 +7961,16 @@ TEST_P(NewCatalogTest, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        String table_key;
-        String table_id_str;
         String db_id_str;
-        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        String table_id_str;
+        String db_key, table_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
         EXPECT_TRUE(status.ok());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1, 2}));
@@ -7972,13 +7988,16 @@ TEST_P(NewCatalogTest, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        String table_key;
-        String table_id_str;
         String db_id_str;
-        Status status = txn->GetTableID(*db_name, *table_name, table_key, table_id_str, db_id_str);
+        String table_id_str;
+        String db_key, table_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
         EXPECT_TRUE(status.ok());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
         auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({3}));
@@ -8076,6 +8095,18 @@ TEST_P(NewCatalogTest, test_cleanup) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         Status status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        EXPECT_TRUE(status.ok());
+    }
+    new_txn_mgr->PrintAllKeyValue();
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        Status status = txn->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

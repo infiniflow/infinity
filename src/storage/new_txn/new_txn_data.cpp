@@ -39,6 +39,7 @@ import segment_meta;
 import table_meeta;
 import table_index_meeta;
 import meta_key;
+import db_meeta;
 
 namespace infinity {
 
@@ -133,10 +134,16 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
     Status status;
 
+    // Get table id
     String db_id_str;
     String table_id_str;
-    String table_key;
-    status = this->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+    String db_key, table_key;
+    status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
         return status;
     }
@@ -246,14 +253,21 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     NewTxnTableStore1 *table_store = nullptr;
 
     auto append_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
+
+    // Get table id
     String db_id_str;
     String table_id_str;
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
     {
-        String table_key;
-        Status status = this->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
-        if (!status.ok()) {
-            return status;
-        }
         append_command->db_id_str_ = db_id_str;
         append_command->table_id_str_ = table_id_str;
         table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
@@ -306,13 +320,20 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
 
     auto delete_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
     {
+        // Get table id
         String db_id_str;
         String table_id_str;
-        String table_key;
-        Status status = this->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
+        String db_key, table_key;
+        Status status = this->GetDbID(db_name, db_key, db_id_str);
         if (!status.ok()) {
             return status;
         }
+        DBMeeta db_meta(db_id_str, *kv_instance_);
+        status = db_meta.GetTableID(table_name, table_key, table_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+
         delete_command->db_id_str_ = db_id_str;
         delete_command->table_id_str_ = table_id_str;
         table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
@@ -335,15 +356,20 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
 
     this->CheckTxn(db_name);
 
+    // Get table id
     String db_id_str;
     String table_id_str;
-    {
-        String table_key;
-        Status status = this->GetTableID(db_name, table_name, table_key, table_id_str, db_id_str);
-        if (!status.ok()) {
-            return status;
-        }
+    String db_key, table_key;
+    status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
     }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
 
     SegmentID new_segment_id = 0;

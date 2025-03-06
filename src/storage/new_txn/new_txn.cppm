@@ -344,10 +344,8 @@ private:
 
     void CheckTxn(const String &db_name);
 
-    Status GetDbID(const String &db_name, String &db_key, String &db_id);
-
 public:
-    Status GetTableID(const String &db_name, const String &table_name, String &table_key, String &table_id, String &db_id);
+    Status GetDbID(const String &db_name, String &db_key, String &db_id);
 
     Status GetIndexID(const String &db_name,
                       const String &table_name,

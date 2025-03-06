@@ -40,6 +40,7 @@ import data_file_worker;
 import var_file_worker;
 import file_worker;
 
+import db_meeta;
 import table_meeta;
 import segment_meta;
 import block_meta;
@@ -85,6 +86,31 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
     }
     visible_range = {block_offset_begin, row_idx};
     return block_offset_begin < row_idx;
+}
+
+Status NewCatalog::CleanDB(DBMeeta &db_meta) {
+    Status status;
+
+    Vector<String> *table_id_strs_ptr = nullptr;
+    status = db_meta.GetTableIDs(table_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (const String &table_id_str : *table_id_strs_ptr) {
+        TableMeeta table_meta(table_id_str, db_meta.db_id_str(), db_meta.kv_instance());
+        status = NewCatalog::CleanTable(table_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    status = db_meta.UninitSet();
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
 }
 
 Status NewCatalog::CleanTable(TableMeeta &table_meta) {

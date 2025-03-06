@@ -243,11 +243,10 @@ Status TableMeeta::LoadIndexIDs() {
     iter->Seek(index_prefix);
     while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
         String column_key = iter->Key().ToString();
-        String column_key1 = column_key.substr(index_prefix.size());
-        String index_name = column_key1.substr(0, column_key1.find('|'));
-        String index_id_str = iter->Value().ToString();
-        index_names.emplace_back(std::move(index_name));
-        index_id_strs.emplace_back(std::move(index_id_str));
+        size_t start = index_prefix.size();
+        size_t end = column_key.find('|', start);
+        index_names.emplace_back(column_key.substr(start, end - start));
+        index_id_strs.emplace_back(iter->Value().ToString());
         iter->Next();
     }
     index_id_strs_ = std::move(index_id_strs);

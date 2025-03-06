@@ -31,6 +31,7 @@ namespace infinity {
 class NewTxn;
 class MemIndex;
 class TableIndexReaderCache;
+class DBMeeta;
 class TableMeeta;
 class SegmentMeta;
 class BlockMeta;
@@ -168,6 +169,8 @@ private:
     MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
 
 public:
+    static Status CleanDB(DBMeeta &db_meta);
+
     static Status CleanTable(TableMeeta &table_meta);
 
     static Status CleanTableIndex(TableIndexMeeta &table_index_meta);
