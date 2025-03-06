@@ -265,10 +265,13 @@ public:
     void Optimize(const BMPOptimizeOptions &options) {
         std::unique_lock lock(mtx_);
 
-        if (options.bp_reorder_) {
+        while (options.bp_reorder_) {
             SizeT block_size = this->block_fwd_.block_size();
             SizeT term_num = this->bm_ivt_.term_num();
             SizeT doc_num = this->doc_ids_.size() - this->doc_ids_.size() % block_size;
+            if (doc_num == 0) {
+                break;
+            }
 
             this->bm_ivt_ = BMPIvt<DataType, CompressType, BMPOwnMem::kTrue>(term_num);
             Vector<Pair<Vector<IdxType>, Vector<DataType>>> fwd = this->block_fwd_.GetFwd(doc_num, term_num);
@@ -293,6 +296,7 @@ public:
                 SparseVecRef<DataType, IdxType> doc((i32)indices.size(), indices.data(), data.data());
                 this->AddDoc(doc, doc_ids[i], false);
             }
+            break;
         }
         if (options.topk_ != 0) {
             SizeT term_num = this->bm_ivt_.term_num();

@@ -441,6 +441,9 @@ public:
                 const auto &[term_id, block_size, block_offsets, scores] = iter.Value();
                 for (SizeT i = 0; i < block_size; ++i) {
                     BMPDocID doc_id = block_offsets[i] + block_id * block_size_;
+                    if (doc_id >= doc_num) {
+                        break;
+                    }
                     DataType score = scores[i];
                     fwd[doc_id].first.push_back(term_id);
                     fwd[doc_id].second.push_back(score);
