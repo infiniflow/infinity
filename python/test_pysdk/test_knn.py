@@ -1069,7 +1069,7 @@ class TestInfinity:
                                                index.IndexType.BMP,
                                                {"block_size": "8", "compress_type": "compress"}), ConflictType.Error)
 
-        table_obj.optimize("idx1", {"topk": "3"})
+        table_obj.optimize("idx1", {"topk": "3", "bp_reorder": ""})
 
         res, extra_result = (table_obj
                              .output(["*", "_row_id", "_similarity"])
