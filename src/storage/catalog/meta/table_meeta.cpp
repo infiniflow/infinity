@@ -126,6 +126,14 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
         }
     }
 
+    for (const auto &column : table_def->columns()) {
+        String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name());
+        Status status = kv_instance_.Put(column_key, column->ToJson().dump());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
     return Status::OK();
 }
 
@@ -165,6 +173,32 @@ Status TableMeeta::UninitSet() {
         if (status.code() != ErrorCode::kNotFound) {
             return status;
         }
+    }
+
+    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str_, table_id_str_);
+    auto iter2 = kv_instance_.GetIterator();
+    iter2->Seek(table_column_prefix);
+
+    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
+        String table_column_key = iter2->Key().ToString();
+        Status status = kv_instance_.Delete(table_column_key);
+        if (!status.ok()) {
+            return status;
+        }
+        iter2->Next();
+    }
+
+    String index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id_str_, table_id_str_);
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(index_prefix);
+
+    while (iter->Valid() && iter->Key().starts_with(index_prefix)) {
+        String index_key = iter->Key().ToString();
+        Status status = kv_instance_.Delete(index_key);
+        if (!status.ok()) {
+            return status;
+        }
+        iter->Next();
     }
 
     return Status::OK();

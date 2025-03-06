@@ -5844,7 +5844,7 @@ TEST_P(NewCatalogTest, drop_column_and_drop_table) {
         //  t1            drop column    commit (success)
         //  |--------------|---------------|
         //                            |------|------------|
-        //                            t2    drop table  commit (false)
+        //                            t2    drop table  commit (success)
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -5874,7 +5874,7 @@ TEST_P(NewCatalogTest, drop_column_and_drop_table) {
         status = txn5->DropTable(*db_name, table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn5);
-        EXPECT_FALSE(status.ok());
+        EXPECT_TRUE(status.ok());
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
