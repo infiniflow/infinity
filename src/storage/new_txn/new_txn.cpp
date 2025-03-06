@@ -1557,6 +1557,14 @@ Status NewTxn::CommitCreateTable(const WalCmdCreateTable *create_table_cmd) {
         return status;
     }
 
+    for (const auto &column : create_table_cmd->table_def_->columns()) {
+        String column_key = KeyEncode::TableColumnKey(db_id_str, table_id_str, column->name());
+        Status status = kv_instance_->Put(column_key, column->ToJson().dump());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
     return Status::OK();
 }
 
@@ -1571,6 +1579,19 @@ Status NewTxn::CommitDropTable(const WalCmdDropTable *drop_table_cmd) {
     Status status = kv_instance_->Delete(table_key);
     if (!status.ok()) {
         return status;
+    }
+
+    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str, table_id_str);
+    auto iter2 = kv_instance_->GetIterator();
+    iter2->Seek(table_column_prefix);
+
+    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
+        String table_column_key = iter2->Key().ToString();
+        Status status = kv_instance_->Delete(table_column_key);
+        if (!status.ok()) {
+            return status;
+        }
+        iter2->Next();
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
