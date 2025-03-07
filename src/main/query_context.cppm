@@ -88,6 +88,9 @@ public:
 
     inline void set_max_node_id(u64 node_id) { current_max_node_id_ = node_id; }
 
+    inline void set_explain_analyze() { explain_analyze_ = true; }
+    [[nodiscard]] inline bool explain_analyze() const { return explain_analyze_; }
+
     inline u64 GetNextNodeID() { return ++current_max_node_id_; }
 
     void BeginTxn(const BaseStatement *statement);
@@ -153,6 +156,7 @@ private:
     UniquePtr<FragmentBuilder> fragment_builder_{};
 
     SharedPtr<QueryProfiler> query_profiler_{};
+    bool explain_analyze_{};
 
     Config *global_config_{};
     TaskScheduler *scheduler_{};

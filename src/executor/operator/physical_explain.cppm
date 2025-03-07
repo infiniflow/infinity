@@ -29,6 +29,7 @@ import explain_statement;
 import data_type;
 import logger;
 import plan_fragment;
+import profiler;
 
 namespace infinity {
 
@@ -61,6 +62,9 @@ public:
     inline ExplainType explain_type() const { return explain_type_; }
 
     static void AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<SharedPtr<String>> &array2);
+
+private:
+    void ExplainTasks(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler);
 
 private:
     ExplainType explain_type_{ExplainType::kPhysical};

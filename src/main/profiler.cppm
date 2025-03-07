@@ -44,9 +44,6 @@ public:
 
     // Return the elapsed time from begin, if the profiler is ended, it will return total elapsed time.
     [[nodiscard]] inline i64 Elapsed() const {
-        if (name_.empty()) {
-            return 0;
-        }
         return ElapsedInternal().count();
     }
 
@@ -166,6 +163,8 @@ public:
         }
     }
 
+    bool Enable() const { return enable_; }
+
     void StartOperator(const PhysicalOperator *op);
 
     void StopOperator(const OperatorState *output_state);
@@ -204,6 +203,8 @@ public:
     static String QueryPhaseToString(QueryPhase phase);
 
     static nlohmann::json Serialize(const QueryProfiler *profiler);
+
+    Vector<TaskProfiler> &GetTaskProfile(u64 fragment_id, i64 task_id);
 
 private:
     bool enable_{};

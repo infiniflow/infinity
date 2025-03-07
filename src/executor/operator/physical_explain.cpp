@@ -14,6 +14,8 @@
 
 module;
 
+#include <vector>
+
 module physical_explain;
 
 import stl;
@@ -33,6 +35,8 @@ import infinity_exception;
 import logical_type;
 import logger;
 import plan_fragment;
+import fragment_task;
+import third_party;
 
 namespace infinity {
 
@@ -96,7 +100,7 @@ void PhysicalExplain::Init(QueryContext *query_context) {
     }
 }
 
-bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
+bool PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operator_state) {
     String title;
 
     auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
@@ -145,13 +149,17 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     task_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
 
     if (explain_type_ == ExplainType::kPipeline or explain_type_ == ExplainType::kAnalyze) {
-        AlignParagraphs(*this->texts_, *this->task_texts_);
+        Vector<SharedPtr<String>> task_texts;
+        ExplainTasks(task_texts, plan_fragment_ptr_, query_context->query_profiler());
+
+        AlignParagraphs(*this->texts_, task_texts);
         for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
             column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
         }
-        for (SizeT idx = 0; idx < this->task_texts_->size(); ++idx) {
-            task_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->task_texts_)[idx]));
+        for (SizeT idx = 0; idx < task_texts.size(); ++idx) {
+            task_vector_ptr->AppendValue(Value::MakeVarchar(*task_texts[idx]));
         }
+
     } else {
         for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
             column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
@@ -174,5 +182,40 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
 }
 
 void PhysicalExplain::SetPlanFragment(PlanFragment *plan_fragment_ptr) { plan_fragment_ptr_ = plan_fragment_ptr; }
+
+void PhysicalExplain::ExplainTasks(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
+    Vector<UniquePtr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
+    u64 fragment_id = plan_fragment_ptr->FragmentID();
+    {
+        String fragment_header = fmt::format("Fragment #{} * {} Tasks", fragment_id, tasks.size());
+        result.emplace_back(MakeShared<String>(fragment_header));
+    }
+    for (const auto &task : tasks) {
+        i64 task_id = task->TaskID();
+
+        Vector<TaskProfiler> &task_profiles = query_profiler->GetTaskProfile(fragment_id, task_id);
+        for (const auto &task_profile : task_profiles) {
+            i64 times = 0;
+            result.emplace_back(MakeShared<String>(fmt::format("-> Task {}, Seq: {}", task_id, times)));
+            for (const auto &operator_info : task_profile.timings_) {
+                String operator_info_str = fmt::format("  -> {} : ElapsedTime: {}, Output: {}",
+                                                       operator_info.name_,
+                                                       BaseProfiler::ElapsedToString(static_cast<infinity::NanoSeconds>(operator_info.elapsed_)),
+                                                       operator_info.output_rows_);
+                result.emplace_back(MakeShared<String>(operator_info_str));
+            }
+            ++times;
+        }
+    }
+    // NOTE: Insert blank elements after each Fragment for alignment
+    result.emplace_back(MakeShared<String>());
+
+    if (plan_fragment_ptr->HasChild()) {
+        // current fragment have children
+        for (const auto &child_fragment : plan_fragment_ptr->Children()) {
+            ExplainTasks(result, child_fragment.get(), query_profiler);
+        }
+    }
+}
 
 } // namespace infinity

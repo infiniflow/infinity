@@ -67,7 +67,10 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             current_fragment_ptr->AddOperator(phys_op);
             break;
         }
-        case ExplainType::kAnalyze:
+        case ExplainType::kAnalyze: {
+            query_context_ptr_->set_explain_analyze();
+            query_context_ptr_->CreateQueryProfiler();
+        }
         case ExplainType::kFragment:
         case ExplainType::kPipeline: {
             // Build explain pipeline fragment

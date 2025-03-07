@@ -316,9 +316,11 @@ void QueryContext::CreateQueryProfiler() {
         return;
     }
 
-    if (InfinityContext::instance().storage()->catalog()->GetProfile()) {
+    bool query_profiler_flag = InfinityContext::instance().storage()->catalog()->GetProfile();
+
+    if (query_profiler_flag or explain_analyze_) {
         if (query_profiler_ == nullptr) {
-            query_profiler_ = MakeShared<QueryProfiler>(true);
+            query_profiler_ = MakeShared<QueryProfiler>(query_profiler_flag);
         }
     }
 }
