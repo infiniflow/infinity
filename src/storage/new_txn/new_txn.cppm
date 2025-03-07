@@ -370,6 +370,12 @@ private:
 
     Status CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state);
 
+    Status AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<ColumnDef>> &column_defs);
+
+    Status AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values);
+
+    Status AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values);
+
     Status AppendIndex(TableIndexMeeta &table_index_meta, const AppendState *append_state);
 
     Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);

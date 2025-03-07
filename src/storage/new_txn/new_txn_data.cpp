@@ -633,6 +633,111 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     return Status::OK();
 }
 
+Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<ColumnDef>> &column_defs) {
+    Status status;
+    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (segment_ids_ptr->empty()) {
+        return Status::OK();
+    }
+
+    Vector<Value> default_values;
+    for (const auto &column_def : column_defs) {
+        if (!column_def->default_value()) {
+            return Status::NotSupport(fmt::format("Column {} has no default value", column_def->name()));
+        }
+
+        // SharedPtr<ConstantExpr> default_expr = column_def->default_value();
+        // auto expr = tmp_binder.BuildValueExpr(*default_expr, nullptr, 0, false);
+        // auto *value_expr = static_cast<ValueExpression *>(expr.get());
+
+        // const SharedPtr<DataType> &column_type = column_def->type();
+        // if (value_expr->Type() == *column_type) {
+        //     default_values.push_back(value_expr->GetValue());
+        // } else {
+        //     const SharedPtr<DataType> &column_type = column_def->type();
+
+        //     BoundCastFunc cast = CastFunction::GetBoundFunc(value_expr->Type(), *column_type);
+        //     SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, expr, *column_type);
+        //     SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(cast_expr);
+        //     SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(column_type);
+        //     output_column_vector->Initialize(ColumnVectorType::kConstant, 1);
+        //     ExpressionEvaluator evaluator;
+        //     evaluator.Init(nullptr);
+        //     evaluator.Execute(cast_expr, expr_state, output_column_vector);
+
+        //     default_values.push_back(output_column_vector->GetValue(0));
+        // }
+    }
+
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        status = this->AddColumnsDataInSegment(segment_meta, column_defs, default_values);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status
+NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
+    Status status;
+
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    status = segment_meta.GetBlockIDs(block_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        status = this->AddColumnsDataInBlock(block_meta, column_defs, default_values);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
+    Status status;
+
+    SizeT block_row_count = 0;
+    status = block_meta.GetRowCnt(block_row_count);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (SizeT i = 0; i < column_defs.size(); ++i) {
+        const SharedPtr<ColumnDef> &column_def = column_defs[i];
+        const Value &default_value = default_values[i];
+
+        ColumnID column_id = column_def->id();
+        Optional<ColumnMeta> column_meta;
+        status = NewCatalog::AddNewBlockColumn(block_meta, column_id, column_meta);
+        if (!status.ok()) {
+            return status;
+        }
+
+        ColumnVector column_vector;
+        status = NewCatalog::GetColumnVector(*column_meta, 0/*row_count*/, ColumnVectorTipe::kReadWrite, column_vector);
+        if (!status.ok()) {
+            return status;
+        }
+
+        for (SizeT i = 0; i < block_row_count; ++i) {
+            column_vector.SetValue(i, default_value);
+        }
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::CommitImport(const WalCmdImport *import_cmd) {
     const String &db_id_str = import_cmd->db_id_str_;
     const String &table_id_str = import_cmd->table_id_str_;
