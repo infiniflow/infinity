@@ -28,6 +28,8 @@ import internal_types;
 import explain_statement;
 import data_type;
 import logger;
+import plan_fragment;
+import profiler;
 
 namespace infinity {
 
@@ -43,13 +45,15 @@ public:
 
     ~PhysicalExplain() override = default;
 
-    void Init(QueryContext* query_context) override;
+    void Init(QueryContext *query_context) override;
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
     void SetExplainText(SharedPtr<Vector<SharedPtr<String>>> text) { texts_ = std::move(text); }
 
     void SetExplainTaskText(SharedPtr<Vector<SharedPtr<String>>> text) { task_texts_ = std::move(text); }
+
+    void SetPlanFragment(PlanFragment *plan_fragment_ptr);
 
     inline SharedPtr<Vector<String>> GetOutputNames() const final { return output_names_; }
 
@@ -60,12 +64,18 @@ public:
     static void AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<SharedPtr<String>> &array2);
 
 private:
+    void ExplainAnalyze(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler);
+    void ExplainPipeline(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler);
+
+private:
     ExplainType explain_type_{ExplainType::kPhysical};
     SharedPtr<Vector<SharedPtr<String>>> texts_{nullptr};
     SharedPtr<Vector<SharedPtr<String>>> task_texts_{nullptr};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
+
+    PlanFragment *plan_fragment_ptr_;
 };
 
 } // namespace infinity

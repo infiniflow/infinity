@@ -111,10 +111,9 @@ public:
     inline void IncreaseTask() { unfinished_task_n_.fetch_add(1); }
 
     inline void FlushProfiler(TaskProfiler &profiler) {
-        if (!InfinityContext::instance().storage()->catalog()->GetProfile()) {
-            return;
+        if(profiler.Enable()) {
+            query_context_->FlushProfiler(std::move(profiler));
         }
-        query_context_->FlushProfiler(std::move(profiler));
     }
 
     bool TryFinishFragment();

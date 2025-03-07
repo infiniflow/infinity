@@ -169,8 +169,10 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
         output_rows += output_data_block->Finalized() ? output_data_block->row_count() : 0;
     }
 
+    i64 elapsed_time = profiler_.Elapsed();
+
     OperatorInformation
-        info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), profiler_.Elapsed(), input_rows, output_data_size, output_rows);
+        info(active_operator_->GetName(), profiler_.GetBegin(), profiler_.GetEnd(), elapsed_time, input_rows, output_data_size, output_rows);
 
     timings_.push_back(std::move(info));
     active_operator_ = nullptr;
@@ -248,6 +250,10 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
 }
 
 void QueryProfiler::Stop() {
+    if (!enable_) {
+        return;
+    }
+
     if (current_phase_ == QueryPhase::kInvalid) {
         return;
     }
@@ -256,9 +262,9 @@ void QueryProfiler::Stop() {
 }
 
 void QueryProfiler::Flush(TaskProfiler &&profiler) {
-    if (!enable_) {
-        return;
-    }
+    //    if (!enable_) {
+    //        return;
+    //    }
 
     std::unique_lock<std::mutex> lk(flush_lock_);
     records_[profiler.binding_.fragment_id_][profiler.binding_.task_id_].push_back(profiler);
@@ -373,5 +379,7 @@ nlohmann::json QueryProfiler::Serialize(const QueryProfiler *profiler) {
 
     return json;
 }
+
+Vector<TaskProfiler> &QueryProfiler::GetTaskProfile(u64 fragment_id, i64 task_id) { return records_[fragment_id][task_id]; }
 
 } // namespace infinity

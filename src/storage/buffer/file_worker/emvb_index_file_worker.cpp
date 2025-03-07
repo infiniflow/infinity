@@ -33,6 +33,7 @@ import internal_types;
 import file_worker_type;
 import third_party;
 import emvb_product_quantization;
+import status;
 
 namespace infinity {
 
@@ -70,7 +71,7 @@ void EMVBIndexFileWorker::AllocateInMemory() {
         const auto error_message = fmt::format("The dimension of the column embedding should be divisible by residual_pq_subspace_num: {} % {} != 0",
                                                column_embedding_dim,
                                                residual_pq_subspace_num);
-        UnrecoverableError(error_message);
+        RecoverableError(Status::InvalidParameter(error_message));
     }
     data_ = static_cast<void *>(new EMVBIndex(start_segment_offset_, column_embedding_dim, residual_pq_subspace_num, residual_pq_subspace_bits));
 }

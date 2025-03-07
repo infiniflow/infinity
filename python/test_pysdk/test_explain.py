@@ -84,8 +84,7 @@ class TestInfinity:
             res = table.output(["*"]).explain(ExplainType.Fragment)
             print(res)
 
-            with pytest.raises(Exception, match=r".*Not implement*"):
-                res = table.output(["*"]).explain(ExplainType.Analyze)
-                print(res)
+            res = table.output(["*"]).explain(ExplainType.Analyze)
+            print(res)
 
         db_obj.drop_table("test_explain_default"+suffix, ConflictType.Error)
