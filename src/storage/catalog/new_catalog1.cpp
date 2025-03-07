@@ -39,6 +39,7 @@ import version_file_worker;
 import data_file_worker;
 import var_file_worker;
 import file_worker;
+import kv_code;
 
 import db_meeta;
 import table_meeta;
@@ -88,6 +89,27 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
     return block_offset_begin < row_idx;
 }
 
+Status NewCatalog::AddNewDB(KVInstance *kv_instance,
+                            const String &db_id_str,
+                            TxnTimeStamp commit_ts,
+                            const String &db_name,
+                            const String *db_comment,
+                            Optional<DBMeeta> &db_meta) {
+    String db_key = KeyEncode::CatalogDbKey(db_name, commit_ts);
+    Status status = kv_instance->Put(db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    db_meta.emplace(db_id_str, *kv_instance);
+    status = db_meta->InitSet(db_comment);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
 Status NewCatalog::CleanDB(DBMeeta &db_meta) {
     Status status;
 
@@ -111,6 +133,28 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta) {
     }
 
     return Status::OK();
+}
+
+Status NewCatalog::AddNewTable(DBMeeta &db_meta,
+                               const String &table_id_str,
+                               TxnTimeStamp commit_ts,
+                               const SharedPtr<TableDef> &table_def,
+                               Optional<TableMeeta> &table_meta) {
+    // Create table key value pair
+    KVInstance &kv_instance = db_meta.kv_instance();
+    String table_key = KeyEncode::CatalogTableKey(db_meta.db_id_str(), *table_def->table_name(), commit_ts);
+    Status status = kv_instance.Put(table_key, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    table_meta.emplace(db_meta.db_id_str(), table_id_str, db_meta.kv_instance());
+    status = table_meta->InitSet(table_def);
+    if (!status.ok()) {
+        return status;
+    }
+
+    return status;
 }
 
 Status NewCatalog::CleanTable(TableMeeta &table_meta) {
@@ -147,6 +191,28 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta) {
         return status;
     }
 
+    return Status::OK();
+}
+
+Status NewCatalog::AddNewTableIndex(TableMeeta &table_meta,
+                                    const String &index_id_str,
+                                    TxnTimeStamp commit_ts,
+                                    const SharedPtr<IndexBase> &index_base,
+                                    Optional<TableIndexMeeta> &table_index_meta) {
+    // Create index key value pair
+    KVInstance &kv_instance = table_meta.kv_instance();
+    const String &index_name = *index_base->index_name_;
+    String index_key = KeyEncode::CatalogIndexKey(table_meta.db_id_str(), table_meta.table_id_str(), index_name, commit_ts);
+    Status status = kv_instance.Put(index_key, index_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+
+    table_index_meta.emplace(index_id_str, table_meta, table_meta.kv_instance());
+    status = table_index_meta->InitSet(index_base);
+    if (!status.ok()) {
+        return status;
+    }
     return Status::OK();
 }
 

@@ -23,6 +23,7 @@ import table_meeta;
 import kv_code;
 import third_party;
 import logger;
+import index_base;
 
 namespace infinity {
 
@@ -88,7 +89,7 @@ Status TableIndexMeeta::AddSegmentID(SegmentID segment_id) {
     return Status::OK();
 }
 
-Status TableIndexMeeta::InitSet(SharedPtr<IndexBase> index_base) {
+Status TableIndexMeeta::InitSet(const SharedPtr<IndexBase> &index_base) {
     {
         Status status = SetSegmentIDs({});
         if (!status.ok()) {

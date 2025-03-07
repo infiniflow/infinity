@@ -60,6 +60,7 @@ import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;
 import db_meeta;
+import catalog_meta;
 import mem_index;
 import roaring_bitmap;
 import index_filter_evaluators;
@@ -451,9 +452,10 @@ TEST_P(NewCatalogTest, db_test4) {
         std::cout << *db_info2->db_entry_dir_ << std::endl;
         EXPECT_STREQ(db_info2->db_comment_->c_str(), "db_comment");
 
-        auto db_list = txn3->ListDatabase();
-        EXPECT_EQ(db_list.size(), 2);
-        for (auto &db : db_list) {
+        Vector<String> db_names;
+        status = txn3->ListDatabase(db_names);
+        EXPECT_EQ(db_names.size(), 2);
+        for (auto &db : db_names) {
             std::cout << db << std::endl;
         }
 
@@ -960,18 +962,11 @@ TEST_P(NewCatalogTest, table_test1) {
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
 
         // - list tables
-        String db_id_str;
-        String db_key;
-        status = txn3->GetDbID(*db_name, db_key, db_id_str);
-        EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn3->kv_instance());
-
-        Vector<String> *table_id_strs = nullptr;
-        Vector<String> *table_names = nullptr;
-        status = db_meta.GetTableIDs(table_id_strs, &table_names);
+        Vector<String> table_names;
+        status = txn3->ListTable(*db_name, table_names);
         EXPECT_TRUE(status.ok());
 
-        for (const auto &table_name : *table_names) {
+        for (const auto &table_name : table_names) {
             std::cout << String("Table name: ") << table_name << std::endl;
             auto [table_info, table_status] = txn3->GetTableInfo(*db_name, table_name);
             std::cout << *table_info->table_name_ << std::endl;
@@ -3583,24 +3578,13 @@ TEST_P(NewCatalogTest, index_test1) {
         auto *txn3_1 = new_txn_mgr->BeginTxn(MakeUnique<String>("get index"), TransactionType::kNormal);
         SharedPtr<IndexBase> index_def1;
 
-        String db_id_str;
-        String table_id_str;
-        String index_id_str;
-
-        String db_key, table_key, index_key;
-        Status status = txn3_1->GetDbID(*db_name, db_key, db_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> index_meta;
+        Status status = txn3_1->GetTableIndexMeta(*db_name, *table_name, *index_name, db_meta, table_meta, index_meta);
         EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn3_1->kv_instance());
 
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
-
-        status = table_meta.GetIndexID(*index_name, index_key, index_id_str);
-        EXPECT_TRUE(status.ok());
-        TableIndexMeeta index_meta(index_id_str, table_meta, table_meta.kv_instance());
-
-        std::tie(index_def1, status) = index_meta.GetIndexBase();
+        std::tie(index_def1, status) = index_meta->GetIndexBase();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_def1, *index_base);
     }
@@ -3608,25 +3592,11 @@ TEST_P(NewCatalogTest, index_test1) {
         // list and drop index
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
 
-        String db_id_str;
-        String table_id_str;
-
-        String db_key, table_key, index_key;
-        Status status = txn4->GetDbID(*db_name, db_key, db_id_str);
-        EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn4->kv_instance());
-
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
-
-        Vector<String> *index_id_strs = nullptr;
-        Vector<String> *index_names = nullptr;
-
-        status = table_meta.GetIndexIDs(index_id_strs, &index_names);
+        Vector<String> index_names;
+        Status status = txn4->ListIndex(*db_name, *table_name, index_names);
         EXPECT_TRUE(status.ok());
 
-        for (const auto &index_name : *index_names) {
+        for (const auto &index_name : index_names) {
             std::cout << String("Index name: ") << index_name << std::endl;
         }
 
@@ -6708,17 +6678,13 @@ TEST_P(NewCatalogTest, test_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
-        String db_id_str;
-        String table_id_str;
-        String db_key, table_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
-        EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -6779,7 +6745,7 @@ TEST_P(NewCatalogTest, test_import) {
         };
 
         for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
             check_segment(segment_meta);
         }
     }
@@ -6867,22 +6833,17 @@ TEST_P(NewCatalogTest, test_append) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        String db_id_str;
-        String table_id_str;
-        String db_key, table_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(segment_ids->size(), 1);
         SegmentID segment_id = segment_ids->at(0);
         EXPECT_EQ(segment_id, 0);
-        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids{};
         status = segment_meta.GetBlockIDs(block_ids);
@@ -7007,22 +6968,16 @@ TEST_P(NewCatalogTest, test_delete) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        String db_id_str;
-        String table_id_str;
-        String db_key, table_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
-        EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
         BlockID block_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
-
-        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
 
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -7140,21 +7095,16 @@ TEST_P(NewCatalogTest, test_compact) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        String db_id_str;
-        String table_id_str;
-        String db_key, table_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
-        SegmentMeta segment_meta((*segment_ids)[0], table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
         Vector<BlockID> *block_ids{};
         status = segment_meta.GetBlockIDs(block_ids);
         EXPECT_TRUE(status.ok());
@@ -7418,32 +7368,22 @@ TEST_P(NewCatalogTest, test_append_with_index) {
 
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
-        String db_id_str;
-        String db_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
-        EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        String table_id_str;
-        String table_key;
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
-        String index_id_str;
-        String index_key;
-        status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
         {
-            auto [segment_ids, status] = table_meta.GetSegmentIDs();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(segment_ids->size(), 1);
             segment_id = segment_ids->at(0);
             EXPECT_EQ(segment_id, 0);
         }
-
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
 
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
@@ -7538,24 +7478,14 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     auto check_index2 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check merged index {}", index_name)), TransactionType::kNormal);
 
-        String db_id_str;
-        String db_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
-        EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        String table_id_str;
-        String table_key;
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
-        String index_id_str;
-        String index_key;
-        status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
 
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
@@ -7818,32 +7748,21 @@ TEST_P(NewCatalogTest, test_populate_index) {
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
 
-        String db_id_str;
-        String db_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
-        EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        String table_id_str;
-        String table_key;
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
-        String index_id_str;
-        String index_key;
-        status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
         {
-            auto [segment_ids, status] = table_meta.GetSegmentIDs();
+            auto [segment_ids, status] = table_meta->GetSegmentIDs();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(segment_ids->size(), 1);
             segment_id = segment_ids->at(0);
             EXPECT_EQ(segment_id, 0);
         }
-
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
 
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
@@ -7983,17 +7902,12 @@ TEST_P(NewCatalogTest, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        String db_id_str;
-        String table_id_str;
-        String db_key, table_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
-        EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -8022,17 +7936,12 @@ TEST_P(NewCatalogTest, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        String db_id_str;
-        String table_id_str;
-        String db_key, table_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1, 2}));
 
@@ -8049,21 +7958,16 @@ TEST_P(NewCatalogTest, test_insert_and_import) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
 
-        String db_id_str;
-        String table_id_str;
-        String db_key, table_key;
-        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        DBMeeta db_meta(db_id_str, *txn->kv_instance());
-        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
-        EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
 
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({3}));
 
-        SegmentMeta segment_meta(3, table_meta, table_meta.kv_instance());
+        SegmentMeta segment_meta(3, *table_meta, table_meta->kv_instance());
         Vector<BlockID> *block_ids;
         auto blk_status = segment_meta.GetBlockIDs(block_ids);
         EXPECT_TRUE(blk_status.ok());

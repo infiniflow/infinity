@@ -270,6 +270,36 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
     return Status::OK();
 }
 
+Status TableMeeta::AddColumn(const ColumnDef &column_def) {
+    String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_def.name());
+    String column_name_value;
+    Status status = kv_instance_.Get(column_key, column_name_value);
+    if (status.code() == ErrorCode::kNotFound) {
+        Status status = kv_instance_.Put(column_key, column_def.ToJson().dump());
+        if (!status.ok()) {
+            return status;
+        }
+    } else {
+        return Status::DuplicateColumnName(column_def.name());
+    }
+    return Status::OK();
+}
+
+Status TableMeeta::DropColumn(const String &column_name) {
+    String column_name_value;
+    String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
+    Status status = kv_instance_.Get(column_key, column_name_value);
+    if (status.ok()) {
+        status = kv_instance_.Delete(column_key);
+        if (!status.ok()) {
+            return status;
+        }
+    } else {
+        return Status::ColumnNotExist(column_name);
+    }
+    return Status::OK();
+}
+
 Status TableMeeta::LoadComment() {
     String table_comment_key = GetTableTag("comment");
     String table_comment;

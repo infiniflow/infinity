@@ -19,7 +19,6 @@ module;
 module new_txn;
 
 import stl;
-import kv_code;
 import third_party;
 import default_values;
 import buffer_obj;
@@ -134,20 +133,13 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
     Status status;
 
-    // Get table id
-    String db_id_str;
-    String table_id_str;
-    String db_key, table_key;
-    status = this->GetDbID(db_name, db_key, db_id_str);
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt);
     if (!status.ok()) {
         return status;
     }
-    DBMeeta db_meta(db_id_str, *kv_instance_);
-    status = db_meta.GetTableID(table_name, table_key, table_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
+    TableMeeta &table_meta = *table_meta_opt;
 
     SegmentID segment_id = 0;
     status = table_meta.GetNextSegmentID(segment_id);
@@ -242,8 +234,8 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta));
     wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(import_command));
     txn_context_ptr_->AddOperation(MakeShared<String>(import_command->ToString()));
-    import_command->db_id_str_ = db_id_str;
-    import_command->table_id_str_ = table_id_str;
+    import_command->db_id_str_ = db_meta->db_id_str();
+    import_command->table_id_str_ = table_meta.table_id_str();
 
     return Status::OK();
 }
@@ -254,23 +246,18 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
 
     auto append_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
 
-    // Get table id
-    String db_id_str;
-    String table_id_str;
-    String db_key, table_key;
-    Status status = this->GetDbID(db_name, db_key, db_id_str);
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt);
     if (!status.ok()) {
         return status;
     }
-    DBMeeta db_meta(db_id_str, *kv_instance_);
-    status = db_meta.GetTableID(table_name, table_key, table_id_str);
-    if (!status.ok()) {
-        return status;
-    }
+    TableMeeta &table_meta = *table_meta_opt;
+
     {
-        append_command->db_id_str_ = db_id_str;
-        append_command->table_id_str_ = table_id_str;
-        table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
+        append_command->db_id_str_ = db_meta->db_id_str();
+        append_command->table_id_str_ = table_meta.table_id_str();
+        table_store = txn_store_.GetNewTxnTableStore1(append_command->db_id_str_, append_command->table_id_str_);
     }
 
     auto wal_command = static_pointer_cast<WalCmd>(append_command);
@@ -278,8 +265,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     txn_context_ptr_->AddOperation(MakeShared<String>(append_command->ToString()));
 
     {
-        TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
-
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs{nullptr};
         {
             auto [col_defs, status] = table_meta.GetColumnDefs();
@@ -320,19 +305,14 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
 
     auto delete_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
     {
-        // Get table id
-        String db_id_str;
-        String table_id_str;
-        String db_key, table_key;
-        Status status = this->GetDbID(db_name, db_key, db_id_str);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta_opt;
+        Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt);
         if (!status.ok()) {
             return status;
         }
-        DBMeeta db_meta(db_id_str, *kv_instance_);
-        status = db_meta.GetTableID(table_name, table_key, table_id_str);
-        if (!status.ok()) {
-            return status;
-        }
+        const String &db_id_str = db_meta->db_id_str();
+        const String &table_id_str = table_meta_opt->table_id_str();
 
         delete_command->db_id_str_ = db_id_str;
         delete_command->table_id_str_ = table_id_str;
@@ -356,21 +336,13 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
 
     this->CheckTxn(db_name);
 
-    // Get table id
-    String db_id_str;
-    String table_id_str;
-    String db_key, table_key;
-    status = this->GetDbID(db_name, db_key, db_id_str);
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt);
     if (!status.ok()) {
         return status;
     }
-    DBMeeta db_meta(db_id_str, *kv_instance_);
-    status = db_meta.GetTableID(table_name, table_key, table_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
+    TableMeeta &table_meta = *table_meta_opt;
 
     SegmentID new_segment_id = 0;
     status = table_meta.GetNextSegmentID(new_segment_id);
@@ -438,8 +410,8 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         auto compact_command = MakeShared<WalCmdCompact>(db_name, table_name, std::move(segment_infos), std::move(deprecated_segment_ids));
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
         txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
-        compact_command->db_id_str_ = db_id_str;
-        compact_command->table_id_str_ = table_id_str;
+        compact_command->db_id_str_ = db_meta->db_id_str();
+        compact_command->table_id_str_ = table_meta.table_id_str();
     }
 
     return Status::OK();
@@ -700,6 +672,9 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     SegmentID unsealed_segment_id = 0;
     status = table_meta.GetUnsealedSegmentID(unsealed_segment_id);
     if (!status.ok()) {
+        if (status.code() != ErrorCode::kNotFound) {
+            return status;
+        }
         SegmentID next_segment_id = 0;
         status = table_meta.GetNextSegmentID(next_segment_id);
         if (!status.ok()) {

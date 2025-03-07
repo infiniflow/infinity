@@ -92,6 +92,10 @@ public:
 
     Status GetTableInfo(TableInfo &table_info);
 
+    Status AddColumn(const ColumnDef &column_def);
+
+    Status DropColumn(const String &column_name);
+
 private:
     Status LoadComment();
 

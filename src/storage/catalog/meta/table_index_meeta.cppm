@@ -19,12 +19,12 @@ export module table_index_meeta;
 import stl;
 import status;
 import column_def;
-import index_base;
 
 namespace infinity {
 
 class KVInstance;
 class TableMeeta;
+class IndexBase;
 
 export class TableIndexMeeta {
 public:
@@ -48,7 +48,7 @@ public:
 
     Status AddSegmentID(SegmentID segment_id);
 
-    Status InitSet(SharedPtr<IndexBase> index_base);
+    Status InitSet(const SharedPtr<IndexBase> &index_base);
 
     Status UninitSet();
 

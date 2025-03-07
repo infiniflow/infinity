@@ -17,11 +17,9 @@ module;
 export module new_catalog;
 
 import stl;
-import table_def;
 import status;
 import meta_info;
 import extra_ddl_info;
-import kv_store;
 import default_values;
 import internal_types;
 import buffer_handle;
@@ -42,6 +40,10 @@ class ChunkIndexMeta;
 class BufferObj;
 class ColumnVector;
 struct MetaKey;
+class KVStore;
+class KVInstance;
+class TableDef;
+class IndexBase;
 
 enum class ColumnVectorTipe;
 
@@ -80,17 +82,17 @@ public:
     ~NewCatalog();
 
 public:
-    // Database related functions
-    Status CreateDatabase(const SharedPtr<String> &db_name,
-                          const SharedPtr<String> &comment,
-                          NewTxn *txn,
-                          ConflictType conflict_type = ConflictType::kError);
+    // // Database related functions
+    // Status CreateDatabase(const SharedPtr<String> &db_name,
+    //                       const SharedPtr<String> &comment,
+    //                       NewTxn *txn,
+    //                       ConflictType conflict_type = ConflictType::kError);
 
-    Status DropDatabase(const SharedPtr<String> &db_name, NewTxn *txn, ConflictType conflict_type = ConflictType::kError);
+    // Status DropDatabase(const SharedPtr<String> &db_name, NewTxn *txn, ConflictType conflict_type = ConflictType::kError);
 
-    bool CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *txn);
+    // bool CheckDatabaseExists(const SharedPtr<String> &db_name, NewTxn *txn);
 
-    Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name, NewTxn *txn);
+    // Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name, NewTxn *txn);
 
     //    void RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id);
     //
@@ -169,9 +171,28 @@ private:
     MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
 
 public:
+    static Status AddNewDB(KVInstance *kv_instance,
+                           const String &db_id_str,
+                           TxnTimeStamp commit_ts,
+                           const String &db_name,
+                           const String *db_comment,
+                           Optional<DBMeeta> &db_meta);
+
     static Status CleanDB(DBMeeta &db_meta);
 
+    static Status AddNewTable(DBMeeta &db_meta,
+                              const String &table_id_str,
+                              TxnTimeStamp commit_ts,
+                              const SharedPtr<TableDef> &table_def,
+                              Optional<TableMeeta> &table_meta);
+
     static Status CleanTable(TableMeeta &table_meta);
+
+    static Status AddNewTableIndex(TableMeeta &table_meta,
+                                   const String &index_id_str,
+                                   TxnTimeStamp commit_ts,
+                                   const SharedPtr<IndexBase> &index_base,
+                                   Optional<TableIndexMeeta> &table_index_meta);
 
     static Status CleanTableIndex(TableIndexMeeta &table_index_meta);
 

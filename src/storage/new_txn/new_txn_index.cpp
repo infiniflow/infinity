@@ -38,7 +38,6 @@ import create_index_info;
 import buffer_obj;
 import mem_index;
 import wal_entry;
-import kv_code;
 import secondary_index_in_mem;
 import secondary_index_data;
 import default_values;
@@ -61,28 +60,14 @@ namespace infinity {
 Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
     Status status;
 
-    String db_id_str;
-    String db_key;
-    status = this->GetDbID(db_name, db_key, db_id_str);
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta);
     if (!status.ok()) {
         return status;
     }
-    DBMeeta db_meta(db_id_str, *kv_instance_);
-    String table_id_str;
-    String table_key;
-    status = db_meta.GetTableID(table_name, table_key, table_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
-    String index_id_str;
-    String index_key;
-    status = table_meta.GetIndexID(index_name, index_key, index_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
-    SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
+    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
 
     ChunkID new_chunk_id = 0;
     {
@@ -104,27 +89,15 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
     Status status;
 
-    String db_id_str;
-    String db_key;
-    status = this->GetDbID(db_name, db_key, db_id_str);
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    Optional<TableIndexMeeta> table_index_meta_opt;
+    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta_opt, table_index_meta_opt);
     if (!status.ok()) {
         return status;
     }
-    DBMeeta db_meta(db_id_str, *kv_instance_);
-    String table_id_str;
-    String table_key;
-    status = db_meta.GetTableID(table_name, table_key, table_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
-    String index_id_str;
-    String index_key;
-    status = table_meta.GetIndexID(index_name, index_key, index_id_str);
-    if (!status.ok()) {
-        return status;
-    }
-    TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+    TableMeeta &table_meta = *table_meta_opt;
+    TableIndexMeeta &table_index_meta = *table_index_meta_opt;
     SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
 
     Vector<ChunkID> *old_chunk_ids_ptr = nullptr;
@@ -293,6 +266,23 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
         txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
     }
+    return Status::OK();
+}
+
+Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector<String> &index_names) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Vector<String> *index_names_ptr = nullptr;
+    status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    index_names = *index_names_ptr;
     return Status::OK();
 }
 
@@ -1154,21 +1144,13 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
         return status;
     }
 
-    // Create index key value pair
-    String index_key = KeyEncode::CatalogIndexKey(db_id_str, table_id_str, index_name, commit_ts);
-    status = kv_instance_->Put(index_key, index_id_str);
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
+    Optional<TableIndexMeeta> table_index_meta_opt;
+    status = NewCatalog::AddNewTableIndex(table_meta, index_id_str, commit_ts, create_index_cmd->index_base_, table_index_meta_opt);
     if (!status.ok()) {
         return status;
     }
-
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
-    TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance_);
-    {
-        Status status = table_index_meta.InitSet(create_index_cmd->index_base_);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    TableIndexMeeta &table_index_meta = *table_index_meta_opt;
     {
         auto [segment_ids_ptr, status] = table_meta.GetSegmentIDs();
         if (!status.ok()) {

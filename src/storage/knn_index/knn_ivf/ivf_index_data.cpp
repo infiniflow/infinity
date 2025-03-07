@@ -42,6 +42,7 @@ import column_meta;
 import block_meta;
 import segment_meta;
 import new_catalog;
+import kv_store;
 
 namespace infinity {
 

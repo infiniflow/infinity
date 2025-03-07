@@ -83,6 +83,7 @@ class TableMeeta;
 class ChunkIndexMeta;
 class SegmentIndexMeta;
 class TableIndexMeeta;
+class DBMeeta;
 struct MemIndex;
 
 struct NewTxnCompactState;
@@ -155,13 +156,11 @@ public:
 
     Tuple<DBEntry *, Status> GetDatabase(const String &db_name);
 
-    bool CheckDatabaseExists(const String &db_name);
+    // bool CheckDatabaseExists(const String &db_name);
 
     Tuple<SharedPtr<DatabaseInfo>, Status> GetDatabaseInfo(const String &db_name);
 
-    Vector<String> ListDatabase();
-
-    Vector<DatabaseDetail> ListDatabases();
+    Status ListDatabase(Vector<String> &db_names);
 
     // Table and Collection OPs
     Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array);
@@ -188,7 +187,9 @@ public:
 
     Status UnlockTable(const String &db_name, const String &table_name);
 
-    Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
+    Status ListTable(const String &db_name, Vector<String> &table_names);
+
+    // Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
 
@@ -207,6 +208,8 @@ public:
     Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
+    Status ListIndex(const String &db_name, const String &table_name, Vector<String> &index_names);
 
     // // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
     // // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
@@ -256,7 +259,8 @@ public:
 
     Status Compact(const String &db_name, const String &table_name);
 
-    // Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
+    // Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType
+    // type);
 
     // Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
 
@@ -330,7 +334,26 @@ private:
     void CheckTxn(const String &db_name);
 
 public:
-    Status GetDbID(const String &db_name, String &db_key, String &db_id);
+    Status GetDBMeta(const String &db_name, Optional<DBMeeta> &db_meta, String *db_key = nullptr);
+
+    Status GetTableMeta(const String &db_name,
+                        const String &table_name,
+                        Optional<DBMeeta> &db_meta,
+                        Optional<TableMeeta> &table_meta,
+                        String *table_key = nullptr);
+
+    Status GetTableMeta(const String &table_name, DBMeeta &db_meta, Optional<TableMeeta> &table_meta, String *table_key = nullptr);
+
+    Status GetTableIndexMeta(const String &db_name,
+                             const String &table_name,
+                             const String &index_name,
+                             Optional<DBMeeta> &db_meta,
+                             Optional<TableMeeta> &table_meta,
+                             Optional<TableIndexMeeta> &table_index_meta,
+                             String *index_key = nullptr);
+
+    Status
+    GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Optional<TableIndexMeeta> &table_index_meta, String *index_key = nullptr);
 
 private:
     friend struct NewTxnCompactState;
