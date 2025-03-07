@@ -166,8 +166,6 @@ public:
     // Table and Collection OPs
     Status GetTables(const String &db_name, Vector<TableDetail> &output_table_array);
 
-    bool CheckTableExists(const String &db_name, const String &table_name);
-
     Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
     Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);
@@ -186,8 +184,6 @@ public:
 
     Status RenameTable(const String &db_name, const String &old_table_name, const String &new_table_name);
 
-    Status ListTable(const String &db_name, Vector<String> &table_list);
-
     Status LockTable(const String &db_name, const String &table_name);
 
     Status UnlockTable(const String &db_name, const String &table_name);
@@ -203,48 +199,37 @@ public:
     Status ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_snapshot_info);
 
     // Index OPs
-    bool GetIndexKey(const String &db_name,
-                     const String &table_name,
-                     const String &index_name,
-                     String &index_key,
-                     String &index_id,
-                     String &table_id,
-                     String &db_id);
 
     Status CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
 
     Status DropIndexByName(const String &db_name, const String &table_name, const String &index_name, ConflictType conflict_type);
 
-    Status ListIndex(const String &db_name, const String &table_name, Vector<String> &index_list);
-
-    Status GetIndexDefByName(const String &db_name, const String &table_name, const String &index_name, SharedPtr<IndexBase> &index_base);
-
     Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
-    // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
-    // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
-    // operator. (called by `PhysicalCreateIndexDo`)
-    Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
+    // // If `prepare` is false, the index will be created in single thread. (called by `FsPhysicalCreateIndex`)
+    // // Else, only data is stored in index (Called by `PhysicalCreateIndexPrepare`). And the index will be created by multiple threads in next
+    // // operator. (called by `PhysicalCreateIndexDo`)
+    // Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
 
-    Tuple<TableIndexEntry *, Status> GetIndexByName(const String &db_name, const String &table_name, const String &index_name);
+    // Tuple<TableIndexEntry *, Status> GetIndexByName(const String &db_name, const String &table_name, const String &index_name);
 
-    Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name);
+    // Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name);
 
-    Pair<Vector<SegmentIndexEntry *>, Status>
-    CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
+    // Pair<Vector<SegmentIndexEntry *>, Status>
+    // CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
 
-    Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
+    // Status CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
-    Status CreateIndexDo(TableEntry *table_entry,
-                         const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
-                         const String &index_name,
-                         HashMap<SegmentID, atomic_u64> &create_index_idxes);
+    // Status CreateIndexDo(TableEntry *table_entry,
+    //                      const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
+    //                      const String &index_name,
+    //                      HashMap<SegmentID, atomic_u64> &create_index_idxes);
 
-    Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
+    // Status CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &indef);
 
-    Status CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry);
+    // Status CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry);
 
     // View Ops
     // Fixme: view definition should be given
@@ -257,23 +242,23 @@ public:
     Status GetViews(const String &db_name, Vector<ViewDetail> &output_view_array);
 
     // DML
-    Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
+    // Status Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry);
 
     Status Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks);
 
-    Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
+    // Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
 
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
-    Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
+    // Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
 
     Status Compact(const String &db_name, const String &table_name);
 
-    Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
+    // Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
-    Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
+    // Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
@@ -347,18 +332,8 @@ private:
 public:
     Status GetDbID(const String &db_name, String &db_key, String &db_id);
 
-    Status GetIndexID(const String &db_name,
-                      const String &table_name,
-                      const String &index_name,
-                      String &index_key,
-                      String &index_id,
-                      String &table_id,
-                      String &db_id);
-
 private:
     friend struct NewTxnCompactState;
-
-    Status GetColumnDefs(const String &db_id, const String &table_id, Vector<SharedPtr<ColumnDef>> &column_defs);
 
     // DML
 

@@ -960,11 +960,18 @@ TEST_P(NewCatalogTest, table_test1) {
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
 
         // - list tables
-        Vector<String> tables;
-        status = txn3->ListTable(*db_name, tables);
+        String db_id_str;
+        String db_key;
+        status = txn3->GetDbID(*db_name, db_key, db_id_str);
+        EXPECT_TRUE(status.ok());
+        DBMeeta db_meta(db_id_str, *txn3->kv_instance());
+
+        Vector<String> *table_id_strs = nullptr;
+        Vector<String> *table_names = nullptr;
+        status = db_meta.GetTableIDs(table_id_strs, &table_names);
         EXPECT_TRUE(status.ok());
 
-        for (const auto &table_name : tables) {
+        for (const auto &table_name : *table_names) {
             std::cout << String("Table name: ") << table_name << std::endl;
             auto [table_info, table_status] = txn3->GetTableInfo(*db_name, table_name);
             std::cout << *table_info->table_name_ << std::endl;
@@ -1302,11 +1309,11 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
         EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         // drop database
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1330,14 +1337,14 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
 
-        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         // drop database
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1358,8 +1365,8 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         // create table
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
-        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
+        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
+        EXPECT_FALSE(status.ok());
 
         status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -1367,8 +1374,8 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         // drop database
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1393,11 +1400,11 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
 
-        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
         EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
@@ -1421,14 +1428,14 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         // create table
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
-        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
+        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
+        EXPECT_FALSE(status.ok());
 
         status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
@@ -1452,11 +1459,11 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         // create table
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
 
-        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
+        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
         EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -1486,11 +1493,11 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
 
-        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
         EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
@@ -1514,14 +1521,14 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
-        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
+        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
+        EXPECT_FALSE(status.ok());
 
         status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
@@ -1551,11 +1558,11 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
-
-        status = new_txn_mgr->CommitTxn(txn2);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
         EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         // drop database
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1579,14 +1586,14 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
 
-        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         // drop database
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -1607,8 +1614,8 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         // create db1
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
-        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
-        EXPECT_TRUE(status.ok());
+        Status status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kError);
+        EXPECT_FALSE(status.ok());
 
         status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -1616,8 +1623,8 @@ TEST_P(NewCatalogTest, createdb_createtable_test) {
         status = new_txn_mgr->CommitTxn(txn1);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         // drop database
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -3575,20 +3582,51 @@ TEST_P(NewCatalogTest, index_test1) {
         // get index def
         auto *txn3_1 = new_txn_mgr->BeginTxn(MakeUnique<String>("get index"), TransactionType::kNormal);
         SharedPtr<IndexBase> index_def1;
-        Status status = txn3_1->GetIndexDefByName(*db_name, *table_name, *index_name, index_def1);
+
+        String db_id_str;
+        String table_id_str;
+        String index_id_str;
+
+        String db_key, table_key, index_key;
+        Status status = txn3_1->GetDbID(*db_name, db_key, db_id_str);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn3_1);
+        DBMeeta db_meta(db_id_str, *txn3_1->kv_instance());
+
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
+
+        status = table_meta.GetIndexID(*index_name, index_key, index_id_str);
+        EXPECT_TRUE(status.ok());
+        TableIndexMeeta index_meta(index_id_str, table_meta, table_meta.kv_instance());
+
+        std::tie(index_def1, status) = index_meta.GetIndexBase();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*index_def1, *index_base);
     }
     {
         // list and drop index
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        Vector<String> indexes;
-        Status status = txn4->ListIndex(*db_name, *table_name, indexes);
+
+        String db_id_str;
+        String table_id_str;
+
+        String db_key, table_key, index_key;
+        Status status = txn4->GetDbID(*db_name, db_key, db_id_str);
+        EXPECT_TRUE(status.ok());
+        DBMeeta db_meta(db_id_str, *txn4->kv_instance());
+
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
+
+        Vector<String> *index_id_strs = nullptr;
+        Vector<String> *index_names = nullptr;
+
+        status = table_meta.GetIndexIDs(index_id_strs, &index_names);
         EXPECT_TRUE(status.ok());
 
-        for (const auto &index_name : indexes) {
+        for (const auto &index_name : *index_names) {
             std::cout << String("Index name: ") << index_name << std::endl;
         }
 
@@ -7380,13 +7418,20 @@ TEST_P(NewCatalogTest, test_append_with_index) {
 
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
-        String index_key;
-        String index_id_str;
-        String table_id_str;
         String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
+        String db_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
         EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        String table_id_str;
+        String table_key;
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
+        String index_id_str;
+        String index_key;
+        status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+        EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
         {
@@ -7397,8 +7442,8 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             EXPECT_EQ(segment_id, 0);
         }
 
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
 
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
@@ -7492,17 +7537,25 @@ TEST_P(NewCatalogTest, test_append_with_index) {
     };
     auto check_index2 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check merged index {}", index_name)), TransactionType::kNormal);
-        String index_key;
-        String index_id_str;
-        String table_id_str;
-        String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
-        EXPECT_TRUE(status.ok());
-        SegmentID segment_id = 0;
 
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
+        String db_id_str;
+        String db_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
+        EXPECT_TRUE(status.ok());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        String table_id_str;
+        String table_key;
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
+        String index_id_str;
+        String index_key;
+        status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
 
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
@@ -7764,13 +7817,21 @@ TEST_P(NewCatalogTest, test_populate_index) {
 
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
-        String index_key;
-        String index_id_str;
-        String table_id_str;
+
         String db_id_str;
-        Status status = txn->GetIndexID(*db_name, *table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
+        String db_key;
+        Status status = txn->GetDbID(*db_name, db_key, db_id_str);
         EXPECT_TRUE(status.ok());
-        TableMeeta table_meta(db_id_str, table_id_str, *txn->kv_instance());
+        DBMeeta db_meta(db_id_str, *txn->kv_instance());
+        String table_id_str;
+        String table_key;
+        status = db_meta.GetTableID(*table_name, table_key, table_id_str);
+        EXPECT_TRUE(status.ok());
+        TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
+        String index_id_str;
+        String index_key;
+        status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+        EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
         {
@@ -7781,8 +7842,8 @@ TEST_P(NewCatalogTest, test_populate_index) {
             EXPECT_EQ(segment_id, 0);
         }
 
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, *txn->kv_instance());
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *txn->kv_instance());
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
 
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);

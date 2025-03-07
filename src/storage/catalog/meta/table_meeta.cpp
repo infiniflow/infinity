@@ -26,6 +26,7 @@ import third_party;
 import default_values;
 import logger;
 import table_def;
+import infinity_exception;
 
 namespace infinity {
 
@@ -43,6 +44,40 @@ Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **
     if (index_names) {
         *index_names = &index_names_.value();
     }
+    return Status::OK();
+}
+
+Status TableMeeta::GetIndexID(const String &index_name, String &index_key, String &index_id_str) {
+    String index_key_prefix = KeyEncode::CatalogIndexPrefix(db_id_str_, table_id_str_, index_name);
+    auto iter2 = kv_instance_.GetIterator();
+    iter2->Seek(index_key_prefix);
+    SizeT found_count = 0;
+
+    Vector<String> error_index_keys;
+    while (iter2->Valid() && iter2->Key().starts_with(index_key_prefix)) {
+        index_key = iter2->Key().ToString();
+        index_id_str = iter2->Value().ToString();
+        if (found_count > 0) {
+            // Error branch
+            error_index_keys.push_back(index_key);
+        }
+        iter2->Next();
+        ++found_count;
+    }
+
+    if (found_count == 0) {
+        return Status::IndexNotExist(index_name);
+    }
+
+    if (!error_index_keys.empty()) {
+        // join error_index_keys
+        String error_index_keys_str =
+            std::accumulate(std::next(error_index_keys.begin()), error_index_keys.end(), error_index_keys.front(), [](String a, String b) {
+                return std::move(a) + ", " + std::move(b);
+            });
+        UnrecoverableError(fmt::format("Found multiple index keys: {}", error_index_keys_str));
+    }
+
     return Status::OK();
 }
 

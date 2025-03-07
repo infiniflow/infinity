@@ -36,6 +36,8 @@ public:
 
     Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
 
+    Status GetIndexID(const String &index_name, String &index_key, String &index_id_str);
+
     Status InitSet(SharedPtr<TableDef> table_def);
 
     Status UninitSet();

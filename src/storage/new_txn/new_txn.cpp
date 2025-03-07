@@ -138,86 +138,6 @@ NewTxn::~NewTxn() {
 #endif
 }
 
-// DML
-Status NewTxn::Import(TableEntry *table_entry, SharedPtr<SegmentEntry> segment_entry) {
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
-
-    this->CheckTxn(db_name);
-
-    // build WalCmd
-    WalSegmentInfo segment_info(segment_entry.get());
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdImport>(db_name, table_name, std::move(segment_info));
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
-    table_store->Import(std::move(segment_entry), nullptr);
-
-    return Status::OK();
-}
-
-Status NewTxn::Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block) {
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
-
-    this->CheckTxn(db_name);
-    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-    auto [err_msg, append_status] = table_store->Append(input_block);
-    return append_status;
-}
-
-Status NewTxn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict) {
-    const String &db_name = *table_entry->GetDBName();
-    const String &table_name = *table_entry->GetTableName();
-
-    this->CheckTxn(db_name);
-
-    if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_context_ptr_->txn_id_)) {
-        String log_msg = fmt::format("Rollback delete in table {} due to conflict.", table_name);
-        RecoverableError(Status::TxnRollback(TxnID(), log_msg));
-    }
-
-    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-    auto [err_msg, delete_status] = table_store->Delete(row_ids);
-    return delete_status;
-}
-
-Status
-NewTxn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type) {
-    const String &table_name = *table_entry->GetTableName();
-    NewTxnTableStore *table_store = this->GetNewTxnTableStore(table_name);
-
-    auto [err_mgs, compact_status] = table_store->Compact(std::move(segment_data), type);
-    return compact_status;
-}
-
-Status NewTxn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
-    TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
-    const String &table_name = *table_entry->GetTableName();
-    //    NewTxnTableStore *txn_table_store = this->GetNewTxnTableStore(table_name);
-
-    const String &index_name = *table_index_entry->GetIndexName();
-    // FIXME: adapt nullptr
-    table_index_entry->OptIndex(nullptr, init_params, false /*replay*/);
-
-    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimize>(db_name_, table_name, index_name, std::move(init_params));
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-    return Status::OK();
-}
-
 NewTxnTableStore *NewTxn::GetNewTxnTableStore(const String &table_name) { return txn_store_.GetNewTxnTableStore(table_name); }
 
 NewTxnTableStore *NewTxn::GetExistNewTxnTableStore(TableEntry *table_entry) const { return txn_store_.GetExistNewTxnTableStore(table_entry); }
@@ -385,25 +305,6 @@ Status NewTxn::GetTables(const String &db_name, Vector<TableDetail> &output_tabl
     return catalog_->GetTables(db_name, output_table_array, nullptr);
 }
 
-bool NewTxn::CheckTableExists(const String &db_name, const String &table_name) {
-    String table_id;
-    String db_id;
-    String db_key, table_key;
-    Status status = this->GetDbID(db_name, db_key, db_id);
-    if (status.ok()) {
-        DBMeeta db_meta(db_id, *kv_instance_);
-        status = db_meta.GetTableID(table_name, table_key, table_id);
-    }
-
-    if (!status.ok()) {
-        if (status.code() != ErrorCode::kDBNotExist && status.code() != ErrorCode::kTableNotExist) {
-            UnrecoverableError(status.message());
-        }
-        return false;
-    }
-    return true;
-}
-
 Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type) {
 
     if (conflict_type == ConflictType::kReplace) {
@@ -416,13 +317,21 @@ Status NewTxn::CreateTable(const String &db_name, const SharedPtr<TableDef> &tab
 
     this->CheckTxn(db_name);
 
-    bool table_exist = this->CheckTableExists(db_name, *table_def->table_name());
-    if (table_exist and conflict_type == ConflictType::kError) {
-        return Status(ErrorCode::kDuplicateTableName, MakeUnique<String>(fmt::format("Table: {} already exists", *table_def->table_name())));
+    String table_id;
+    String db_id;
+    String db_key, table_key;
+    Status status = this->GetDbID(db_name, db_key, db_id);
+    if (!status.ok()) {
+        return status;
     }
+    DBMeeta db_meta(db_id, *kv_instance_);
+    status = db_meta.GetTableID(*table_def->table_name(), table_key, table_id);
 
-    if (table_exist and conflict_type == ConflictType::kIgnore) {
-        return Status::OK();
+    if (status.ok()) {
+        if (conflict_type == ConflictType::kIgnore) {
+            return Status::OK();
+        }
+        return Status(ErrorCode::kDuplicateTableName, MakeUnique<String>(fmt::format("Table: {} already exists", *table_def->table_name())));
     }
 
     SharedPtr<String> local_table_dir = DetermineRandomPath(*table_def->table_name());
@@ -606,25 +515,22 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
 
     this->CheckTxnStatus();
 
-    bool table_exist = this->CheckTableExists(db_name, table_name);
-    if (!table_exist and conflict_type == ConflictType::kError) {
-        return Status::TableNotExist(table_name);
-    }
-
-    if (!table_exist and conflict_type == ConflictType::kIgnore) {
-        return Status::OK();
-    }
-
-    String db_id_str;
     String table_id_str;
+    String db_id_str;
     String db_key, table_key;
     Status status = this->GetDbID(db_name, db_key, db_id_str);
     if (!status.ok()) {
+        if (conflict_type == ConflictType::kIgnore) {
+            return Status::OK();
+        }
         return status;
     }
     DBMeeta db_meta(db_id_str, *kv_instance_);
     status = db_meta.GetTableID(table_name, table_key, table_id_str);
     if (!status.ok()) {
+        if (conflict_type == ConflictType::kIgnore) {
+            return Status::OK();
+        }
         return status;
     }
 
@@ -649,14 +555,26 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     this->CheckTxnStatus();
     this->CheckTxn(db_name);
 
-    bool table_exist = this->CheckTableExists(db_name, new_table_name);
-    if (table_exist) {
-        return Status(ErrorCode::kDuplicateTableName, MakeUnique<String>(fmt::format("Table: {} already exists", new_table_name)));
+    String db_id_str, db_key;
+    {
+        String table_id;
+        String table_key;
+        Status status = this->GetDbID(db_name, db_key, db_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+        DBMeeta db_meta(db_id_str, *kv_instance_);
+        status = db_meta.GetTableID(new_table_name, table_key, table_id);
+
+        if (status.ok()) {
+            return Status(ErrorCode::kDuplicateTableName, MakeUnique<String>(fmt::format("Table: {} already exists", new_table_name)));
+        } else if (status.code() != ErrorCode::kTableNotExist) {
+            return status;
+        }
     }
 
-    String db_id_str;
     String table_id_str;
-    String db_key, table_key;
+    String table_key;
     Status status = this->GetDbID(db_name, db_key, db_id_str);
     if (!status.ok()) {
         return status;
@@ -680,29 +598,6 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
     LOG_TRACE(fmt::format("NewTxn::Rename table from {}.{} to {}.{}.", db_name, old_table_name, db_name, new_table_name));
-    return Status::OK();
-}
-
-Status NewTxn::ListTable(const String &db_name, Vector<String> &table_list) {
-    this->CheckTxnStatus();
-
-    String db_key;
-    String db_id;
-    Status status = GetDbID(db_name, db_key, db_id);
-    if (!status.ok()) {
-        return status;
-    }
-
-    String db_table_prefix = KeyEncode::CatalogDbTablePrefix(db_id);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(db_table_prefix);
-    while (iter2->Valid() && iter2->Key().starts_with(db_table_prefix)) {
-        String key_str = iter2->Key().ToString();
-        size_t start = db_table_prefix.size();
-        size_t end = key_str.find('|', start);
-        table_list.emplace_back(key_str.substr(start, end - start));
-        iter2->Next();
-    }
     return Status::OK();
 }
 
@@ -758,23 +653,6 @@ Status NewTxn::UnlockTable(const String &db_name, const String &table_name) {
 
 // Index OPs
 
-bool NewTxn::GetIndexKey(const String &db_name,
-                         const String &table_name,
-                         const String &index_name,
-                         String &index_key,
-                         String &index_id,
-                         String &table_id,
-                         String &db_id) {
-    Status status = GetIndexID(db_name, table_name, index_name, index_key, index_id, table_id, db_id);
-    if (!status.ok()) {
-        if (status.code() != ErrorCode::kDBNotExist && status.code() != ErrorCode::kTableNotExist && status.code() != ErrorCode::kIndexNotExist) {
-            UnrecoverableError(status.message());
-        }
-        return false;
-    }
-    return true;
-}
-
 Status NewTxn::CreateIndex(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
     if (conflict_type == ConflictType::kReplace) {
         return Status::NotSupport("ConflictType::kReplace");
@@ -785,16 +663,28 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
 
     this->CheckTxn(db_name);
 
-    String index_key;
+    String db_key, table_key, index_key;
     String index_id;
     String table_id;
     String db_id;
-    bool index_exist = this->GetIndexKey(db_name, table_name, *index_base->index_name_, index_key, index_id, table_id, db_id);
-    if (index_exist && conflict_type == ConflictType::kError) {
-        return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
+    Status status = this->GetDbID(db_name, db_key, db_id);
+    if (!status.ok()) {
+        return status;
     }
-    if (index_exist && conflict_type == ConflictType::kIgnore) {
-        return Status::OK();
+    DBMeeta db_meta(db_id, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id);
+    if (!status.ok()) {
+        return status;
+    }
+    TableMeeta table_meta(db_id, table_id, *kv_instance_);
+    status = table_meta.GetIndexID(*index_base->index_name_, index_key, index_id);
+    if (status.ok()) {
+        if (conflict_type == ConflictType::kIgnore) {
+            return Status::OK();
+        }
+        return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
+    } else if (status.code() != ErrorCode::kIndexNotExist) {
+        return status;
     }
 
     SharedPtr<WalCmdCreateIndex> wal_command = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_base);
@@ -817,17 +707,32 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
 
     this->CheckTxnStatus();
 
-    String index_key;
+    String db_key, table_key, index_key;
     String index_id;
     String table_id;
     String db_id;
-    bool index_exist = this->GetIndexKey(db_name, table_name, index_name, index_key, index_id, table_id, db_id);
-    if (!index_exist && conflict_type == ConflictType::kError) {
-        return Status::IndexNotExist(index_name);
+    Status status = this->GetDbID(db_name, db_key, db_id);
+    if (!status.ok()) {
+        if (conflict_type == ConflictType::kIgnore) {
+            return Status::OK();
+        }
+        return status;
     }
-
-    if (!index_exist && conflict_type == ConflictType::kIgnore) {
-        return Status::OK();
+    DBMeeta db_meta(db_id, *kv_instance_);
+    status = db_meta.GetTableID(table_name, table_key, table_id);
+    if (!status.ok()) {
+        if (conflict_type == ConflictType::kIgnore) {
+            return Status::OK();
+        }
+        return status;
+    }
+    TableMeeta table_meta(db_id, table_id, *kv_instance_);
+    status = table_meta.GetIndexID(index_name, index_key, index_id);
+    if (!status.ok()) {
+        if (conflict_type == ConflictType::kIgnore) {
+            return Status::OK();
+        }
+        return status;
     }
 
     SharedPtr<WalCmdDropIndex> wal_command = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
@@ -840,169 +745,6 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
 
     LOG_TRACE(fmt::format("NewTxn::DropIndexByName dropped index: {}.{}.{}", db_name, table_name, index_name));
     return Status::OK();
-}
-
-Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector<String> &index_list) {
-    this->CheckTxnStatus();
-
-    String table_id;
-    String db_id;
-    String db_key, table_key;
-    Status status = this->GetDbID(db_name, db_key, db_id);
-    if (!status.ok()) {
-        return status;
-    }
-    DBMeeta db_meta(db_id, *kv_instance_);
-    status = db_meta.GetTableID(table_name, table_key, table_id);
-    if (!status.ok()) {
-        return status;
-    }
-
-    String table_index_prefix = KeyEncode::CatalogTableIndexPrefix(db_id, table_id);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(table_index_prefix);
-    while (iter2->Valid() && iter2->Key().starts_with(table_index_prefix)) {
-        String key_str = iter2->Key().ToString();
-        size_t start = table_index_prefix.size();
-        size_t end = key_str.find('|', start);
-        index_list.emplace_back(key_str.substr(start, end - start));
-        iter2->Next();
-    }
-    return Status::OK();
-}
-
-Status NewTxn::GetIndexDefByName(const String &db_name, const String &table_name, const String &index_name, SharedPtr<IndexBase> &index_base) {
-    this->CheckTxnStatus();
-
-    String index_key;
-    String index_id;
-    String table_id;
-    String db_id;
-    Status status = GetIndexID(db_name, table_name, index_name, index_key, index_id, table_id, db_id);
-    if (!status.ok()) {
-        return status;
-    }
-
-    String index_def_key = KeyEncode::CatalogIndexTagKey(db_id, table_id, index_id, "index_base");
-    String index_def_str;
-    status = kv_instance_->Get(index_def_key, index_def_str);
-    if (!status.ok()) {
-        return status;
-    }
-    nlohmann::json index_def_json = nlohmann::json::parse(index_def_str);
-    index_base = IndexBase::Deserialize(index_def_json);
-
-    return Status::OK();
-}
-
-Tuple<TableIndexEntry *, Status> NewTxn::CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type) {
-    TxnTimeStamp begin_ts = this->BeginTS();
-
-    auto [table_index_entry, index_status] =
-        catalog_->CreateIndex(table_entry, index_base, conflict_type, txn_context_ptr_->txn_id_, begin_ts, nullptr);
-    if (table_index_entry == nullptr) { // nullptr means some exception happened
-        return {nullptr, index_status};
-    }
-
-    const String &table_name = *table_entry->GetTableName();
-    auto *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
-    txn_table_store->AddIndexStore(table_index_entry);
-
-    String index_dir_tail = table_index_entry->GetPathNameTail();
-
-    SharedPtr<WalCmd> wal_command =
-        MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(index_dir_tail), index_base);
-    wal_entry_->cmds_.push_back(wal_command);
-    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-    return {table_index_entry, index_status};
-}
-
-Tuple<TableIndexEntry *, Status> NewTxn::GetIndexByName(const String &db_name, const String &table_name, const String &index_name) {
-    this->CheckTxn(db_name);
-
-    TxnTimeStamp begin_ts = this->BeginTS();
-    return catalog_->GetIndexByName(db_name, table_name, index_name, txn_context_ptr_->txn_id_, begin_ts);
-}
-
-Tuple<SharedPtr<TableIndexInfo>, Status> NewTxn::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name) {
-    auto [table_entry, table_status] = this->GetTableByName(db_name, table_name);
-    if (!table_status.ok()) {
-        return {nullptr, table_status};
-    }
-    return table_entry->GetTableIndexInfo(index_name, nullptr);
-}
-
-Pair<Vector<SegmentIndexEntry *>, Status>
-NewTxn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts) {
-    auto [segment_index_entries, status] = table_index_entry->CreateIndexPrepare(table_ref, nullptr, prepare, false, check_ts);
-    if (!status.ok()) {
-        return {segment_index_entries, status};
-    }
-
-    return {segment_index_entries, Status::OK()};
-}
-
-// TODO: use table ref instead of table entry
-Status NewTxn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
-    auto [table_entry, table_status] = this->GetTableByName(*table_ref->table_info_->db_name_, *table_ref->table_info_->table_name_);
-    if (!table_status.ok()) {
-        return table_status;
-    }
-
-    const auto &db_name = *table_entry->GetDBName();
-    const auto &table_name = *table_entry->GetTableName();
-
-    auto [table_index_entry, index_status] = this->GetIndexByName(db_name, table_name, index_name);
-    if (!index_status.ok()) {
-        return index_status;
-    }
-
-    return table_index_entry->CreateIndexDo(table_ref, create_index_idxes, nullptr);
-}
-
-Status NewTxn::CreateIndexDo(TableEntry *table_entry,
-                             const Map<SegmentID, SegmentIndexEntry *> &segment_index_entries,
-                             const String &index_name,
-                             HashMap<SegmentID, atomic_u64> &create_index_idxes) {
-    // auto *table_entry = table_ref->table_entry_ptr_;
-    const auto &db_name = *table_entry->GetDBName();
-    const auto &table_name = *table_entry->GetTableName();
-
-    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
-    if (!status.ok()) {
-        return status;
-    }
-
-    return table_index_entry->CreateIndexDo(segment_index_entries, create_index_idxes, nullptr);
-}
-
-Status NewTxn::CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry) {
-    // String index_dir_tail = table_index_entry->GetPathNameTail();
-    // auto index_base = table_index_entry->table_index_def();
-    // wal_entry_->cmds_.push_back(
-    //     MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(index_dir_tail), index_base));
-    return Status::OK();
-}
-
-Status NewTxn::CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base) {
-    // this->CheckTxn(db_name);
-
-    // auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, *index_base->index_name_);
-    // if (!status.ok()) {
-    //     return status;
-    // }
-    // String index_dir_tail = table_index_entry->GetPathNameTail();
-    // this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, std::move(index_dir_tail), index_base));
-    return Status::OK();
-}
-
-Tuple<TableEntry *, Status> NewTxn::GetTableByName(const String &db_name, const String &table_name) {
-    this->CheckTxn(db_name);
-
-    TxnTimeStamp begin_ts = this->BeginTS();
-
-    return catalog_->GetTableByName(db_name, table_name, txn_context_ptr_->txn_id_, begin_ts);
 }
 
 Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, const String &table_name) {
@@ -1383,75 +1125,6 @@ Status NewTxn::GetDbID(const String &db_name, String &db_key, String &db_id) {
         UnrecoverableError(fmt::format("Found multiple database keys: {}", error_db_keys_str));
     }
 
-    return Status::OK();
-}
-
-Status NewTxn::GetIndexID(const String &db_name,
-                          const String &table_name,
-                          const String &index_name,
-                          String &index_key,
-                          String &index_id,
-                          String &table_id,
-                          String &db_id) {
-    Status status;
-
-    String db_key;
-    status = this->GetDbID(db_name, db_key, db_id);
-    if (!status.ok()) {
-        return status;
-    }
-    String table_key;
-    DBMeeta db_meta(db_id, *kv_instance_);
-    status = db_meta.GetTableID(table_name, table_key, table_id);
-    if (!status.ok()) {
-        return status;
-    }
-
-    String index_key_prefix = KeyEncode::CatalogIndexPrefix(db_id, table_id, index_name);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(index_key_prefix);
-    SizeT found_count = 0;
-
-    Vector<String> error_index_keys;
-    while (iter2->Valid() && iter2->Key().starts_with(index_key_prefix)) {
-        index_key = iter2->Key().ToString();
-        index_id = iter2->Value().ToString();
-        if (found_count > 0) {
-            // Error branch
-            error_index_keys.push_back(index_key);
-        }
-        iter2->Next();
-        ++found_count;
-    }
-
-    if (found_count == 0) {
-        return Status::IndexNotExist(index_name);
-    }
-
-    if (!error_index_keys.empty()) {
-        // join error_index_keys
-        String error_index_keys_str =
-            std::accumulate(std::next(error_index_keys.begin()), error_index_keys.end(), error_index_keys.front(), [](String a, String b) {
-                return std::move(a) + ", " + std::move(b);
-            });
-        UnrecoverableError(fmt::format("Found multiple index keys: {}", error_index_keys_str));
-    }
-
-    return Status::OK();
-}
-
-Status NewTxn::GetColumnDefs(const String &db_id, const String &table_id, Vector<SharedPtr<ColumnDef>> &column_defs) {
-    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id, table_id);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(table_column_prefix);
-    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
-        String column_key = iter2->Key().ToString();
-        String column_value = iter2->Value().ToString();
-        [[maybe_unused]] String column_name = column_key.substr(column_key.find_last_of('|') + 1);
-        auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value));
-        column_defs.emplace_back(column_def);
-        iter2->Next();
-    }
     return Status::OK();
 }
 
@@ -1973,7 +1646,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
     for (auto &meta : metas) {
         switch (meta->type_) {
             case MetaKey::Type::kDB: {
-                [[maybe_unused]] auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
+                auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
                 DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
                 Status status = NewCatalog::CleanDB(db_meta);
                 if (!status.ok()) {

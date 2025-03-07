@@ -22,6 +22,7 @@ module new_txn;
 import chunk_index_meta;
 import segment_index_meta;
 import table_index_meeta;
+import db_meeta;
 import table_meeta;
 import segment_meta;
 import block_meta;
@@ -58,18 +59,28 @@ import meta_key;
 namespace infinity {
 
 Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+    Status status;
+
     String db_id_str;
+    String db_key;
+    status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
     String table_id_str;
+    String table_key;
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
     String index_id_str;
     String index_key;
-    {
-        Status status = this->GetIndexID(db_name, table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
-        if (!status.ok()) {
-            return status;
-        }
+    status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+    if (!status.ok()) {
+        return status;
     }
-
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
     TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
     SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
 
@@ -91,18 +102,28 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 }
 
 Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+    Status status;
+
     String db_id_str;
+    String db_key;
+    status = this->GetDbID(db_name, db_key, db_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    DBMeeta db_meta(db_id_str, *kv_instance_);
     String table_id_str;
+    String table_key;
+    status = db_meta.GetTableID(table_name, table_key, table_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    TableMeeta table_meta(db_id_str, table_id_str, db_meta.kv_instance());
     String index_id_str;
     String index_key;
-    {
-        Status status = this->GetIndexID(db_name, table_name, index_name, index_key, index_id_str, table_id_str, db_id_str);
-        if (!status.ok()) {
-            return status;
-        }
+    status = table_meta.GetIndexID(index_name, index_key, index_id_str);
+    if (!status.ok()) {
+        return status;
     }
-
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
     TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
     SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
 
