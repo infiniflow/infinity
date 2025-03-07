@@ -387,16 +387,12 @@ Optional<String> TxnTableStore::CheckConflict(const TxnTableStore *other_table_s
         }
         for (const auto &index_entry : std::views::keys(txn_indexes_)) {
             if (const auto &index_name = *index_entry->GetIndexName(); other_txn_indexes_set.contains(index_name)) {
-                return fmt::format("{}: txn_indexes_ containing Index {} conflict with other_table_store->txn_indexes_",
-                                   __func__,
-                                   index_name);
+                return fmt::format("{}: txn_indexes_ containing Index {} conflict with other_table_store->txn_indexes_", __func__, index_name);
             }
         }
         for (const auto &[index_name, index_store] : txn_indexes_store_) {
             if (other_txn_indexes_set.contains(index_name)) {
-                return fmt::format("{}: txn_indexes_store_ containing Index {} conflict with other_table_store->txn_indexes_",
-                                   __func__,
-                                   index_name);
+                return fmt::format("{}: txn_indexes_store_ containing Index {} conflict with other_table_store->txn_indexes_", __func__, index_name);
             }
             if (const auto iter = other_txn_indexes_store_map.find(index_name); iter != other_txn_indexes_store_map.end()) {
                 for (const auto &other_segment_set = iter->second; const auto segment_id : std::views::keys(index_store->index_entry_map_)) {
@@ -626,6 +622,12 @@ void TxnStore::DropTableStore(TableEntry *dropped_table_entry) {
     }
 }
 
+void TxnStore::AddTableToRestore(TableEntry *table_entry) { to_restore_tables_.emplace_back(table_entry); }
+
+void TxnStore::AddTableIndexToRestore(TableIndexEntry *table_index_entry) { to_restore_table_indexes_.emplace_back(table_index_entry); }
+
+void TxnStore::AddDBToRestore(DBEntry *db_entry) { to_restore_dbs_.emplace_back(db_entry); }
+
 TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
     const String &table_name = *table_entry->GetTableName();
     if (auto iter = txn_tables_store_.find(table_name); iter != txn_tables_store_.end()) {
@@ -755,6 +757,31 @@ void TxnStore::CommitBottom(TransactionID txn_id, TxnTimeStamp commit_ts) {
     // Commit tables to memory catalog
     for (auto [table_entry, ptr_seq_n] : txn_tables_) {
         table_entry->Commit(commit_ts);
+    }
+
+    // Commit restored tables
+    for (auto table_entry : to_restore_tables_) {
+        table_entry->Commit(commit_ts);
+        // Go through each segment
+        // Go through each block in segment
+        // TODO (mayang) add index commit
+        // Go through each index => segment index => chunk index to commit
+        for (auto &segment_pair : table_entry->segment_map()) {
+            segment_pair.second->Commit(commit_ts);
+            for (auto &block_entry : segment_pair.second->block_entries()) {
+                block_entry->CommitApplySnapshot(txn_id, commit_ts);
+            }
+        }
+    }
+
+    // Commit restored tables indexes
+    for (auto table_index_entry : to_restore_table_indexes_) {
+        table_index_entry->Commit(commit_ts);
+    }
+
+    // Commit restore databases
+    for (auto db_entry : to_restore_dbs_) {
+        db_entry->Commit(commit_ts);
     }
 }
 
