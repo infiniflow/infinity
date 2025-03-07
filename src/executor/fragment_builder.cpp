@@ -67,12 +67,12 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             current_fragment_ptr->AddOperator(phys_op);
             break;
         }
-        case ExplainType::kAnalyze: {
+        case ExplainType::kAnalyze:
+        case ExplainType::kPipeline: {
             query_context_ptr_->set_explain_analyze();
             query_context_ptr_->CreateQueryProfiler();
         }
-        case ExplainType::kFragment:
-        case ExplainType::kPipeline: {
+        case ExplainType::kFragment: {
             // Build explain pipeline fragment
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
             auto explain_child_fragment = this->BuildFragment(phys_op->left());

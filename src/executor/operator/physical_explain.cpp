@@ -148,9 +148,20 @@ bool PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operat
     column_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
     task_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
 
-    if (explain_type_ == ExplainType::kPipeline or explain_type_ == ExplainType::kAnalyze) {
+    if (explain_type_ == ExplainType::kPipeline) {
         Vector<SharedPtr<String>> task_texts;
-        ExplainTasks(task_texts, plan_fragment_ptr_, query_context->query_profiler());
+        ExplainPipeline(task_texts, plan_fragment_ptr_, query_context->query_profiler());
+
+        AlignParagraphs(*this->texts_, task_texts);
+        for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
+            column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
+        }
+        for (SizeT idx = 0; idx < task_texts.size(); ++idx) {
+            task_vector_ptr->AppendValue(Value::MakeVarchar(*task_texts[idx]));
+        }
+    } else if (explain_type_ == ExplainType::kAnalyze) {
+        Vector<SharedPtr<String>> task_texts;
+        ExplainAnalyze(task_texts, plan_fragment_ptr_, query_context->query_profiler());
 
         AlignParagraphs(*this->texts_, task_texts);
         for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
@@ -183,7 +194,7 @@ bool PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operat
 
 void PhysicalExplain::SetPlanFragment(PlanFragment *plan_fragment_ptr) { plan_fragment_ptr_ = plan_fragment_ptr; }
 
-void PhysicalExplain::ExplainTasks(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
+void PhysicalExplain::ExplainAnalyze(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
     Vector<UniquePtr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
     u64 fragment_id = plan_fragment_ptr->FragmentID();
     {
@@ -213,7 +224,25 @@ void PhysicalExplain::ExplainTasks(Vector<SharedPtr<String>> &result, PlanFragme
     if (plan_fragment_ptr->HasChild()) {
         // current fragment have children
         for (const auto &child_fragment : plan_fragment_ptr->Children()) {
-            ExplainTasks(result, child_fragment.get(), query_profiler);
+            ExplainAnalyze(result, child_fragment.get(), query_profiler);
+        }
+    }
+}
+
+void PhysicalExplain::ExplainPipeline(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
+    Vector<UniquePtr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
+    u64 fragment_id = plan_fragment_ptr->FragmentID();
+    {
+        String fragment_header = fmt::format("Fragment #{} * {} Tasks", fragment_id, tasks.size());
+        result.emplace_back(MakeShared<String>(fragment_header));
+    }
+    // NOTE: Insert blank elements after each Fragment for alignment
+    result.emplace_back(MakeShared<String>());
+
+    if (plan_fragment_ptr->HasChild()) {
+        // current fragment have children
+        for (const auto &child_fragment : plan_fragment_ptr->Children()) {
+            ExplainPipeline(result, child_fragment.get(), query_profiler);
         }
     }
 }
