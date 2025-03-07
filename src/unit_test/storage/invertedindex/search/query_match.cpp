@@ -180,7 +180,7 @@ void QueryMatchTest::CreateDBAndTable(const String &db_name, const String &table
     TxnManager *txn_mgr = storage->txn_manager();
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        txn->DropTableCollectionByName(db_name, table_name, ConflictType::kIgnore);
+        txn->DropTable(db_name, table_name, ConflictType::kIgnore);
         last_commit_ts_ = txn_mgr->CommitTxn(txn);
     }
     {

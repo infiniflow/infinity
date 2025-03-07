@@ -153,6 +153,14 @@ BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker, boo
     return res;
 }
 
+BufferObj *BufferManager::GetBufferObject(const String &file_path) {
+    std::unique_lock lock(w_locker_);
+    if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
+        return iter->second.get();
+    }
+    return nullptr;
+}
+
 Vector<SizeT> BufferManager::WaitingGCObjectCount() {
     Vector<SizeT> size_list(lru_caches_.size());
     for (SizeT i = 0; i < lru_caches_.size(); ++i) {

@@ -440,7 +440,7 @@ Status Status::FunctionIsDisable(const String &function_name) {
     return Status(ErrorCode::kFunctionIsDisable, MakeUnique<String>(fmt::format("Function: {} is disable", function_name)));
 }
 
-Status Status::NotFound(const String &detailed_info) { return Status(ErrorCode::kFunctionIsDisable, MakeUnique<String>(detailed_info)); }
+Status Status::NotFound(const String &detailed_info) { return Status(ErrorCode::kNotFound, MakeUnique<String>(detailed_info)); }
 
 Status Status::ErrorInit(const String &detailed_info) { return Status(ErrorCode::kErrorInit, MakeUnique<String>(detailed_info)); }
 
@@ -457,6 +457,10 @@ Status Status::FailToStartTxn(const String &detail) { return Status(ErrorCode::k
 Status Status::AlreadyLocked(const String &detail) { return Status(ErrorCode::kAlreadyLocked, MakeUnique<String>(detail)); }
 
 Status Status::NotLocked(const String &detail) { return Status(ErrorCode::kNotLocked, MakeUnique<String>(detail)); }
+
+Status Status::TableIsUsing(const String &detail) { return Status(ErrorCode::kTableIsUsing, MakeUnique<String>(detail)); }
+
+Status Status::DuplicateColumnIndex(const String &detail) { return Status(ErrorCode::kDuplicateColumnIndex, MakeUnique<String>(detail)); }
 
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
@@ -620,7 +624,7 @@ Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUniq
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }
 
-Status Status::DuplicateEntry() { return Status(ErrorCode::kDuplicateEntry, MakeUnique<String>("Duplicate entry")); }
+Status Status::DuplicateEntry(const String &detail_info) { return Status(ErrorCode::kDuplicateEntry, MakeUnique<String>(detail_info)); }
 
 Status Status::EmptyEntryList() { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>("Empty entry list")); }
 
@@ -642,6 +646,14 @@ Status Status::NodeInfoUpdated(const String &message) { return Status(ErrorCode:
 Status Status::NodeNameMismatch(const String &actual_node_name, const String &expected_node_name) {
     return Status(ErrorCode::kNodeNameMismatch,
                   MakeUnique<String>(fmt::format("Expect node name: {}, actual node name: {}", expected_node_name, actual_node_name)));
+}
+
+Status Status::CatalogError(const String &detailed_info) {
+    return Status(ErrorCode::kCatalogError, MakeUnique<String>(fmt::format("Catalog error: {}", detailed_info)));
+}
+
+Status Status::BufferManagerError(const String &detailed_info) {
+    return Status(ErrorCode::kBufferManagerError, MakeUnique<String>(fmt::format("Buffer manager error: {}", detailed_info)));
 }
 
 } // namespace infinity

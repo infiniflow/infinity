@@ -22,6 +22,8 @@ import column_vector;
 
 namespace infinity {
 
+void PhysicalReadCache::Init(QueryContext* query_context) {}
+
 PhysicalReadCache::PhysicalReadCache(u64 id,
                                      LogicalNodeType origin_type,
                                      SharedPtr<BaseTableRef> base_table_ref,

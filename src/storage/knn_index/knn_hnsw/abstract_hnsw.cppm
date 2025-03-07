@@ -49,6 +49,8 @@ class BufferManager;
 struct ChunkIndexEntry;
 struct SegmentIndexEntry;
 struct BlockColumnEntry;
+class ColumnVector;
+class BufferObj;
 
 export using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset> *,
                                          KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset> *,
@@ -155,11 +157,21 @@ public:
 
     SizeT GetRowCount() const;
 
+    RowID GetBeginRowID() const { return begin_row_id_; }
+
+    SizeT GetSizeInBytes() const;
+
     void InsertVecs(SizeT block_offset,
                     BlockColumnEntry *block_column_entry,
                     BufferManager *buffer_manager,
                     SizeT row_offset,
                     SizeT row_count,
+                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
+
+    void InsertVecs(SegmentOffset block_offset,
+                    const ColumnVector &col,
+                    BlockOffset offset,
+                    BlockOffset row_count,
                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
     void InsertVecs(const SegmentEntry *segment_entry,
@@ -197,6 +209,8 @@ public:
     void SetLSGParam(float alpha, UniquePtr<float[]> avg);
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
+
+    void Dump(BufferObj *buffer_obj, SizeT *dump_size = nullptr);
 
     const AbstractHnsw &get() const { return hnsw_; }
 

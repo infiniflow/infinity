@@ -36,6 +36,9 @@ struct BlockEntry;
 struct SegmentEntry;
 struct ChunkIndexEntry;
 enum class SegmentStatus;
+class ChunkIndexMeta;
+class BlockMeta;
+class SegmentMeta;
 
 export enum class WalCommandType : i8 {
     INVALID = 0,
@@ -96,6 +99,8 @@ export struct WalBlockInfo {
 
     explicit WalBlockInfo(BlockEntry *block_entry);
 
+    explicit WalBlockInfo(BlockMeta &block_meta);
+
     bool operator==(const WalBlockInfo &other) const;
 
     [[nodiscard]] i32 GetSizeInBytes() const;
@@ -118,6 +123,8 @@ export struct WalSegmentInfo {
     WalSegmentInfo() = default;
 
     explicit WalSegmentInfo(SegmentEntry *segment_entry);
+
+    explicit WalSegmentInfo(SegmentMeta &segment_meta);
 
     bool operator==(const WalSegmentInfo &other) const;
 
@@ -143,6 +150,8 @@ export struct WalChunkIndexInfo {
     WalChunkIndexInfo() = default;
 
     explicit WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry);
+
+    explicit WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta);
 
     bool operator==(const WalChunkIndexInfo &other) const;
 
@@ -255,6 +264,9 @@ export struct WalCmdDropTable final : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String db_id_{};
+    String table_id_{};
+    String table_key_{};
 };
 
 export struct WalCmdCreateIndex final : public WalCmd {
@@ -263,6 +275,9 @@ export struct WalCmdCreateIndex final : public WalCmd {
           index_base_(std::move(index_base)) {
         assert(!std::filesystem::path(index_dir_tail_).is_absolute());
     }
+
+    WalCmdCreateIndex(String db_name, String table_name, SharedPtr<IndexBase> index_base)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_base_(std::move(index_base)) {}
 
     WalCommandType GetType() const final { return WalCommandType::CREATE_INDEX; }
     bool operator==(const WalCmd &other) const final;
@@ -275,6 +290,8 @@ export struct WalCmdCreateIndex final : public WalCmd {
     String table_name_{};
     String index_dir_tail_{};
     SharedPtr<IndexBase> index_base_{};
+    String db_id_{};
+    String table_id_{};
 };
 
 export struct WalCmdDropIndex final : public WalCmd {
@@ -288,9 +305,13 @@ export struct WalCmdDropIndex final : public WalCmd {
     String ToString() const final;
     String CompactInfo() const final;
 
-    const String db_name_{};
-    const String table_name_{};
-    const String index_name_{};
+    String db_name_{};
+    String table_name_{};
+    String index_name_{};
+    String db_id_{};
+    String table_id_{};
+    String index_id_{};
+    String index_key_{};
 };
 
 export struct WalCmdImport final : public WalCmd {
@@ -307,6 +328,9 @@ export struct WalCmdImport final : public WalCmd {
     String db_name_{};
     String table_name_{};
     WalSegmentInfo segment_info_;
+
+    String db_id_str_{};
+    String table_id_str_{};
 };
 
 export struct WalCmdAppend final : public WalCmd {
@@ -323,6 +347,9 @@ export struct WalCmdAppend final : public WalCmd {
     String db_name_{};
     String table_name_{};
     SharedPtr<DataBlock> block_{};
+
+    String db_id_str_{};
+    String table_id_str_{};
 };
 
 export struct WalCmdDelete final : public WalCmd {
@@ -339,6 +366,9 @@ export struct WalCmdDelete final : public WalCmd {
     String db_name_{};
     String table_name_{};
     Vector<RowID> row_ids_{};
+
+    String db_id_str_{};
+    String table_id_str_{};
 };
 
 // used when append op turn an old unsealed segment full and sealed
@@ -414,7 +444,7 @@ export struct WalCmdCheckpoint final : public WalCmd {
 };
 
 export struct WalCmdCompact final : public WalCmd {
-    WalCmdCompact(String &&db_name, String &&table_name, Vector<WalSegmentInfo> &&new_segment_infos, Vector<SegmentID> &&deprecated_segment_ids)
+    WalCmdCompact(String db_name, String table_name, Vector<WalSegmentInfo> new_segment_infos, Vector<SegmentID> deprecated_segment_ids)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), new_segment_infos_(std::move(new_segment_infos)),
           deprecated_segment_ids_(std::move(deprecated_segment_ids)) {}
 
@@ -429,6 +459,9 @@ export struct WalCmdCompact final : public WalCmd {
     const String table_name_{};
     Vector<WalSegmentInfo> new_segment_infos_{};
     const Vector<SegmentID> deprecated_segment_ids_{};
+
+    String db_id_str_;
+    String table_id_str_;
 };
 
 export struct WalCmdOptimize final : public WalCmd {
@@ -449,6 +482,9 @@ export struct WalCmdOptimize final : public WalCmd {
 };
 
 export struct WalCmdDumpIndex final : public WalCmd {
+    WalCmdDumpIndex(String db_name, String table_name, String index_name, SegmentID segment_id)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id) {}
+
     WalCmdDumpIndex(String db_name,
                     String table_name,
                     String index_name,
@@ -471,6 +507,11 @@ export struct WalCmdDumpIndex final : public WalCmd {
     SegmentID segment_id_{};
     Vector<WalChunkIndexInfo> chunk_infos_{};
     Vector<ChunkID> deprecate_ids_{};
+
+    bool clear_mem_index_{};
+    String db_id_str_{};
+    String table_id_str_{};
+    String index_id_str_{};
 };
 
 export struct WalCmdRenameTable : public WalCmd {
@@ -487,6 +528,9 @@ export struct WalCmdRenameTable : public WalCmd {
     String db_name_{};
     String table_name_{};
     String new_table_name_{};
+    String old_db_id_{};
+    String old_table_id_{};
+    String old_table_key_{};
 };
 
 export struct WalCmdAddColumns : public WalCmd {
@@ -502,6 +546,7 @@ export struct WalCmdAddColumns : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String table_key_{};
     Vector<SharedPtr<ColumnDef>> column_defs_{};
 };
 
@@ -518,6 +563,7 @@ export struct WalCmdDropColumns : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+    String table_key_{};
     Vector<String> column_names_{};
 };
 
