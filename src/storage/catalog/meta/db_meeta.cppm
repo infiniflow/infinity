@@ -22,6 +22,7 @@ import status;
 namespace infinity {
 
 class KVInstance;
+class DatabaseInfo;
 
 export class DBMeeta {
 public:
@@ -31,9 +32,20 @@ public:
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
-    Status InitSet();
+    Status InitSet(const String *comment = nullptr);
 
     Status UninitSet();
+
+    Status GetComment(String *&comment) {
+        if (!comment_) {
+            Status status = LoadComment();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        comment = &*comment_;
+        return Status::OK();
+    }
 
     Status GetTableIDs(Vector<String> *&table_id_strs, Vector<String> **table_names = nullptr) {
         if (!table_id_strs_ || !table_names_) {
@@ -51,13 +63,20 @@ public:
 
     Status GetTableID(const String &table_name, String &table_key, String &table_id_str);
 
+    Status GetDatabaseInfo(DatabaseInfo &db_info);
+
 private:
+    Status LoadComment();
+
     Status LoadTableIDs();
+
+    String GetDBTag(const String &tag) const;
 
 private:
     String db_id_str_;
     KVInstance &kv_instance_;
 
+    Optional<String> comment_;
     Optional<Vector<String>> table_id_strs_;
     Optional<Vector<String>> table_names_;
 };

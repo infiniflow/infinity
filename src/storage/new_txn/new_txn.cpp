@@ -238,39 +238,22 @@ bool NewTxn::CheckDatabaseExists(const String &db_name) {
 Tuple<SharedPtr<DatabaseInfo>, Status> NewTxn::GetDatabaseInfo(const String &db_name) {
     this->CheckTxnStatus();
 
-    String db_key_prefix = KeyEncode::CatalogDbPrefix(db_name);
-    auto iter2 = kv_instance_->GetIterator();
-
-    iter2->Seek(db_key_prefix);
-    SizeT found_count = 0;
-    String db_id{};
-    while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
-        //        std::cout << String("Key: ") << iter2->Key().ToString() << std::endl;
-        //        std::cout << String("Value: ") << iter2->Value().ToString() << std::endl;
-        db_id = iter2->Value().ToString();
-        iter2->Next();
-        ++found_count;
-        if (found_count > 1) {
-            UnrecoverableError("Found multiple database keys");
-        }
+    String db_id;
+    String db_key;
+    Status status = GetDbID(db_name, db_key, db_id);
+    if (!status.ok()) {
+        return {nullptr, status};
     }
+    DBMeeta db_meta(db_id, *kv_instance_);
 
-    if (found_count == 0) {
-        return {nullptr, Status::DBNotExist(db_name)};
-    }
-
-    SharedPtr<DatabaseInfo> db_info = MakeShared<DatabaseInfo>();
+    auto db_info = MakeShared<DatabaseInfo>();
     db_info->db_name_ = MakeShared<String>(db_name);
 
-    db_info->db_entry_dir_ = MakeShared<String>(fmt::format("db_{}", db_id));
-    String db_comment_prefix = KeyEncode::CatalogDbTagKey(db_id, "comment");
-    String db_comment;
-    Status status = kv_instance_->Get(db_comment_prefix, db_comment);
-    if (status.ok()) {
-        db_info->db_comment_ = MakeShared<String>(db_comment);
+    status = db_meta.GetDatabaseInfo(*db_info);
+    if (!status.ok()) {
+        return {nullptr, status};
     }
-
-    return {db_info, Status::OK()};
+    return {std::move(db_info), Status::OK()};
 }
 
 Vector<String> NewTxn::ListDatabase() {
@@ -764,38 +747,13 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
     if (!status.ok()) {
         return {nullptr, status};
     }
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
 
-    // Create table comment;
-    String table_comment_key = KeyEncode::CatalogTableTagKey(db_id_str, table_id_str, "comment");
-    String table_comment;
-    status = kv_instance_->Get(table_comment_key, table_comment);
-    if (!status.ok() and status.code() != ErrorCode::kNotFound) {
+    status = table_meta.GetTableInfo(*table_info);
+    if (!status.ok()) {
         return {nullptr, status};
     }
-
-    table_info->table_full_dir_ =
-        MakeShared<String>(fmt::format("{}/db_{}/tbl_{}", InfinityContext::instance().config()->DataDir(), db_id_str, table_id_str));
-
-    String table_column_prefix = KeyEncode::TableColumnPrefix(db_id_str, table_id_str);
-    auto iter2 = kv_instance_->GetIterator();
-    iter2->Seek(table_column_prefix);
-    while (iter2->Valid() && iter2->Key().starts_with(table_column_prefix)) {
-        String column_key = iter2->Key().ToString();
-        String column_value = iter2->Value().ToString();
-        auto column_def = ColumnDef::FromJson(nlohmann::json::parse(column_value));
-        table_info->column_defs_.emplace_back(column_def);
-        iter2->Next();
-    }
-
-    // sort table_info->column_defs_ by column_id
-    std::sort(table_info->column_defs_.begin(), table_info->column_defs_.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) {
-        return a->id_ < b->id_;
-    });
-
-    table_info->db_id_ = std::move(db_id_str);
-    table_info->table_id_ = std::move(table_id_str);
-
-    return {table_info, Status::OK()};
+    return {std::move(table_info), Status::OK()};
 }
 
 Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const String &db_name, const String &table_name) {
@@ -1144,21 +1102,15 @@ Status NewTxn::CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd) {
         return status;
     }
 
-    if (!create_db_cmd->db_comment_.empty()) {
-        String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment");
-        status = kv_instance_->Put(db_comment_key, create_db_cmd->db_comment_);
+    DBMeeta db_meeta(db_id_str, *kv_instance_);
+    {
+        const String *db_comment = create_db_cmd->db_comment_.empty() ? nullptr : &create_db_cmd->db_comment_;
+        status = db_meeta.InitSet(db_comment);
         if (!status.ok()) {
             return status;
         }
     }
 
-    //                auto iter2 = kv_instance_->GetIterator();
-    //                String prefix = "";
-    //                iter2->Seek(prefix);
-    //                while (iter2->Valid() && iter2->Key().starts_with(prefix)) {
-    //                    std::cout << iter2->Key().ToString() << String(" : ") << iter2->Value().ToString() << std::endl;
-    //                    iter2->Next();
-    //                }
     return Status::OK();
 }
 Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
@@ -1179,11 +1131,8 @@ Status NewTxn::CommitDropDB(const WalCmdDropDatabase *drop_db_cmd) {
         return status;
     }
 
-    String db_comment_key = KeyEncode::CatalogDbTagKey(db_id_str, "comment");
-    status = kv_instance_->Delete(db_comment_key);
-    if (!status.ok()) {
-        return status;
-    }
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<DBMetaKey>(db_id_str));
 
     return Status::OK();
 }

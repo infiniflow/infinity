@@ -27,6 +27,8 @@ import default_values;
 import logger;
 import table_def;
 import infinity_exception;
+import meta_info;
+import infinity_context;
 
 namespace infinity {
 
@@ -236,6 +238,47 @@ Status TableMeeta::UninitSet() {
         iter->Next();
     }
 
+    return Status::OK();
+}
+
+Status TableMeeta::GetTableInfo(TableInfo &table_info) {
+    Status status;
+
+    String *table_comment = nullptr;
+    status = GetComment(table_comment);
+    if (!status.ok()) {
+        return status;
+    }
+    table_info.table_comment_ = MakeShared<String>(*table_comment);
+
+    table_info.table_full_dir_ =
+        MakeShared<String>(fmt::format("{}/db_{}/tbl_{}", InfinityContext::instance().config()->DataDir(), db_id_str_, table_id_str_));
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    std::tie(column_defs, status) = this->GetColumnDefs();
+    if (!status.ok()) {
+        return status;
+    }
+    table_info.column_defs_ = *column_defs;
+    std::sort(table_info.column_defs_.begin(), table_info.column_defs_.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) {
+        return a->id_ < b->id_;
+    });
+
+    table_info.db_id_ = db_id_str_;
+    table_info.table_id_ = table_id_str_;
+
+    return Status::OK();
+}
+
+Status TableMeeta::LoadComment() {
+    String table_comment_key = GetTableTag("comment");
+    String table_comment;
+    Status status = kv_instance_.Get(table_comment_key, table_comment);
+    if (!status.ok() && status.code() != ErrorCode::kNotFound) { // not found is ok
+        LOG_ERROR(fmt::format("Fail to get table comment from kv store, key: {}, cause: {}", table_comment_key, status.message()));
+        return status;
+    }
+    comment_ = std::move(table_comment);
     return Status::OK();
 }
 

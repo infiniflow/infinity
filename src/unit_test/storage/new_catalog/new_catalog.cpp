@@ -444,7 +444,7 @@ TEST_P(NewCatalogTest, db_test4) {
         auto [db_info1, db_status1] = txn3->GetDatabaseInfo("db1");
         EXPECT_TRUE(db_status1.ok());
         std::cout << *db_info1->db_entry_dir_ << std::endl;
-        EXPECT_EQ(db_info1->db_comment_, nullptr);
+        EXPECT_EQ(*db_info1->db_comment_, "");
 
         auto [db_info2, db_status2] = txn3->GetDatabaseInfo("db2");
         EXPECT_TRUE(db_status2.ok());

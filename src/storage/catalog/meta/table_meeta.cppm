@@ -24,6 +24,7 @@ namespace infinity {
 
 class KVInstance;
 class TableDef;
+class TableInfo;
 
 export class TableMeeta {
 public:
@@ -33,6 +34,17 @@ public:
 
     const String &table_id_str() const { return table_id_str_; }
     const String &db_id_str() const { return db_id_str_; }
+
+    Status GetComment(String *&comment) {
+        if (!comment_) {
+            Status status = LoadComment();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        comment = &*comment_;
+        return Status::OK();
+    }
 
     Status GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names = nullptr);
 
@@ -78,7 +90,11 @@ public:
     Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name);
 
+    Status GetTableInfo(TableInfo &table_info);
+
 private:
+    Status LoadComment();
+
     Status LoadColumnDefs();
 
     Status LoadSegmentIDs();
@@ -96,6 +112,7 @@ private:
     String db_id_str_;
     String table_id_str_;
 
+    Optional<String> comment_;
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
     Optional<Vector<SegmentID>> segment_ids_;
     Optional<Vector<String>> index_id_strs_;

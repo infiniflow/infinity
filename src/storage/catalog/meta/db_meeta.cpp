@@ -23,13 +23,20 @@ import kv_code;
 import kv_store;
 import third_party;
 import infinity_exception;
+import meta_info;
 
 namespace infinity {
 
 DBMeeta::DBMeeta(String db_id_str, KVInstance &kv_instance) : db_id_str_(std::move(db_id_str)), kv_instance_(kv_instance) {}
 
-Status DBMeeta::InitSet() {
-    //
+Status DBMeeta::InitSet(const String *comment) {
+    if (comment) {
+        String db_comment_key = GetDBTag("comment");
+        Status status = kv_instance_.Put(db_comment_key, *comment);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 
@@ -47,6 +54,12 @@ Status DBMeeta::UninitSet() {
             return status;
         }
         iter->Next();
+    }
+
+    String db_comment_key = GetDBTag("comment");
+    status = kv_instance_.Delete(db_comment_key);
+    if (!status.ok()) {
+        return status;
     }
 
     return Status::OK();
@@ -87,6 +100,32 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
     return Status::OK();
 }
 
+Status DBMeeta::GetDatabaseInfo(DatabaseInfo &db_info) {
+    Status status;
+
+    String *db_comment = nullptr;
+    status = this->GetComment(db_comment);
+    if (!status.ok()) {
+        return status;
+    }
+    db_info.db_comment_ = MakeShared<String>(*db_comment);
+
+    db_info.db_entry_dir_ = MakeShared<String>(fmt::format("db_{}", db_id_str_));
+
+    return Status::OK();
+}
+
+Status DBMeeta::LoadComment() {
+    String comment;
+    String db_comment_key = GetDBTag("comment");
+    Status status = kv_instance_.Get(db_comment_key, comment);
+    if (!status.ok() && status.code() != ErrorCode::kNotFound) { // "comment" not found is ok
+        return status;
+    }
+    comment_ = std::move(comment);
+    return Status::OK();
+}
+
 Status DBMeeta::LoadTableIDs() {
     table_id_strs_ = Vector<String>();
     table_names_ = Vector<String>();
@@ -107,5 +146,7 @@ Status DBMeeta::LoadTableIDs() {
 
     return Status::OK();
 }
+
+String DBMeeta::GetDBTag(const String &tag) const { return KeyEncode::CatalogDbTagKey(db_id_str_, tag); }
 
 } // namespace infinity
