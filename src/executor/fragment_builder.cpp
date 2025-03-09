@@ -38,19 +38,21 @@ import explain_statement;
 
 namespace infinity {
 
-SharedPtr<PlanFragment> FragmentBuilder::BuildFragment(PhysicalOperator *phys_op) {
+SharedPtr<PlanFragment> FragmentBuilder::BuildFragment(const Vector<PhysicalOperator *> &phys_ops) {
     SharedPtr<PlanFragment> result = nullptr;
-    auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
-    plan_fragment->SetSinkNode(query_context_ptr_, SinkType::kResult, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
-    BuildFragments(phys_op, plan_fragment.get());
-    if (plan_fragment->GetSourceNode() == nullptr) {
-        plan_fragment->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
-    }
-    if (result.get() == nullptr) {
-        result = std::move(plan_fragment);
-    } else {
-        PlanFragment::AddNext(result, plan_fragment.get());
-        result = std::move(plan_fragment);
+    for (auto *phys_op : phys_ops) {
+        auto plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+        plan_fragment->SetSinkNode(query_context_ptr_, SinkType::kResult, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+        BuildFragments(phys_op, plan_fragment.get());
+        if (plan_fragment->GetSourceNode() == nullptr) {
+            plan_fragment->SetSourceNode(query_context_ptr_, SourceType::kEmpty, phys_op->GetOutputNames(), phys_op->GetOutputTypes());
+        }
+        if (result.get() == nullptr) {
+            result = std::move(plan_fragment);
+        } else {
+            PlanFragment::AddNext(result, plan_fragment.get());
+            result = std::move(plan_fragment);
+        }
     }
     return result;
 }
@@ -75,7 +77,8 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
         case ExplainType::kFragment: {
             // Build explain pipeline fragment
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
-            auto explain_child_fragment = this->BuildFragment(phys_op->left());
+            Vector<PhysicalOperator *> phys_ops{phys_op->left()};
+            auto explain_child_fragment = this->BuildFragment(phys_ops);
 
             // Generate explain context of the child fragment
             ExplainFragment::Explain(explain_child_fragment.get(), texts_ptr);

@@ -38,7 +38,7 @@ public:
 #endif
     }
 
-    SharedPtr<PlanFragment> BuildFragment(PhysicalOperator *physical_plan);
+    SharedPtr<PlanFragment> BuildFragment(const Vector<PhysicalOperator *> &physical_plans);
 
 private:
     void BuildFragments(PhysicalOperator *phys_op, PlanFragment *current_fragment_ptr);

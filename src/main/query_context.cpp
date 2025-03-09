@@ -246,7 +246,14 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
         StopProfile(QueryPhase::kPhysicalPlan);
         //        LOG_WARN(fmt::format("Before pipeline cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kPipelineBuild);
-        plan_fragment = fragment_builder_->BuildFragment(physical_plans[0].get());
+        // Fragment Builder, only for test now.
+        {
+            Vector<PhysicalOperator *> physical_plan_ptrs;
+            for (auto &physical_plan : physical_plans) {
+                physical_plan_ptrs.push_back(physical_plan.get());
+            }
+            plan_fragment = fragment_builder_->BuildFragment(physical_plan_ptrs);
+        }
         StopProfile(QueryPhase::kPipelineBuild);
 
         StartProfile(QueryPhase::kTaskBuild);
@@ -365,7 +372,13 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *base_statement, BGQueryStat
             state.physical_plans.push_back(std::move(physical_plan));
         }
 
-        state.plan_fragment = fragment_builder_->BuildFragment(state.physical_plans[0].get());
+        {
+            Vector<PhysicalOperator *> physical_plan_ptrs;
+            for (auto &physical_plan : state.physical_plans) {
+                physical_plan_ptrs.push_back(physical_plan.get());
+            }
+            state.plan_fragment = fragment_builder_->BuildFragment(physical_plan_ptrs);
+        }
 
         state.notifier = MakeUnique<Notifier>();
         FragmentContext::BuildTask(this, nullptr, state.plan_fragment.get(), state.notifier.get());
