@@ -68,6 +68,8 @@ struct WalCmdCompact;
 struct WalCmdDumpIndex;
 struct WalChunkIndexInfo;
 struct WalSegmentInfo;
+struct WalCmdCheckpoint;
+
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
 class BaseTableRef;
@@ -87,6 +89,10 @@ class DBMeeta;
 struct MemIndex;
 
 struct NewTxnCompactState;
+
+export struct CheckpointOption {
+    TxnTimeStamp checkpoint_ts_ = 0;
+};
 
 export class NewTxn : public EnableSharedFromThis<NewTxn> {
 public:
@@ -167,15 +173,15 @@ public:
 
     Status CreateTable(const String &db_name, const SharedPtr<TableDef> &table_def, ConflictType conflict_type);
 
-    Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);
+    // Status RenameTable(TableEntry *old_table_entry, const String &new_table_name);
 
     Status AddColumns(const String &db_name, const String &table_name, const Vector<SharedPtr<ColumnDef>> &column_defs);
 
     Status DropColumns(const String &db_name, const String &table_name, const Vector<String> &column_names);
 
-    Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs);
+    // Status AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs);
 
-    Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
+    // Status DropColumns(TableEntry *table_entry, const Vector<String> &column_names);
 
     Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
@@ -263,6 +269,8 @@ public:
     // type);
 
     // Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
+
+    Status Checkpoint(CheckpointOption &option);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
@@ -426,6 +434,12 @@ private:
                        const Vector<ChunkID> &deprecate_ids,
                        bool clear_mem_index);
 
+    Status CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option);
+
+    Status CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option);
+
+    Status CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option);
+
 private:
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
@@ -442,8 +456,14 @@ private:
     Status PostCommitDelete(const WalCmdDelete *delete_cmd);
     Status CommitCompact(const WalCmdCompact *compact_cmd);
     Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd);
+    Status CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd);
+    Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpoint *checkpoint_cmd);
+    Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpoint *checkpoint_cmd);
+    Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);
 
     Status CommitSegmentVersion(const WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
+    Status FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts);
+    Status FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 

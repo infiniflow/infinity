@@ -676,6 +676,60 @@ Status NewTxn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: GetViews"};
 }
 
+Status NewTxn::Checkpoint(CheckpointOption &option) {
+    if (option.checkpoint_ts_ == 0) {
+        option.checkpoint_ts_ = txn_mgr_->max_committed_ts();
+    }
+
+    Vector<String> *db_id_strs_ptr;
+    CatalogMeta catalog_meta(*kv_instance_);
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &db_id_str : *db_id_strs_ptr) {
+        DBMeeta db_meta(db_id_str, *kv_instance_);
+        Status status = this->CheckpointDB(db_meta, option);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    bool is_full_checkpoint = true;
+    String catalog_path;
+    String catalog_name;
+    auto checkpoint_cmd = MakeShared<WalCmdCheckpoint>(option.checkpoint_ts_, is_full_checkpoint, catalog_path, catalog_name);
+    wal_entry_->cmds_.push_back(checkpoint_cmd);
+    txn_context_ptr_->AddOperation(MakeShared<String>(checkpoint_cmd->ToString()));
+
+    return Status::OK();
+}
+
+Status NewTxn::CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option) {
+    Vector<String> *table_id_strs_ptr;
+    Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &table_id_str : *table_id_strs_ptr) {
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_);
+        Status status = this->CheckpointTable(table_meta, option);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::CheckpointTable(TableMeeta &table_meta, const CheckpointOption &option) {
+    Status status = CheckpointTableData(table_meta, option);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 TxnTimeStamp NewTxn::CommitTS() const {
     std::shared_lock<std::shared_mutex> r_locker(rw_locker_);
     return txn_context_ptr_->commit_ts_;
@@ -929,6 +983,14 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::CHECKPOINT: {
+                auto *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(command.get());
+                Status status = CommitCheckpoint(checkpoint_cmd);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to checkpoint");
+                }
+                break;
+            }
             default: {
                 UnrecoverableError(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
                 break;
@@ -1170,7 +1232,7 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
             return status;
         }
     }
-    
+
     status = this->DropColumnsData(*table_meta, drop_columns_cmd->column_ids_);
     if (!status.ok()) {
         return status;
@@ -1193,6 +1255,48 @@ Status NewTxn::CommitDropIndex(const WalCmdDropIndex *drop_index_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     new_catalog_->AddCleanedMeta(commit_ts, MakeUnique<TableIndexMetaKey>(db_id_str, table_id_str, index_id_str));
 
+    return Status::OK();
+}
+
+Status NewTxn::CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd) {
+    Vector<String> *db_id_strs_ptr;
+    CatalogMeta catalog_meta(*kv_instance_);
+    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &db_id_str : *db_id_strs_ptr) {
+        DBMeeta db_meta(db_id_str, *kv_instance_);
+        Status status = this->CommitCheckpointDB(db_meta, checkpoint_cmd);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpoint *checkpoint_cmd) {
+    Vector<String> *table_id_strs_ptr;
+    Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &table_id_str : *table_id_strs_ptr) {
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance_);
+        Status status = this->CommitCheckpointTable(table_meta, checkpoint_cmd);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpoint *checkpoint_cmd) {
+    TxnTimeStamp checkpoint_ts = checkpoint_cmd->max_commit_ts_;
+    Status status = CommitCheckpointTableData(table_meta, checkpoint_ts);
+    if (!status.ok()) {
+        return status;
+    }
     return Status::OK();
 }
 
@@ -1268,7 +1372,7 @@ void NewTxn::PostCommit() {
         sema->acquire();
     }
 
-    auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
+    // auto *wal_manager = InfinityContext::instance().storage()->wal_manager();
     for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -1289,12 +1393,12 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::CHECKPOINT: {
-                auto *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(wal_cmd.get());
-                if (checkpoint_cmd->is_full_checkpoint_) {
-                    wal_manager->CommitFullCheckpoint(checkpoint_cmd->max_commit_ts_);
-                } else {
-                    wal_manager->CommitDeltaCheckpoint(checkpoint_cmd->max_commit_ts_);
-                }
+                // auto *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(wal_cmd.get());
+                // if (checkpoint_cmd->is_full_checkpoint_) {
+                //     wal_manager->CommitFullCheckpoint(checkpoint_cmd->max_commit_ts_);
+                // } else {
+                //     wal_manager->CommitDeltaCheckpoint(checkpoint_cmd->max_commit_ts_);
+                // }
                 break;
             }
             case WalCommandType::DROP_TABLE: {

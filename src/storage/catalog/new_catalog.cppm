@@ -57,6 +57,9 @@ export struct TableMemoryContext {
 
 export struct BlockLock {
     std::shared_mutex mtx_;
+    TxnTimeStamp min_ts_{};
+    TxnTimeStamp max_ts_{};
+    TxnTimeStamp checkpoint_ts_{};
 };
 
 export class NewTxnGetVisibleRangeState {

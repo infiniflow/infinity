@@ -509,6 +509,8 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
     {
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
+        block_lock->min_ts_ = std::max(block_lock->min_ts_, commit_ts);
+
         // append in column file
         for (SizeT column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
             const ColumnVector &column_vector = *input_block->column_vectors[column_idx];
@@ -568,6 +570,9 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &b
             return status;
         }
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
+
+        block_lock->min_ts_ = std::max(block_lock->min_ts_, commit_ts);
+        block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
 
         // delete in version file
         BufferHandle buffer_handle = version_buffer->Load();
@@ -799,6 +804,60 @@ Status NewTxn::DropColumnsDataInBlock(BlockMeta &block_meta, const Vector<Column
                                                               block_meta.block_id(),
                                                               column_id));
     }
+    return Status::OK();
+}
+
+Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option) {
+    // TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
+    Status status;
+
+    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        status = segment_meta.GetBlockIDs(block_ids_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+
+            SharedPtr<BlockLock> block_lock;
+            status = block_meta.GetBlockLock(block_lock);
+            if (!status.ok()) {
+                return status;
+            }
+
+            bool flush_version = false;
+            bool flush_column = false;
+            {
+                std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->max_ts_)) {
+                    flush_version = true;
+                }
+                if (block_lock->checkpoint_ts_ < std::min(option.checkpoint_ts_, block_lock->min_ts_)) {
+                    flush_column = true;
+                }
+            }
+            if (flush_version) {
+                status = FlushVersionFile(block_meta, option.checkpoint_ts_);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+            if (flush_column) {
+                status = FlushColumnFiles(block_meta, option.checkpoint_ts_);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
+        }
+    }
+
     return Status::OK();
 }
 
@@ -1091,6 +1150,40 @@ Status NewTxn::CommitCompact(const WalCmdCompact *compact_cmd) {
     return Status::OK();
 }
 
+Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts) {
+    Status status;
+
+    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        status = segment_meta.GetBlockIDs(block_ids_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+
+            SharedPtr<BlockLock> block_lock;
+            status = block_meta.GetBlockLock(block_lock);
+            if (!status.ok()) {
+                return status;
+            }
+
+            {
+                std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+                block_lock->checkpoint_ts_ = checkpoint_ts;
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::CommitSegmentVersion(const WalSegmentInfo &segment_info, SegmentMeta &segment_meta) {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
@@ -1112,8 +1205,62 @@ Status NewTxn::CommitSegmentVersion(const WalSegmentInfo &segment_info, SegmentM
 
         block_version->Append(commit_ts, block_info.row_count_);
         version_buffer->Save(VersionFileWorkerSaveCtx(commit_ts));
+
+        SharedPtr<BlockLock> block_lock;
+        Status status = block_meta.GetBlockLock(block_lock);
+        if (!status.ok()) {
+            return status;
+        }
+        {
+            std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
+            block_lock->min_ts_ = std::max(block_lock->min_ts_, commit_ts);
+            block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
+            block_lock->checkpoint_ts_ = commit_ts;
+        }
     }
 
+    return Status::OK();
+}
+
+Status NewTxn::FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts) {
+    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+    BufferObj *version_buffer = nullptr;
+    {
+        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+        if (version_buffer == nullptr) {
+            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+        }
+    }
+
+    version_buffer->Save(VersionFileWorkerSaveCtx(save_ts));
+    return Status::OK();
+}
+
+Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
+    Status status;
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        return status;
+    }
+    for (const auto &column_def : *column_defs) {
+        ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+        BufferObj *buffer_obj = nullptr;
+        BufferObj *outline_buffer_obj = nullptr;
+
+        status = NewCatalog::GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
+        if (!status.ok()) {
+            return status;
+        }
+        buffer_obj->Save();
+        if (outline_buffer_obj) {
+            outline_buffer_obj->Save();
+        }
+    }
     return Status::OK();
 }
 
