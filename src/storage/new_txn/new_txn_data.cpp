@@ -701,15 +701,12 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<Col
 
 Status
 NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
-    Status status;
-
-    Vector<BlockID> *block_ids_ptr = nullptr;
-    status = segment_meta.GetBlockIDs(block_ids_ptr);
+    auto [block_ids, status] = segment_meta.GetBlockIDs();
     if (!status.ok()) {
         return status;
     }
 
-    for (BlockID block_id : *block_ids_ptr) {
+    for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         status = this->AddColumnsDataInBlock(block_meta, column_defs, default_values);
         if (!status.ok()) {
@@ -776,13 +773,11 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
 }
 
 Status NewTxn::DropColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<ColumnID> &column_ids) {
-    Status status;
-    Vector<BlockID> *block_ids_ptr = nullptr;
-    status = segment_meta.GetBlockIDs(block_ids_ptr);
+    auto [block_ids, status] = segment_meta.GetBlockIDs();
     if (!status.ok()) {
         return status;
     }
-    for (BlockID block_id : *block_ids_ptr) {
+    for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         status = this->DropColumnsDataInBlock(block_meta, column_ids);
         if (!status.ok()) {
@@ -816,14 +811,15 @@ Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOptio
     if (!status.ok()) {
         return status;
     }
+
+    SharedPtr<Vector<BlockID>> block_ids;
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        status = segment_meta.GetBlockIDs(block_ids_ptr);
+        std::tie(block_ids, status) = segment_meta.GetBlockIDs();
         if (!status.ok()) {
             return status;
         }
-        for (BlockID block_id : *block_ids_ptr) {
+        for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
 
             SharedPtr<BlockLock> block_lock;
@@ -1158,14 +1154,15 @@ Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp ch
     if (!status.ok()) {
         return status;
     }
+
+    SharedPtr<Vector<BlockID>> block_ids;
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        status = segment_meta.GetBlockIDs(block_ids_ptr);
+        auto [block_ids, status] = segment_meta.GetBlockIDs();
         if (!status.ok()) {
             return status;
         }
-        for (BlockID block_id : *block_ids_ptr) {
+        for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
 
             SharedPtr<BlockLock> block_lock;

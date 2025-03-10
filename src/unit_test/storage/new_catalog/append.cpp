@@ -177,8 +177,8 @@ TEST_P(TestAppend, test_append) {
         EXPECT_EQ(segment_id, 0);
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
-        Vector<BlockID> *block_ids{};
-        status = segment_meta.GetBlockIDs(block_ids);
+        SharedPtr<Vector<BlockID>> block_ids;
+        std::tie(block_ids, status) = segment_meta.GetBlockIDs();
 
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(block_ids->size(), 1);

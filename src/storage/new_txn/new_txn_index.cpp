@@ -596,14 +596,15 @@ Status NewTxn::PopulateIndex(const String &db_name,
 }
 
 Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id) {
-    Vector<BlockID> *block_ids_ptr = nullptr;
+    SharedPtr<Vector<BlockID>> block_ids;
+    Status status;
     {
-        Status status = segment_meta.GetBlockIDs(block_ids_ptr);
+        std::tie(block_ids, status) = segment_meta.GetBlockIDs();
         if (!status.ok()) {
             return status;
         }
     }
-    for (BlockID block_id : *block_ids_ptr) {
+    for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
@@ -656,14 +657,16 @@ NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &
         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
     MemoryIndexer *memory_indexer = mem_index->memory_indexer_.get();
 
-    Vector<BlockID> *block_ids_ptr = nullptr;
+    SharedPtr<Vector<BlockID>> block_ids;
+
     {
-        Status status = segment_meta.GetBlockIDs(block_ids_ptr);
+        Status status;
+        std::tie(block_ids, status) = segment_meta.GetBlockIDs();
         if (!status.ok()) {
             return status;
         }
     }
-    for (BlockID block_id : *block_ids_ptr) {
+    for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
@@ -894,12 +897,9 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
                                 RowID base_rowid,
                                 u32 total_row_cnt,
                                 BufferObj *buffer_obj) {
-    Vector<BlockID> *block_ids_ptr = nullptr;
-    {
-        Status status = segment_meta.GetBlockIDs(block_ids_ptr);
-        if (!status.ok()) {
-            return status;
-        }
+    auto [block_ids, status] = segment_meta.GetBlockIDs();
+    if (!status.ok()) {
+        return status;
     }
 
     if (index_base->index_type_ == IndexType::kHnsw) {
@@ -909,11 +909,11 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
         }
 
         UniquePtr<HnswIndexInMem> memory_hnsw_index = HnswIndexInMem::Make(base_rowid, index_base.get(), column_def.get(), nullptr);
-        for (BlockID block_id : *block_ids_ptr) {
+        for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
             {
-                Status status = block_meta.GetRowCnt(block_row_cnt);
+                status = block_meta.GetRowCnt(block_row_cnt);
                 if (!status.ok()) {
                     return status;
                 }
@@ -923,7 +923,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             total_row_cnt -= row_cnt;
             ColumnVector col;
             {
-                Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
                 if (!status.ok()) {
                     return status;
                 }
@@ -940,11 +940,11 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
     } else if (index_base->index_type_ == IndexType::kBMP) {
         auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base.get(), column_def.get(), nullptr);
 
-        for (BlockID block_id : *block_ids_ptr) {
+        for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
             {
-                Status status = block_meta.GetRowCnt(block_row_cnt);
+                status = block_meta.GetRowCnt(block_row_cnt);
                 if (!status.ok()) {
                     return status;
                 }
@@ -954,7 +954,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             total_row_cnt -= row_cnt;
             ColumnVector col;
             {
-                Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+                status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
                 if (!status.ok()) {
                     return status;
                 }

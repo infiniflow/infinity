@@ -6734,8 +6734,7 @@ TEST_P(NewCatalogTest, test_import) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            Vector<BlockID> *block_ids{};
-            status = segment_meta.GetBlockIDs(block_ids);
+            auto [block_ids, status] = segment_meta.GetBlockIDs();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -6957,9 +6956,9 @@ TEST_P(NewCatalogTest, test_compact) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
-        Vector<BlockID> *block_ids{};
-        status = segment_meta.GetBlockIDs(block_ids);
-        EXPECT_TRUE(status.ok());
+
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs();
+        EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3}));
 
         {
@@ -7820,9 +7819,8 @@ TEST_P(NewCatalogTest, test_insert_and_import) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({3}));
 
         SegmentMeta segment_meta(3, *table_meta, table_meta->kv_instance());
-        Vector<BlockID> *block_ids;
-        auto blk_status = segment_meta.GetBlockIDs(block_ids);
-        EXPECT_TRUE(blk_status.ok());
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs();
+        EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3, 4, 5}));
 
         status = new_txn_mgr->CommitTxn(txn);

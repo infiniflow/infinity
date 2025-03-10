@@ -40,17 +40,6 @@ Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
     return Status::OK();
 }
 
-Status SegmentMeta::GetBlockIDs(Vector<BlockID> *&block_ids) {
-    if (block_ids_ == nullptr) {
-        Status status = LoadBlockIDs();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    block_ids = block_ids_.get();
-    return Status::OK();
-}
-
 Status SegmentMeta::GetNextBlockID(BlockID &next_block_id) {
     if (!next_block_id_) {
         Status status = LoadNextBlockID();

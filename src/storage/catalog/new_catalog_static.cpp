@@ -171,13 +171,12 @@ Status NewCatalog::InitBufferObjs(KVInstance *kv_instance) {
         return Status::OK();
     };
     auto InitBufferObjsInSegment = [&](SegmentMeta &segment_meta) {
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        status = segment_meta.GetBlockIDs(block_ids_ptr);
+        auto [block_ids, status] = segment_meta.GetBlockIDs();
         if (!status.ok()) {
             return status;
         }
 
-        for (BlockID block_id : *block_ids_ptr) {
+        for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, *kv_instance);
             status = InitBufferObjsInBlock(block_meta);
             if (!status.ok()) {
@@ -399,14 +398,11 @@ Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, O
 }
 
 Status NewCatalog::CleanSegment(SegmentMeta &segment_meta) {
-    Status status;
-
-    Vector<BlockID> *block_ids_ptr = nullptr;
-    status = segment_meta.GetBlockIDs(block_ids_ptr);
+    auto [block_ids, status] = segment_meta.GetBlockIDs();
     if (!status.ok()) {
         return status;
     }
-    for (BlockID block_id : *block_ids_ptr) {
+    for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         status = NewCatalog::CleanBlock(block_meta);
         if (!status.ok()) {
