@@ -348,8 +348,6 @@ Status NewTxn::AddColumns(const String &db_name, const String &table_name, const
         }
     }
 
-    this->AddColumnsData(*table_meta, column_defs);
-
     // Generate add column cmd
     SharedPtr<WalCmdAddColumns> wal_command = MakeShared<WalCmdAddColumns>(db_name, table_name, column_defs);
     wal_command->table_key_ = table_key;
@@ -396,57 +394,6 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
 
     return Status::OK();
 }
-
-// Status NewTxn::AddColumns(TableEntry *table_entry, const Vector<SharedPtr<ColumnDef>> &column_defs) {
-//     TxnTimeStamp begin_ts = this->BeginTS();
-
-//     auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_context_ptr_->txn_id_, begin_ts);
-//     if (!db_status.ok()) {
-//         return db_status;
-//     }
-//     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
-//     new_table_entry->InitCompactionAlg(begin_ts);
-
-//     //    const String &table_name = *table_entry->GetTableName();
-//     //    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
-//     // TODO: adapt nullptr
-//     new_table_entry->AddColumns(column_defs, nullptr);
-//     auto add_status = db_entry->AddTable(std::move(new_table_entry), txn_context_ptr_->txn_id_, begin_ts, nullptr, true /*add_if_found*/);
-//     if (!add_status.ok()) {
-//         return add_status;
-//     }
-
-//     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdAddColumns>(*table_entry->GetDBName(), *table_entry->GetTableName(), column_defs);
-//     wal_entry_->cmds_.push_back(wal_command);
-//     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-//     return Status::OK();
-// }
-
-// Status NewTxn::DropColumns(TableEntry *table_entry, const Vector<String> &column_names) {
-//     TxnTimeStamp begin_ts = this->BeginTS();
-
-//     auto [db_entry, db_status] = catalog_->GetDatabase(*table_entry->GetDBName(), txn_context_ptr_->txn_id_, begin_ts);
-//     if (!db_status.ok()) {
-//         return db_status;
-//     }
-//     UniquePtr<TableEntry> new_table_entry = table_entry->Clone();
-//     new_table_entry->InitCompactionAlg(begin_ts);
-//     //    const String &table_name = *table_entry->GetTableName();
-//     //    NewTxnTableStore *txn_table_store = txn_store_.GetNewTxnTableStore(table_name);
-//     // TODO: adapt nullptr
-//     new_table_entry->DropColumns(column_names, nullptr);
-//     auto drop_status = db_entry->AddTable(std::move(new_table_entry), txn_context_ptr_->txn_id_, begin_ts, nullptr, true /*add_if_found*/);
-//     if (!drop_status.ok()) {
-//         return drop_status;
-//     }
-
-//     SharedPtr<WalCmd> wal_command = MakeShared<WalCmdDropColumns>(*table_entry->GetDBName(), *table_entry->GetTableName(), column_names);
-//     wal_entry_->cmds_.push_back(wal_command);
-//     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
-
-//     return Status::OK();
-// }
 
 Status NewTxn::DropTable(const String &db_name, const String &table_name, ConflictType conflict_type) {
 
@@ -1192,6 +1139,11 @@ Status NewTxn::CommitAddColumns(const WalCmdAddColumns *add_columns_cmd) {
         if (!status.ok()) {
             return status;
         }
+    }
+
+    status = this->AddColumnsData(*table_meta, add_columns_cmd->column_defs_);
+    if (!status.ok()) {
+        return status;
     }
     return Status::OK();
 }

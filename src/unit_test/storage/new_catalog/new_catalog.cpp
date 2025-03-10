@@ -65,6 +65,7 @@ import mem_index;
 import roaring_bitmap;
 import index_filter_evaluators;
 import index_emvb;
+import constant_expr;
 
 using namespace infinity;
 
@@ -8081,4 +8082,106 @@ TEST_P(NewCatalogTest, test_cleanup) {
         EXPECT_TRUE(status.ok());
     }
     new_txn_mgr->PrintAllKeyValue();
+}
+
+TEST_P(NewCatalogTest, test_add_columns) {
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto default_value2 = std::make_shared<ConstantExpr>(LiteralType::kString);
+    {
+        const char *str = "abcdefghijklmnopqrstuvwxyz";
+        size_t str_len = strlen(str);
+        default_value2->str_value_ = (char *)malloc(str_len + 1);
+        strncpy(default_value2->str_value_, str, str_len + 1);
+    }
+    auto column_def2 =
+        std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>(), "", default_value2);
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1});
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    u32 block_row_cnt = 8192;
+    auto make_input_block = [&](Value v1) {
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, Value v) {
+            for (u32 i = 0; i < block_row_cnt; ++i) {
+                col.AppendValue(std::move(v));
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, v1);
+            input_block->InsertVector(col1, 0);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+
+        auto input_block = make_input_block(Value::MakeInt(1));
+        Status status = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def2);
+        Status status = txn->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        BlockID block_id = 0;
+
+        SegmentMeta segment_meta(segment_id, *table_meta, table_meta->kv_instance());
+        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+
+        SizeT row_count = 0;
+        status = block_meta.GetRowCnt(row_count);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(row_count, block_row_cnt);
+
+        ColumnMeta column_meta(1, block_meta, block_meta.kv_instance());
+
+        ColumnVector col;
+        status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+        EXPECT_TRUE(status.ok());
+
+        for (u32 i = 0; i < row_count; ++i) {
+            EXPECT_EQ(col.GetValue(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        }
+    }
 }

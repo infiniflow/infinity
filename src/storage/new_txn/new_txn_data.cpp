@@ -40,6 +40,16 @@ import table_index_meeta;
 import meta_key;
 import db_meeta;
 
+import base_expression;
+import cast_expression;
+import value_expression;
+import expression_binder;
+import cast_function;
+import bound_cast_func;
+import constant_expr;
+import expression_state;
+import expression_evaluator;
+
 namespace infinity {
 
 struct NewTxnCompactState {
@@ -646,32 +656,32 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<Col
     }
 
     Vector<Value> default_values;
+    ExpressionBinder tmp_binder(nullptr);
     for (const auto &column_def : column_defs) {
         if (!column_def->default_value()) {
             return Status::NotSupport(fmt::format("Column {} has no default value", column_def->name()));
         }
+        SharedPtr<ConstantExpr> default_expr = column_def->default_value();
+        auto expr = tmp_binder.BuildValueExpr(*default_expr, nullptr, 0, false);
+        auto *value_expr = static_cast<ValueExpression *>(expr.get());
 
-        // SharedPtr<ConstantExpr> default_expr = column_def->default_value();
-        // auto expr = tmp_binder.BuildValueExpr(*default_expr, nullptr, 0, false);
-        // auto *value_expr = static_cast<ValueExpression *>(expr.get());
+        const SharedPtr<DataType> &column_type = column_def->type();
+        if (value_expr->Type() == *column_type) {
+            default_values.push_back(value_expr->GetValue());
+        } else {
+            const SharedPtr<DataType> &column_type = column_def->type();
 
-        // const SharedPtr<DataType> &column_type = column_def->type();
-        // if (value_expr->Type() == *column_type) {
-        //     default_values.push_back(value_expr->GetValue());
-        // } else {
-        //     const SharedPtr<DataType> &column_type = column_def->type();
+            BoundCastFunc cast = CastFunction::GetBoundFunc(value_expr->Type(), *column_type);
+            SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, expr, *column_type);
+            SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(cast_expr);
+            SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(column_type);
+            output_column_vector->Initialize(ColumnVectorType::kConstant, 1);
+            ExpressionEvaluator evaluator;
+            evaluator.Init(nullptr);
+            evaluator.Execute(cast_expr, expr_state, output_column_vector);
 
-        //     BoundCastFunc cast = CastFunction::GetBoundFunc(value_expr->Type(), *column_type);
-        //     SharedPtr<BaseExpression> cast_expr = MakeShared<CastExpression>(cast, expr, *column_type);
-        //     SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(cast_expr);
-        //     SharedPtr<ColumnVector> output_column_vector = ColumnVector::Make(column_type);
-        //     output_column_vector->Initialize(ColumnVectorType::kConstant, 1);
-        //     ExpressionEvaluator evaluator;
-        //     evaluator.Init(nullptr);
-        //     evaluator.Execute(cast_expr, expr_state, output_column_vector);
-
-        //     default_values.push_back(output_column_vector->GetValue(0));
-        // }
+            default_values.push_back(output_column_vector->GetValue(0));
+        }
     }
 
     for (SegmentID segment_id : *segment_ids_ptr) {
@@ -725,13 +735,13 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
         }
 
         ColumnVector column_vector;
-        status = NewCatalog::GetColumnVector(*column_meta, 0/*row_count*/, ColumnVectorTipe::kReadWrite, column_vector);
+        status = NewCatalog::GetColumnVector(*column_meta, 0 /*row_count*/, ColumnVectorTipe::kReadWrite, column_vector);
         if (!status.ok()) {
             return status;
         }
 
         for (SizeT i = 0; i < block_row_count; ++i) {
-            column_vector.SetValue(i, default_value);
+            column_vector.AppendValue(default_value);
         }
     }
 
