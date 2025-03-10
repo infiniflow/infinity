@@ -162,7 +162,7 @@ public:
         infinity::GlobalResourceUsage::Init();
 #endif
         std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
+        config_path = nullptr;
         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
             config_path = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
         }
@@ -178,6 +178,9 @@ public:
         infinity::GlobalResourceUsage::UnInit();
 #endif
     }
+
+protected:
+    std::shared_ptr<std::string> config_path;
 };
 
 } // namespace infinity
