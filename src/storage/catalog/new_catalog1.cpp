@@ -708,16 +708,7 @@ Status NewCatalog::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&b
 }
 
 Status NewCatalog::GetColumnBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj) {
-    SharedPtr<String> block_dir_ptr = column_meta.block_meta().GetBlockDir();
-    const ColumnDef *col_def = nullptr;
-    {
-        TableMeeta &table_meta = column_meta.block_meta().segment_meta().table_meta();
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
-    }
+    SharedPtr<String> block_dir_ptr = column_meta.block_meta().GetBlockDir(); 
 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     {
@@ -730,20 +721,18 @@ Status NewCatalog::GetColumnBufferObj(ColumnMeta &column_meta, BufferObj *&buffe
     }
     [[maybe_unused]] SizeT chunk_offset = 0;
     {
-        VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
-        if (buffer_type == VectorBufferType::kVarBuffer) {
-            String outline_filename = fmt::format("col_{}_out_0", column_meta.column_idx());
-            String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
-            BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-            outline_buffer_obj = buffer_mgr->GetBufferObject(outline_filepath);
-            if (outline_buffer_obj == nullptr) {
-                return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
-            }
-            {
-                Status status = column_meta.GetChunkOffset(chunk_offset);
-                if (!status.ok()) {
-                    return status;
-                }
+        String outline_filename = fmt::format("col_{}_out_0", column_meta.column_idx());
+        String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        outline_buffer_obj = buffer_mgr->GetBufferObject(outline_filepath);
+        if (outline_buffer_obj == nullptr) {
+            return Status::OK();
+            // return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
+        }
+        {
+            Status status = column_meta.GetChunkOffset(chunk_offset);
+            if (!status.ok()) {
+                return status;
             }
         }
     }

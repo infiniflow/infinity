@@ -376,6 +376,12 @@ private:
 
     Status AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values);
 
+    Status DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &column_ids);
+
+    Status DropColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<ColumnID> &column_ids);
+
+    Status DropColumnsDataInBlock(BlockMeta &block_meta, const Vector<ColumnID> &column_ids);
+
     Status AppendIndex(TableIndexMeeta &table_index_meta, const AppendState *append_state);
 
     Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);

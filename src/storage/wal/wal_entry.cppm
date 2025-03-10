@@ -565,6 +565,8 @@ export struct WalCmdDropColumns : public WalCmd {
     String table_name_{};
     String table_key_{};
     Vector<String> column_names_{};
+
+    Vector<ColumnID> column_ids_{};
 };
 
 export struct WalEntryHeader {

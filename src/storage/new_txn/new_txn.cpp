@@ -372,12 +372,15 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     if (!status.ok()) {
         return status;
     }
-    Set<String> column_name_set;
+    Map<String, ColumnID> column_name_set;
     for (const auto &column_def : *old_column_defs) {
-        column_name_set.insert(column_def->name());
+        column_name_set.emplace(column_def->name(), column_def->id());
     }
+    Vector<ColumnID> column_ids;
     for (const auto &column_name : column_names) {
-        if (!column_name_set.contains(column_name)) {
+        if (auto iter = column_name_set.find(column_name); iter != column_name_set.end()) {
+            column_ids.push_back(iter->second);
+        } else {
             return Status::ColumnNotExist(column_name);
         }
     }
@@ -389,6 +392,8 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
 
     SharedPtr<WalCmdDropColumns> wal_command = MakeShared<WalCmdDropColumns>(db_name, table_name, column_names);
     wal_command->table_key_ = table_key;
+    wal_command->column_ids_ = std::move(column_ids);
+
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -1164,6 +1169,11 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
         if (!status.ok()) {
             return status;
         }
+    }
+    
+    status = this->DropColumnsData(*table_meta, drop_columns_cmd->column_ids_);
+    if (!status.ok()) {
+        return status;
     }
     return Status::OK();
 }

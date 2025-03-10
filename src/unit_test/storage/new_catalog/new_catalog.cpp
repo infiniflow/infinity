@@ -8184,4 +8184,18 @@ TEST_P(NewCatalogTest, test_add_columns) {
             EXPECT_EQ(col.GetValue(i), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
         }
     }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        Vector<String> column_names;
+        column_names.emplace_back(column_def2->name());
+        Status status = txn->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        EXPECT_TRUE(status.ok());
+    }
 }

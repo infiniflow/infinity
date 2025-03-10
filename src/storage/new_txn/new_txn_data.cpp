@@ -748,6 +748,60 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
     return Status::OK();
 }
 
+Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &column_ids) {
+    Status status;
+    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (segment_ids_ptr->empty()) {
+        return Status::OK();
+    }
+
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        status = this->DropColumnsDataInSegment(segment_meta, column_ids);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::DropColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<ColumnID> &column_ids) {
+    Status status;
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    status = segment_meta.GetBlockIDs(block_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        status = this->DropColumnsDataInBlock(block_meta, column_ids);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::DropColumnsDataInBlock(BlockMeta &block_meta, const Vector<ColumnID> &column_ids) {
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    for (ColumnID column_id : column_ids) {
+        new_catalog->AddCleanedMeta(commit_ts,
+                                    MakeUnique<ColumnMetaKey>(block_meta.segment_meta().table_meta().db_id_str(),
+                                                              block_meta.segment_meta().table_meta().table_id_str(),
+                                                              block_meta.segment_meta().segment_id(),
+                                                              block_meta.block_id(),
+                                                              column_id));
+    }
+    return Status::OK();
+}
+
 Status NewTxn::CommitImport(const WalCmdImport *import_cmd) {
     const String &db_id_str = import_cmd->db_id_str_;
     const String &table_id_str = import_cmd->table_id_str_;
