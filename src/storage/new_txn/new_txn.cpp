@@ -681,9 +681,16 @@ Status NewTxn::Checkpoint(CheckpointOption &option) {
         option.checkpoint_ts_ = txn_mgr_->max_committed_ts();
     }
 
+    Status status;
+
+    status = txn_mgr_->kv_store()->Flush();
+    if (!status.ok()) {
+        return status;
+    }
+
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance_);
-    Status status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    status = catalog_meta.GetDBIDs(db_id_strs_ptr);
     if (!status.ok()) {
         return status;
     }

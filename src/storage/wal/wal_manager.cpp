@@ -944,10 +944,13 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
     auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_checkpoint_ts);
     if (!catalog_fileinfo.has_value()) {
         String error_message = fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir);
-        UnrecoverableError(error_message);
+        // UnrecoverableError(error_message);
+        LOG_ERROR(error_message);
+        storage_->AttachCatalog();
+    } else {
+        auto &[full_catalog_fileinfo, delta_catalog_fileinfo_array] = catalog_fileinfo.value();
+        storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfo_array);
     }
-    auto &[full_catalog_fileinfo, delta_catalog_fileinfo_array] = catalog_fileinfo.value();
-    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfo_array);
 
     // phase 3: replay the entries
     LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));

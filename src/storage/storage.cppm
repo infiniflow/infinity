@@ -105,6 +105,7 @@ public:
     Status UnInitFromWriter();
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
+    void AttachCatalog();
     void LoadFullCheckpoint(const String &checkpoint_path);
     void AttachDeltaCheckpoint(const String &checkpoint_path);
 

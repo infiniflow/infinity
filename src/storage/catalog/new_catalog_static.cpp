@@ -41,6 +41,7 @@ import var_file_worker;
 import file_worker;
 import kv_code;
 
+import catalog_meta;
 import db_meeta;
 import table_meeta;
 import segment_meta;
@@ -87,6 +88,146 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
     }
     visible_range = {block_offset_begin, row_idx};
     return block_offset_begin < row_idx;
+}
+
+Status NewCatalog::InitBufferObjs(KVInstance *kv_instance) {
+    Status status;
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+    Vector<String> *db_id_strs_ptr;
+    CatalogMeta catalog_meta(*kv_instance);
+    status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    auto InitBufferObjsInBlockColumn = [&](ColumnMeta &column_meta, SharedPtr<ColumnDef> col_def) {
+        auto &block_meta = column_meta.block_meta();
+
+        BufferObj *buffer = nullptr;
+
+        SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
+        {
+            auto filename = MakeShared<String>(fmt::format("{}.col", col_def->id()));
+            SizeT total_data_size = block_meta.block_capacity() * col_def->type()->Size();
+            auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                          MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                          block_dir_ptr,
+                                                          filename,
+                                                          total_data_size,
+                                                          buffer_mgr->persistence_manager());
+            buffer = buffer_mgr->GetBufferObject(std::move(file_worker));
+            buffer->AddObjRc();
+        }
+        VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+        if (buffer_type == VectorBufferType::kVarBuffer) {
+            auto filename = MakeShared<String>(fmt::format("col_{}_out_0", col_def->id()));
+
+            SizeT chunk_offset = 0;
+            status = column_meta.GetChunkOffset(chunk_offset);
+            if (!status.ok()) {
+                return status;
+            }
+
+            auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                 MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                 block_dir_ptr,
+                                                                 filename,
+                                                                 chunk_offset,
+                                                                 buffer_mgr->persistence_manager());
+            BufferObj *outline_buffer = buffer_mgr->GetBufferObject(std::move(outline_file_worker));
+            outline_buffer->AddObjRc();
+        }
+        return Status::OK();
+    };
+    auto InitBufferObjsInBlock = [&](BlockMeta &block_meta) {
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+        std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+
+        for (const auto &column_def : *column_defs_ptr) {
+            ColumnMeta column_meta(column_def->id(), block_meta, *kv_instance);
+            status = InitBufferObjsInBlockColumn(column_meta, column_def);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+
+        SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
+        BufferObj *version_buffer = nullptr;
+        {
+            auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                     block_dir_ptr,
+                                                                     BlockVersion::FileName(),
+                                                                     block_meta.block_capacity(),
+                                                                     buffer_mgr->persistence_manager());
+            version_buffer = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+            version_buffer->AddObjRc();
+        }
+
+        return Status::OK();
+    };
+    auto InitBufferObjsInSegment = [&](SegmentMeta &segment_meta) {
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        status = segment_meta.GetBlockIDs(block_ids_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+
+        for (BlockID block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta, *kv_instance);
+            status = InitBufferObjsInBlock(block_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+
+        return Status::OK();
+    };
+    auto InitBufferObjsInTable = [&](const String &table_id_str, DBMeeta &db_meta) {
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance);
+
+        SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+        if (!status.ok()) {
+            return status;
+        }
+
+        for (SegmentID segment_id : *segment_ids_ptr) {
+            SegmentMeta segment_meta(segment_id, table_meta, *kv_instance);
+            status = InitBufferObjsInSegment(segment_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+
+        return Status::OK();
+    };
+    auto InitBufferObjsInDB = [&](const String &db_id_str) {
+        DBMeeta db_meta(db_id_str, *kv_instance);
+
+        Vector<String> *table_id_strs_ptr = nullptr;
+        status = db_meta.GetTableIDs(table_id_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+
+        for (const String &table_id_str : *table_id_strs_ptr) {
+            InitBufferObjsInTable(table_id_str, db_meta);
+        }
+        return Status::OK();
+    };
+    for (const String &db_id_str : *db_id_strs_ptr) {
+        status = InitBufferObjsInDB(db_id_str);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    return Status::OK();
 }
 
 Status NewCatalog::AddNewDB(KVInstance *kv_instance,
@@ -708,7 +849,7 @@ Status NewCatalog::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&b
 }
 
 Status NewCatalog::GetColumnBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj) {
-    SharedPtr<String> block_dir_ptr = column_meta.block_meta().GetBlockDir(); 
+    SharedPtr<String> block_dir_ptr = column_meta.block_meta().GetBlockDir();
 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     {

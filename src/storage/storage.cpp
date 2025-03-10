@@ -257,12 +257,12 @@ Status Storage::AdminToWriter() {
 
     // Must init catalog before txn manager.
     // Replay wal file wrap init catalog
+    kv_store_ = MakeUnique<KVStore>();
+    kv_store_->Init(config_ptr_->CatalogDir());
     TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
     if (system_start_ts == 0) {
         // Init database, need to create default_db
         LOG_INFO(fmt::format("Init a new catalog"));
-        kv_store_ = MakeUnique<KVStore>();
-        kv_store_->Init(config_ptr_->CatalogDir());
         catalog_ = Catalog::NewCatalog();
         new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
     }
@@ -800,6 +800,21 @@ Status Storage::AdminToReaderBottom(TxnTimeStamp system_start_ts) {
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
     catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
+}
+
+void Storage::AttachCatalog() {
+    catalog_ = MakeUnique<Catalog>();
+    auto kv_instance = this->KVInstance();
+
+    Status status = NewCatalog::InitBufferObjs(kv_instance.get());
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Init catalog failed: {}", status.message()));
+    }
+
+    status = kv_instance->Commit();
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Commit catalog failed: {}", status.message()));
+    }
 }
 
 void Storage::LoadFullCheckpoint(const String &checkpoint_path) {

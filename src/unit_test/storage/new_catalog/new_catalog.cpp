@@ -8122,52 +8122,54 @@ TEST_P(NewCatalogTest, test_checkpoint) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    new_txn_mgr->PrintAllKeyValue();
 
-    // infinity::InfinityContext::instance().UnInit();
+    infinity::InfinityContext::instance().UnInit();
 
-    // SharedPtr<String> config_path = nullptr;
-    // InfinityContext::instance().InitPhase1(config_path);
-    // InfinityContext::instance().InitPhase2();
+    InfinityContext::instance().InitPhase1(this->config_path);
+    InfinityContext::instance().InitPhase2();
 
-    // new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    // {
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-    //     Status status;
+    new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
-    //     Optional<DBMeeta> db_meta;
-    //     Optional<TableMeeta> table_meta;
-    //     status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-    //     EXPECT_TRUE(status.ok());
+    new_txn_mgr->PrintAllKeyValue();
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Status status;
 
-    //     SegmentID segment_id = 0;
-    //     SegmentMeta segment_meta(segment_id, *table_meta, table_meta->kv_instance());
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
 
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
+        SegmentID segment_id = 0;
+        SegmentMeta segment_meta(segment_id, *table_meta, table_meta->kv_instance());
 
-    //     auto check_block = [&](BlockID block_id, const Value &v1, const Value &v2) {
-    //         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        auto check_block = [&](BlockID block_id, const Value &v1, const Value &v2) {
+            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
 
-    //         SizeT row_count = 0;
-    //         status = block_meta.GetRowCnt(row_count);
-    //         EXPECT_TRUE(status.ok());
-    //         EXPECT_EQ(row_count, block_row_cnt);
+            SizeT row_count = 0;
+            status = block_meta.GetRowCnt(row_count);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(row_count, block_row_cnt);
 
-    //         auto check_column = [&](ColumnID column_id, const Value &v) {
-    //             ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
-    //             ColumnVector col1;
-    //             status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col1);
-    //             EXPECT_TRUE(status.ok());
+            auto check_column = [&](ColumnID column_id, const Value &v) {
+                ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+                ColumnVector col1;
+                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col1);
+                EXPECT_TRUE(status.ok());
 
-    //             for (u32 i = 0; i < row_count; ++i) {
-    //                 EXPECT_EQ(col1.GetValue(i), v);
-    //             }
-    //         };
+                for (u32 i = 0; i < row_count; ++i) {
+                    EXPECT_EQ(col1.GetValue(i), v);
+                }
+            };
 
-    //         check_column(0, v1);
-    //         check_column(1, v2);
-    //     };
-    //     check_block(0, Value::MakeInt(1), Value::MakeVarchar("abc"));
-    //     check_block(1, Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
-    // }
+            check_column(0, v1);
+            check_column(1, v2);
+        };
+        check_block(0, Value::MakeInt(1), Value::MakeVarchar("abc"));
+        check_block(1, Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
 }

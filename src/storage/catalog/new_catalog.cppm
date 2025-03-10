@@ -174,6 +174,8 @@ private:
     MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
 
 public:
+    static Status InitBufferObjs(KVInstance *kv_instance);
+
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,
                            TxnTimeStamp commit_ts,
