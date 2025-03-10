@@ -38,29 +38,11 @@ public:
 
     SizeT segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    Status GetBlockIDs(Vector<BlockID> *&block_ids) {
-        if (!block_ids_) {
-            LoadBlockIDs();
-        }
-        block_ids = &block_ids_.value();
-        return Status::OK();
-    }
+    Status GetBlockIDs(Vector<BlockID> *&block_ids);
 
-    Status GetNextBlockID(BlockID &next_block_id) {
-        if (!next_block_id_) {
-            LoadNextBlockID();
-        }
-        next_block_id = *next_block_id_;
-        return Status::OK();
-    }
+    Status GetNextBlockID(BlockID &next_block_id);
 
-    Status GetRowCnt(SizeT &row_cnt) {
-        if (!row_cnt_) {
-            LoadRowCnt();
-        }
-        row_cnt = *row_cnt_;
-        return Status::OK();
-    }
+    Status GetRowCnt(SizeT &row_cnt);
 
     Status SetBlockIDs(const Vector<BlockID> &block_ids);
 
@@ -94,7 +76,7 @@ private:
     SegmentID segment_id_;
     Optional<String> segment_dir_;
 
-    Optional<Vector<BlockID>> block_ids_;
+    SharedPtr<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;
     Optional<SizeT> row_cnt_;
 };

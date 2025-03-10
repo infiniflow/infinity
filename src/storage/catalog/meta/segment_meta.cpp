@@ -30,13 +30,46 @@ SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta, KVInstanc
     : kv_instance_(kv_instance), table_meta_(table_meta), segment_id_(segment_id) {}
 
 Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
-    block_ids_ = block_ids;
+    block_ids_ = MakeShared<Vector<BlockID>>(block_ids);
     String block_ids_key = GetSegmentTag("block_ids");
     String block_ids_str = nlohmann::json(block_ids).dump();
     Status status = kv_instance_.Put(block_ids_key, block_ids_str);
     if (!status.ok()) {
         return status;
     }
+    return Status::OK();
+}
+
+Status SegmentMeta::GetBlockIDs(Vector<BlockID> *&block_ids) {
+    if (block_ids_ == nullptr) {
+        Status status = LoadBlockIDs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    block_ids = block_ids_.get();
+    return Status::OK();
+}
+
+Status SegmentMeta::GetNextBlockID(BlockID &next_block_id) {
+    if (!next_block_id_) {
+        Status status = LoadNextBlockID();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    next_block_id = *next_block_id_;
+    return Status::OK();
+}
+
+Status SegmentMeta::GetRowCnt(SizeT &row_cnt) {
+    if (!row_cnt_) {
+        Status status = LoadRowCnt();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    row_cnt = *row_cnt_;
     return Status::OK();
 }
 
@@ -131,7 +164,7 @@ Status SegmentMeta::LoadBlockIDs() {
     if (!status.ok()) {
         return status;
     }
-    block_ids_ = nlohmann::json::parse(block_ids_str).get<Vector<BlockID>>();
+    block_ids_ = MakeShared<Vector<BlockID>>(nlohmann::json::parse(block_ids_str).get<Vector<BlockID>>());
     return Status::OK();
 }
 
@@ -206,7 +239,7 @@ Status SegmentMeta::Init() {
 }
 
 Status SegmentMeta::AddBlockID(BlockID block_id) {
-    if (!block_ids_) {
+    if (block_ids_ == nullptr) {
         Status status = LoadBlockIDs();
         if (!status.ok()) {
             return status;
@@ -215,13 +248,14 @@ Status SegmentMeta::AddBlockID(BlockID block_id) {
 
     block_ids_->push_back(block_id);
     String block_ids_key = GetSegmentTag("block_ids");
-    String block_ids_str = nlohmann::json(block_ids_.value()).dump();
+    String block_ids_str = nlohmann::json(*block_ids_).dump();
     Status status = kv_instance_.Put(block_ids_key, block_ids_str);
     if (!status.ok()) {
         return status;
     }
     return Status::OK();
 }
+
 Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
     String seg_dir_key = GetSegmentTag("dir");
     String seg_dir;
@@ -234,13 +268,13 @@ Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
 }
 
 Tuple<SharedPtr<Vector<BlockID>>, Status> SegmentMeta::GetBlockIDs() {
-    if (!block_ids_) {
+    if (block_ids_ == nullptr) {
         Status status = LoadBlockIDs();
         if (!status.ok()) {
             return {nullptr, status};
         }
     }
-    return {MakeShared<Vector<BlockID>>(block_ids_.value()), Status::OK()};
+    return {MakeShared<Vector<BlockID>>(*block_ids_), Status::OK()};
 }
 
 Tuple<SizeT, Status> SegmentMeta::GetRowCnt() {

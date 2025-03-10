@@ -119,6 +119,10 @@ TEST_P(TestAppend, test_append) {
         }
         input_block->Finalize();
     }
+    //    t1      append      commit (success)
+    //    |----------|---------|
+    //                            |----------------------|----------|
+    //                           t2                  append      commit (success)
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
@@ -136,6 +140,10 @@ TEST_P(TestAppend, test_append) {
         EXPECT_TRUE(status.ok());
     }
 
+    //    t1      append                 commit (success)
+    //    |----------|-------------------------|
+    //            |----------------------|----------|
+    //           t2                  append      commit (success)
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 1"), TransactionType::kNormal);
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 2"), TransactionType::kNormal);
