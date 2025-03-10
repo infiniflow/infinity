@@ -62,10 +62,6 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
     PhysicalExplain *explain_op = (PhysicalExplain *)phys_op;
     switch (explain_op->explain_type()) {
 
-        case ExplainType::kAnalyze: {
-            Status status = Status::NotSupport("Not implement: Query analyze");
-            RecoverableError(status);
-        }
         case ExplainType::kAst:
         case ExplainType::kUnOpt:
         case ExplainType::kOpt:
@@ -73,8 +69,12 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             current_fragment_ptr->AddOperator(phys_op);
             break;
         }
-        case ExplainType::kFragment:
+        case ExplainType::kAnalyze:
         case ExplainType::kPipeline: {
+            query_context_ptr_->set_explain_analyze();
+            query_context_ptr_->CreateQueryProfiler();
+        }
+        case ExplainType::kFragment: {
             // Build explain pipeline fragment
             SharedPtr<Vector<SharedPtr<String>>> texts_ptr = MakeShared<Vector<SharedPtr<String>>>();
             Vector<PhysicalOperator *> phys_ops{phys_op->left()};
@@ -88,7 +88,7 @@ void FragmentBuilder::BuildExplain(PhysicalOperator *phys_op, PlanFragment *curr
             // Set texts to explain physical operator
             current_fragment_ptr->AddOperator(phys_op);
 
-            if (explain_op->explain_type() == ExplainType::kPipeline) {
+            if (explain_op->explain_type() == ExplainType::kPipeline or explain_op->explain_type() == ExplainType::kAnalyze) {
                 current_fragment_ptr->AddChild(std::move(explain_child_fragment));
             }
             break;

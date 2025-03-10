@@ -144,6 +144,7 @@ export enum class ErrorCode : long {
     kNotLocked = 3095,
     kTableIsUsing = 3096,
     kDuplicateColumnIndex = 3097,
+    kInvalidParameter = 3098,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -329,6 +330,7 @@ public:
     static Status NotLocked(const String &detail);
     static Status TableIsUsing(const String &detail);
     static Status DuplicateColumnIndex(const String &detail);
+    static Status InvalidParameter(const String &detail);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no re\anson gived");

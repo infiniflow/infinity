@@ -138,7 +138,6 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
     // prepare training data
     if (centroid_count > std::numeric_limits<u32>::max()) {
         const auto error_msg = "EMVBIndex::BuildEMVBIndex: centroid_count exceeds u32 limit!";
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     n_centroids_ = static_cast<u32>(centroid_count);
@@ -146,7 +145,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
     if (embedding_count < least_training_data_num) {
         const auto error_msg =
             fmt::format("EMVBIndex::BuildEMVBIndex: embedding_count must be at least {}, got {} instead.", least_training_data_num, embedding_count);
-        UnrecoverableError(error_msg);
+        RecoverableError(Status::InvalidParameter(error_msg));
     }
     // train the index
     {

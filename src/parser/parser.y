@@ -1194,6 +1194,11 @@ explain_statement : EXPLAIN IDENTIFIER explainable_statement {
     else if(!strcmp($2, "physical")) $$->type_ =infinity::ExplainType::kPhysical;
     else if(!strcmp($2, "pipeline")) $$->type_ =infinity::ExplainType::kPipeline;
     else if(!strcmp($2, "fragment")) $$->type_ =infinity::ExplainType::kFragment;
+    else {
+        free $2;
+        yyerror(&yyloc, scanner, result, "invalid explain option");
+        YYERROR;
+    }
     free($2);
     $$->statement_ = $3;
 } | EXPLAIN explainable_statement {
