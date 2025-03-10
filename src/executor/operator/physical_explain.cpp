@@ -14,6 +14,8 @@
 
 module;
 
+#include <vector>
+
 module physical_explain;
 
 import stl;
@@ -32,6 +34,9 @@ import status;
 import infinity_exception;
 import logical_type;
 import logger;
+import plan_fragment;
+import fragment_task;
+import third_party;
 
 namespace infinity {
 
@@ -46,7 +51,7 @@ void PhysicalExplain::AlignParagraphs(Vector<SharedPtr<String>> &array1, Vector<
     }
 }
 
-void PhysicalExplain::Init(QueryContext* query_context) {
+void PhysicalExplain::Init(QueryContext *query_context) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     output_names_ = MakeShared<Vector<String>>();
@@ -54,9 +59,9 @@ void PhysicalExplain::Init(QueryContext* query_context) {
 
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
-            output_names_->emplace_back("Query Analyze");
-            Status status = Status::NotSupport("Not implement: Query analyze");
-            RecoverableError(status);
+            output_names_->emplace_back("Pipeline");
+            output_names_->emplace_back("Task cost");
+            break;
         }
         case ExplainType::kAst: {
             output_names_->emplace_back("Abstract Syntax Tree");
@@ -90,12 +95,12 @@ void PhysicalExplain::Init(QueryContext* query_context) {
     }
     output_types_->emplace_back(varchar_type);
 
-    if (explain_type_ == ExplainType::kPipeline) {
+    if (explain_type_ == ExplainType::kPipeline or explain_type_ == ExplainType::kAnalyze) {
         output_types_->emplace_back(varchar_type);
     }
 }
 
-bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
+bool PhysicalExplain::Execute(QueryContext *query_context, OperatorState *operator_state) {
     String title;
 
     auto column_vector_ptr = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
@@ -105,8 +110,8 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
 
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
-            Status status = Status::NotSupport("Not implement: Query analyze");
-            RecoverableError(status);
+            title = "Analyze";
+            break;
         }
         case ExplainType::kAst: {
             title = "Abstract Syntax Tree";
@@ -144,13 +149,28 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     task_vector_ptr->Initialize(ColumnVectorType::kFlat, capacity);
 
     if (explain_type_ == ExplainType::kPipeline) {
-        AlignParagraphs(*this->texts_, *this->task_texts_);
+        Vector<SharedPtr<String>> task_texts;
+        ExplainPipeline(task_texts, plan_fragment_ptr_, query_context->query_profiler());
+
+        AlignParagraphs(*this->texts_, task_texts);
         for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
             column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
         }
-        for (SizeT idx = 0; idx < this->task_texts_->size(); ++idx) {
-            task_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->task_texts_)[idx]));
+        for (SizeT idx = 0; idx < task_texts.size(); ++idx) {
+            task_vector_ptr->AppendValue(Value::MakeVarchar(*task_texts[idx]));
         }
+    } else if (explain_type_ == ExplainType::kAnalyze) {
+        Vector<SharedPtr<String>> task_texts;
+        ExplainAnalyze(task_texts, plan_fragment_ptr_, query_context->query_profiler());
+
+        AlignParagraphs(*this->texts_, task_texts);
+        for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
+            column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
+        }
+        for (SizeT idx = 0; idx < task_texts.size(); ++idx) {
+            task_vector_ptr->AppendValue(Value::MakeVarchar(*task_texts[idx]));
+        }
+
     } else {
         for (SizeT idx = 0; idx < this->texts_->size(); ++idx) {
             column_vector_ptr->AppendValue(Value::MakeVarchar(*(*this->texts_)[idx]));
@@ -161,7 +181,7 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     column_vectors.reserve(2);
 
     column_vectors.push_back(column_vector_ptr);
-    if (explain_type_ == ExplainType::kPipeline) {
+    if (explain_type_ == ExplainType::kPipeline or explain_type_ == ExplainType::kAnalyze) {
         column_vectors.push_back(task_vector_ptr);
     }
     output_data_block->Init(column_vectors);
@@ -170,6 +190,61 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     explain_operator_state->data_block_array_.emplace_back(std::move(output_data_block));
     operator_state->SetComplete();
     return true;
+}
+
+void PhysicalExplain::SetPlanFragment(PlanFragment *plan_fragment_ptr) { plan_fragment_ptr_ = plan_fragment_ptr; }
+
+void PhysicalExplain::ExplainAnalyze(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
+    Vector<UniquePtr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
+    u64 fragment_id = plan_fragment_ptr->FragmentID();
+    {
+        String fragment_header = fmt::format("Fragment #{} * {} Tasks", fragment_id, tasks.size());
+        result.emplace_back(MakeShared<String>(fragment_header));
+    }
+    for (const auto &task : tasks) {
+        i64 task_id = task->TaskID();
+
+        Vector<TaskProfiler> &task_profiles = query_profiler->GetTaskProfile(fragment_id, task_id);
+        for (const auto &task_profile : task_profiles) {
+            i64 times = 0;
+            result.emplace_back(MakeShared<String>(fmt::format("-> Task {}, Seq: {}", task_id, times)));
+            for (const auto &operator_info : task_profile.timings_) {
+                String operator_info_str = fmt::format("  -> {} : ElapsedTime: {}, Output: {}",
+                                                       operator_info.name_,
+                                                       BaseProfiler::ElapsedToString(static_cast<infinity::NanoSeconds>(operator_info.elapsed_)),
+                                                       operator_info.output_rows_);
+                result.emplace_back(MakeShared<String>(operator_info_str));
+            }
+            ++times;
+        }
+    }
+    // NOTE: Insert blank elements after each Fragment for alignment
+    result.emplace_back(MakeShared<String>());
+
+    if (plan_fragment_ptr->HasChild()) {
+        // current fragment have children
+        for (const auto &child_fragment : plan_fragment_ptr->Children()) {
+            ExplainAnalyze(result, child_fragment.get(), query_profiler);
+        }
+    }
+}
+
+void PhysicalExplain::ExplainPipeline(Vector<SharedPtr<String>> &result, PlanFragment *plan_fragment_ptr, QueryProfiler *query_profiler) {
+    Vector<UniquePtr<FragmentTask>> &tasks = plan_fragment_ptr->GetContext()->Tasks();
+    u64 fragment_id = plan_fragment_ptr->FragmentID();
+    {
+        String fragment_header = fmt::format("Fragment #{} * {} Tasks", fragment_id, tasks.size());
+        result.emplace_back(MakeShared<String>(fragment_header));
+    }
+    // NOTE: Insert blank elements after each Fragment for alignment
+    result.emplace_back(MakeShared<String>());
+
+    if (plan_fragment_ptr->HasChild()) {
+        // current fragment have children
+        for (const auto &child_fragment : plan_fragment_ptr->Children()) {
+            ExplainPipeline(result, child_fragment.get(), query_profiler);
+        }
+    }
 }
 
 } // namespace infinity

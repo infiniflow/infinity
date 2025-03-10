@@ -323,9 +323,11 @@ void QueryContext::CreateQueryProfiler() {
         return;
     }
 
-    if (InfinityContext::instance().storage()->catalog()->GetProfile()) {
+    bool query_profiler_flag = InfinityContext::instance().storage()->catalog()->GetProfile();
+
+    if (query_profiler_flag or explain_analyze_) {
         if (query_profiler_ == nullptr) {
-            query_profiler_ = MakeShared<QueryProfiler>(true);
+            query_profiler_ = MakeShared<QueryProfiler>(query_profiler_flag);
         }
     }
 }
@@ -423,7 +425,7 @@ QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_state
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     if (session_ptr_->GetTxn() == nullptr) {
         Txn *new_txn = nullptr;
-        if(base_statement == nullptr) {
+        if (base_statement == nullptr) {
             new_txn = storage_->txn_manager()->BeginTxn(MakeUnique<String>(""), TransactionType::kNormal);
         } else {
             // TODO: more type check and setting

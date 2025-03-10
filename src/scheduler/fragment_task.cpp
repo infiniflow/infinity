@@ -51,7 +51,8 @@ void FragmentTask::OnExecute() {
     //    prof.Begin();
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     QueryContext *query_context = fragment_context->query_context();
-
+    //    bool enable_profiler = InfinityContext::instance().storage()->catalog()->GetProfile();
+    bool explain_analyze = query_context->explain_analyze();
     // TODO:
     // Tell the fragment type:
     // For materialized type, we need to run the sink on the last source
@@ -72,8 +73,7 @@ void FragmentTask::OnExecute() {
         // No source error
         Vector<PhysicalOperator *> &operator_refs = fragment_context->GetOperators();
 
-        bool enable_profiler = InfinityContext::instance().storage()->catalog()->GetProfile();
-        TaskProfiler profiler(TaskBinding(), enable_profiler, operator_count_);
+        TaskProfiler profiler(TaskBinding(), explain_analyze, operator_count_);
         HashMap<SizeT, SharedPtr<BaseTableRef>> table_refs;
         profiler.Begin();
         try {
