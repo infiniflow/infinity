@@ -80,6 +80,8 @@ public:
 
     UniquePtr<KVInstance> KVInstance();
 
+    [[nodiscard]] KVStore *kv_store() const { return kv_store_.get(); }
+
     [[nodiscard]] ResultCacheManager *result_cache_manager() const noexcept;
 
     [[nodiscard]] ResultCacheManager *GetResultCacheManagerPtr() const noexcept;

@@ -26,6 +26,8 @@ import status;
 // A view means a logical plan
 namespace infinity {
 
+class KVInstance;
+
 export struct ObjAddr {
     String obj_key_{};
     SizeT part_offset_{};
@@ -36,6 +38,8 @@ export struct ObjAddr {
     nlohmann::json Serialize() const;
 
     void Deserialize(const nlohmann::json &obj);
+
+    void Deserialize(const String &str);
 
     SizeT GetSizeInBytes() const;
 
@@ -97,6 +101,8 @@ public:
 
     void Deserialize(const nlohmann::json &obj);
 
+    void Deserialize(KVInstance *kv_instance);
+
     HashMap<String, ObjStat> GetAllObjects() const;
     HashMap<String, ObjAddr> GetAllFiles() const;
 
@@ -131,6 +137,8 @@ public: // for unit test
 
 private:
     void SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat);
+
+    void AddObjAddrToKVStore(const String &path, const ObjAddr &obj_addr);
 
     String workspace_;
     String local_data_dir_;

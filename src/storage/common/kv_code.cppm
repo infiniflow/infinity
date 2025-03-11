@@ -189,6 +189,14 @@ public:
                                      ChunkID chunk_id,
                                      TxnTimeStamp ts);
     static String TableIndexChunkKeyPrefix(const String &db_name, const String &tbl_name, const String &index_name);
+
+    static String PMObjectPrefix();
+
+    static String PMObjectStatPrefix();
+
+    static String PMObjectKey(const String &key);
+
+    static String PMObjectStatKey(const String &key);
 };
 
 } // namespace infinity

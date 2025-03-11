@@ -811,6 +811,8 @@ void Storage::AttachCatalog() {
         UnrecoverableError(fmt::format("Init catalog failed: {}", status.message()));
     }
 
+    persistence_manager_->Deserialize(kv_instance.get());
+
     status = kv_instance->Commit();
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Commit catalog failed: {}", status.message()));

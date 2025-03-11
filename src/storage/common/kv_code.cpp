@@ -274,4 +274,12 @@ String KeyEncode::TableIndexChunkKeyPrefix(const String &db_name, const String &
     return fmt::format("idx_chunk|{}|{}|{}|", db_name, tbl_name, index_name);
 }
 
+String KeyEncode::PMObjectPrefix() { return "pm|object|"; }
+
+String KeyEncode::PMObjectStatPrefix() { return "pm|object_stat|"; }
+
+String KeyEncode::PMObjectKey(const String &key) { return fmt::format("pm|object|{}", key); }
+
+String KeyEncode::PMObjectStatKey(const String &key) { return fmt::format("pm|object_stat|{}", key); }
+
 } // namespace infinity
