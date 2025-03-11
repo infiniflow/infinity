@@ -40,17 +40,6 @@ Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
     return Status::OK();
 }
 
-Status SegmentMeta::GetNextBlockID(BlockID &next_block_id) {
-    if (!next_block_id_) {
-        Status status = LoadNextBlockID();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    next_block_id = *next_block_id_;
-    return Status::OK();
-}
-
 Status SegmentMeta::GetRowCnt(SizeT &row_cnt) {
     if (!row_cnt_) {
         Status status = LoadRowCnt();
@@ -274,6 +263,16 @@ Tuple<SizeT, Status> SegmentMeta::GetRowCnt() {
         }
     }
     return {row_cnt_.value(), Status::OK()};
+}
+
+Tuple<BlockID, Status> SegmentMeta::GetNextBlockID() {
+    if (!next_block_id_) {
+        Status status = LoadNextBlockID();
+        if (!status.ok()) {
+            return {INVALID_BLOCK_ID, status};
+        }
+    }
+    return {*next_block_id_, Status::OK()};
 }
 
 } // namespace infinity

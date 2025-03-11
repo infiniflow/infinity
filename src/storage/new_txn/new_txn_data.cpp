@@ -80,7 +80,7 @@ struct NewTxnCompactState {
 
         BlockID block_id = 0;
         {
-            status = new_segment_meta_->GetNextBlockID(block_id);
+            std::tie(block_id, status) = new_segment_meta_->GetNextBlockID();
             if (!status.ok()) {
                 return status;
             }
@@ -174,7 +174,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
         BlockID block_id = 0;
         {
-            status = segment_meta->GetNextBlockID(block_id);
+            std::tie(block_id, status) = segment_meta->GetNextBlockID();
             if (!status.ok()) {
                 return status;
             }
@@ -923,7 +923,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     }
 
     BlockID next_block_id = 0;
-    status = segment_meta->GetNextBlockID(next_block_id);
+    std::tie(next_block_id, status) = segment_meta->GetNextBlockID();
     if (!status.ok()) {
         return status;
     }

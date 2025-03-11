@@ -90,8 +90,7 @@ TEST_P(TableMeetaTest, table_meeta) {
             segment_meta.Init();
             segment_meta.SetRowCnt(1048);
             {
-                BlockID block_id = 0;
-                auto block_status = segment_meta.GetNextBlockID(block_id);
+                auto [block_id, block_status] = segment_meta.GetNextBlockID();
                 EXPECT_TRUE(block_status.ok());
                 EXPECT_EQ(block_id, 0);
             }
@@ -111,8 +110,7 @@ TEST_P(TableMeetaTest, table_meeta) {
             }
 
             {
-                BlockID block_id = 0;
-                auto block_status = segment_meta.GetNextBlockID(block_id);
+                auto [block_id, block_status] = segment_meta.GetNextBlockID();
                 EXPECT_TRUE(block_status.ok());
                 EXPECT_EQ(block_id, 1);
             }

@@ -38,8 +38,6 @@ public:
 
     SizeT segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    Status GetNextBlockID(BlockID &next_block_id);
-
     Status GetRowCnt(SizeT &row_cnt);
 
     Status SetBlockIDs(const Vector<BlockID> &block_ids);
@@ -58,6 +56,7 @@ public:
     Tuple<SharedPtr<String>, Status> GetSegmentDir();
     Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
     Tuple<SizeT, Status> GetRowCnt();
+    Tuple<BlockID, Status> GetNextBlockID();
 
 private:
     Status LoadBlockIDs();
