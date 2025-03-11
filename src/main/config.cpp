@@ -1987,7 +1987,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         UnrecoverableError(status.message());
                     }
                 }
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kMemIndexMemoryQuota) == nullptr) {
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kFulltextIndexBuildingWorker) == nullptr) {
                     // fulltext index building worker
                     i64 fulltext_index_building_worker = Thread::hardware_concurrency() / 2;
                     if (fulltext_index_building_worker < 2) {
