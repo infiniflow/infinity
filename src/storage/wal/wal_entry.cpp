@@ -1459,16 +1459,18 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
 
 bool WalEntry::IsCheckPoint(WalCmdCheckpoint *&last_checkpoint_cmd) const {
     TxnTimeStamp max_commit_ts = 0;
+    bool found = false;
     for (auto &cmd : cmds_) {
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
             auto checkpoint_cmd = static_cast<WalCmdCheckpoint *>(cmd.get());
-            if (TxnTimeStamp(checkpoint_cmd->max_commit_ts_) > max_commit_ts) {
+            if (!found || TxnTimeStamp(checkpoint_cmd->max_commit_ts_) > max_commit_ts) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 last_checkpoint_cmd = checkpoint_cmd;
+                found = true;
             }
         }
     }
-    return max_commit_ts != 0;
+    return found;
 }
 
 String WalEntry::ToString() const {

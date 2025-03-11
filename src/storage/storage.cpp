@@ -36,6 +36,7 @@ import logger;
 import kv_store;
 
 import txn;
+import new_txn;
 import infinity_exception;
 import status;
 import background_process;
@@ -259,12 +260,13 @@ Status Storage::AdminToWriter() {
     // Replay wal file wrap init catalog
     kv_store_ = MakeUnique<KVStore>();
     kv_store_->Init(config_ptr_->CatalogDir());
+    new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
+
     TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
     if (system_start_ts == 0) {
         // Init database, need to create default_db
         LOG_INFO(fmt::format("Init a new catalog"));
         catalog_ = Catalog::NewCatalog();
-        new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
     }
 
     i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
@@ -343,6 +345,21 @@ Status Storage::AdminToWriter() {
     periodic_trigger_thread_->cleanup_trigger_ =
         MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
     bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+
+    // if (new_txn_mgr_) {
+    //     auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
+
+    //     CheckpointOption option;
+    //     option.checkpoint_ts_ = system_start_ts;
+    //     Status status = new_txn->Checkpoint(option);
+    //     if (!status.ok()) {
+    //         UnrecoverableError("Failed to checkpoint");
+    //     }
+    //     status = new_txn_mgr_->CommitTxn(new_txn);
+    //     if (!status.ok()) {
+    //         UnrecoverableError("Failed to commit txn for checkpoint");
+    //     }
+    // }
 
     //    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
     //    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);

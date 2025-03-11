@@ -8061,6 +8061,9 @@ TEST_P(NewCatalogTest, test_checkpoint) {
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -8103,6 +8106,14 @@ TEST_P(NewCatalogTest, test_checkpoint) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    [[maybe_unused]] auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    create_index(index_def1);
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
 
@@ -8112,25 +8123,49 @@ TEST_P(NewCatalogTest, test_checkpoint) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
-        CheckpointOption option;
-        Status status = txn->Checkpoint(option);
+
+    [[maybe_unused]] auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
+
+        ChunkID chunk_id = 0;
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+
+        BufferObj *buffer_obj = nullptr;
+        status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
+        EXPECT_TRUE(status.ok());
+
+        {
+            BufferHandle buffer_handle = buffer_obj->Load();
+            [[maybe_unused]] const auto *index = reinterpret_cast<const SecondaryIndexData *>(buffer_handle.GetData());
+        }
+
+        SharedPtr<MemIndex> mem_index;
+        status = segment_index_meta.GetMemIndex(mem_index);
+        EXPECT_TRUE(status.ok());
+        {
+            auto [row_id, row_cnt] = check_mem_index(mem_index);
+            EXPECT_EQ(row_id, RowID(0, block_row_cnt));
+            EXPECT_EQ(row_cnt, block_row_cnt);
+        }
+
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-    }
-    new_txn_mgr->PrintAllKeyValue();
-
-    infinity::InfinityContext::instance().UnInit();
-
-    InfinityContext::instance().InitPhase1(this->config_path);
-    InfinityContext::instance().InitPhase2();
-
-    new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
-    new_txn_mgr->PrintAllKeyValue();
-    {
+    };
+    auto check_table = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         Status status;
 
@@ -8167,7 +8202,41 @@ TEST_P(NewCatalogTest, test_checkpoint) {
         check_block(0, Value::MakeInt(1), Value::MakeVarchar("abc"));
         check_block(1, Value::MakeInt(2), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
 
+        // check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+        //     RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+        //     u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        //     return std::make_pair(begin_id, row_cnt);
+        // });
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    // check_table();
+
+    // new_txn_mgr->PrintAllKeyValue();
+    // infinity::InfinityContext::instance().UnInit();
+
+    // InfinityContext::instance().InitPhase1(this->config_path);
+    // InfinityContext::instance().InitPhase2();
+    // new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    // new_txn_mgr->PrintAllKeyValue();
+    check_table();
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
+        CheckpointOption option;
+        Status status = txn->Checkpoint(option);
+        EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    new_txn_mgr->PrintAllKeyValue();
+    infinity::InfinityContext::instance().UnInit();
+
+    InfinityContext::instance().InitPhase1(this->config_path);
+    InfinityContext::instance().InitPhase2();
+    new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    new_txn_mgr->PrintAllKeyValue();
+    check_table();
 }
