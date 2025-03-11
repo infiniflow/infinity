@@ -436,12 +436,9 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
             append_state->current_block_offset_ = 0;
             continue;
         }
-        SizeT block_row_count = 0;
-        {
-            Status status = block_meta.GetRowCnt(block_row_count);
-            if (!status.ok()) {
-                return status;
-            }
+        auto [block_row_count, block_status] = block_meta.GetRowCnt();
+        if (!block_status.ok()) {
+            return block_status;
         }
         SizeT actual_append = std::min(to_append_rows, block_meta.block_capacity() - block_row_count);
 
@@ -461,13 +458,11 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
 
         block_full = block_row_count + actual_append >= block_meta.block_capacity();
 
-        SizeT segment_row_count = 0;
-        {
-            Status status = block_meta.segment_meta().GetRowCnt(segment_row_count);
-            if (!status.ok()) {
-                return status;
-            }
+        auto [segment_row_count, segment_status] = block_meta.segment_meta().GetRowCnt();
+        if (!segment_status.ok()) {
+            return segment_status;
         }
+
         if (actual_append) {
             block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
         }
@@ -717,10 +712,7 @@ NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPt
 }
 
 Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
-    Status status;
-
-    SizeT block_row_count = 0;
-    status = block_meta.GetRowCnt(block_row_count);
+    auto [block_row_count, status] = block_meta.GetRowCnt();
     if (!status.ok()) {
         return status;
     }

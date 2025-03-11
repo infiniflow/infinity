@@ -40,17 +40,6 @@ public:
 
     SharedPtr<String> GetBlockDir();
 
-    Status GetRowCnt(SizeT &row_cnt) {
-        if (!row_cnt_) {
-            Status status = LoadRowCnt();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        row_cnt = *row_cnt_;
-        return Status::OK();
-    }
-
     Status GetBlockLock(SharedPtr<BlockLock> &block_lock);
 
     Status SetRowCnt(SizeT row_cnt);
@@ -58,6 +47,8 @@ public:
     Status InitSet();
 
     Status UninitSet();
+
+    Tuple<SizeT, Status> GetRowCnt();
 
 private:
     Status LoadRowCnt();

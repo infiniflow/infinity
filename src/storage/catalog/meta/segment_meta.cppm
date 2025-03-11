@@ -38,8 +38,6 @@ public:
 
     SizeT segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    Status GetRowCnt(SizeT &row_cnt);
-
     Status SetBlockIDs(const Vector<BlockID> &block_ids);
 
     Status SetNextBlockID(BlockID next_block_id);

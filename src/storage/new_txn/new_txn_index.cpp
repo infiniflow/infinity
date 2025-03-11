@@ -596,36 +596,29 @@ Status NewTxn::PopulateIndex(const String &db_name,
 }
 
 Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id) {
-    SharedPtr<Vector<BlockID>> block_ids;
-    Status status;
-    {
-        std::tie(block_ids, status) = segment_meta.GetBlockIDs();
-        if (!status.ok()) {
-            return status;
-        }
+    auto [block_ids, status] = segment_meta.GetBlockIDs();
+    if (!status.ok()) {
+        return status;
     }
     for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
         SizeT row_cnt = 0;
-        {
-            Status status = block_meta.GetRowCnt(row_cnt);
-            if (!status.ok()) {
-                return status;
-            }
+        std::tie(row_cnt, status) = block_meta.GetRowCnt();
+        if (!status.ok()) {
+            return status;
         }
+
         ColumnVector col;
-        {
-            Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
-            if (!status.ok()) {
-                return status;
-            }
+        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+        if (!status.ok()) {
+            return status;
         }
         SegmentOffset block_offset = block_meta.block_capacity() * block_meta.block_id();
         RowID begin_row_id(segment_meta.segment_id(), block_offset);
         u32 offset = 0;
-        Status status = this->AppendMemIndex(segment_index_meta, begin_row_id, col, offset, row_cnt);
+        status = this->AppendMemIndex(segment_index_meta, begin_row_id, col, offset, row_cnt);
         if (!status.ok()) {
             return status;
         }
@@ -646,12 +639,11 @@ NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &
         SharedPtr<String> index_dir = segment_index_meta.table_index_meta().GetTableIndexDir();
         full_path = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), *index_dir);
     }
+    Status status;
     SharedPtr<MemIndex> mem_index;
-    {
-        Status status = segment_index_meta.GetAndWriteMemIndex(mem_index);
-        if (!status.ok()) {
-            return status;
-        }
+    status = segment_index_meta.GetAndWriteMemIndex(mem_index);
+    if (!status.ok()) {
+        return status;
     }
     mem_index->memory_indexer_ =
         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
@@ -659,30 +651,23 @@ NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &
 
     SharedPtr<Vector<BlockID>> block_ids;
 
-    {
-        Status status;
-        std::tie(block_ids, status) = segment_meta.GetBlockIDs();
-        if (!status.ok()) {
-            return status;
-        }
+    std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+    if (!status.ok()) {
+        return status;
     }
     for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
         SizeT row_cnt = 0;
-        {
-            Status status = block_meta.GetRowCnt(row_cnt);
-            if (!status.ok()) {
-                return status;
-            }
+        std::tie(row_cnt, status) = block_meta.GetRowCnt();
+        if (!status.ok()) {
+            return status;
         }
         ColumnVector col;
-        {
-            Status status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
-            if (!status.ok()) {
-                return status;
-            }
+        status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+        if (!status.ok()) {
+            return status;
         }
         SegmentOffset block_offset = block_meta.block_capacity() * block_meta.block_id();
         RowID begin_row_id(segment_meta.segment_id(), block_offset);
@@ -912,21 +897,17 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
-            {
-                status = block_meta.GetRowCnt(block_row_cnt);
-                if (!status.ok()) {
-                    return status;
-                }
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+            if (!status.ok()) {
+                return status;
             }
             ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
             SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
             total_row_cnt -= row_cnt;
             ColumnVector col;
-            {
-                status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
-                if (!status.ok()) {
-                    return status;
-                }
+            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+            if (!status.ok()) {
+                return status;
             }
             u32 offset = 0;
             memory_hnsw_index->InsertVecs(base_rowid.segment_offset_, col, offset, row_cnt);
@@ -943,21 +924,17 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
-            {
-                status = block_meta.GetRowCnt(block_row_cnt);
-                if (!status.ok()) {
-                    return status;
-                }
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+            if (!status.ok()) {
+                return status;
             }
             ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
             SizeT row_cnt = std::min(block_row_cnt, SizeT(total_row_cnt));
             total_row_cnt -= row_cnt;
             ColumnVector col;
-            {
-                status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
-                if (!status.ok()) {
-                    return status;
-                }
+            status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
+            if (!status.ok()) {
+                return status;
             }
             u32 offset = 0;
             memory_bmp_index->AddDocs(base_rowid.segment_offset_, col, offset, row_cnt);

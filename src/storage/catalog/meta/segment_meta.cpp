@@ -40,17 +40,6 @@ Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
     return Status::OK();
 }
 
-Status SegmentMeta::GetRowCnt(SizeT &row_cnt) {
-    if (!row_cnt_) {
-        Status status = LoadRowCnt();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    row_cnt = *row_cnt_;
-    return Status::OK();
-}
-
 // Status SegmentMeta::AddBlockID(BlockID block_id) {
 //     if (!block_ids_) {
 //         Status status = LoadBlockIDs();

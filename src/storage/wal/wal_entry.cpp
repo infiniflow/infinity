@@ -74,15 +74,12 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
 }
 
 WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_id()) {
-    Status status;
-
-    SizeT row_count = 0;
-    status = block_meta.GetRowCnt(row_count);
+    auto [row_count, status] = block_meta.GetRowCnt();
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
-    row_count_ = row_count;
 
+    row_count_ = row_count;
     row_capacity_ = block_meta.block_capacity();
 
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
@@ -225,7 +222,7 @@ WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta) : segment_id_(segment_
         block_infos_.emplace_back(block_meta);
 
         SizeT block_row_cnt = 0;
-        status = block_meta.GetRowCnt(block_row_cnt);
+        std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }

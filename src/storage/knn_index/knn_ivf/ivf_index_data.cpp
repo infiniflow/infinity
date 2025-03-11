@@ -107,8 +107,7 @@ private:
         if (block_id != last_block_id_) {
             last_block_id_ = block_id;
             BlockMeta block_meta(block_id, segment_meta_, segment_meta_.kv_instance());
-            SizeT row_cnt = 0;
-            Status status = block_meta.GetRowCnt(row_cnt);
+            auto [row_cnt, status] = block_meta.GetRowCnt();
             if (!status.ok()) {
                 UnrecoverableError("Get row count failed");
             }

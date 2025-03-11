@@ -113,4 +113,14 @@ String BlockMeta::GetBlockTag(const String &tag) const {
     return KeyEncode::CatalogTableSegmentBlockTagKey(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, tag);
 }
 
+Tuple<SizeT, Status> BlockMeta::GetRowCnt() {
+    if (!row_cnt_) {
+        Status status = LoadRowCnt();
+        if (!status.ok()) {
+            return {0, status};
+        }
+    }
+    return {*row_cnt_, Status::OK()};
+}
+
 } // namespace infinity

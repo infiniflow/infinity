@@ -8019,7 +8019,7 @@ TEST_P(NewCatalogTest, test_add_columns) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
 
         SizeT row_count = 0;
-        status = block_meta.GetRowCnt(row_count);
+        std::tie(row_count, status) = block_meta.GetRowCnt();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(row_count, block_row_cnt);
 
@@ -8146,7 +8146,7 @@ TEST_P(NewCatalogTest, test_checkpoint) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
 
             SizeT row_count = 0;
-            status = block_meta.GetRowCnt(row_count);
+            std::tie(row_count, status) = block_meta.GetRowCnt();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_count, block_row_cnt);
 
