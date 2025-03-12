@@ -201,7 +201,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
 
-            status = NewCatalog::GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
+            Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
             if (!status.ok()) {
                 return status;
             }
@@ -1241,7 +1241,7 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         BufferObj *buffer_obj = nullptr;
         BufferObj *outline_buffer_obj = nullptr;
 
-        status = NewCatalog::GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
+        Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
         if (!status.ok()) {
             return status;
         }

@@ -25,11 +25,13 @@ namespace infinity {
 
 class KVInstance;
 class SegmentIndexMeta;
+class BufferObj;
 
 export struct ChunkIndexMetaInfo {
     String base_name_;
     RowID base_row_id_;
     SizeT row_cnt_;
+    SizeT index_size_;
 
     void ToJson(nlohmann::json &json) const;
 
@@ -55,12 +57,18 @@ public:
         return Status::OK();
     }
 
+    Status GetIndexBuffer(BufferObj *&index_buffer);
+
     Status InitSet(const ChunkIndexMetaInfo &chunk_info);
+
+    Status LoadSet();
 
     Status UninitSet();
 
 private:
     Status LoadChunkInfo();
+
+    Status LoadIndexBuffer();
 
     String GetChunkIndexTag(const String &tag) const;
 
@@ -70,6 +78,8 @@ private:
     ChunkID chunk_id_;
 
     Optional<ChunkIndexMetaInfo> chunk_info_;
+
+    BufferObj *index_buffer_ = nullptr;
 };
 
 } // namespace infinity

@@ -175,6 +175,18 @@ Status SegmentIndexMeta::InitSet() {
     return Status::OK();
 }
 
+Status SegmentIndexMeta::LoadSet() {
+    {
+        String mem_index_key = GetSegmentIndexTag("mem_index");
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        Status status = new_catalog->AddMemIndex(std::move(mem_index_key), MakeShared<MemIndex>());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status SegmentIndexMeta::UninitSet() {
     {
         String chunk_ids_key = GetSegmentIndexTag("chunk_ids");

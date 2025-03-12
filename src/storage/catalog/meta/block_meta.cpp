@@ -26,6 +26,10 @@ import table_meeta;
 import new_catalog;
 import infinity_context;
 
+import buffer_manager;
+import block_version;
+import version_file_worker;
+
 namespace infinity {
 
 BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta, KVInstance &kv_instance)
@@ -66,6 +70,47 @@ Status BlockMeta::InitSet() {
             return status;
         }
     }
+    SharedPtr<String> block_dir_ptr = this->GetBlockDir();
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    {
+        auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                                 MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                                 block_dir_ptr,
+                                                                 BlockVersion::FileName(),
+                                                                 this->block_capacity(),
+                                                                 buffer_mgr->persistence_manager());
+        version_buffer_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
+        if (!version_buffer_) {
+            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
+        }
+        version_buffer_->AddObjRc();
+    }
+    return Status::OK();
+}
+
+Status BlockMeta::LoadSet() {
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    {
+        String block_lock_key = GetBlockTag("lock");
+        Status status = new_catalog->AddBlockLock(std::move(block_lock_key));
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    SharedPtr<String> block_dir_ptr = this->GetBlockDir();
+    auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_dir_ptr,
+                                                             BlockVersion::FileName(),
+                                                             this->block_capacity(),
+                                                             buffer_mgr->persistence_manager());
+    version_buffer_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
+    if (!version_buffer_) {
+        return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_file_worker->GetFilePath()));
+    }
+    version_buffer_->AddObjRc();
+
     return Status::OK();
 }
 
@@ -85,7 +130,23 @@ Status BlockMeta::UninitSet() {
             return status;
         }
     }
+
+    auto [version_buffer, status] = this->GetVersionBuffer();
+    if (!status.ok()) {
+        return status;
+    }
+    version_buffer->PickForCleanup();
     return Status::OK();
+}
+
+Tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
+    if (!version_buffer_) {
+        Status status = LoadVersionBuffer();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    return {version_buffer_, Status::OK()};
 }
 
 SharedPtr<String> BlockMeta::GetBlockDir() {
@@ -105,6 +166,19 @@ Status BlockMeta::LoadRowCnt() {
         return status;
     }
     row_cnt_ = std::stoull(row_cnt_str);
+    return Status::OK();
+}
+
+Status BlockMeta::LoadVersionBuffer() {
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+    SharedPtr<String> block_dir_ptr = this->GetBlockDir();
+    String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+    version_buffer_ = buffer_mgr->GetBufferObject(version_filepath);
+    if (version_buffer_ == nullptr) {
+        return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+    }
+
     return Status::OK();
 }
 

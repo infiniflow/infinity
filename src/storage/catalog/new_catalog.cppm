@@ -223,20 +223,13 @@ public:
                                    SizeT row_count,
                                    const String &base_name,
                                    SizeT index_size,
-                                   Optional<ChunkIndexMeta> &chunk_index_meta,
-                                   BufferObj *&buffer_obj);
+                                   Optional<ChunkIndexMeta> &chunk_index_meta);
 
     static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta);
 
     static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector);
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, NewTxnGetVisibleRangeState &state);
-
-    static Status GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffer_obj);
-
-    static Status GetColumnBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj);
-
-    static Status GetVersionBufferObj(BlockMeta &block_meta, BufferObj *&buffer_obj);
 };
 
 } // namespace infinity

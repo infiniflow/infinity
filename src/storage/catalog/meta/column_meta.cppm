@@ -23,6 +23,8 @@ namespace infinity {
 
 class BlockMeta;
 class KVInstance;
+class BufferObj;
+class ColumnDef;
 
 export class ColumnMeta {
 public:
@@ -49,10 +51,16 @@ public:
 
     Status InitSet();
 
+    Status LoadSet();
+
     Status UninitSet();
+
+    Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
 
 private:
     Status LoadChunkOffset();
+
+    Status LoadColumnBuffer();
 
     String GetColumnTag(const String &tag) const;
 
@@ -62,6 +70,9 @@ private:
     SizeT column_idx_;
 
     Optional<SizeT> chunk_offset_;
+
+    BufferObj *column_buffer_ = nullptr;
+    BufferObj *outline_buffer_ = nullptr;
 };
 
 } // namespace infinity

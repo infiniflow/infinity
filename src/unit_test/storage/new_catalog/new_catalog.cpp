@@ -7273,7 +7273,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -7369,7 +7369,7 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         // int32_t end_val = 3;
 
         BufferObj *buffer_obj = nullptr;
-        status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
         // {
@@ -7643,7 +7643,7 @@ TEST_P(NewCatalogTest, test_populate_index) {
         }
 
         BufferObj *buffer_obj = nullptr;
-        status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -8145,7 +8145,7 @@ TEST_P(NewCatalogTest, test_checkpoint) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
 
         BufferObj *buffer_obj = nullptr;
-        status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
+        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
         EXPECT_TRUE(status.ok());
 
         {

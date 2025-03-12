@@ -20,26 +20,13 @@ module new_catalog;
 
 import stl;
 import third_party;
-import vector_buffer;
-import buffer_manager;
-import infinity_context;
 import block_version;
 import column_def;
 import infinity_exception;
-import index_defines;
-import create_index_info;
-
-import secondary_index_file_worker;
-import ivf_index_file_worker;
-import raw_file_worker;
-import hnsw_file_worker;
-import bmp_index_file_worker;
-import emvb_index_file_worker;
-import version_file_worker;
-import data_file_worker;
-import var_file_worker;
-import file_worker;
+import table_def;
 import kv_code;
+import kv_store;
+import column_vector;
 
 import catalog_meta;
 import db_meeta;
@@ -53,11 +40,11 @@ import chunk_index_meta;
 
 namespace infinity {
 
-namespace {
+// namespace {
 
-String IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
+// String IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
 
-} // namespace
+// } // namespace
 
 void NewTxnGetVisibleRangeState::Init(SharedPtr<BlockLock> block_lock, BufferHandle version_buffer_handle, TxnTimeStamp begin_ts) {
     block_lock_ = std::move(block_lock);
@@ -92,7 +79,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
 
 Status NewCatalog::InitBufferObjs(KVInstance *kv_instance) {
     Status status;
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    // BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance);
@@ -101,42 +88,10 @@ Status NewCatalog::InitBufferObjs(KVInstance *kv_instance) {
         return status;
     }
 
-    auto InitBufferObjsInBlockColumn = [&](ColumnMeta &column_meta, SharedPtr<ColumnDef> col_def) {
-        auto &block_meta = column_meta.block_meta();
-
-        BufferObj *buffer = nullptr;
-
-        SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
-        {
-            auto filename = MakeShared<String>(fmt::format("{}.col", col_def->id()));
-            SizeT total_data_size = block_meta.block_capacity() * col_def->type()->Size();
-            auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                          MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                          block_dir_ptr,
-                                                          filename,
-                                                          total_data_size,
-                                                          buffer_mgr->persistence_manager());
-            buffer = buffer_mgr->GetBufferObject(std::move(file_worker));
-            buffer->AddObjRc();
-        }
-        VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
-        if (buffer_type == VectorBufferType::kVarBuffer) {
-            auto filename = MakeShared<String>(fmt::format("col_{}_out_0", col_def->id()));
-
-            SizeT chunk_offset = 0;
-            status = column_meta.GetChunkOffset(chunk_offset);
-            if (!status.ok()) {
-                return status;
-            }
-
-            auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                 MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                 block_dir_ptr,
-                                                                 filename,
-                                                                 chunk_offset,
-                                                                 buffer_mgr->persistence_manager());
-            BufferObj *outline_buffer = buffer_mgr->GetBufferObject(std::move(outline_file_worker));
-            outline_buffer->AddObjRc();
+    auto InitBufferObjsInBlockColumn = [&](ColumnMeta &column_meta) {
+        Status status = column_meta.LoadSet();
+        if (!status.ok()) {
+            return status;
         }
         return Status::OK();
     };
@@ -148,23 +103,14 @@ Status NewCatalog::InitBufferObjs(KVInstance *kv_instance) {
         }
         for (const auto &column_def : *column_defs_ptr) {
             ColumnMeta column_meta(column_def->id(), block_meta, *kv_instance);
-            status = InitBufferObjsInBlockColumn(column_meta, column_def);
+            status = InitBufferObjsInBlockColumn(column_meta);
             if (!status.ok()) {
                 return status;
             }
         }
-
-        SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
-        BufferObj *version_buffer = nullptr;
-        {
-            auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                     MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                     block_dir_ptr,
-                                                                     BlockVersion::FileName(),
-                                                                     block_meta.block_capacity(),
-                                                                     buffer_mgr->persistence_manager());
-            version_buffer = buffer_mgr->GetBufferObject(std::move(version_file_worker));
-            version_buffer->AddObjRc();
+        Status status = block_meta.LoadSet();
+        if (!status.ok()) {
+            return status;
         }
 
         return Status::OK();
@@ -186,115 +132,10 @@ Status NewCatalog::InitBufferObjs(KVInstance *kv_instance) {
     };
     auto InitBufferObjsInChunkIndex = [&](ChunkID chunk_id, SegmentIndexMeta &segment_index_meta) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *kv_instance);
-        TableIndexMeeta &table_index_meta = chunk_index_meta.segment_index_meta().table_index_meta();
-        SegmentID segment_id = chunk_index_meta.segment_index_meta().segment_id();
-
-        ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-        status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+        Status status = chunk_index_meta.LoadSet();
         if (!status.ok()) {
             return status;
         }
-        RowID base_row_id = chunk_info_ptr->base_row_id_;
-        SizeT row_count = chunk_info_ptr->row_cnt_;
-        const String &base_name = chunk_info_ptr->base_name_;
-        SizeT index_size = 0;
-
-        auto [index_base, index_status] = table_index_meta.GetIndexBase();
-        if (!index_status.ok()) {
-            return index_status;
-        }
-        auto [column_def, col_status] = table_index_meta.GetColumnDef();
-        if (!col_status.ok()) {
-            return status;
-        }
-        SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
-
-        BufferObj *buffer_obj = nullptr;
-        switch (index_base->index_type_) {
-            case IndexType::kSecondary: {
-                auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                              index_dir,
-                                                                              std::move(secondary_index_file_name),
-                                                                              index_base,
-                                                                              column_def,
-                                                                              row_count,
-                                                                              buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kFullText: {
-                auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
-                auto index_file_worker = MakeUnique<RawFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                   index_dir,
-                                                                   std::move(column_length_file_name),
-                                                                   row_count * sizeof(u32),
-                                                                   buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kIVF: {
-                auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                        MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                        index_dir,
-                                                                        std::move(ivf_index_file_name),
-                                                                        index_base,
-                                                                        column_def,
-                                                                        buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kHnsw: {
-                auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto index_file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                    MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                    index_dir,
-                                                                    std::move(hnsw_index_file_name),
-                                                                    index_base,
-                                                                    column_def,
-                                                                    buffer_mgr->persistence_manager(),
-                                                                    index_size);
-                buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kBMP: {
-                auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                  index_dir,
-                                                                  std::move(bmp_index_file_name),
-                                                                  index_base,
-                                                                  column_def,
-                                                                  buffer_mgr->persistence_manager(),
-                                                                  index_size);
-                buffer_obj = buffer_mgr->GetBufferObject(std::move(file_worker));
-                break;
-            }
-            case IndexType::kEMVB: {
-                auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                const auto segment_start_offset = base_row_id.segment_offset_;
-                auto file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                   index_dir,
-                                                                   std::move(emvb_index_file_name),
-                                                                   index_base,
-                                                                   column_def,
-                                                                   segment_start_offset,
-                                                                   buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->GetBufferObject(std::move(file_worker));
-                break;
-            }
-            default: {
-                UnrecoverableError("Not implemented yet");
-            }
-        }
-        if (buffer_obj == nullptr) {
-            return Status::BufferManagerError("GetBufferObject failed");
-        }
-        buffer_obj->AddObjRc();
         return Status::OK();
     };
     auto InitBufferObjsInSegmentIndex = [&](SegmentID segment_id, TableIndexMeeta &table_index_meta) {
@@ -582,19 +423,6 @@ Status NewCatalog::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Opti
             return status;
         }
     }
-    SharedPtr<String> block_dir_ptr = block_meta->GetBlockDir();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    BufferObj *version_buffer = nullptr;
-    {
-        auto version_file_worker = MakeUnique<VersionFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                 MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                 block_dir_ptr,
-                                                                 BlockVersion::FileName(),
-                                                                 block_meta->block_capacity(),
-                                                                 buffer_mgr->persistence_manager());
-        version_buffer = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
-        version_buffer->AddObjRc();
-    }
     SizeT column_num = 0;
     {
         TableMeeta &table_meta = segment_meta.table_meta();
@@ -615,15 +443,6 @@ Status NewCatalog::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Opti
 }
 
 Status NewCatalog::CleanBlock(BlockMeta &block_meta) {
-    Status status;
-
-    BufferObj *version_buffer = nullptr;
-    status = NewCatalog::GetVersionBufferObj(block_meta, version_buffer);
-    if (!status.ok()) {
-        return status;
-    }
-    version_buffer->PickForCleanup();
-
     SizeT column_num = 0;
     {
         TableMeeta &table_meta = block_meta.segment_meta().table_meta();
@@ -646,16 +465,6 @@ Status NewCatalog::CleanBlock(BlockMeta &block_meta) {
 }
 
 Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta) {
-    const ColumnDef *col_def = nullptr;
-    {
-        TableMeeta &table_meta = block_meta.segment_meta().table_meta();
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        col_def = (*column_defs_ptr)[column_idx].get();
-    }
-
     column_meta.emplace(column_idx, block_meta, block_meta.kv_instance());
     {
         Status status = column_meta->InitSet();
@@ -663,50 +472,12 @@ Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Op
             return status;
         }
     }
-    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    BufferObj *buffer = nullptr;
-    {
-        auto filename = MakeShared<String>(fmt::format("{}.col", column_idx));
-        SizeT total_data_size = block_meta.block_capacity() * col_def->type()->Size();
-        auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                      block_dir_ptr,
-                                                      filename,
-                                                      total_data_size,
-                                                      buffer_mgr->persistence_manager());
-        buffer = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-        buffer->AddObjRc();
-    }
-    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
-    if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_idx));
-        auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                             block_dir_ptr,
-                                                             filename,
-                                                             0, /*buffer_size*/
-                                                             buffer_mgr->persistence_manager());
-        BufferObj *outline_buffer = buffer_mgr->AllocateBufferObject(std::move(outline_file_worker));
-        outline_buffer->AddObjRc();
-    }
     return Status::OK();
 }
 
 Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta) {
     Status status;
 
-    BufferObj *buffer_obj = nullptr;
-    BufferObj *outline_buffer_obj = nullptr;
-    status = NewCatalog::GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
-    if (!status.ok()) {
-        return status;
-    }
-
-    buffer_obj->PickForCleanup();
-    if (outline_buffer_obj) {
-        outline_buffer_obj->PickForCleanup();
-    }
     status = column_meta.UninitSet();
     if (!status.ok()) {
         return status;
@@ -761,118 +532,12 @@ Status NewCatalog::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
                                     SizeT row_count,
                                     const String &base_name,
                                     SizeT index_size,
-                                    Optional<ChunkIndexMeta> &chunk_index_meta,
-                                    BufferObj *&buffer_obj) {
-    TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
-    SegmentID segment_id = segment_index_meta.segment_id();
-
-    auto [index_base, index_status] = table_index_meta.GetIndexBase();
-    if (!index_status.ok()) {
-        return index_status;
-    }
-
-    SharedPtr<ColumnDef> column_def;
-    {
-        auto [col_def, status] = table_index_meta.GetColumnDef();
-        if (!status.ok()) {
-            return status;
-        }
-        column_def = std::move(col_def);
-    }
-
-    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
+                                    Optional<ChunkIndexMeta> &chunk_index_meta) {
     ChunkIndexMetaInfo chunk_info;
-    {
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        switch (index_base->index_type_) {
-            case IndexType::kSecondary: {
-                auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto index_file_worker = MakeUnique<SecondaryIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                              index_dir,
-                                                                              std::move(secondary_index_file_name),
-                                                                              index_base,
-                                                                              column_def,
-                                                                              row_count,
-                                                                              buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kFullText: {
-                auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
-                auto index_file_worker = MakeUnique<RawFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                   index_dir,
-                                                                   std::move(column_length_file_name),
-                                                                   row_count * sizeof(u32),
-                                                                   buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->GetBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kIVF: {
-                auto ivf_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto index_file_worker = MakeUnique<IVFIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                        MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                        index_dir,
-                                                                        std::move(ivf_index_file_name),
-                                                                        index_base,
-                                                                        column_def,
-                                                                        buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kHnsw: {
-                auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto index_file_worker = MakeUnique<HnswFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                    MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                    index_dir,
-                                                                    std::move(hnsw_index_file_name),
-                                                                    index_base,
-                                                                    column_def,
-                                                                    buffer_mgr->persistence_manager(),
-                                                                    index_size);
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(index_file_worker));
-                break;
-            }
-            case IndexType::kBMP: {
-                auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                auto file_worker = MakeUnique<BMPIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                  MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                  index_dir,
-                                                                  std::move(bmp_index_file_name),
-                                                                  index_base,
-                                                                  column_def,
-                                                                  buffer_mgr->persistence_manager(),
-                                                                  index_size);
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-                break;
-            }
-            case IndexType::kEMVB: {
-                auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-                const auto segment_start_offset = base_row_id.segment_offset_;
-                auto file_worker = MakeUnique<EMVBIndexFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
-                                                                   MakeShared<String>(InfinityContext::instance().config()->TempDir()),
-                                                                   index_dir,
-                                                                   std::move(emvb_index_file_name),
-                                                                   index_base,
-                                                                   column_def,
-                                                                   segment_start_offset,
-                                                                   buffer_mgr->persistence_manager());
-                buffer_obj = buffer_mgr->AllocateBufferObject(std::move(file_worker));
-                break;
-            }
-            default: {
-                UnrecoverableError("Not implemented yet");
-            }
-        }
-        if (buffer_obj == nullptr) {
-            return Status::BufferManagerError("AllocateBufferObject failed");
-        }
-        buffer_obj->AddObjRc();
-    }
     chunk_info.base_name_ = base_name;
     chunk_info.base_row_id_ = base_row_id;
     chunk_info.row_cnt_ = row_count;
+    chunk_info.index_size_ = index_size;
     {
         chunk_index_meta.emplace(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
         Status status = chunk_index_meta->InitSet(chunk_info);
@@ -891,13 +556,6 @@ Status NewCatalog::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
 
 Status NewCatalog::CleanChunkIndex(ChunkIndexMeta &chunk_index_meta) {
     Status status;
-
-    BufferObj *buffer_obj = nullptr;
-    status = NewCatalog::GetChunkIndex(chunk_index_meta, buffer_obj);
-    if (!status.ok()) {
-        return status;
-    }
-    buffer_obj->PickForCleanup();
 
     status = chunk_index_meta.UninitSet();
     if (!status.ok()) {
@@ -919,7 +577,7 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, con
 
     BufferObj *buffer_obj = nullptr;
     BufferObj *outline_buffer_obj = nullptr;
-    Status status = NewCatalog::GetColumnBufferObj(column_meta, buffer_obj, outline_buffer_obj);
+    Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
     if (!status.ok()) {
         return status;
     }
@@ -930,8 +588,7 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, con
 }
 
 Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, NewTxnGetVisibleRangeState &state) {
-    BufferObj *version_buffer = nullptr;
-    Status status = NewCatalog::GetVersionBufferObj(block_meta, version_buffer);
+    auto [version_buffer, status] = block_meta.GetVersionBuffer();
     if (!status.ok()) {
         return status;
     }
@@ -945,101 +602,6 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
         }
     }
     state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts);
-    return Status::OK();
-}
-
-Status NewCatalog::GetChunkIndex(ChunkIndexMeta &chunk_index_meta, BufferObj *&buffer_obj) {
-    TableIndexMeeta &table_index_meta = chunk_index_meta.segment_index_meta().table_index_meta();
-
-    String index_dir = fmt::format("{}/{}", InfinityContext::instance().config()->DataDir(), table_index_meta.GetTableIndexDir()->c_str());
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-
-    auto [index_base, index_status] = table_index_meta.GetIndexBase();
-    if (!index_status.ok()) {
-        return index_status;
-    }
-    SegmentID segment_id = chunk_index_meta.segment_index_meta().segment_id();
-    ChunkID chunk_id = chunk_index_meta.chunk_id();
-    switch (index_base->index_type_) {
-        case IndexType::kSecondary:
-        case IndexType::kIVF:
-        case IndexType::kHnsw:
-        case IndexType::kBMP:
-        case IndexType::kEMVB: {
-            String index_file_name = IndexFileName(segment_id, chunk_id);
-            String index_filepath = fmt::format("{}/{}", index_dir, index_file_name);
-            buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
-            if (buffer_obj == nullptr) {
-                return Status::BufferManagerError("GetBufferObject failed");
-            }
-            break;
-        }
-        case IndexType::kFullText: {
-            ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
-            {
-                Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
-                if (!status.ok()) {
-                    return status;
-                }
-            }
-            auto column_length_file_name = chunk_info_ptr->base_name_ + LENGTH_SUFFIX;
-            String index_filepath = fmt::format("{}/{}", index_dir, column_length_file_name);
-            buffer_obj = buffer_mgr->GetBufferObject(index_filepath);
-            if (buffer_obj == nullptr) {
-                return Status::BufferManagerError("GetBufferObject failed");
-            }
-            break;
-        }
-        default: {
-            UnrecoverableError("Not implemented yet");
-        }
-    }
-
-    return Status::OK();
-}
-
-Status NewCatalog::GetColumnBufferObj(ColumnMeta &column_meta, BufferObj *&buffer_obj, BufferObj *&outline_buffer_obj) {
-    SharedPtr<String> block_dir_ptr = column_meta.block_meta().GetBlockDir();
-
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    {
-        String col_filename = std::to_string(column_meta.column_idx()) + ".col";
-        String col_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + col_filename;
-        buffer_obj = buffer_mgr->GetBufferObject(col_filepath);
-        if (buffer_obj == nullptr) {
-            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", col_filepath));
-        }
-    }
-    [[maybe_unused]] SizeT chunk_offset = 0;
-    {
-        String outline_filename = fmt::format("col_{}_out_0", column_meta.column_idx());
-        String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        outline_buffer_obj = buffer_mgr->GetBufferObject(outline_filepath);
-        if (outline_buffer_obj == nullptr) {
-            return Status::OK();
-            // return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
-        }
-        {
-            Status status = column_meta.GetChunkOffset(chunk_offset);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-    }
-    return Status::OK();
-}
-
-Status NewCatalog::GetVersionBufferObj(BlockMeta &block_meta, BufferObj *&version_buffer) {
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-
-    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
-    String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
-    version_buffer = buffer_mgr->GetBufferObject(version_filepath);
-    if (version_buffer == nullptr) {
-        return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
-    }
-
     return Status::OK();
 }
 

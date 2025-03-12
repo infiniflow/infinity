@@ -160,14 +160,12 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = NewCatalog::AddNewChunkIndex(segment_index_meta,
-                                                     chunk_id,
-                                                     base_rowid,
-                                                     row_cnt,
-                                                     base_name,
-                                                     0 /*index_size*/,
-                                                     chunk_index_meta,
-                                                     buffer_obj);
+        Status status =
+            NewCatalog::AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, base_name, 0 /*index_size*/, chunk_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -181,7 +179,8 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
 
                 BufferObj *buffer_obj = nullptr;
                 {
-                    Status status = NewCatalog::GetChunkIndex(old_chunk_meta, buffer_obj);
+                    // Status status = NewCatalog::GetChunkIndex(old_chunk_meta, buffer_obj);
+                    status = old_chunk_meta.GetIndexBuffer(buffer_obj);
                     if (!status.ok()) {
                         return status;
                     }
@@ -718,14 +717,12 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = NewCatalog::AddNewChunkIndex(segment_index_meta,
-                                                     chunk_id,
-                                                     base_row_id,
-                                                     row_count,
-                                                     "" /*base_name*/,
-                                                     0 /*index_size*/,
-                                                     chunk_index_meta,
-                                                     buffer_obj);
+        Status status =
+            NewCatalog::AddNewChunkIndex(segment_index_meta, chunk_id, base_row_id, row_count, "" /*base_name*/, 0 /*index_size*/, chunk_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -768,14 +765,9 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status = NewCatalog::AddNewChunkIndex(segment_index_meta,
-                                                     chunk_id,
-                                                     base_row_id,
-                                                     row_count,
-                                                     "" /*base_name*/,
-                                                     0 /*index_size*/,
-                                                     chunk_index_meta,
-                                                     buffer_obj);
+        Status status =
+            NewCatalog::AddNewChunkIndex(segment_index_meta, chunk_id, base_row_id, row_count, "" /*base_name*/, 0 /*index_size*/, chunk_index_meta);
+        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {
             return status;
         }
@@ -1026,8 +1018,11 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status =
-            NewCatalog::AddNewChunkIndex(segment_index_meta, chunk_id, row_id, row_count, base_name, index_size, chunk_index_meta, buffer_obj);
+        Status status = NewCatalog::AddNewChunkIndex(segment_index_meta, chunk_id, row_id, row_count, base_name, index_size, chunk_index_meta);
+        if (!status.ok()) {
+            return status;
+        }
+        status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {
             return status;
         }

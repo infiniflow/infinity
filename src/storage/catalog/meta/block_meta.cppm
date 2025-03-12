@@ -25,6 +25,7 @@ namespace infinity {
 class KVInstance;
 class SegmentMeta;
 struct BlockLock;
+class BufferObj;
 
 export class BlockMeta {
 public:
@@ -46,12 +47,18 @@ public:
 
     Status InitSet();
 
+    Status LoadSet();
+
     Status UninitSet();
 
     Tuple<SizeT, Status> GetRowCnt();
 
+    Tuple<BufferObj *, Status> GetVersionBuffer();
+
 private:
     Status LoadRowCnt();
+
+    Status LoadVersionBuffer();
 
     String GetBlockTag(const String &tag) const;
 
@@ -62,6 +69,8 @@ private:
 
     SharedPtr<String> block_dir_;
     Optional<SizeT> row_cnt_;
+
+    BufferObj *version_buffer_ = nullptr;
 };
 
 } // namespace infinity

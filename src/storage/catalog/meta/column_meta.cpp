@@ -25,6 +25,13 @@ import segment_meta;
 import table_meeta;
 import third_party;
 
+import infinity_context;
+import buffer_manager;
+import data_file_worker;
+import var_file_worker;
+import vector_buffer;
+import column_vector;
+
 namespace infinity {
 
 ColumnMeta::ColumnMeta(SizeT column_idx, BlockMeta &block_meta, KVInstance &kv_instance)
@@ -45,12 +52,132 @@ Status ColumnMeta::InitSet() {
     if (!status.ok()) {
         return status;
     }
+
+    SharedPtr<ColumnDef> col_def;
+    {
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        col_def = (*column_defs_ptr)[column_idx_];
+    }
+
+    SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    {
+        auto filename = MakeShared<String>(fmt::format("{}.col", column_idx_));
+        SizeT total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
+        auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                      block_dir_ptr,
+                                                      filename,
+                                                      total_data_size,
+                                                      buffer_mgr->persistence_manager());
+        column_buffer_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+        if (!column_buffer_) {
+            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
+        }
+        column_buffer_->AddObjRc();
+    }
+    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+    if (buffer_type == VectorBufferType::kVarBuffer) {
+        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_idx_));
+        auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_dir_ptr,
+                                                             filename,
+                                                             0, /*buffer_size*/
+                                                             buffer_mgr->persistence_manager());
+        outline_buffer_ = buffer_mgr->AllocateBufferObject(std::move(outline_file_worker));
+        if (!outline_buffer_) {
+            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
+        }
+        outline_buffer_->AddObjRc();
+    }
+    return Status::OK();
+}
+
+Status ColumnMeta::LoadSet() {
+    Status status;
+    SharedPtr<ColumnDef> col_def;
+    {
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+        std::tie(column_defs_ptr, status) = block_meta_.segment_meta().table_meta().GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        col_def = (*column_defs_ptr)[column_idx_];
+    }
+
+    auto *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
+    {
+        auto filename = MakeShared<String>(fmt::format("{}.col", col_def->id()));
+        SizeT total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
+        auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                      MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                      block_dir_ptr,
+                                                      filename,
+                                                      total_data_size,
+                                                      buffer_mgr->persistence_manager());
+        column_buffer_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+        if (!column_buffer_) {
+            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", file_worker->GetFilePath()));
+        }
+        column_buffer_->AddObjRc();
+    }
+    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+    if (buffer_type == VectorBufferType::kVarBuffer) {
+        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", col_def->id()));
+
+        SizeT chunk_offset = 0;
+        status = this->GetChunkOffset(chunk_offset);
+        if (!status.ok()) {
+            return status;
+        }
+
+        auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
+                                                             MakeShared<String>(InfinityContext::instance().config()->TempDir()),
+                                                             block_dir_ptr,
+                                                             filename,
+                                                             chunk_offset,
+                                                             buffer_mgr->persistence_manager());
+        outline_buffer_ = buffer_mgr->GetBufferObject(std::move(outline_file_worker));
+        if (!outline_buffer_) {
+            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", outline_file_worker->GetFilePath()));
+        }
+        outline_buffer_->AddObjRc();
+    }
+    return Status::OK();
+}
+
+Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer) {
+    if (!column_buffer_) {
+        Status status = LoadColumnBuffer();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    column_buffer = column_buffer_;
+    outline_buffer = outline_buffer_;
     return Status::OK();
 }
 
 Status ColumnMeta::UninitSet() {
+    Status status;
+
+    status = this->GetColumnBuffer(column_buffer_, outline_buffer_);
+    if (!status.ok()) {
+        return status;
+    }
+    column_buffer_->PickForCleanup();
+    if (outline_buffer_) {
+        outline_buffer_->PickForCleanup();
+    }
+
     String chunk_offset_key = GetColumnTag("last_chunk_offset");
-    Status status = kv_instance_.Delete(chunk_offset_key);
+    status = kv_instance_.Delete(chunk_offset_key);
     if (!status.ok()) {
         return status;
     }
@@ -66,6 +193,49 @@ Status ColumnMeta::LoadChunkOffset() {
         return status;
     }
     chunk_offset_ = std::stoull(chunk_offset_str);
+    return Status::OK();
+}
+
+Status ColumnMeta::LoadColumnBuffer() {
+    SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
+    // TODO
+    // SharedPtr<ColumnDef> col_def;
+    // {
+    //     auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     col_def = (*column_defs_ptr)[column_idx_];
+    // }
+
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    {
+        String col_filename = std::to_string(column_idx_) + ".col";
+        String col_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + col_filename;
+        column_buffer_ = buffer_mgr->GetBufferObject(col_filepath);
+        if (column_buffer_ == nullptr) {
+            return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", col_filepath));
+        }
+    }
+    // VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+    [[maybe_unused]] SizeT chunk_offset = 0;
+    // if (buffer_type == VectorBufferType::kVarBuffer) {
+    {
+        String outline_filename = fmt::format("col_{}_out_0", column_idx_);
+        String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        outline_buffer_ = buffer_mgr->GetBufferObject(outline_filepath);
+        if (outline_buffer_ == nullptr) {
+            // return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
+            return Status::OK();
+        }
+        {
+            Status status = this->GetChunkOffset(chunk_offset);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
     return Status::OK();
 }
 
