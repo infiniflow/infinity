@@ -1519,6 +1519,14 @@ Status NewTxn::Rollback() {
                 }
                 break;
             }
+            case WalCommandType::APPEND: {
+                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table when rollback append txn");
+                }
+                break;
+            }
             default: {
                 break;
             }

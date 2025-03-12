@@ -254,20 +254,26 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     this->CheckTxn(db_name);
     NewTxnTableStore1 *table_store = nullptr;
 
-    auto append_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
-
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt);
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
     if (!status.ok()) {
         return status;
     }
     TableMeeta &table_meta = *table_meta_opt;
 
+    auto append_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
     {
         append_command->db_id_str_ = db_meta->db_id_str();
         append_command->table_id_str_ = table_meta.table_id_str();
+        append_command->table_key_ = table_key;
         table_store = txn_store_.GetNewTxnTableStore1(append_command->db_id_str_, append_command->table_id_str_);
+    }
+
+    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (!status.ok()) {
+        return status;
     }
 
     auto wal_command = static_pointer_cast<WalCmd>(append_command);
@@ -277,9 +283,9 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     {
         SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs{nullptr};
         {
-            auto [col_defs, status] = table_meta.GetColumnDefs();
-            if (!status.ok()) {
-                return status;
+            auto [col_defs, col_def_status] = table_meta.GetColumnDefs();
+            if (!col_def_status.ok()) {
+                return col_def_status;
             }
             column_defs = col_defs;
         }
@@ -991,6 +997,11 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
 }
 
 Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
+    Status status = new_catalog_->DecreaseTableWriteCount(append_cmd->table_key_);
+    if (!status.ok()) {
+        UnrecoverableError("Fail to unlock table on post commit phase");
+    }
+
     KVStore *kv_store = txn_mgr_->kv_store();
     UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
 
@@ -1016,14 +1027,14 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
         if (!block_meta || block_meta->block_id() != block_id) {
             block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
         }
-        Status status = this->AppendInBlock(*block_meta, range.start_offset_, range.row_count_, data_block, range.data_block_offset_);
+        status = this->AppendInBlock(*block_meta, range.start_offset_, range.row_count_, data_block, range.data_block_offset_);
         if (!status.ok()) {
             return status;
         }
     }
     Vector<String> *index_id_strs = nullptr;
     {
-        Status status = table_meta.GetIndexIDs(index_id_strs, nullptr);
+        status = table_meta.GetIndexIDs(index_id_strs, nullptr);
         if (!status.ok()) {
             return status;
         }
@@ -1031,13 +1042,13 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
     for (SizeT i = 0; i < index_id_strs->size(); ++i) {
         const String &index_id_str = (*index_id_strs)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
-        Status status = this->AppendIndex(table_index_meta, append_state);
+        status = this->AppendIndex(table_index_meta, append_state);
         if (!status.ok()) {
             return status;
         }
     }
     {
-        Status status = kv_instance->Commit();
+        status = kv_instance->Commit();
         if (!status.ok()) {
             return status;
         }
