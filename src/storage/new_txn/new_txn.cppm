@@ -446,8 +446,8 @@ private:
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
     Status CommitImport(const WalCmdImport *import_cmd);
-    Status CommitAppend(const WalCmdAppend *append_cmd);
-    Status PostCommitAppend(const WalCmdAppend *append_cmd);
+    Status CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
+    Status PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
     Status PostCommitDelete(const WalCmdDelete *delete_cmd);
     Status CommitCompact(const WalCmdCompact *compact_cmd);
     Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd);

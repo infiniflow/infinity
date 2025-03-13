@@ -991,8 +991,27 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX:
-            case WalCommandType::APPEND:
             case WalCommandType::DELETE: {
+                break;
+            }
+            case WalCommandType::APPEND: {
+                auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
+
+                KVStore *kv_store = txn_mgr_->kv_store();
+                UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+
+                Status status = CommitAppend(append_cmd, kv_instance.get());
+                if (!status.ok()) {
+                    return status;
+                }
+                status = PostCommitAppend(append_cmd, kv_instance.get());
+                if (!status.ok()) {
+                    return status;
+                }
+                status = kv_instance->Commit();
+                if (!status.ok()) {
+                    return status;
+                }
                 break;
             }
             case WalCommandType::IMPORT: {
@@ -1353,22 +1372,22 @@ void NewTxn::CommitBottom() {
     // prepare to commit txn local data into table
     //    TxnTimeStamp commit_ts = this->CommitTS();
 
-    for (auto &command : wal_entry_->cmds_) {
-        WalCommandType command_type = command->GetType();
-        switch (command_type) {
-            case WalCommandType::APPEND: {
-                auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
-                Status status = CommitAppend(append_cmd);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("CommitAppend failed: {}", status.message()));
-                }
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    }
+//    for (auto &command : wal_entry_->cmds_) {
+//        WalCommandType command_type = command->GetType();
+//        switch (command_type) {
+//            case WalCommandType::APPEND: {
+//                auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
+//                Status status = CommitAppend(append_cmd);
+//                if (!status.ok()) {
+//                    UnrecoverableError(fmt::format("CommitAppend failed: {}", status.message()));
+//                }
+//                break;
+//            }
+//            default: {
+//                break;
+//            }
+//        }
+//    }
 
     Status status = kv_instance_->Commit();
     if (!status.ok()) {
@@ -1405,11 +1424,11 @@ void NewTxn::PostCommit() {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::APPEND: {
-                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                Status status = PostCommitAppend(append_cmd);
-                if (!status.ok()) {
-                    UnrecoverableError("PostCommitAppend failed");
-                }
+//                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+//                Status status = PostCommitAppend(append_cmd);
+//                if (!status.ok()) {
+//                    UnrecoverableError("PostCommitAppend failed");
+//                }
                 break;
             }
             case WalCommandType::DELETE: {

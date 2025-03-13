@@ -913,7 +913,7 @@ Status NewTxn::CommitImport(const WalCmdImport *import_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
+Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance) {
     const String &db_id_str = append_cmd->db_id_str_;
     const String &table_id_str = append_cmd->table_id_str_;
 
@@ -925,7 +925,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
         return Status::OK();
     }
 
-    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
 
     Status status;
 
@@ -958,7 +958,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
             return status;
         }
     } else {
-        segment_meta.emplace(unsealed_segment_id, table_meta, *kv_instance_.get());
+        segment_meta.emplace(unsealed_segment_id, table_meta, *kv_instance);
     }
 
     BlockID next_block_id = 0;
@@ -979,7 +979,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
         }
     } else {
         BlockID block_id = next_block_id - 1;
-        block_meta.emplace(block_id, segment_meta.value(), *kv_instance_.get());
+        block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
     }
     while (true) {
         bool block_full = false;
@@ -1037,14 +1037,11 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
+Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance) {
     Status status = new_catalog_->DecreaseTableWriteCount(append_cmd->table_key_);
     if (!status.ok()) {
         UnrecoverableError("Fail to unlock table on post commit phase");
     }
-
-    KVStore *kv_store = txn_mgr_->kv_store();
-    UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
 
     const String &db_id_str = append_cmd->db_id_str_;
     const String &table_id_str = append_cmd->table_id_str_;
@@ -1084,12 +1081,6 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd) {
         const String &index_id_str = (*index_id_strs)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
         status = this->AppendIndex(table_index_meta, append_state);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    {
-        status = kv_instance->Commit();
         if (!status.ok()) {
             return status;
         }
