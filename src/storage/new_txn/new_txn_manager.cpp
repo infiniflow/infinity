@@ -163,6 +163,15 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(NewTxn *txn) {
     return commit_ts;
 }
 
+TxnTimeStamp NewTxnManager::GetReplayWriteCommitTS(NewTxn *txn) {
+    std::lock_guard guard(locker_);
+    current_ts_ += 2;
+    TxnTimeStamp commit_ts = current_ts_;
+    committing_txns_.emplace(commit_ts, txn);
+    txn->SetTxnWrite();
+    return commit_ts;
+}
+
 Optional<String> NewTxnManager::CheckTxnConflict(NewTxn *txn) {
     TxnTimeStamp commit_ts = txn->CommitTS();
     Vector<SharedPtr<NewTxn>> candidate_txns;

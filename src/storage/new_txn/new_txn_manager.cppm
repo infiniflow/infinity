@@ -17,7 +17,6 @@ module;
 export module new_txn_manager;
 
 import stl;
-import new_txn;
 import buffer_manager;
 import txn_state;
 import wal_entry;
@@ -32,6 +31,7 @@ namespace infinity {
 class BGTaskProcessor;
 class WalManager;
 class CatalogDeltaEntry;
+class NewTxn;
 
 export class NewTxnManager {
 public:
@@ -56,6 +56,8 @@ public:
     TxnTimeStamp GetReadCommitTS(NewTxn *txn);
 
     TxnTimeStamp GetWriteCommitTS(NewTxn *txn);
+
+    TxnTimeStamp GetReplayWriteCommitTS(NewTxn *txn);
 
     Optional<String> CheckTxnConflict(NewTxn *txn);
 

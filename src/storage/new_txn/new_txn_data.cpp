@@ -20,6 +20,7 @@ module new_txn;
 
 import stl;
 import third_party;
+import new_txn_manager;
 import default_values;
 import buffer_obj;
 import infinity_exception;

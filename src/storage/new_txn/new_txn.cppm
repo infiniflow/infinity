@@ -465,6 +465,12 @@ private:
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
 
+    void SetReplay(bool replay) { txn_context_ptr_->replay_ = replay; }
+
+    bool IsReplay() const { return txn_context_ptr_->replay_; }
+
+    void SetWalEntry(SharedPtr<WalEntry> wal_entry) { wal_entry_ = wal_entry; }
+
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};

@@ -455,10 +455,7 @@ TEST_P(NewCatalogTest, db_test4) {
 
         Vector<String> db_names;
         status = txn3->ListDatabase(db_names);
-        EXPECT_EQ(db_names.size(), 2);
-        for (auto &db : db_names) {
-            std::cout << db << std::endl;
-        }
+        EXPECT_EQ(Set<String>(db_names.begin(), db_names.end()), Set<String>({"db1", "db2", "default_db"}));
 
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());

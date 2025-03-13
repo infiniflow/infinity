@@ -19,7 +19,6 @@ import config;
 import catalog;
 import new_catalog;
 import txn_manager;
-import new_txn_manager;
 import buffer_manager;
 import wal_manager;
 import background_process;
@@ -39,6 +38,7 @@ namespace infinity {
 
 class CleanupInfoTracer;
 class ResultCacheManager;
+class NewTxnManager;
 
 export enum class ReaderInitPhase {
     kInvalid,

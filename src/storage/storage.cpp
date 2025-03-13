@@ -59,6 +59,8 @@ import result_cache_manager;
 import global_resource_usage;
 import txn_state;
 
+import wal_entry;
+
 namespace infinity {
 
 Storage::Storage(Config *config_ptr) : config_ptr_(config_ptr) {
@@ -262,11 +264,29 @@ Status Storage::AdminToWriter() {
     kv_store_->Init(config_ptr_->CatalogDir());
     new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
 
-    TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
-    if (system_start_ts == 0) {
+    this->AttachCatalog();
+
+    // TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
+    TxnTimeStamp system_start_ts = 0;
+    {
+        Vector<SharedPtr<WalEntry>> replay_entries;
+        system_start_ts = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
         // Init database, need to create default_db
         LOG_INFO(fmt::format("Init a new catalog"));
         catalog_ = Catalog::NewCatalog();
+
+        // TODO: new txn manager
+        new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
+        new_txn_mgr_->Start();
+
+        // start WalManager after TxnManager since it depends on TxnManager.
+        wal_mgr_->Start();
+
+        wal_mgr_->ReplayWalEntries(replay_entries);
+    }
+
+    if (system_start_ts == 0) {
+        CreateDefaultDB();
     }
 
     i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
@@ -291,17 +311,6 @@ Status Storage::AdminToWriter() {
     }
     txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
     txn_mgr_->Start();
-
-    // TODO: new txn manager
-    new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
-    new_txn_mgr_->Start();
-
-    // start WalManager after TxnManager since it depends on TxnManager.
-    wal_mgr_->Start();
-
-    //    if (system_start_ts == 0) {
-    //        CreateDefaultDB();
-    //    }
 
     if (memory_index_tracer_ != nullptr) {
         UnrecoverableError("Memory index tracer was initialized before.");
@@ -346,20 +355,20 @@ Status Storage::AdminToWriter() {
         MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
     bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
-    // if (new_txn_mgr_) {
-    //     auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
+    if (new_txn_mgr_) {
+        auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
 
-    //     CheckpointOption option;
-    //     option.checkpoint_ts_ = system_start_ts;
-    //     Status status = new_txn->Checkpoint(option);
-    //     if (!status.ok()) {
-    //         UnrecoverableError("Failed to checkpoint");
-    //     }
-    //     status = new_txn_mgr_->CommitTxn(new_txn);
-    //     if (!status.ok()) {
-    //         UnrecoverableError("Failed to commit txn for checkpoint");
-    //     }
-    // }
+        CheckpointOption option;
+        option.checkpoint_ts_ = system_start_ts;
+        Status status = new_txn->Checkpoint(option);
+        if (!status.ok()) {
+            UnrecoverableError("Failed to checkpoint");
+        }
+        status = new_txn_mgr_->CommitTxn(new_txn);
+        if (!status.ok()) {
+            UnrecoverableError("Failed to commit txn for checkpoint");
+        }
+    }
 
     //    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
     //    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
@@ -820,7 +829,6 @@ void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vect
 }
 
 void Storage::AttachCatalog() {
-    catalog_ = MakeUnique<Catalog>();
     auto kv_instance = this->KVInstance();
 
     Status status = NewCatalog::InitBufferObjs(kv_instance.get());
@@ -847,6 +855,19 @@ void Storage::LoadFullCheckpoint(const String &checkpoint_path) {
 void Storage::AttachDeltaCheckpoint(const String &checkpoint_path) { catalog_->AttachDeltaCheckpoint(checkpoint_path); }
 
 void Storage::CreateDefaultDB() {
+    if (new_txn_mgr_) {
+        NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("create default_db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase("default_db", ConflictType::kError, MakeShared<String>());
+        if (!status.ok()) {
+            UnrecoverableError("Can't create 'default_db'");
+        }
+        status = new_txn_mgr_->CommitTxn(txn);
+        if (!status.ok()) {
+            UnrecoverableError("Can't commit txn for 'default_db'");
+        }
+        return;
+    }
+
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
     new_txn->SetReaderAllowed(true);
     // Txn1: Create db1, OK

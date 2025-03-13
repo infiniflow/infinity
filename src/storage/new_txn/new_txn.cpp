@@ -835,7 +835,12 @@ Status NewTxn::Commit() {
     }
 
     // register commit ts in wal manager here, define the commit sequence
-    TxnTimeStamp commit_ts = txn_mgr_->GetWriteCommitTS(this);
+    TxnTimeStamp commit_ts;
+    if (this->IsReplay()) {
+        commit_ts = txn_mgr_->GetReplayWriteCommitTS(this);
+    } else {
+        commit_ts = txn_mgr_->GetWriteCommitTS(this);
+    }
     LOG_TRACE(fmt::format("NewTxn: {} is committing, begin_ts:{} committing ts: {}", txn_context_ptr_->txn_id_, BeginTS(), commit_ts));
 
     this->SetTxnCommitting(commit_ts);
@@ -853,20 +858,28 @@ Status NewTxn::Commit() {
     //     return Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", *conflict_reason));
     // }
 
-    Status status = this->PrepareCommit();
-    if (!status.ok()) {
-        wal_entry_ = nullptr;
+    if (this->IsReplay()) {
+        Status status = this->PrepareCommit();
+        if (!status.ok()) {
+            return status;
+        }
+        this->CommitBottom();
+    } else {
+        Status status = this->PrepareCommit();
+        if (!status.ok()) {
+            wal_entry_ = nullptr;
+            txn_mgr_->SendToWAL(this);
+            return status;
+        }
+
+        // Put wal entry to the manager in the same order as commit_ts.
+        wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
         txn_mgr_->SendToWAL(this);
-        return status;
+
+        // Wait until CommitTxnBottom is done.
+        std::unique_lock<std::mutex> lk(commit_lock_);
+        commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
     }
-
-    // Put wal entry to the manager in the same order as commit_ts.
-    wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
-    txn_mgr_->SendToWAL(this);
-
-    // Wait until CommitTxnBottom is done.
-    std::unique_lock<std::mutex> lk(commit_lock_);
-    commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
     PostCommit();
 

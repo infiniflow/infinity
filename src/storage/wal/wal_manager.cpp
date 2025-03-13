@@ -982,6 +982,147 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
     return system_start_ts;
 }
 
+TxnTimeStamp WalManager::GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries) {
+    Vector<String> wal_list{};
+    {
+        auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
+        if (wal_infos.size() > 1) {
+            std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
+                return a.max_commit_ts_ > b.max_commit_ts_;
+            });
+        }
+        if (temp_wal_info.has_value()) {
+            wal_list.push_back(temp_wal_info->path_);
+            LOG_INFO(fmt::format("Find temp wal file: {}", temp_wal_info->path_));
+        }
+        for (const auto &wal_info : wal_infos) {
+            wal_list.push_back(wal_info.path_);
+            LOG_INFO(fmt::format("Find wal file: {}", wal_info.path_));
+        }
+        // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
+    }
+    if (wal_list.empty()) {
+        LOG_INFO(fmt::format("No checkpoint found, terminate replaying WAL"));
+        return 0;
+    }
+
+    LOG_INFO("Start Wal Replay");
+    // log the wal files.
+
+    TxnTimeStamp max_checkpoint_ts = 0; // the max commit ts that has been checkpointed
+    replay_entries.clear();
+    String catalog_dir = "";
+    TxnTimeStamp last_commit_ts = 0; // last wal commit ts
+
+    { // if no checkpoint, max_checkpoint_ts is 0
+        WalListIterator iterator(wal_list);
+        // phase 1: find the max commit ts and catalog path
+        LOG_INFO("Replay phase 1: find the max commit ts and catalog path");
+        while (iterator.HasNext()) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                String error_message = "Found unexpected bad wal entry";
+                UnrecoverableError(error_message);
+            }
+            // LOG_TRACE(wal_entry->ToString());
+
+            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            if (wal_entry->IsCheckPoint(checkpoint_cmd)) {
+                max_checkpoint_ts = checkpoint_cmd->max_commit_ts_;
+                std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
+                catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
+                last_commit_ts = wal_entry->commit_ts_;
+                break;
+            }
+            replay_entries.push_back(wal_entry);
+        }
+        LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_checkpoint_ts));
+
+        // phase 2: by the max commit ts, find the entries to replay
+        LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay");
+        while (iterator.HasNext()) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                String error_message = "Found unexpected bad wal entry";
+                UnrecoverableError(error_message);
+                // TODO: clean the wal entries, disk break will reach this place.
+                // replay_entries.clear();
+                break;
+            }
+            // LOG_TRACE(wal_entry->ToString());
+
+            if (wal_entry->commit_ts_ > max_checkpoint_ts) {
+                replay_entries.push_back(wal_entry);
+            } else {
+                break;
+            }
+        }
+    }
+    if (last_commit_ts == 0) {
+        switch (targe_storage_mode) {
+            case StorageMode::kWritable: {
+                // once wal is not empty, a checkpoint should always be found in leader or standalone mode.
+                String error_message = "WAL replay: No checkpoint found in wal";
+                UnrecoverableError(error_message);
+                break;
+            }
+            case StorageMode::kReadable: {
+                return 0;
+            }
+            default: {
+                String error_message = "Unreachable branch";
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+    LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
+    std::reverse(replay_entries.begin(), replay_entries.end());
+
+    return last_commit_ts;
+}
+
+void WalManager::ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries) {
+    // phase 3: replay the entries
+
+    LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));
+    // TransactionID last_txn_id = 0;
+
+    NewTxnManager *txn_mgr = storage_->new_txn_manager();
+
+    for (SizeT replay_count = 0; replay_count < replay_entries.size(); ++replay_count) {
+        // if (replay_entries[replay_count]->commit_ts_ < max_checkpoint_ts) {
+        //     String error_message = fmt::format("Wal Replay: Commit ts should be greater than max commit ts, commit_ts: {}, max_commit: {}",
+        //                                        replay_entries[replay_count]->commit_ts_,
+        //                                        max_checkpoint_ts);
+        //     UnrecoverableError(error_message);
+        // }
+        // last_commit_ts = replay_entries[replay_count]->commit_ts_;
+        // last_txn_id = replay_entries[replay_count]->txn_id_;
+
+        const SharedPtr<WalEntry> &replay_entry = replay_entries[replay_count];
+        LOG_DEBUG(replay_entry->ToString());
+        // ReplayWalOptions options{.on_startup_ = false, .is_replay_ = true, .sync_from_leader_ = false};
+
+        NewTxn *replay_txn = txn_mgr->BeginTxn(nullptr, TransactionType::kNormal);
+        replay_txn->SetReplay(true);
+        for (const auto &cmd : replay_entry->cmds_) {
+            LOG_INFO(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), replay_entry->commit_ts_));
+        }
+        replay_txn->SetWalEntry(replay_entry);
+        Status status = txn_mgr->CommitTxn(replay_txn);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Fail to replay wal entry: {}", status.message()));
+        }
+    }
+
+    // LOG_INFO(fmt::format("Latest txn commit_ts: {}, latest txn id: {}", last_commit_ts, last_txn_id));
+    // storage_->catalog()->next_txn_id_ = last_txn_id;
+    // UpdateCommitState(last_commit_ts, 0);
+
+    // TxnTimeStamp system_start_ts = last_commit_ts + 1;
+    // LOG_INFO(fmt::format("System start ts: {}", system_start_ts));
+}
+
 Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::GetCatalogFiles() const {
     Vector<String> wal_list{};
     {
