@@ -19,6 +19,7 @@ module;
 
 module new_txn;
 
+import new_catalog;
 import chunk_index_meta;
 import segment_index_meta;
 import table_index_meeta;
@@ -1170,6 +1171,7 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd) {
         if (!status.ok()) {
             return status;
         }
+        mem_index->Clear();
     }
     {
         Status status = kv_instance->Commit();

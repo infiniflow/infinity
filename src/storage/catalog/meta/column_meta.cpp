@@ -153,8 +153,12 @@ Status ColumnMeta::LoadSet() {
 }
 
 Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer) {
+    return GetColumnBuffer(column_buffer, outline_buffer, nullptr);
+}
+
+Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def) {
     if (!column_buffer_) {
-        Status status = LoadColumnBuffer();
+        Status status = LoadColumnBuffer(column_def);
         if (!status.ok()) {
             return status;
         }
@@ -164,10 +168,10 @@ Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outlin
     return Status::OK();
 }
 
-Status ColumnMeta::UninitSet() {
+Status ColumnMeta::UninitSet(const ColumnDef *column_def) {
     Status status;
 
-    status = this->GetColumnBuffer(column_buffer_, outline_buffer_);
+    status = this->GetColumnBuffer(column_buffer_, outline_buffer_, column_def);
     if (!status.ok()) {
         return status;
     }
@@ -196,17 +200,15 @@ Status ColumnMeta::LoadChunkOffset() {
     return Status::OK();
 }
 
-Status ColumnMeta::LoadColumnBuffer() {
+Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
     SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
-    // TODO
-    // SharedPtr<ColumnDef> col_def;
-    // {
-    //     auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
-    //     if (!status.ok()) {
-    //         return status;
-    //     }
-    //     col_def = (*column_defs_ptr)[column_idx_];
-    // }
+    if (!col_def) {
+        auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        col_def = (*column_defs_ptr)[column_idx_].get();
+    }
 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     {
@@ -217,17 +219,15 @@ Status ColumnMeta::LoadColumnBuffer() {
             return Status::BufferManagerError(fmt::format("Get buffer object failed: {}", col_filepath));
         }
     }
-    // VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+    VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     [[maybe_unused]] SizeT chunk_offset = 0;
-    // if (buffer_type == VectorBufferType::kVarBuffer) {
-    {
+    if (buffer_type == VectorBufferType::kVarBuffer) {
         String outline_filename = fmt::format("col_{}_out_0", column_idx_);
         String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
         outline_buffer_ = buffer_mgr->GetBufferObject(outline_filepath);
         if (outline_buffer_ == nullptr) {
-            // return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
-            return Status::OK();
+            return Status::BufferManagerError(fmt::format("Get outline buffer object failed: {}", outline_filepath));
         }
         {
             Status status = this->GetChunkOffset(chunk_offset);

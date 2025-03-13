@@ -30,12 +30,10 @@ import database_detail;
 import status;
 import extra_ddl_info;
 import internal_types;
-import column_def;
 import value;
 import snapshot_info;
 import txn_context;
 import kv_store;
-import new_catalog;
 import column_def;
 import extra_command;
 import column_vector;
@@ -43,6 +41,7 @@ import buffer_handle;
 
 namespace infinity {
 
+class NewCatalog;
 class NewTxnManager;
 struct Catalog;
 struct TableEntry;
@@ -385,10 +384,6 @@ private:
     Status AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values);
 
     Status DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &column_ids);
-
-    Status DropColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<ColumnID> &column_ids);
-
-    Status DropColumnsDataInBlock(BlockMeta &block_meta, const Vector<ColumnID> &column_ids);
 
     Status AppendIndex(TableIndexMeeta &table_index_meta, const AppendState *append_state);
 

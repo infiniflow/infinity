@@ -21,7 +21,6 @@ module new_catalog;
 import stl;
 import third_party;
 import block_version;
-import column_def;
 import infinity_exception;
 import table_def;
 import kv_code;
@@ -255,7 +254,7 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta) {
     }
 
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(table_id_str, db_meta.db_id_str(), db_meta.kv_instance());
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance());
         status = NewCatalog::CleanTable(table_meta);
         if (!status.ok()) {
             return status;
@@ -443,18 +442,18 @@ Status NewCatalog::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Opti
 }
 
 Status NewCatalog::CleanBlock(BlockMeta &block_meta) {
-    SizeT column_num = 0;
-    {
-        TableMeeta &table_meta = block_meta.segment_meta().table_meta();
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        column_num = column_defs_ptr->size();
+    Status status;
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+
+    TableMeeta &table_meta = block_meta.segment_meta().table_meta();
+    std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+    if (!status.ok()) {
+        return status;
     }
-    for (SizeT column_idx = 0; column_idx < column_num; ++column_idx) {
-        ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
-        Status status = NewCatalog::CleanBlockColumn(column_meta);
+
+    for (const auto &column_def : *column_defs_ptr) {
+        ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+        Status status = NewCatalog::CleanBlockColumn(column_meta, column_def.get());
         if (!status.ok()) {
             return status;
         }
@@ -475,10 +474,10 @@ Status NewCatalog::AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Op
     return Status::OK();
 }
 
-Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta) {
+Status NewCatalog::CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def) {
     Status status;
 
-    status = column_meta.UninitSet();
+    status = column_meta.UninitSet(column_def);
     if (!status.ok()) {
         return status;
     }

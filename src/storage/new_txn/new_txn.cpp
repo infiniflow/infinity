@@ -22,7 +22,7 @@ module;
 module new_txn;
 
 import stl;
-
+import new_catalog;
 import infinity_exception;
 import new_txn_manager;
 import buffer_manager;
@@ -1241,16 +1241,16 @@ Status NewTxn::CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd) {
         return status;
     }
 
+    status = this->DropColumnsData(*table_meta, drop_columns_cmd->column_ids_);
+    if (!status.ok()) {
+        return status;
+    }
+
     for (const auto &column_name : drop_columns_cmd->column_names_) {
         Status status = table_meta->DropColumn(column_name);
         if (!status.ok()) {
             return status;
         }
-    }
-
-    status = this->DropColumnsData(*table_meta, drop_columns_cmd->column_ids_);
-    if (!status.ok()) {
-        return status;
     }
     return Status::OK();
 }
@@ -1664,8 +1664,8 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 TableMeeta table_meta(column_meta_key->db_id_str_, column_meta_key->table_id_str_, *kv_instance);
                 SegmentMeta segment_meta(column_meta_key->segment_id_, table_meta, *kv_instance);
                 BlockMeta block_meta(column_meta_key->block_id_, segment_meta, *kv_instance);
-                ColumnMeta column_meta(column_meta_key->column_idx_, block_meta, *kv_instance);
-                Status status = NewCatalog::CleanBlockColumn(column_meta);
+                ColumnMeta column_meta(column_meta_key->column_def_->id(), block_meta, *kv_instance);
+                Status status = NewCatalog::CleanBlockColumn(column_meta, column_meta_key->column_def_.get());
                 if (!status.ok()) {
                     return status;
                 }

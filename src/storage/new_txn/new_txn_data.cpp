@@ -37,6 +37,8 @@ import block_meta;
 import segment_meta;
 import table_meeta;
 import table_index_meeta;
+import segment_index_meta;
+import new_catalog;
 import meta_key;
 import db_meeta;
 
@@ -760,42 +762,55 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
         return Status::OK();
     }
 
-    for (SegmentID segment_id : *segment_ids_ptr) {
-        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
-        status = this->DropColumnsDataInSegment(segment_meta, column_ids);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
-
-Status NewTxn::DropColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<ColumnID> &column_ids) {
-    auto [block_ids, status] = segment_meta.GetBlockIDs();
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
     if (!status.ok()) {
         return status;
     }
-    for (BlockID block_id : *block_ids) {
-        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-        status = this->DropColumnsDataInBlock(block_meta, column_ids);
+
+    auto drop_columns_in_block = [&](BlockMeta &block_meta) {
+        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        for (ColumnID column_id : column_ids) {
+            auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [&](const SharedPtr<ColumnDef> &column_def) {
+                return ColumnID(column_def->id()) == column_id;
+            });
+            if (iter == column_defs_ptr->end()) {
+                UnrecoverableError(fmt::format("Column {} not found in table meta", column_id));
+            }
+            SharedPtr<ColumnDef> column_def = *iter;
+            new_catalog->AddCleanedMeta(commit_ts,
+                                        MakeUnique<ColumnMetaKey>(block_meta.segment_meta().table_meta().db_id_str(),
+                                                                  block_meta.segment_meta().table_meta().table_id_str(),
+                                                                  block_meta.segment_meta().segment_id(),
+                                                                  block_meta.block_id(),
+                                                                  column_def));
+        }
+        return Status::OK();
+    };
+
+    auto drop_columns_in_segment = [&](SegmentMeta &segment_meta) {
+        auto [block_ids, status] = segment_meta.GetBlockIDs();
         if (!status.ok()) {
             return status;
         }
-    }
-    return Status::OK();
-}
+        for (BlockID block_id : *block_ids) {
+            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+            status = drop_columns_in_block(block_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    };
 
-Status NewTxn::DropColumnsDataInBlock(BlockMeta &block_meta, const Vector<ColumnID> &column_ids) {
-    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    for (ColumnID column_id : column_ids) {
-        new_catalog->AddCleanedMeta(commit_ts,
-                                    MakeUnique<ColumnMetaKey>(block_meta.segment_meta().table_meta().db_id_str(),
-                                                              block_meta.segment_meta().table_meta().table_id_str(),
-                                                              block_meta.segment_meta().segment_id(),
-                                                              block_meta.block_id(),
-                                                              column_id));
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        status = drop_columns_in_segment(segment_meta);
+        if (!status.ok()) {
+            return status;
+        }
     }
     return Status::OK();
 }

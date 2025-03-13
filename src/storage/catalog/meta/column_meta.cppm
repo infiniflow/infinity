@@ -53,14 +53,16 @@ public:
 
     Status LoadSet();
 
-    Status UninitSet();
+    Status UninitSet(const ColumnDef *column_def);
 
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
 
 private:
+    Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);
+
     Status LoadChunkOffset();
 
-    Status LoadColumnBuffer();
+    Status LoadColumnBuffer(const ColumnDef *col_def);
 
     String GetColumnTag(const String &tag) const;
 

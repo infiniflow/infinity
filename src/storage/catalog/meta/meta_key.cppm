@@ -31,7 +31,11 @@ export struct MetaKey {
         kSegmentIndex,
         kChunkIndex,
     } type_;
+
+    MetaKey(Type type) : type_(type) {}
+    virtual ~MetaKey() = default;
 };
+class ColumnDef;
 
 export struct DBMetaKey : public MetaKey {
     DBMetaKey(String db_id_str) : MetaKey(Type::kDB), db_id_str_(std::move(db_id_str)) {}
@@ -68,15 +72,15 @@ export struct BlockMetaKey : public MetaKey {
 };
 
 export struct ColumnMetaKey : public MetaKey {
-    ColumnMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, BlockID block_id, SizeT column_idx)
-        : MetaKey(Type::kColumn), db_id_str_(std::move(db_id_str)), table_id_str_(std::move(table_id_str)), segment_id_(segment_id),
-          block_id_(block_id), column_idx_(column_idx) {}
+    ColumnMetaKey(String db_id_str, String table_id_str, SegmentID segment_id, BlockID block_id, SharedPtr<ColumnDef> column_def);
+
+    ~ColumnMetaKey() override;
 
     String db_id_str_;
     String table_id_str_;
     SegmentID segment_id_;
     BlockID block_id_;
-    SizeT column_idx_;
+    SharedPtr<ColumnDef> column_def_;
 };
 
 export struct TableIndexMetaKey : public MetaKey {

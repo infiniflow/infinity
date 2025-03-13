@@ -37,7 +37,6 @@ import global_resource_usage;
 import bg_task;
 import kv_store;
 import new_catalog;
-import meta_key;
 
 namespace infinity {
 

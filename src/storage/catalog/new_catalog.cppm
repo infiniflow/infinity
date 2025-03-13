@@ -23,6 +23,7 @@ import extra_ddl_info;
 import default_values;
 import internal_types;
 import buffer_handle;
+import column_def;
 
 namespace infinity {
 
@@ -211,7 +212,7 @@ public:
 
     static Status AddNewBlockColumn(BlockMeta &block_meta, SizeT column_idx, Optional<ColumnMeta> &column_meta);
 
-    static Status CleanBlockColumn(ColumnMeta &column_meta);
+    static Status CleanBlockColumn(ColumnMeta &column_meta, const ColumnDef *column_def);
 
     static Status AddNewSegmentIndex(TableIndexMeeta &table_index_meta, SegmentID segment_id, Optional<SegmentIndexMeta> &segment_index_meta);
 
