@@ -464,7 +464,6 @@ Status Status::DuplicateColumnIndex(const String &detail) { return Status(ErrorC
 
 Status Status::InvalidParameter(const String &detail) { return Status(ErrorCode::kInvalidParameter, MakeUnique<String>(detail)); }
 
-
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));
@@ -658,5 +657,13 @@ Status Status::CatalogError(const String &detailed_info) {
 Status Status::BufferManagerError(const String &detailed_info) {
     return Status(ErrorCode::kBufferManagerError, MakeUnique<String>(fmt::format("Buffer manager error: {}", detailed_info)));
 }
+
+Status Status::RocksDBError(rocksdb::Status rocksdb_s) { return Status(ErrorCode::kRocksDBError, std::move(rocksdb_s)); }
+
+Status Status::RocksDBError(rocksdb::IOStatus rocksdb_s) { return Status(ErrorCode::kRocksDBError, MakeUnique<String>(rocksdb_s.ToString())); }
+
+Status::Status(ErrorCode code, rocksdb::Status detail) : code_(code) { rocksdb_status_ = MakeUnique<rocksdb::Status>(std::move(detail)); }
+
+Status::Status(ErrorCode code, rocksdb::IOStatus detail) : code_(code) { rocksdb_status_ = MakeUnique<rocksdb::IOStatus>(std::move(detail)); }
 
 } // namespace infinity

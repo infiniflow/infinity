@@ -156,7 +156,7 @@ TEST_P(NewTxnReplayTest, test_replay_create_table) {
 }
 
 TEST_P(NewTxnReplayTest, test_replay_append) {
-    GTEST_SKIP("Not implemented");
+    GTEST_SKIP() << "Not implemented";
 
     using namespace infinity;
 

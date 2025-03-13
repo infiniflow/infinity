@@ -17,6 +17,7 @@ module;
 export module status;
 
 import stl;
+import third_party;
 
 // If new error codes are added, it also needs to be added to python/infinity/errors.py.
 namespace infinity {
@@ -208,6 +209,7 @@ export enum class ErrorCode : long {
     // 9. internal error
     kCatalogError = 9001,
     kBufferManagerError = 9002,
+    kRocksDBError = 9003,
 };
 
 export class Status {
@@ -382,7 +384,7 @@ public:
     // meta
     static Status InvalidEntry();
     static Status NotFoundEntry();
-    static Status DuplicateEntry(const String& detailed_info);
+    static Status DuplicateEntry(const String &detailed_info);
     static Status EmptyEntryList();
     static Status NoWALEntryFound(const String &file_name, i64 index);
     static Status WrongCheckpointType(const String &expect_type, const String &actual_type);
@@ -394,6 +396,8 @@ public:
     // catalog
     static Status CatalogError(const String &detailed_info);
     static Status BufferManagerError(const String &detailed_info);
+    static Status RocksDBError(rocksdb::Status rocksdb_s);
+    static Status RocksDBError(rocksdb::IOStatus rocksdb_s);
 
 public:
     Status() = default;
@@ -401,6 +405,10 @@ public:
     inline explicit Status(ErrorCode code) : code_(code) {}
 
     inline Status(ErrorCode code, UniquePtr<String> message) : code_(code), msg_(std::move(message)) {}
+
+    Status(ErrorCode code, rocksdb::Status detail);
+
+    Status(ErrorCode code, rocksdb::IOStatus detail);
 
     Status(ErrorCode code, const char *msg);
 
@@ -439,6 +447,7 @@ public:
 
     ErrorCode code_{ErrorCode::kOk};
     UniquePtr<String> msg_{};
+    UniquePtr<rocksdb::Status> rocksdb_status_{};
 };
 
 } // namespace infinity
