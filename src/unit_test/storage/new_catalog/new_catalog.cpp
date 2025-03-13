@@ -150,7 +150,6 @@ TEST_P(NewCatalogTest, createdb_createdb_test) {
         // Conflict, can't commit
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
-        std::cout << status.message() << std::endl;
 
         // Check if db1 exists
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -197,7 +196,6 @@ TEST_P(NewCatalogTest, createdb_createdb_test) {
         // Conflict, can't commit
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
-        std::cout << status.message() << std::endl;
 
         // Check if db1 exists
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
