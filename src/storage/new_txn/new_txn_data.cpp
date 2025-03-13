@@ -278,6 +278,15 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         return status;
     }
 
+    // Read col definition in new rocksdb transaction
+    KVStore *kv_store = txn_mgr_->kv_store();
+    UniquePtr<KVInstance> kv_instance_validation = kv_store->GetInstance();
+    TableMeeta table_meta_validation(db_meta->db_id_str(), table_meta.table_id_str(), *kv_instance_validation);
+    auto [column_defs_validation, column_defs_validation_status] = table_meta_validation.GetColumnDefs();
+    if (!column_defs_validation_status.ok()) {
+        return column_defs_validation_status;
+    }
+
     auto wal_command = static_pointer_cast<WalCmd>(append_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(append_command->ToString()));
@@ -299,6 +308,14 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
             return Status::ColumnCountMismatch(err_msg);
         }
 
+        if (column_defs_validation->size() != column_count) {
+            String err_msg = fmt::format("Insert data conflicts with alter columns, expected column count: {}, actual column count: {}",
+                                         column_count,
+                                         column_defs_validation->size());
+            LOG_ERROR(err_msg);
+            return Status::ColumnCountMismatch(err_msg);
+        }
+
         Vector<SharedPtr<DataType>> column_types;
         for (SizeT col_id = 0; col_id < column_count; ++col_id) {
             column_types.emplace_back((*column_defs)[col_id]->type());
@@ -306,6 +323,14 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
                 String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
                 LOG_ERROR(err_msg);
                 return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
+            }
+            if (*column_types.back() != *(*column_defs_validation)[col_id]->type()) {
+                String err_msg = fmt::format("Insert data conflicts with alter column: column_id: {}, left_type:{}, right_type{}",
+                                             col_id,
+                                             column_types.back()->ToString(),
+                                             (*column_defs_validation)[col_id]->type()->ToString());
+                LOG_ERROR(err_msg);
+                return Status::DataTypeMismatch(column_types.back()->ToString(), (*column_defs_validation)[col_id]->type()->ToString());
             }
         }
     }
