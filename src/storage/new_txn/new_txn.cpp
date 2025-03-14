@@ -1760,6 +1760,19 @@ void NewTxn::SetWalEntry(SharedPtr<WalEntry> wal_entry) {
                 append_cmd->table_key_ = table_key;
                 break;
             }
+            case WalCommandType::DELETE: {
+                auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
+
+                Optional<DBMeeta> db_meta;
+                Optional<TableMeeta> table_meta;
+                Status status = this->GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to get table meta");
+                }
+                delete_cmd->db_id_str_ = db_meta->db_id_str();
+                delete_cmd->table_id_str_ = table_meta->table_id_str();
+                break;
+            }
             default: {
                 break;
             }

@@ -60,7 +60,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
     if (block_offset_begin == block_offset_end_) {
         return false;
     }
-    [[maybe_unused]] const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(version_buffer_handle_.GetData());
 
     std::shared_lock<std::shared_mutex> lock(block_lock_->mtx_);
     while (block_offset_begin < block_offset_end_ && block_version->CheckDelete(block_offset_begin, begin_ts_)) {

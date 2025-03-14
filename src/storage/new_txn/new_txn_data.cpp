@@ -339,7 +339,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
 
 Status NewTxn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
     this->CheckTxn(db_name);
-    NewTxnTableStore1 *table_store = nullptr;
 
     auto delete_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
     {
@@ -354,17 +353,11 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
 
         delete_command->db_id_str_ = db_id_str;
         delete_command->table_id_str_ = table_id_str;
-        table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
     }
 
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(delete_command->ToString()));
-
-    auto delete_status = table_store->Delete(row_ids);
-    if (!delete_status.ok()) {
-        return delete_status;
-    }
 
     return Status::OK();
 }
@@ -1102,8 +1095,9 @@ Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd) {
     Optional<BlockMeta> block_meta;
 
     NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
-    if (txn_table_store == nullptr) {
-        return Status::OK();
+    Status delete_status = txn_table_store->Delete(delete_cmd->row_ids_);
+    if (!delete_status.ok()) {
+        return delete_status;
     }
     const DeleteState &delete_state = txn_table_store->delete_state();
     for (const auto &[segment_id, block_map] : delete_state.rows_) {

@@ -154,7 +154,7 @@ TEST_P(TestAppend, test_append1) {
 
         Status status1 = txn->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status1.ok());
-        Status status2 = txn->Append(*db_name, *table_name, input_block); // typo ?
+        Status status2 = txn2->Append(*db_name, *table_name, input_block);
         EXPECT_TRUE(status2.ok());
 
         status1 = new_txn_mgr->CommitTxn(txn);
@@ -343,7 +343,7 @@ TEST_P(TestAppend, test_append2) {
 
         Status status1 = txn->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status1.ok());
-        Status status2 = txn->Append(*db_name, *table_name, input_block2); // typo ?
+        Status status2 = txn2->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status2.ok());
 
         status1 = new_txn_mgr->CommitTxn(txn);
