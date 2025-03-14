@@ -160,12 +160,18 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     return column_entry;
 }
 
+// TODO FIX
 UniquePtr<BlockColumnEntry> BlockColumnEntry::ApplyBlockColumnSnapshot(BlockEntry *block_entry,
                                                                        BlockColumnSnapshotInfo *block_column_snapshot_info,
                                                                        TransactionID txn_id,
                                                                        TxnTimeStamp begin_ts) {
     ColumnID column_id = block_column_snapshot_info->column_id_;
-    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id);
+    //
+    auto buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+
+    UniquePtr<BlockColumnEntry> block_column_entry =
+            NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, block_column_snapshot_info->outline_snapshots_.size(), block_column_snapshot_info->last_chunk_offset_, 0);
+
     block_column_entry->filename_ = MakeShared<String>(block_column_snapshot_info->filename_);
     block_column_entry->column_type_ = block_entry->GetColumnType(column_id);
 

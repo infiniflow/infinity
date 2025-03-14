@@ -133,11 +133,12 @@ void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(Transactio
     }
 }
 
-Status TableMeta::ApplyTableSnapshot(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&restore_entry,
-                                     TransactionID txn_id,
-                                     TxnTimeStamp begin_ts) {
+Status TableMeta::ApplyTableSnapshot(std::function<SharedPtr<TableEntry>()> &&restore_entry,
+                                     Txn *txn_ptr) {
 
-    auto [entry, status] = table_entry_list_.ApplySnapshot(std::move(restore_entry), txn_id, begin_ts);
+    auto [entry, status] = table_entry_list_.ApplySnapshot(std::move(restore_entry), txn_ptr->TxnID(),txn_ptr->BeginTS());
+    //add entry to to_restore_tables_ for commit ts
+    txn_ptr->txn_store()->AddTableToRestore(entry);
     if (!status.ok()) {
         RecoverableError(status);
     }

@@ -331,7 +331,7 @@ Status Catalog::ApplyTableSnapshot(const SharedPtr<TableSnapshotInfo> &table_sna
         return status;
     }
 
-    return db_entry->ApplyTableSnapshot(table_snapshot_info, txn_ptr->TxnID(), txn_ptr->BeginTS());
+    return db_entry->ApplyTableSnapshot(table_snapshot_info, txn_ptr);
 }
 
 Tuple<SharedPtr<TableInfo>, Status> Catalog::GetTableInfo(const String &db_name, const String &table_name, Txn *txn) {
@@ -1336,7 +1336,7 @@ void Catalog::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
             db_entry->MemIndexRecover(buffer_manager, ts);
         }
     }
-    for(auto& segment_index_entry:all_memindex_recover_segment_){
+    for (auto &segment_index_entry : all_memindex_recover_segment_) {
         segment_index_entry->MemIndexWaitInflightTasks();
     }
     all_memindex_recover_segment_.clear();
