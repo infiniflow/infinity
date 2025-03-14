@@ -3411,3 +3411,150 @@ TEST_P(TestAppend, test_append_append) {
 
     RemoveDbDirs();
 }
+
+TEST_P(TestAppend, test_append_append_concurrent) {
+    using namespace infinity;
+
+    std::shared_ptr<ConstantExpr> default_int = std::make_shared<ConstantExpr>(LiteralType::kInteger);
+    default_int->integer_value_ = 2;
+    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    default_varchar->str_value_ = strdup("");
+
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto input_block1 = MakeShared<DataBlock>();
+    SizeT insert_row = 4096;
+    {
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            for (SizeT i = 0; i < insert_row; ++i) {
+                col1->AppendValue(Value::MakeInt(i));
+            }
+
+            input_block1->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            for (SizeT i = 0; i < insert_row; ++i) {
+                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
+            }
+
+            //            col2->AppendValue(Value::MakeVarchar("abc"));
+            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block1->InsertVector(col2, 1);
+        }
+        input_block1->Finalize();
+    }
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    //               t1                  append    commit (success)
+    //  thread1      |--------------------|----------|
+    //  thread2      |------------------- |----------|
+    //               t2                  append   commit (success)
+    {
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        std::vector<std::thread> worker_threads;
+        SizeT thread_count = 16;
+        SizeT loop_count = 128;
+        for (SizeT i = 0; i < thread_count; ++i) {
+            worker_threads.emplace_back([&] {
+                for (SizeT j = 0; j < loop_count; ++j) {
+                    auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+                    status = txn3->Append(*db_name, *table_name, input_block1);
+                    EXPECT_TRUE(status.ok());
+                    status = new_txn_mgr->CommitTxn(txn3);
+                    if (!status.ok()) {
+                        std::cout << "Fail to commit txn3" << std::endl;
+                    }
+                }
+            });
+        }
+        for (SizeT i = 0; i < thread_count; ++i) {
+            worker_threads[i].join();
+        }
+
+        // Check the appended data.
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+            TxnTimeStamp begin_ts = txn->BeginTS();
+
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+            EXPECT_TRUE(status.ok());
+
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+            EXPECT_TRUE(seg_status.ok());
+            EXPECT_EQ(segment_ids->size(), 1);
+            {
+                SegmentID segment_id = segment_ids->at(0);
+                EXPECT_EQ(segment_id, 0);
+                SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+
+                SharedPtr<Vector<BlockID>> block_ids;
+                std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(block_ids->size(), 1024);
+                for (SizeT idx = 0; idx < block_ids->size(); ++idx) {
+                    BlockID block_id = block_ids->at(idx);
+                    EXPECT_EQ(block_id, idx);
+                    BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+
+                    NewTxnGetVisibleRangeState state;
+                    status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+                    EXPECT_TRUE(status.ok());
+                    {
+                        Pair<BlockOffset, BlockOffset> range;
+                        BlockOffset offset = 0;
+                        bool has_next = state.Next(offset, range);
+                        EXPECT_TRUE(has_next);
+                        EXPECT_EQ(range.first, 0);
+                        EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
+                        offset = range.second;
+                        has_next = state.Next(offset, range);
+                        EXPECT_FALSE(has_next);
+                    }
+
+                    SizeT row_count = state.block_offset_end();
+                    EXPECT_EQ(row_count, 8192);
+                }
+            }
+        }
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Check the appended data.
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    RemoveDbDirs();
+}

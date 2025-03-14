@@ -487,7 +487,10 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
                               append_state->current_block_offset_);
             append_state->append_ranges_.push_back(range);
 
-            block_meta.SetRowCnt(block_row_count + actual_append);
+            Status status = block_meta.SetRowCnt(block_row_count + actual_append);
+            if (!status.ok()) {
+                return status;
+            }
         }
 
         block_full = block_row_count + actual_append >= block_meta.block_capacity();
@@ -498,7 +501,10 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
         }
 
         if (actual_append) {
-            block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
+            Status status = block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
+            if (!status.ok()) {
+                return status;
+            }
         }
         segment_full = segment_row_count + actual_append >= block_meta.segment_meta().segment_capacity();
 
@@ -1038,11 +1044,8 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
 }
 
 Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance) {
-    Status status = new_catalog_->DecreaseTableWriteCount(append_cmd->table_key_);
-    if (!status.ok()) {
-        UnrecoverableError("Fail to unlock table on post commit phase");
-    }
 
+    Status status = Status::OK();
     const String &db_id_str = append_cmd->db_id_str_;
     const String &table_id_str = append_cmd->table_id_str_;
 
@@ -1085,6 +1088,12 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
             return status;
         }
     }
+
+    status = new_catalog_->DecreaseTableWriteCount(append_cmd->table_key_);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Fail to unlock table on post commit phase: {}", status.message()));
+    }
+
     return Status::OK();
 }
 

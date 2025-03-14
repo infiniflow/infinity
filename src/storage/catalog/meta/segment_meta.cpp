@@ -23,6 +23,7 @@ import kv_code;
 import third_party;
 import default_values;
 import table_meeta;
+import logger;
 
 namespace infinity {
 
@@ -218,6 +219,7 @@ Status SegmentMeta::AddBlockID(BlockID block_id) {
     String block_ids_str = nlohmann::json(*block_ids_).dump();
     Status status = kv_instance_.Put(block_ids_key, block_ids_str);
     if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to add block_id: {} to key: {}", block_id, block_ids_key));
         return status;
     }
     return Status::OK();

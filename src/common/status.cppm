@@ -430,13 +430,7 @@ public:
 
     void Init(ErrorCode code, const char *msg);
 
-    [[nodiscard]] const char *message() const {
-        if (msg_.get() != nullptr) {
-            return msg_->c_str();
-        } else {
-            return nullptr;
-        }
-    }
+    [[nodiscard]] const char *message() const;
 
     void MoveStatus(Status &s);
     void MoveStatus(Status &&s);
@@ -446,7 +440,7 @@ public:
     inline Status clone() const { return Status{code_, MakeUnique<String>(*msg_)}; }
 
     ErrorCode code_{ErrorCode::kOk};
-    UniquePtr<String> msg_{};
+    mutable UniquePtr<String> msg_{};
     UniquePtr<rocksdb::Status> rocksdb_status_{};
 };
 

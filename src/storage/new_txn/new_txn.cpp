@@ -997,20 +997,43 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::APPEND: {
                 auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
 
-                KVStore *kv_store = txn_mgr_->kv_store();
-                UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+                auto commit_append_func = [&]() -> Status {
+                    KVStore *kv_store = txn_mgr_->kv_store();
+                    UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
 
-                Status status = CommitAppend(append_cmd, kv_instance.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                status = PostCommitAppend(append_cmd, kv_instance.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                status = kv_instance->Commit();
-                if (!status.ok()) {
-                    return status;
+                    Status status = CommitAppend(append_cmd, kv_instance.get());
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    status = PostCommitAppend(append_cmd, kv_instance.get());
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    status = kv_instance->Commit();
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    return Status::OK();
+                };
+
+                SizeT attempt_count = 0;
+                Status status = Status::OK();
+                while (true) {
+                    attempt_count++;
+                    status = commit_append_func();
+                    if (status.ok()) {
+                        if (attempt_count > 0) {
+                            LOG_DEBUG(fmt::format("Append transaction retry count: {}", attempt_count));
+                        }
+                        break;
+                    } else {
+                        if (status.code() == ErrorCode::kRocksDBError && status.rocksdb_status_->IsBusy()) {
+                            LOG_DEBUG(fmt::format("Retry the append transaction, retry count: {}", attempt_count));
+                        } else {
+                            LOG_ERROR(fmt::format("Other append transaction error: {}", status.message()));
+                            break;
+                        }
+                    }
                 }
                 break;
             }
@@ -1369,26 +1392,6 @@ Optional<String> NewTxn::CheckConflict(NewTxn *other_txn) {
 
 void NewTxn::CommitBottom() {
     LOG_TRACE(fmt::format("NewTxn bottom: {} is started.", txn_context_ptr_->txn_id_));
-    // prepare to commit txn local data into table
-    //    TxnTimeStamp commit_ts = this->CommitTS();
-
-//    for (auto &command : wal_entry_->cmds_) {
-//        WalCommandType command_type = command->GetType();
-//        switch (command_type) {
-//            case WalCommandType::APPEND: {
-//                auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
-//                Status status = CommitAppend(append_cmd);
-//                if (!status.ok()) {
-//                    UnrecoverableError(fmt::format("CommitAppend failed: {}", status.message()));
-//                }
-//                break;
-//            }
-//            default: {
-//                break;
-//            }
-//        }
-//    }
-
     Status status = kv_instance_->Commit();
     if (!status.ok()) {
         UnrecoverableError("KV instance commit failed");
@@ -1424,11 +1427,6 @@ void NewTxn::PostCommit() {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::APPEND: {
-//                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-//                Status status = PostCommitAppend(append_cmd);
-//                if (!status.ok()) {
-//                    UnrecoverableError("PostCommitAppend failed");
-//                }
                 break;
             }
             case WalCommandType::DELETE: {

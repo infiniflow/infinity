@@ -379,7 +379,7 @@ Status TableMeeta::LoadUnsealedSegmentID() {
     String unsealed_seg_id_str;
     Status status = kv_instance_.Get(unsealed_seg_id_key, unsealed_seg_id_str);
     if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to get unsealed segment id from kv store, key: {}, cause: {}", unsealed_seg_id_key, status.message()));
+        LOG_DEBUG(fmt::format("Fail to get unsealed segment id from kv store, key: {}, cause: {}", unsealed_seg_id_key, status.message()));
         return status;
     }
     unsealed_segment_id_ = std::stoull(unsealed_seg_id_str);
@@ -406,8 +406,7 @@ Status TableMeeta::SetUnsealedSegmentID(SegmentID unsealed_segment_id) {
     String unsealed_id_str = fmt::format("{}", unsealed_segment_id);
     Status status = kv_instance_.Put(unsealed_id_key, unsealed_id_str);
     if (!status.ok()) {
-        LOG_ERROR(
-            fmt::format("Fail to set unsealed segment id from kv store, key: {}:{}, cause: {}", unsealed_id_key, unsealed_id_str, status.message()));
+        LOG_ERROR(fmt::format("Fail to set unsealed segment id from kv store, {}:{}, cause: {}", unsealed_id_key, unsealed_id_str, status.message()));
         return status;
     }
     return Status::OK();
