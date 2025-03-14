@@ -255,7 +255,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
 Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
     this->CheckTxn(db_name);
-    NewTxnTableStore1 *table_store = nullptr;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
@@ -271,7 +270,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         append_command->db_id_str_ = db_meta->db_id_str();
         append_command->table_id_str_ = table_meta.table_id_str();
         append_command->table_key_ = table_key;
-        table_store = txn_store_.GetNewTxnTableStore1(append_command->db_id_str_, append_command->table_id_str_);
     }
 
     status = new_catalog_->IncreaseTableWriteCount(table_key);
@@ -336,10 +334,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         }
     }
 
-    auto append_status = table_store->Append(input_block);
-    if (!append_status.ok()) {
-        return append_status;
-    }
     return Status::OK();
 }
 
@@ -914,10 +908,16 @@ Status NewTxn::CommitImport(const WalCmdImport *import_cmd) {
 }
 
 Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance) {
+    Status status;
+
     const String &db_id_str = append_cmd->db_id_str_;
     const String &table_id_str = append_cmd->table_id_str_;
 
     NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
+    status = txn_table_store->Append(append_cmd->block_);
+    if (!status.ok()) {
+        return status;
+    }
     AppendState *append_state = txn_table_store->append_state();
     append_state->Finalize();
     if (append_state->Finished()) {
@@ -926,8 +926,6 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
     }
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
-
-    Status status;
 
     // SegmentID next_segment_id = 0;
     Optional<SegmentMeta> segment_meta;
@@ -1038,9 +1036,12 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
 }
 
 Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance) {
-    Status status = new_catalog_->DecreaseTableWriteCount(append_cmd->table_key_);
-    if (!status.ok()) {
-        UnrecoverableError("Fail to unlock table on post commit phase");
+    Status status;
+    if (!this->IsReplay()) {
+        status = new_catalog_->DecreaseTableWriteCount(append_cmd->table_key_);
+        if (!status.ok()) {
+            UnrecoverableError("Fail to unlock table on post commit phase");
+        }
     }
 
     const String &db_id_str = append_cmd->db_id_str_;

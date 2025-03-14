@@ -469,7 +469,7 @@ public:
 
     bool IsReplay() const { return txn_context_ptr_->replay_; }
 
-    void SetWalEntry(SharedPtr<WalEntry> wal_entry) { wal_entry_ = wal_entry; }
+    void SetWalEntry(SharedPtr<WalEntry> wal_entry);
 
 private:
     // Reference to external class

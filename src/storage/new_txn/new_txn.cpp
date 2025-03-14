@@ -1742,4 +1742,31 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
     return Status::OK();
 }
 
+void NewTxn::SetWalEntry(SharedPtr<WalEntry> wal_entry) {
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_entry->cmds_) {
+        switch (wal_cmd->GetType()) {
+            case WalCommandType::APPEND: {
+                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+
+                Optional<DBMeeta> db_meta;
+                Optional<TableMeeta> table_meta;
+                String table_key;
+                Status status = this->GetTableMeta(append_cmd->db_name_, append_cmd->table_name_, db_meta, table_meta, &table_key);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to get table meta");
+                }
+                append_cmd->db_id_str_ = db_meta->db_id_str();
+                append_cmd->table_id_str_ = table_meta->table_id_str();
+                append_cmd->table_key_ = table_key;
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    wal_entry_ = std::move(wal_entry);
+}
+
 } // namespace infinity

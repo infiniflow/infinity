@@ -156,8 +156,6 @@ TEST_P(NewTxnReplayTest, test_replay_create_table) {
 }
 
 TEST_P(NewTxnReplayTest, test_replay_append) {
-    GTEST_SKIP() << "Not implemented";
-
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -227,12 +225,7 @@ TEST_P(NewTxnReplayTest, test_replay_append) {
             bool has_next = state.Next(offset, range);
             EXPECT_TRUE(has_next);
             EXPECT_EQ(range.first, 0);
-            EXPECT_EQ(range.second, 1);
-            offset = range.second;
-            has_next = state.Next(offset, range);
-            EXPECT_TRUE(has_next);
-            EXPECT_EQ(range.first, 2);
-            EXPECT_EQ(range.second, 3);
+            EXPECT_EQ(range.second, 4);
             offset = range.second;
             has_next = state.Next(offset, range);
             EXPECT_FALSE(has_next);
