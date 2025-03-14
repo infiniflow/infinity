@@ -104,7 +104,7 @@ public:
 
     i64 ReplayWalFile(StorageMode targe_storage_mode);
 
-    TxnTimeStamp GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries);
+    Pair<TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries);
 
     void ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries);
 

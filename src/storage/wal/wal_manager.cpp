@@ -944,9 +944,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
     auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_checkpoint_ts);
     if (!catalog_fileinfo.has_value()) {
         String error_message = fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir);
-        // UnrecoverableError(error_message);
-        LOG_ERROR(error_message);
-        storage_->AttachCatalog();
+        UnrecoverableError(error_message);
     } else {
         auto &[full_catalog_fileinfo, delta_catalog_fileinfo_array] = catalog_fileinfo.value();
         storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfo_array);
@@ -982,7 +980,7 @@ i64 WalManager::ReplayWalFile(StorageMode targe_storage_mode) {
     return system_start_ts;
 }
 
-TxnTimeStamp WalManager::GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries) {
+Pair<TxnTimeStamp, TxnTimeStamp> WalManager::GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries) {
     Vector<String> wal_list{};
     {
         auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
@@ -1003,7 +1001,7 @@ TxnTimeStamp WalManager::GetReplayEntries(StorageMode targe_storage_mode, Vector
     }
     if (wal_list.empty()) {
         LOG_INFO(fmt::format("No checkpoint found, terminate replaying WAL"));
-        return 0;
+        return {0, 0};
     }
 
     LOG_INFO("Start Wal Replay");
@@ -1067,7 +1065,7 @@ TxnTimeStamp WalManager::GetReplayEntries(StorageMode targe_storage_mode, Vector
                 break;
             }
             case StorageMode::kReadable: {
-                return 0;
+                return {0, 0};
             }
             default: {
                 String error_message = "Unreachable branch";
@@ -1078,7 +1076,7 @@ TxnTimeStamp WalManager::GetReplayEntries(StorageMode targe_storage_mode, Vector
     LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
     std::reverse(replay_entries.begin(), replay_entries.end());
 
-    return last_commit_ts;
+    return {last_commit_ts, max_checkpoint_ts};
 }
 
 void WalManager::ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries) {

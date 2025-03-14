@@ -73,12 +73,12 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
 
     Vector<String> error_table_keys;
     while (iter2->Valid() && iter2->Key().starts_with(table_key_prefix)) {
-        table_key = iter2->Key().ToString();
-        table_id_str = iter2->Value().ToString();
         if (found_count > 0) {
             // Error branch
             error_table_keys.push_back(table_key);
         }
+        table_key = iter2->Key().ToString();
+        table_id_str = iter2->Value().ToString();
         iter2->Next();
         ++found_count;
     }
@@ -89,6 +89,7 @@ Status DBMeeta::GetTableID(const String &table_name, String &table_key, String &
     }
 
     if (!error_table_keys.empty()) {
+        error_table_keys.push_back(table_key);
         // join error_table_keys
         String error_table_keys_str =
             std::accumulate(std::next(error_table_keys.begin()), error_table_keys.end(), error_table_keys.front(), [](String a, String b) {

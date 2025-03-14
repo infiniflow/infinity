@@ -35,12 +35,12 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
 
     Vector<String> error_db_keys;
     while (iter2->Valid() && iter2->Key().starts_with(db_key_prefix)) {
-        db_key = iter2->Key().ToString();
-        db_id = iter2->Value().ToString();
         if (found_count > 0) {
             // Error branch
             error_db_keys.push_back(db_key);
         }
+        db_key = iter2->Key().ToString();
+        db_id = iter2->Value().ToString();
         iter2->Next();
         ++found_count;
     }
@@ -51,6 +51,7 @@ Status CatalogMeta::GetDBID(const String &db_name, String &db_key, String &db_id
     }
 
     if (!error_db_keys.empty()) {
+        error_db_keys.push_back(db_key);
         // join error_db_keys
         String error_db_keys_str =
             std::accumulate(std::next(error_db_keys.begin()), error_db_keys.end(), error_db_keys.front(), [](String a, String b) {

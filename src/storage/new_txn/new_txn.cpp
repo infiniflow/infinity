@@ -990,12 +990,24 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
-            case WalCommandType::DUMP_INDEX:
-            case WalCommandType::DELETE: {
+            case WalCommandType::DUMP_INDEX: {
                 break;
             }
             case WalCommandType::APPEND: {
                 auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
+
+                if (this->IsReplay()) {
+                    Optional<DBMeeta> db_meta;
+                    Optional<TableMeeta> table_meta;
+                    String table_key;
+                    Status status = GetTableMeta(append_cmd->db_name_, append_cmd->table_name_, db_meta, table_meta, &table_key);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    append_cmd->db_id_str_ = db_meta->db_id_str();
+                    append_cmd->table_id_str_ = table_meta->table_id_str();
+                    append_cmd->table_key_ = std::move(table_key);
+                }
 
                 KVStore *kv_store = txn_mgr_->kv_store();
                 UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
@@ -1011,6 +1023,29 @@ Status NewTxn::PrepareCommit() {
                 status = kv_instance->Commit();
                 if (!status.ok()) {
                     return status;
+                }
+                break;
+            }
+            case WalCommandType::DELETE: {
+                auto *delete_cmd = static_cast<WalCmdDelete *>(command.get());
+
+                if (this->IsReplay()) {
+                    Optional<DBMeeta> db_meta;
+                    Optional<TableMeeta> table_meta;
+                    Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    delete_cmd->db_id_str_ = db_meta->db_id_str();
+                    delete_cmd->table_id_str_ = table_meta->table_id_str();
+                }
+
+                KVStore *kv_store = txn_mgr_->kv_store();
+                UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+
+                Status status = PostCommitDelete(delete_cmd, kv_instance.get());
+                if (!status.ok()) {
+                    UnrecoverableError("PostCommitDelete failed");
                 }
                 break;
             }
@@ -1372,22 +1407,22 @@ void NewTxn::CommitBottom() {
     // prepare to commit txn local data into table
     //    TxnTimeStamp commit_ts = this->CommitTS();
 
-//    for (auto &command : wal_entry_->cmds_) {
-//        WalCommandType command_type = command->GetType();
-//        switch (command_type) {
-//            case WalCommandType::APPEND: {
-//                auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
-//                Status status = CommitAppend(append_cmd);
-//                if (!status.ok()) {
-//                    UnrecoverableError(fmt::format("CommitAppend failed: {}", status.message()));
-//                }
-//                break;
-//            }
-//            default: {
-//                break;
-//            }
-//        }
-//    }
+    //    for (auto &command : wal_entry_->cmds_) {
+    //        WalCommandType command_type = command->GetType();
+    //        switch (command_type) {
+    //            case WalCommandType::APPEND: {
+    //                auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
+    //                Status status = CommitAppend(append_cmd);
+    //                if (!status.ok()) {
+    //                    UnrecoverableError(fmt::format("CommitAppend failed: {}", status.message()));
+    //                }
+    //                break;
+    //            }
+    //            default: {
+    //                break;
+    //            }
+    //        }
+    //    }
 
     Status status = kv_instance_->Commit();
     if (!status.ok()) {
@@ -1424,19 +1459,19 @@ void NewTxn::PostCommit() {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::APPEND: {
-//                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-//                Status status = PostCommitAppend(append_cmd);
-//                if (!status.ok()) {
-//                    UnrecoverableError("PostCommitAppend failed");
-//                }
+                //                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                //                Status status = PostCommitAppend(append_cmd);
+                //                if (!status.ok()) {
+                //                    UnrecoverableError("PostCommitAppend failed");
+                //                }
                 break;
             }
             case WalCommandType::DELETE: {
-                auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
-                Status status = PostCommitDelete(delete_cmd);
-                if (!status.ok()) {
-                    UnrecoverableError("PostCommitDelete failed");
-                }
+                // auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
+                // Status status = PostCommitDelete(delete_cmd);
+                // if (!status.ok()) {
+                //     UnrecoverableError("PostCommitDelete failed");
+                // }
                 break;
             }
             case WalCommandType::CHECKPOINT: {
@@ -1742,44 +1777,6 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
     return Status::OK();
 }
 
-void NewTxn::SetWalEntry(SharedPtr<WalEntry> wal_entry) {
-    for (const SharedPtr<WalCmd> &wal_cmd : wal_entry->cmds_) {
-        switch (wal_cmd->GetType()) {
-            case WalCommandType::APPEND: {
-                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-
-                Optional<DBMeeta> db_meta;
-                Optional<TableMeeta> table_meta;
-                String table_key;
-                Status status = this->GetTableMeta(append_cmd->db_name_, append_cmd->table_name_, db_meta, table_meta, &table_key);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to get table meta");
-                }
-                append_cmd->db_id_str_ = db_meta->db_id_str();
-                append_cmd->table_id_str_ = table_meta->table_id_str();
-                append_cmd->table_key_ = table_key;
-                break;
-            }
-            case WalCommandType::DELETE: {
-                auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
-
-                Optional<DBMeeta> db_meta;
-                Optional<TableMeeta> table_meta;
-                Status status = this->GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to get table meta");
-                }
-                delete_cmd->db_id_str_ = db_meta->db_id_str();
-                delete_cmd->table_id_str_ = table_meta->table_id_str();
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    }
-
-    wal_entry_ = std::move(wal_entry);
-}
+void NewTxn::SetWalEntry(SharedPtr<WalEntry> wal_entry) { wal_entry_ = std::move(wal_entry); }
 
 } // namespace infinity

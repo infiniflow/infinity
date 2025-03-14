@@ -57,12 +57,12 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
 
     Vector<String> error_index_keys;
     while (iter2->Valid() && iter2->Key().starts_with(index_key_prefix)) {
-        index_key = iter2->Key().ToString();
-        index_id_str = iter2->Value().ToString();
         if (found_count > 0) {
             // Error branch
             error_index_keys.push_back(index_key);
         }
+        index_key = iter2->Key().ToString();
+        index_id_str = iter2->Value().ToString();
         iter2->Next();
         ++found_count;
     }
@@ -72,6 +72,7 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
     }
 
     if (!error_index_keys.empty()) {
+        error_index_keys.push_back(index_key);
         // join error_index_keys
         String error_index_keys_str =
             std::accumulate(std::next(error_index_keys.begin()), error_index_keys.end(), error_index_keys.front(), [](String a, String b) {

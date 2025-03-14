@@ -526,6 +526,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         block_lock->min_ts_ = std::max(block_lock->min_ts_, commit_ts);
+        block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
 
         // append in column file
         for (SizeT column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
@@ -587,7 +588,6 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &b
         }
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
-        block_lock->min_ts_ = std::max(block_lock->min_ts_, commit_ts);
         block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
 
         // delete in version file
@@ -1082,10 +1082,7 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
     return Status::OK();
 }
 
-Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd) {
-    KVStore *kv_store = txn_mgr_->kv_store();
-    UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
-
+Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance) {
     const String &db_id_str = delete_cmd->db_id_str_;
     const String &table_id_str = delete_cmd->table_id_str_;
 

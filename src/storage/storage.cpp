@@ -264,16 +264,16 @@ Status Storage::AdminToWriter() {
     kv_store_->Init(config_ptr_->CatalogDir());
     new_catalog_ = MakeUnique<NewCatalog>(kv_store_.get());
 
-    this->AttachCatalog();
-
     // TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
     TxnTimeStamp system_start_ts = 0;
+    TxnTimeStamp max_checkpoint_ts = 0;
     {
         Vector<SharedPtr<WalEntry>> replay_entries;
-        system_start_ts = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
+        std::tie(system_start_ts, max_checkpoint_ts) = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
         // Init database, need to create default_db
         LOG_INFO(fmt::format("Init a new catalog"));
         catalog_ = Catalog::NewCatalog();
+        this->AttachCatalog(max_checkpoint_ts);
 
         // TODO: new txn manager
         new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
@@ -359,7 +359,6 @@ Status Storage::AdminToWriter() {
         auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
 
         CheckpointOption option;
-        option.checkpoint_ts_ = system_start_ts;
         Status status = new_txn->Checkpoint(option);
         if (!status.ok()) {
             UnrecoverableError("Failed to checkpoint");
@@ -828,10 +827,10 @@ void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vect
     catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
-void Storage::AttachCatalog() {
+void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
     auto kv_instance = this->KVInstance();
 
-    Status status = NewCatalog::InitBufferObjs(kv_instance.get());
+    Status status = NewCatalog::InitCatalog(kv_instance.get(), checkpoint_ts);
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Init catalog failed: {}", status.message()));
     }

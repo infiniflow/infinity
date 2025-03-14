@@ -57,6 +57,9 @@ export struct TableMemoryContext {
 };
 
 export struct BlockLock {
+    BlockLock() = default;
+    BlockLock(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
+
     std::shared_mutex mtx_;
     TxnTimeStamp min_ts_{};
     TxnTimeStamp max_ts_{};
@@ -140,6 +143,7 @@ private:
 
 public:
     Status AddBlockLock(String block_key);
+    Status AddBlockLock(String block_key, TxnTimeStamp checkpoint_ts);
     Status GetBlockLock(const String &block_key, SharedPtr<BlockLock> &block_lock);
     Status DropBlockLockByBlockKey(const String &block_key);
 
@@ -175,7 +179,7 @@ private:
     MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
 
 public:
-    static Status InitBufferObjs(KVInstance *kv_instance);
+    static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
 
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,

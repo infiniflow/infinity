@@ -47,7 +47,7 @@ public:
 
     Status InitSet();
 
-    Status LoadSet();
+    Status LoadSet(TxnTimeStamp checkpoint_ts);
 
     Status UninitSet();
 

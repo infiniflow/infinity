@@ -348,6 +348,19 @@ Status NewCatalog::AddBlockLock(String block_key) {
     return Status::OK();
 }
 
+Status NewCatalog::AddBlockLock(String block_key, TxnTimeStamp checkpoint_ts) {
+    bool insert_success = false;
+    HashMap<String, SharedPtr<BlockLock>>::iterator iter;
+    {
+        std::unique_lock lock(block_lock_mtx_);
+        std::tie(iter, insert_success) = block_lock_map_.emplace(std::move(block_key), MakeShared<BlockLock>(checkpoint_ts));
+    }
+    if (!insert_success) {
+        return Status::CatalogError(fmt::format("Block key: {} already exists", iter->first));
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::GetBlockLock(const String &block_key, SharedPtr<BlockLock> &block_lock) {
     block_lock = nullptr;
     {

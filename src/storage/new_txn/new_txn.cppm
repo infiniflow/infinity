@@ -448,7 +448,7 @@ private:
     Status CommitImport(const WalCmdImport *import_cmd);
     Status CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
     Status PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
-    Status PostCommitDelete(const WalCmdDelete *delete_cmd);
+    Status PostCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance);
     Status CommitCompact(const WalCmdCompact *compact_cmd);
     Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd);
     Status CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd);
