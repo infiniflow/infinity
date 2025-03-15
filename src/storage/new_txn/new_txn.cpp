@@ -1009,20 +1009,42 @@ Status NewTxn::PrepareCommit() {
                     append_cmd->table_key_ = std::move(table_key);
                 }
 
-                KVStore *kv_store = txn_mgr_->kv_store();
-                UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+                auto commit_append_func = [&]() -> Status {
+                    KVStore *kv_store = txn_mgr_->kv_store();
+                    UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+                    Status status = CommitAppend(append_cmd, kv_instance.get());
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    status = PostCommitAppend(append_cmd, kv_instance.get());
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    status = kv_instance->Commit();
+                    if (!status.ok()) {
+                        return status;
+                    }
+                    return Status::OK();
+                };
 
-                Status status = CommitAppend(append_cmd, kv_instance.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                status = PostCommitAppend(append_cmd, kv_instance.get());
-                if (!status.ok()) {
-                    return status;
-                }
-                status = kv_instance->Commit();
-                if (!status.ok()) {
-                    return status;
+                SizeT attempt_count = 0;
+                Status status = Status::OK();
+                while (true) {
+                    attempt_count++;
+                    status = commit_append_func();
+                    if (status.ok()) {
+                        if (attempt_count > 0) {
+                            LOG_DEBUG(fmt::format("Append transaction retry count: {}", attempt_count));
+                        }
+                        break;
+                    } else {
+                        if (status.code() == ErrorCode::kRocksDBError && status.rocksdb_status_->IsBusy()) {
+                            LOG_DEBUG(fmt::format("Retry the append transaction, retry count: {}", attempt_count));
+                        } else {
+                            LOG_ERROR(fmt::format("Other append transaction error: {}", status.message()));
+                            break;
+                        }
+                    }
                 }
                 break;
             }

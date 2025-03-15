@@ -461,8 +461,8 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
         if (!block_status.ok()) {
             return block_status;
         }
-        SizeT actual_append = std::min(to_append_rows, block_meta.block_capacity() - block_row_count);
 
+        SizeT actual_append = std::min(to_append_rows, block_meta.block_capacity() - block_row_count);
         if (actual_append) {
             SegmentID segment_id = block_meta.segment_meta().segment_id();
             BlockID block_id = block_meta.block_id();
@@ -473,8 +473,16 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
                               append_state->current_block_,
                               append_state->current_block_offset_);
             append_state->append_ranges_.push_back(range);
-
-            block_meta.SetRowCnt(block_row_count + actual_append);
+//            LOG_INFO(fmt::format("actual to append rows: {}, from block: {} and offset {} to target block id: {} and offset: {}",
+//                                 to_append_rows,
+//                                 append_state->current_block_,
+//                                 append_state->current_block_offset_,
+//                                 block_id,
+//                                 block_row_count));
+            Status status = block_meta.SetRowCnt(block_row_count + actual_append);
+            if (!status.ok()) {
+                return status;
+            }
         }
 
         block_full = block_row_count + actual_append >= block_meta.block_capacity();
@@ -485,7 +493,10 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
         }
 
         if (actual_append) {
-            block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
+            Status status = block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
+            if (!status.ok()) {
+                return status;
+            }
         }
         segment_full = segment_row_count + actual_append >= block_meta.segment_meta().segment_capacity();
 
@@ -907,15 +918,14 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
     const String &table_id_str = append_cmd->table_id_str_;
 
     NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
-    status = txn_table_store->Append(append_cmd->block_);
-    if (!status.ok()) {
-        return status;
-    }
     AppendState *append_state = txn_table_store->append_state();
-    append_state->Finalize();
-    if (append_state->Finished()) {
-        // FIXME append_state will merge all appended blocks data. If append more than one block, this branch will be executed.
-        return Status::OK();
+    if (append_state == nullptr) {
+        status = txn_table_store->Append(append_cmd->block_);
+        if (!status.ok()) {
+            return status;
+        }
+        append_state = txn_table_store->append_state();
+        append_state->Finalize();
     }
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
@@ -1029,14 +1039,8 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
 }
 
 Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance) {
-    Status status;
-    if (!this->IsReplay()) {
-        status = new_catalog_->DecreaseTableWriteCount(append_cmd->table_key_);
-        if (!status.ok()) {
-            UnrecoverableError("Fail to unlock table on post commit phase");
-        }
-    }
 
+    Status status = Status::OK();
     const String &db_id_str = append_cmd->db_id_str_;
     const String &table_id_str = append_cmd->table_id_str_;
 
@@ -1079,6 +1083,14 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
             return status;
         }
     }
+
+    if (!this->IsReplay()) {
+        status = new_catalog_->DecreaseTableWriteCount(append_cmd->table_key_);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Fail to unlock table on post commit phase: {}", status.message()));
+        }
+    }
+
     return Status::OK();
 }
 
