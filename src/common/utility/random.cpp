@@ -43,6 +43,18 @@ String RandomString(SizeT len) {
     return ret;
 }
 
+SharedPtr<String> DetermineRandomPath(const String &name) {
+    String rand, result;
+    static bool initialized = false;
+    if (!initialized) {
+        initialized = true;
+        srand(std::time(nullptr));
+    }
+    rand = RandomString(DEFAULT_RANDOM_NAME_LEN);
+    result = fmt::format("{}_{}", rand, name);
+    return MakeShared<String>(std::move(result));
+}
+
 SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &name) {
     assert(std::filesystem::path(parent_dir).is_absolute());
     String rand, temp, result;

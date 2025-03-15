@@ -17,6 +17,7 @@ module;
 import stl;
 import config;
 import catalog;
+import new_catalog;
 import txn_manager;
 import buffer_manager;
 import wal_manager;
@@ -28,6 +29,7 @@ import log_file;
 import memindex_tracer;
 import persistence_manager;
 import virtual_store;
+import kv_store;
 import status;
 
 export module storage;
@@ -36,6 +38,7 @@ namespace infinity {
 
 class CleanupInfoTracer;
 class ResultCacheManager;
+class NewTxnManager;
 
 export enum class ReaderInitPhase {
     kInvalid,
@@ -51,11 +54,15 @@ public:
 
     [[nodiscard]] inline Catalog *catalog() noexcept { return catalog_.get(); }
 
+    [[nodiscard]] inline NewCatalog *new_catalog() noexcept { return new_catalog_.get(); }
+
     [[nodiscard]] inline BufferManager *buffer_manager() noexcept { return buffer_mgr_.get(); }
 
     [[nodiscard]] inline BGMemIndexTracer *memindex_tracer() noexcept { return memory_index_tracer_.get(); }
 
     [[nodiscard]] inline TxnManager *txn_manager() const noexcept { return txn_mgr_.get(); }
+
+    [[nodiscard]] inline NewTxnManager *new_txn_manager() const noexcept { return new_txn_mgr_.get(); }
 
     [[nodiscard]] inline WalManager *wal_manager() const noexcept { return wal_mgr_.get(); }
 
@@ -70,6 +77,10 @@ public:
     [[nodiscard]] inline CompactionProcessor *compaction_processor() const noexcept { return compact_processor_.get(); }
 
     [[nodiscard]] inline CleanupInfoTracer *cleanup_info_tracer() const noexcept { return cleanup_info_tracer_.get(); }
+
+    UniquePtr<KVInstance> KVInstance();
+
+    [[nodiscard]] KVStore *kv_store() const { return kv_store_.get(); }
 
     [[nodiscard]] ResultCacheManager *result_cache_manager() const noexcept;
 
@@ -96,6 +107,7 @@ public:
     Status UnInitFromWriter();
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
+    void AttachCatalog(TxnTimeStamp checkpoint_ts);
     void LoadFullCheckpoint(const String &checkpoint_path);
     void AttachDeltaCheckpoint(const String &checkpoint_path);
 
@@ -113,11 +125,14 @@ private:
     UniquePtr<ResultCacheManager> result_cache_manager_{};
     UniquePtr<BufferManager> buffer_mgr_{};
     UniquePtr<Catalog> catalog_{};
+    UniquePtr<NewCatalog> new_catalog_{};
     UniquePtr<BGMemIndexTracer> memory_index_tracer_{};
     UniquePtr<TxnManager> txn_mgr_{};
+    UniquePtr<NewTxnManager> new_txn_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};
     UniquePtr<CompactionProcessor> compact_processor_{};
     UniquePtr<PeriodicTriggerThread> periodic_trigger_thread_{};
+    UniquePtr<KVStore> kv_store_{};
 
     mutable std::mutex mutex_;
     StorageMode current_storage_mode_{StorageMode::kUnInitialized};

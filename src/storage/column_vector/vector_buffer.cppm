@@ -31,6 +31,7 @@ namespace infinity {
 
 class BufferManager;
 struct BlockColumnEntry;
+class BufferObj;
 
 export enum class VectorBufferType {
     kInvalid,
@@ -46,6 +47,9 @@ public:
 
     static SharedPtr<VectorBuffer>
     Make(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_types);
+
+    static SharedPtr<VectorBuffer>
+    Make(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
 
 public:
     explicit VectorBuffer() {
@@ -67,6 +71,12 @@ public:
     void InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity);
 
     void Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity);
+
+    void InitializeCompactBit(BufferObj *buffer_obj, SizeT capacity);
+
+    void Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT type_size, SizeT capacity);
+
+    void SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj);
 
     void ResetToInit(VectorBufferType type);
 
@@ -154,6 +164,8 @@ public:
     const char *GetArrayRaw(SizeT offset, SizeT size) const;
 
     SizeT AppendArrayRaw(const char *raw_data, SizeT size) const;
+
+    VarBufferManager *var_buffer_mgr() const { return var_buffer_mgr_.get(); }
 
 private:
     UniquePtr<VarBufferManager> var_buffer_mgr_{nullptr};

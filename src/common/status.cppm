@@ -17,6 +17,7 @@ module;
 export module status;
 
 import stl;
+import third_party;
 
 // If new error codes are added, it also needs to be added to python/infinity/errors.py.
 namespace infinity {
@@ -142,7 +143,9 @@ export enum class ErrorCode : long {
     kFailToStartTxn = 3093,
     kAlreadyLocked = 3094,
     kNotLocked = 3095,
-    kInvalidParameter = 3096,
+    kTableIsUsing = 3096,
+    kDuplicateColumnIndex = 3097,
+    kInvalidParameter = 3098,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -201,7 +204,12 @@ export enum class ErrorCode : long {
     kInvalidNodeRole = 8007,
     kInvalidNodeStatus = 8008,
     kNodeInfoUpdated = 8009,
-    kNodeNameMismatch = 8010
+    kNodeNameMismatch = 8010,
+
+    // 9. internal error
+    kCatalogError = 9001,
+    kBufferManagerError = 9002,
+    kRocksDBError = 9003,
 };
 
 export class Status {
@@ -322,10 +330,12 @@ public:
     static Status FailToStartTxn(const String &detail);
     static Status AlreadyLocked(const String &detail);
     static Status NotLocked(const String &detail);
+    static Status TableIsUsing(const String &detail);
+    static Status DuplicateColumnIndex(const String &detail);
     static Status InvalidParameter(const String &detail);
 
     // 4. TXN fail
-    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");
+    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no re\anson gived");
     static Status TxnConflict(u64 txn_id, const String &conflict_reason);
 
     // 5. Insufficient resource or exceed limits
@@ -374,7 +384,7 @@ public:
     // meta
     static Status InvalidEntry();
     static Status NotFoundEntry();
-    static Status DuplicateEntry();
+    static Status DuplicateEntry(const String &detailed_info);
     static Status EmptyEntryList();
     static Status NoWALEntryFound(const String &file_name, i64 index);
     static Status WrongCheckpointType(const String &expect_type, const String &actual_type);
@@ -383,12 +393,22 @@ public:
     static Status NodeInfoUpdated(const String &message);
     static Status NodeNameMismatch(const String &actual_node_name, const String &expected_node_name);
 
+    // catalog
+    static Status CatalogError(const String &detailed_info);
+    static Status BufferManagerError(const String &detailed_info);
+    static Status RocksDBError(rocksdb::Status rocksdb_s);
+    static Status RocksDBError(rocksdb::IOStatus rocksdb_s);
+
 public:
     Status() = default;
 
     inline explicit Status(ErrorCode code) : code_(code) {}
 
     inline Status(ErrorCode code, UniquePtr<String> message) : code_(code), msg_(std::move(message)) {}
+
+    Status(ErrorCode code, rocksdb::Status detail);
+
+    Status(ErrorCode code, rocksdb::IOStatus detail);
 
     Status(ErrorCode code, const char *msg);
 
@@ -410,13 +430,7 @@ public:
 
     void Init(ErrorCode code, const char *msg);
 
-    [[nodiscard]] const char *message() const {
-        if (msg_.get() != nullptr) {
-            return msg_->c_str();
-        } else {
-            return nullptr;
-        }
-    }
+    [[nodiscard]] const char *message() const;
 
     void MoveStatus(Status &s);
     void MoveStatus(Status &&s);
@@ -426,7 +440,8 @@ public:
     inline Status clone() const { return Status{code_, MakeUnique<String>(*msg_)}; }
 
     ErrorCode code_{ErrorCode::kOk};
-    UniquePtr<String> msg_{};
+    mutable UniquePtr<String> msg_{};
+    UniquePtr<rocksdb::Status> rocksdb_status_{};
 };
 
 } // namespace infinity

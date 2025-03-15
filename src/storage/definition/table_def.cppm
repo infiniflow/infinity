@@ -93,7 +93,6 @@ private:
     SharedPtr<String> table_comment_{};
     Vector<SharedPtr<ColumnDef>> columns_{};
     HashMap<String, SizeT> column_name2id_{};
-    Vector<IndexBase> indexes_{};
 };
 
 } // namespace infinity

@@ -30,6 +30,7 @@ class Storage;
 class BGTaskProcessor;
 struct TableEntry;
 class Txn;
+class NewTxn;
 struct SegmentEntry;
 class Catalog;
 
@@ -80,12 +81,14 @@ public:
     void Stop();
 
     void SubmitTxn(Vector<Txn *> &txn_batch);
+    void SubmitTxn(Vector<NewTxn *> &txn_batch);
 
     // Flush is scheduled regularly. It collects a batch of transactions, sync
     // wal and do parallel committing. Each sync cost ~1s. Each checkpoint cost
     // ~10s. So it's necessary to sync for a batch of transactions, and to
     // checkpoint for a batch of sync.
     void Flush();
+    void NewFlush();
 
     void FlushLogByReplication(const Vector<String> &synced_logs, bool on_startup);
 
@@ -100,6 +103,10 @@ public:
     String GetWalFilename() const;
 
     i64 ReplayWalFile(StorageMode targe_storage_mode);
+
+    Pair<TxnTimeStamp, TxnTimeStamp> GetReplayEntries(StorageMode targe_storage_mode, Vector<SharedPtr<WalEntry>> &replay_entries);
+
+    void ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entries);
 
     Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> GetCatalogFiles() const;
 
@@ -169,9 +176,11 @@ private:
     // WalManager state
     Atomic<bool> running_{};
     Thread flush_thread_{};
+    Thread new_flush_thread_{};
 
     // TxnManager and Flush thread access following members
     BlockingQueue<Txn *> wait_flush_{"WalManager"};
+    BlockingQueue<NewTxn *> new_wait_flush_{"WalManager"};
 
     // Only Flush thread access following members
     std::ofstream ofs_{};

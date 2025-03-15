@@ -487,7 +487,7 @@ Tuple<Entry *, Status> EntryList<Entry>::ApplySnapshot(std::function<SharedPtr<E
             return {entry_ptr, Status::OK()};
         }
         case FindResult::kFound: {
-            return {nullptr, Status::DuplicateEntry()};
+            return {nullptr, Status::DuplicateEntry("Duplicated entry.")};
         }
         default: {
             return {nullptr, Status::InvalidEntry()};

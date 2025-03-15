@@ -68,6 +68,23 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(BufferManager *buffer_mgr,
     return buffer_ptr;
 }
 
+SharedPtr<VectorBuffer>
+VectorBuffer::Make(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type) {
+    SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
+    buffer_ptr->buffer_type_ = buffer_type;
+    switch (buffer_type) {
+        case VectorBufferType::kCompactBit: {
+            buffer_ptr->InitializeCompactBit(buffer_obj, capacity);
+            break;
+        }
+        default: {
+            buffer_ptr->Initialize(buffer_obj, outline_buffer_obj, data_type_size, capacity);
+            break;
+        }
+    }
+    return buffer_ptr;
+}
+
 void VectorBuffer::InitializeCompactBit(SizeT capacity) {
     if (initialized_) {
         String error_message = "Vector buffer is already initialized.";
@@ -142,6 +159,64 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
     initialized_ = true;
     data_size_ = data_size;
     capacity_ = capacity;
+}
+
+void VectorBuffer::InitializeCompactBit(BufferObj *buffer_obj, SizeT capacity) {
+    if (initialized_) {
+        String error_message = "Vector buffer is already initialized.";
+        UnrecoverableError(error_message);
+    }
+    SizeT data_size = (capacity + 7) / 8;
+    if (buffer_obj == nullptr) {
+        String error_message = "Buffer object is nullptr.";
+        UnrecoverableError(error_message);
+    }
+    if (buffer_obj->GetBufferSize() != data_size) {
+        String error_message = "Buffer object size is not equal to data size.";
+        UnrecoverableError(error_message);
+    }
+    ptr_ = buffer_obj->Load();
+    initialized_ = true;
+    data_size_ = data_size;
+    capacity_ = capacity;
+}
+
+void VectorBuffer::Initialize(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, SizeT type_size, SizeT capacity) {
+    if (initialized_) {
+        String error_message = "Vector buffer is already initialized.";
+        UnrecoverableError(error_message);
+    }
+    SizeT data_size = type_size * capacity;
+    if (buffer_obj == nullptr) {
+        String error_message = "Buffer object is nullptr.";
+        UnrecoverableError(error_message);
+    }
+    if (buffer_obj->GetBufferSize() != data_size) {
+        String error_message = "Buffer object size is not equal to data size.";
+        UnrecoverableError(error_message);
+    }
+    ptr_ = buffer_obj->Load();
+    if (buffer_type_ == VectorBufferType::kVarBuffer) {
+        var_buffer_mgr_ = MakeUnique<VarBufferManager>(outline_buffer_obj);
+    }
+    initialized_ = true;
+    data_size_ = data_size;
+    capacity_ = capacity;
+}
+
+void VectorBuffer::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj) {
+    if (!std::holds_alternative<UniquePtr<char[]>>(ptr_)) {
+        UnrecoverableError("Cannot convert to new catalog");
+    }
+
+    void *src_ptr = std::get<UniquePtr<char[]>>(ptr_).release();
+    buffer_obj->SetData(src_ptr);
+
+    BufferHandle buffer_handle = buffer_obj->Load();
+    ptr_ = buffer_handle;
+    if (buffer_type_ == VectorBufferType::kVarBuffer) {
+        var_buffer_mgr_->SetToCatalog(outline_buffer_obj);
+    }
 }
 
 void VectorBuffer::ResetToInit(VectorBufferType type) {
