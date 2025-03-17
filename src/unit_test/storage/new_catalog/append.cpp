@@ -3492,6 +3492,7 @@ TEST_P(TestAppend, test_append_append_concurrent) {
                     NewTxnGetVisibleRangeState state;
                     status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
                     EXPECT_TRUE(status.ok());
+                    SizeT row_count = state.block_offset_end();
                     {
                         Pair<BlockOffset, BlockOffset> range;
                         BlockOffset offset = 0;
@@ -3502,9 +3503,39 @@ TEST_P(TestAppend, test_append_append_concurrent) {
                         offset = range.second;
                         has_next = state.Next(offset, range);
                         EXPECT_FALSE(has_next);
-                    }
 
-                    SizeT row_count = state.block_offset_end();
+                        {
+                            SizeT column_idx = 0;
+                            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                            ColumnVector col;
+
+                            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                            EXPECT_TRUE(status.ok());
+
+                            for(SizeT row_id = 0; row_id < 4096; ++row_id) {
+                                EXPECT_EQ(col.GetValue(row_id), Value::MakeInt(row_id));
+                            }
+                            for(SizeT row_id = 4096; row_id < 8192; ++row_id) {
+                                EXPECT_EQ(col.GetValue(row_id), Value::MakeInt(row_id - 4096));
+                            }
+                        }
+                        {
+                            SizeT column_idx = 1;
+                            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                            ColumnVector col;
+
+                            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                            EXPECT_TRUE(status.ok());
+
+                            for(SizeT row_id = 0; row_id < 4096; ++row_id) {
+                                EXPECT_EQ(col.GetValue(row_id), Value::MakeVarchar(fmt::format("abc_{}", row_id)));
+                            }
+                            for(SizeT row_id = 4096; row_id < 8192; ++row_id) {
+                                EXPECT_EQ(col.GetValue(row_id), Value::MakeVarchar(fmt::format("abc_{}", row_id - 4096)));
+                            }
+                        }
+
+                    }
                     EXPECT_EQ(row_count, 8192);
                 }
             }
