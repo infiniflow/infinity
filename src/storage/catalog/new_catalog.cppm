@@ -133,6 +133,7 @@ public:
 
     Status IncreaseTableWriteCount(const String &table_key);
     Status DecreaseTableWriteCount(const String &table_key);
+    SizeT GetTableWriteCount() const;
 
 private:
     KVStore *kv_store_{};

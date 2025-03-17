@@ -867,6 +867,7 @@ Status NewTxn::Commit() {
     } else {
         Status status = this->PrepareCommit();
         if (!status.ok()) {
+            PostRollback(commit_ts);
             wal_entry_ = nullptr;
             txn_mgr_->SendToWAL(this);
             return status;
@@ -1547,20 +1548,7 @@ void NewTxn::CancelCommitBottom() {
     commit_cv_.notify_one();
 }
 
-Status NewTxn::Rollback() {
-    DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
-    auto state = this->GetTxnState();
-    TxnTimeStamp abort_ts = 0;
-    if (state == TxnState::kStarted) {
-        abort_ts = txn_mgr_->GetReadCommitTS(this);
-    } else if (state == TxnState::kCommitting) {
-        abort_ts = this->CommitTS();
-    } else {
-        String error_message = fmt::format("Transaction {} state is {}.", txn_context_ptr_->txn_id_, TxnState2Str(state));
-        UnrecoverableError(error_message);
-    }
-    this->SetTxnRollbacking(abort_ts);
-
+Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     for (const SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
@@ -1640,10 +1628,28 @@ Status NewTxn::Rollback() {
         return status;
     }
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
+    return Status::OK();
+}
+
+Status NewTxn::Rollback() {
+    DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
+    auto state = this->GetTxnState();
+    TxnTimeStamp abort_ts = 0;
+    if (state == TxnState::kStarted) {
+        abort_ts = txn_mgr_->GetReadCommitTS(this);
+    } else if (state == TxnState::kCommitting) {
+        abort_ts = this->CommitTS();
+    } else {
+        String error_message = fmt::format("Transaction {} state is {}.", txn_context_ptr_->txn_id_, TxnState2Str(state));
+        UnrecoverableError(error_message);
+    }
+    this->SetTxnRollbacking(abort_ts);
+
+    Status status = PostRollback(abort_ts);
 
     LOG_TRACE(fmt::format("NewTxn: {} is dropped.", txn_context_ptr_->txn_id_));
 
-    return Status::OK();
+    return status;
 }
 
 SharedPtr<AddDeltaEntryTask> NewTxn::MakeAddDeltaEntryTask() {

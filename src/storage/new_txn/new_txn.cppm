@@ -150,6 +150,8 @@ public:
 
     void CancelCommitBottom();
 
+    Status PostRollback(TxnTimeStamp abort_ts);
+
     Status Rollback();
 
     SharedPtr<AddDeltaEntryTask> MakeAddDeltaEntryTask();

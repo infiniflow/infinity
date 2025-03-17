@@ -335,6 +335,11 @@ Status NewCatalog::DecreaseTableWriteCount(const String &table_key) {
     return Status::OK();
 }
 
+SizeT NewCatalog::GetTableWriteCount() const {
+    std::lock_guard lock(mtx_);
+    return table_memory_context_map_.size();
+}
+
 Status NewCatalog::AddBlockLock(String block_key) {
     bool insert_success = false;
     HashMap<String, SharedPtr<BlockLock>>::iterator iter;
