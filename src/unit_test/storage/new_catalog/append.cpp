@@ -1540,7 +1540,7 @@ TEST_P(TestAppend, test_append_add_column) {
         EXPECT_TRUE(status.ok());
     }
 
-    //    t1                                      append                                   commit (success)
+    //    t1                                      append (fail)                               rollback (success)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  add column   commit (success)

@@ -160,7 +160,8 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
-    status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt);
+    String table_key;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -209,6 +210,21 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
         if (j < input_blocks.size() - 1 && row_cnt != block_meta->block_capacity()) {
             UnrecoverableError("Attempt to import data block with different capacity");
+        }
+
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs{nullptr};
+        {
+            auto [col_defs, col_def_status] = table_meta.GetColumnDefs();
+            if (!col_def_status.ok()) {
+                return col_def_status;
+            }
+            column_defs = col_defs;
+        }
+        SizeT column_count = column_defs->size();
+        if (column_count != input_block->column_count()) {
+            String err_msg = fmt::format("Attempt to import different column count data block into transaction table store");
+            LOG_ERROR(err_msg);
+            return Status::ColumnCountMismatch(err_msg);
         }
 
         for (SizeT i = 0; i < input_block->column_count(); ++i) {
@@ -266,11 +282,17 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         }
     }
 
+    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta));
     wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(import_command));
     txn_context_ptr_->AddOperation(MakeShared<String>(import_command->ToString()));
     import_command->db_id_str_ = db_meta->db_id_str();
     import_command->table_id_str_ = table_meta.table_id_str();
+    import_command->table_key_ = table_key;
 
     return Status::OK();
 }
@@ -345,7 +367,7 @@ Status NewTxn::ReplayImport(WalCmdImport *import_cmd) {
 
         for (SizeT i = 0; i < column_count; ++i) {
             const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[i];
-            ColumnMeta column_meta(i, block_meta, block_meta.kv_instance());    
+            ColumnMeta column_meta(i, block_meta, block_meta.kv_instance());
             status = column_meta.SetChunkOffset(chunk_offset);
             if (!status.ok()) {
                 return status;
@@ -1198,13 +1220,6 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
         status = this->AppendIndex(table_index_meta, append_state);
         if (!status.ok()) {
             return status;
-        }
-    }
-
-    if (!this->IsReplay()) {
-        status = new_catalog_->DecreaseTableWriteCount(append_cmd->table_key_);
-        if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to unlock table on post commit phase: {}", status.message()));
         }
     }
 

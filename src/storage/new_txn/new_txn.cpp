@@ -1457,11 +1457,23 @@ void NewTxn::PostCommit() {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::APPEND: {
-                //                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                //                Status status = PostCommitAppend(append_cmd);
-                //                if (!status.ok()) {
-                //                    UnrecoverableError("PostCommitAppend failed");
-                //                }
+                if (!this->IsReplay()) {
+                    auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                    Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("Fail to unlock table on post commit phase: {}", status.message()));
+                    }
+                }
+                break;
+            }
+            case WalCommandType::IMPORT: {
+                if (!this->IsReplay()) {
+                    auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
+                    Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("Fail to unlock table on post commit phase: {}", status.message()));
+                    }
+                }
                 break;
             }
             case WalCommandType::DELETE: {
@@ -1586,6 +1598,14 @@ Status NewTxn::Rollback() {
             }
             case WalCommandType::APPEND: {
                 auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table when rollback append txn");
+                }
+                break;
+            }
+            case WalCommandType::IMPORT: {
+                auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table when rollback append txn");
