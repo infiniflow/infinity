@@ -1039,6 +1039,21 @@ Status NewTxn::CommitImport(WalCmdImport *import_cmd) {
 
     WalSegmentInfo &segment_info = import_cmd->segment_info_;
 
+    {
+        KVStore *kv_store = txn_mgr_->kv_store();
+        UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+        TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
+        auto [col_defs, col_def_status] = table_meta.GetColumnDefs();
+        if (!col_def_status.ok()) {
+            return col_def_status;
+        }
+
+        if (segment_info.column_count_ != col_defs->size()) {
+            return Status::ColumnCountMismatch(
+                fmt::format("Column count mismatch, expect: {}, actual: {}", col_defs->size(), segment_info.column_count_));
+        }
+    }
+
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta, table_meta.kv_instance());
 
