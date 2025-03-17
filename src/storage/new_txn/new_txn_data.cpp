@@ -118,18 +118,30 @@ struct NewTxnCompactState {
                 return status;
             }
         }
+        for (ColumnID i = 0; i < column_cnt_; ++i) {
+            ColumnMeta column_meta(i, *block_meta_, block_meta_->kv_instance());
+            BufferObj *buffer_obj = nullptr;
+            BufferObj *outline_buffer_obj = nullptr;
+
+            Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+            if (!status.ok()) {
+                return status;
+            }
+            buffer_obj->Save();
+            if (outline_buffer_obj) {
+                outline_buffer_obj->Save();
+            }
+        }
         block_meta_.reset();
         return Status::OK();
     }
 
     Status Finalize() {
-        if (block_meta_) {
-            Status status = block_meta_->SetRowCnt(cur_block_row_cnt_);
-            if (!status.ok()) {
-                return status;
-            }
+        Status status = FinalizeBlock();
+        if (!status.ok()) {
+            return status;
         }
-        Status status = new_segment_meta_->SetRowCnt(segment_row_cnt_);
+        status = new_segment_meta_->SetRowCnt(segment_row_cnt_);
         return status;
     }
 
