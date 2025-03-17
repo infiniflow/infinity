@@ -282,6 +282,18 @@ Status Storage::AdminToWriter() {
         // start WalManager after TxnManager since it depends on TxnManager.
         wal_mgr_->Start();
 
+        // Construct txn manager
+        if (txn_mgr_ != nullptr) {
+            UnrecoverableError("Transaction manager was initialized before.");
+        }
+        txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
+        txn_mgr_->Start();
+
+        if (memory_index_tracer_ != nullptr) {
+            UnrecoverableError("Memory index tracer was initialized before.");
+        }
+        memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), catalog_.get(), txn_mgr_.get());
+
         wal_mgr_->ReplayWalEntries(replay_entries);
     }
 
@@ -305,17 +317,6 @@ Status Storage::AdminToWriter() {
     }
     bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
 
-    // Construct txn manager
-    if (txn_mgr_ != nullptr) {
-        UnrecoverableError("Transaction manager was initialized before.");
-    }
-    txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
-    txn_mgr_->Start();
-
-    if (memory_index_tracer_ != nullptr) {
-        UnrecoverableError("Memory index tracer was initialized before.");
-    }
-    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), catalog_.get(), txn_mgr_.get());
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
     bg_processor_->Start();

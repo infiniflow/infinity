@@ -88,6 +88,7 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
         UnrecoverableError(status.message());
     }
     outline_infos_.resize(column_defs_ptr->size());
+    Vector<String> paths;
     for (SizeT i = 0; i < column_defs_ptr->size(); i++) {
         ColumnID column_id = (*column_defs_ptr)[i]->id();
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
@@ -98,8 +99,14 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
         }
         outline_infos_[i] = {1, chunk_offset};
 
-        // TODO
+        Status status = column_meta.FilePaths(paths);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        paths_.insert(paths_.end(), paths.begin(), paths.end());
     }
+    paths = block_meta.FilePaths();
+    paths_.insert(paths_.end(), paths.begin(), paths.end());
 
     auto *pm = InfinityContext::instance().persistence_manager();
     addr_serializer_.Initialize(pm, paths_);

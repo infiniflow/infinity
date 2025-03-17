@@ -254,6 +254,10 @@ public:
 
     Status Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks);
 
+private:
+    Status ReplayImport(WalCmdImport *import_cmd);
+
+public:
     // Status Append(TableEntry *table_entry, const SharedPtr<DataBlock> &input_block);
 
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
@@ -445,18 +449,18 @@ private:
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
     Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
-    Status CommitImport(const WalCmdImport *import_cmd);
+    Status CommitImport(WalCmdImport *import_cmd);
     Status CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
     Status PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
     Status PostCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance);
-    Status CommitCompact(const WalCmdCompact *compact_cmd);
+    Status CommitCompact(WalCmdCompact *compact_cmd);
     Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd);
     Status CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd);
     Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpoint *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpoint *checkpoint_cmd);
     Status CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts);
 
-    Status CommitSegmentVersion(const WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
+    Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts);
     Status FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts);
 
@@ -469,7 +473,7 @@ public:
 
     bool IsReplay() const { return txn_context_ptr_->replay_; }
 
-    void SetWalEntry(SharedPtr<WalEntry> wal_entry);
+    Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd);
 
 private:
     // Reference to external class

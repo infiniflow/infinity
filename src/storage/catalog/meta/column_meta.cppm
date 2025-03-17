@@ -57,6 +57,8 @@ public:
 
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer);
 
+    Status FilePaths(Vector<String> &paths);
+
 private:
     Status GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def);
 

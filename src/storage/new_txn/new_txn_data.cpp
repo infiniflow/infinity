@@ -160,6 +160,9 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         return status;
     }
     status = table_meta.SetNextSegmentID(segment_id + 1);
+    if (!status.ok()) {
+        return status;
+    }
 
     Optional<SegmentMeta> segment_meta;
     status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
@@ -209,6 +212,13 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
                 return status;
             }
             col->SetToCatalog(buffer_obj, outline_buffer_obj, ColumnVectorTipe::kReadWrite);
+            if (VarBufferManager *var_buffer_mgr = col->buffer_->var_buffer_mgr(); var_buffer_mgr != nullptr) {
+                SizeT chunk_size = var_buffer_mgr->TotalSize();
+                Status status = column_meta.SetChunkOffset(chunk_size);
+                if (!status.ok()) {
+                    return status;
+                }
+            }
 
             buffer_obj->Save();
             if (outline_buffer_obj) {
@@ -249,6 +259,101 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     txn_context_ptr_->AddOperation(MakeShared<String>(import_command->ToString()));
     import_command->db_id_str_ = db_meta->db_id_str();
     import_command->table_id_str_ = table_meta.table_id_str();
+
+    return Status::OK();
+}
+
+Status NewTxn::ReplayImport(WalCmdImport *import_cmd) {
+    Status status;
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    status = GetTableMeta(import_cmd->db_name_, import_cmd->table_name_, db_meta, table_meta_opt);
+    if (!status.ok()) {
+        return status;
+    }
+    TableMeeta &table_meta = *table_meta_opt;
+
+    import_cmd->db_id_str_ = db_meta->db_id_str();
+    import_cmd->table_id_str_ = table_meta.table_id_str();
+
+    const WalSegmentInfo &segment_info = import_cmd->segment_info_;
+
+    SegmentID segment_id = 0;
+    status = table_meta.GetNextSegmentID(segment_id);
+    if (!status.ok()) {
+        return status;
+    }
+    if (segment_id != segment_info.segment_id_) {
+        UnrecoverableError(fmt::format("Segment id mismatch, expect: {}, actual: {}", segment_id, segment_info.segment_id_));
+    }
+    status = table_meta.SetNextSegmentID(segment_id + 1);
+    if (!status.ok()) {
+        return status;
+    }
+
+    Optional<SegmentMeta> segment_meta;
+    status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    u64 column_count = segment_info.column_count_;
+
+    auto *pm = InfinityContext::instance().persistence_manager();
+    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+        if (pm) {
+            block_info.addr_serializer_.AddToPersistenceManager(pm);
+        }
+
+        BlockID block_id = 0;
+        {
+            std::tie(block_id, status) = segment_meta->GetNextBlockID();
+            if (!status.ok()) {
+                return status;
+            }
+            if (block_id != block_info.block_id_) {
+                UnrecoverableError(fmt::format("Block id mismatch, expect: {}, actual: {}", block_id, block_info.block_id_));
+            }
+            status = segment_meta->SetNextBlockID(block_id + 1);
+            if (!status.ok()) {
+                return status;
+            }
+            status = segment_meta->AddBlockID(block_id);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        BlockMeta block_meta(block_id, *segment_meta, segment_meta->kv_instance());
+
+        TxnTimeStamp checkpoint_ts = txn_mgr_->max_committed_ts();
+        status = block_meta.LoadSet(checkpoint_ts);
+        if (!status.ok()) {
+            return status;
+        }
+
+        for (SizeT i = 0; i < column_count; ++i) {
+            const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[i];
+            ColumnMeta column_meta(i, block_meta, block_meta.kv_instance());    
+            status = column_meta.SetChunkOffset(chunk_offset);
+            if (!status.ok()) {
+                return status;
+            }
+
+            status = column_meta.LoadSet();
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        status = block_meta.SetRowCnt(block_info.row_count_);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    status = segment_meta->SetRowCnt(segment_info.row_count_);
+    if (!status.ok()) {
+        return status;
+    }
 
     return Status::OK();
 }
@@ -473,12 +578,12 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
                               append_state->current_block_,
                               append_state->current_block_offset_);
             append_state->append_ranges_.push_back(range);
-//            LOG_INFO(fmt::format("actual to append rows: {}, from block: {} and offset {} to target block id: {} and offset: {}",
-//                                 to_append_rows,
-//                                 append_state->current_block_,
-//                                 append_state->current_block_offset_,
-//                                 block_id,
-//                                 block_row_count));
+            //            LOG_INFO(fmt::format("actual to append rows: {}, from block: {} and offset {} to target block id: {} and offset: {}",
+            //                                 to_append_rows,
+            //                                 append_state->current_block_,
+            //                                 append_state->current_block_offset_,
+            //                                 block_id,
+            //                                 block_row_count));
             Status status = block_meta.SetRowCnt(block_row_count + actual_append);
             if (!status.ok()) {
                 return status;
@@ -894,11 +999,11 @@ Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOptio
     return Status::OK();
 }
 
-Status NewTxn::CommitImport(const WalCmdImport *import_cmd) {
+Status NewTxn::CommitImport(WalCmdImport *import_cmd) {
     const String &db_id_str = import_cmd->db_id_str_;
     const String &table_id_str = import_cmd->table_id_str_;
 
-    const WalSegmentInfo &segment_info = import_cmd->segment_info_;
+    WalSegmentInfo &segment_info = import_cmd->segment_info_;
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta, table_meta.kv_instance());
@@ -1133,18 +1238,18 @@ Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_i
     return Status::OK();
 }
 
-Status NewTxn::CommitCompact(const WalCmdCompact *compact_cmd) {
+Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
     const String &db_id_str = compact_cmd->db_id_str_;
     const String &table_id_str = compact_cmd->table_id_str_;
 
-    const Vector<WalSegmentInfo> &segment_infos = compact_cmd->new_segment_infos_;
+    Vector<WalSegmentInfo> &segment_infos = compact_cmd->new_segment_infos_;
     if (segment_infos.empty()) {
         return Status::OK();
     }
     if (segment_infos.size() > 1) {
         UnrecoverableError("Not implemented");
     }
-    const WalSegmentInfo &segment_info = segment_infos[0];
+    WalSegmentInfo &segment_info = segment_infos[0];
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta, table_meta.kv_instance());
@@ -1220,11 +1325,12 @@ Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp ch
     return Status::OK();
 }
 
-Status NewTxn::CommitSegmentVersion(const WalSegmentInfo &segment_info, SegmentMeta &segment_meta) {
+Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta) {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+    auto *pm = InfinityContext::instance().persistence_manager();
 
-    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+    for (WalBlockInfo &block_info : segment_info.block_infos_) {
         BlockMeta block_meta(block_info.block_id_, segment_meta, segment_meta.kv_instance());
         SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
 
@@ -1252,6 +1358,10 @@ Status NewTxn::CommitSegmentVersion(const WalSegmentInfo &segment_info, SegmentM
             block_lock->min_ts_ = std::max(block_lock->min_ts_, commit_ts);
             block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
             block_lock->checkpoint_ts_ = commit_ts;
+        }
+
+        if (pm) {
+            block_info.addr_serializer_.InitializeValid(pm);
         }
     }
 

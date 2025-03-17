@@ -156,6 +156,28 @@ Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outlin
     return GetColumnBuffer(column_buffer, outline_buffer, nullptr);
 }
 
+Status ColumnMeta::FilePaths(Vector<String> &paths) {
+    paths.clear();
+    String col_filename = std::to_string(column_idx_) + ".col";
+    paths.push_back(*block_meta_.GetBlockDir() + "/" + col_filename);
+
+    {
+        auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        ColumnDef *col_def = (*column_defs_ptr)[column_idx_].get();
+
+        VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
+        if (buffer_type == VectorBufferType::kVarBuffer) {
+            String outline_filename = fmt::format("col_{}_out_0", column_idx_);
+            paths.push_back(*block_meta_.GetBlockDir() + "/" + outline_filename);
+        }
+    }
+
+    return Status::OK();
+}
+
 Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outline_buffer, const ColumnDef *column_def) {
     if (!column_buffer_) {
         Status status = LoadColumnBuffer(column_def);

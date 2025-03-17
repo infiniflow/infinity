@@ -1105,8 +1105,12 @@ void WalManager::ReplayWalEntries(const Vector<SharedPtr<WalEntry>> &replay_entr
         replay_txn->SetReplay(true);
         for (const auto &cmd : replay_entry->cmds_) {
             LOG_INFO(fmt::format("Replay wal cmd: {}, commit ts: {}", WalCmd::WalCommandTypeToString(cmd->GetType()).c_str(), replay_entry->commit_ts_));
+
+            Status status = replay_txn->ReplayWalCmd(cmd);
+            if (!status.ok()) {
+                UnrecoverableError(fmt::format("Fail to replay wal entry: {}", status.message()));
+            }
         }
-        replay_txn->SetWalEntry(replay_entry);
         Status status = txn_mgr->CommitTxn(replay_txn);
         if (!status.ok()) {
             UnrecoverableError(fmt::format("Fail to replay wal entry: {}", status.message()));

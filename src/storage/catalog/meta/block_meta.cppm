@@ -55,6 +55,8 @@ public:
 
     Tuple<BufferObj *, Status> GetVersionBuffer();
 
+    Vector<String> FilePaths();
+
 private:
     Status LoadRowCnt();
 

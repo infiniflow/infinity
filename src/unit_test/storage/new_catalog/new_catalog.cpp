@@ -7221,14 +7221,12 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
-        SegmentID segment_id = 0;
         {
             auto [segment_ids, status] = table_meta->GetSegmentIDs();
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
+        SegmentID segment_id = 0;
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
 
         SharedPtr<MemIndex> mem_index;
@@ -7249,15 +7247,13 @@ TEST_P(NewCatalogTest, test_append_with_index) {
         //     [[maybe_unused]] Pair<u32, Bitmask> result = memory_secondary_index->RangeQuery(&arg_tuple);
         // }
 
-        ChunkID chunk_id = 0;
         {
             Vector<ChunkID> *chunk_ids = nullptr;
             Status status = segment_index_meta.GetChunkIDs(chunk_ids);
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_ids->size(), 1);
-            chunk_id = chunk_ids->at(0);
-            EXPECT_EQ(chunk_id, 0);
+            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
+        ChunkID chunk_id = 0;
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
@@ -7342,15 +7338,13 @@ TEST_P(NewCatalogTest, test_append_with_index) {
             EXPECT_EQ(row_cnt, block_row_cnt);
         }
 
-        ChunkID chunk_id = 0;
         {
             Vector<ChunkID> *chunk_ids = nullptr;
             Status status = segment_index_meta.GetChunkIDs(chunk_ids);
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_ids->size(), 1);
-            chunk_id = chunk_ids->at(0);
-            EXPECT_EQ(chunk_id, 2);
+            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
         }
+        ChunkID chunk_id = 2;
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;

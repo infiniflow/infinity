@@ -44,16 +44,22 @@ import segment_index_meta;
 import chunk_index_meta;
 import catalog_meta;
 
+import index_secondary;
+import index_ivf;
+import index_full_text;
+import index_hnsw;
+import index_emvb;
+import embedding_info;
+import sparse_info;
+import index_bmp;
+import defer_op;
+import statement_common;
+import mem_index;
+
+import buffer_obj;
+import buffer_handle;
+
 // import infinity_exception;
-// import index_secondary;
-// import index_ivf;
-// import index_full_text;
-// import index_hnsw;
-// import embedding_info;
-// import sparse_info;
-// import index_bmp;
-// import defer_op;
-// import statement_common;
 // import meta_info;
 // import value;
 // import data_access_state;
@@ -61,15 +67,13 @@ import catalog_meta;
 // import kv_store;
 // import new_txn;
 // import new_txn_store;
-// import buffer_obj;
-// import buffer_handle;
+
 // import secondary_index_in_mem;
 // import secondary_index_data;
 
-// import mem_index;
 // import roaring_bitmap;
 // import index_filter_evaluators;
-// import index_emvb;
+
 // import constant_expr;
 
 using namespace infinity;
@@ -124,8 +128,6 @@ TEST_P(NewTxnReplayTest, test_replay_create_db) {
 }
 
 TEST_P(NewTxnReplayTest, test_replay_create_db2) {
-    // GTEST_SKIP() << "Skip this test case because of the bug in the replay logic";
-
     using namespace infinity;
 
     {
@@ -322,6 +324,8 @@ TEST_P(NewTxnReplayTest, test_replay_append_delete) {
         EXPECT_TRUE(status.ok());
     }
 
+    RestartTxnMgr();
+
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
         Vector<RowID> row_ids;
@@ -372,8 +376,10 @@ TEST_P(NewTxnReplayTest, test_replay_append_delete) {
     }
 }
 
-TEST_P(NewTxnReplayTest, test_replay_append_delete2) {
+TEST_P(NewTxnReplayTest, test_replay_import) {
     using namespace infinity;
+
+    new_txn_mgr->PrintAllKeyValue();
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -388,42 +394,36 @@ TEST_P(NewTxnReplayTest, test_replay_append_delete2) {
         EXPECT_TRUE(status.ok());
     }
 
-    auto input_block = MakeShared<DataBlock>();
-    {
+    u32 block_row_cnt = 8192;
+    auto make_input_block = [&] {
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+            for (u32 i = 0; i < block_row_cnt; i += 2) {
+                col.AppendValue(v1);
+                col.AppendValue(v2);
+            }
+        };
         // Initialize input block
         {
             auto col1 = ColumnVector::Make(column_def1->type());
             col1->Initialize();
-            col1->AppendValue(Value::MakeInt(1));
-            col1->AppendValue(Value::MakeInt(2));
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
             input_block->InsertVector(col1, 0);
         }
         {
             auto col2 = ColumnVector::Make(column_def2->type());
             col2->Initialize();
-            col2->AppendValue(Value::MakeVarchar("abc"));
-            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
             input_block->InsertVector(col2, 1);
         }
         input_block->Finalize();
-    }
+        return input_block;
+    };
+
     for (int i = 0; i < 2; ++i) {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-
-        Status status = txn->Append(*db_name, *table_name, input_block);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_TRUE(status.ok());
-    }
-
-    RestartTxnMgr();
-
-    {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
-        Vector<RowID> row_ids;
-        row_ids.push_back(RowID(0, 1));
-        row_ids.push_back(RowID(0, 3));
-        Status status = txn->Delete(*db_name, *table_name, row_ids);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        Status status = txn->Import(*db_name, *table_name, input_blocks);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -440,30 +440,68 @@ TEST_P(NewTxnReplayTest, test_replay_append_delete2) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        SegmentID segment_id = 0;
-        BlockID block_id = 0;
-        NewTxnGetVisibleRangeState state;
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
-        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+        auto check_block = [&](BlockMeta &block_meta) {
+            NewTxnGetVisibleRangeState state;
+            Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            EXPECT_TRUE(status.ok());
 
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
-        EXPECT_TRUE(status.ok());
-        {
-            Pair<BlockOffset, BlockOffset> range;
             BlockOffset offset = 0;
-            bool has_next = state.Next(offset, range);
-            EXPECT_TRUE(has_next);
+            Pair<BlockOffset, BlockOffset> range;
+            bool next = state.Next(offset, range);
+            EXPECT_TRUE(next);
             EXPECT_EQ(range.first, 0);
-            EXPECT_EQ(range.second, 1);
+            EXPECT_EQ(range.second, block_row_cnt);
             offset = range.second;
-            has_next = state.Next(offset, range);
-            EXPECT_TRUE(has_next);
-            EXPECT_EQ(range.first, 2);
-            EXPECT_EQ(range.second, 3);
-            offset = range.second;
-            has_next = state.Next(offset, range);
-            EXPECT_FALSE(has_next);
+            next = state.Next(offset, range);
+            EXPECT_FALSE(next);
+
+            SizeT row_count = state.block_offset_end();
+            {
+                SizeT column_idx = 0;
+                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnVector col;
+
+                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
+                EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
+                EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+            }
+            {
+                SizeT column_idx = 1;
+                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnVector col;
+
+                Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+                EXPECT_TRUE(status.ok());
+
+                EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
+                EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            }
+        };
+
+        auto check_segment = [&](SegmentMeta &segment_meta) {
+            auto [block_ids, status] = segment_meta.GetBlockIDs();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
+
+            for (auto block_id : *block_ids) {
+                BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                check_block(block_meta);
+            }
+        };
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            check_segment(segment_meta);
         }
     }
 }

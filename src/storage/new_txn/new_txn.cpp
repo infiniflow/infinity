@@ -996,19 +996,6 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::APPEND: {
                 auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
 
-                if (this->IsReplay()) {
-                    Optional<DBMeeta> db_meta;
-                    Optional<TableMeeta> table_meta;
-                    String table_key;
-                    Status status = GetTableMeta(append_cmd->db_name_, append_cmd->table_name_, db_meta, table_meta, &table_key);
-                    if (!status.ok()) {
-                        return status;
-                    }
-                    append_cmd->db_id_str_ = db_meta->db_id_str();
-                    append_cmd->table_id_str_ = table_meta->table_id_str();
-                    append_cmd->table_key_ = std::move(table_key);
-                }
-
                 auto commit_append_func = [&]() -> Status {
                     KVStore *kv_store = txn_mgr_->kv_store();
                     UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
@@ -1050,17 +1037,6 @@ Status NewTxn::PrepareCommit() {
             }
             case WalCommandType::DELETE: {
                 auto *delete_cmd = static_cast<WalCmdDelete *>(command.get());
-
-                if (this->IsReplay()) {
-                    Optional<DBMeeta> db_meta;
-                    Optional<TableMeeta> table_meta;
-                    Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
-                    if (!status.ok()) {
-                        return status;
-                    }
-                    delete_cmd->db_id_str_ = db_meta->db_id_str();
-                    delete_cmd->table_id_str_ = table_meta->table_id_str();
-                }
 
                 KVStore *kv_store = txn_mgr_->kv_store();
                 UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
@@ -1799,6 +1775,65 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
     return Status::OK();
 }
 
-void NewTxn::SetWalEntry(SharedPtr<WalEntry> wal_entry) { wal_entry_ = std::move(wal_entry); }
+Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
+    WalCommandType command_type = command->GetType();
+    switch (command_type) {
+        case WalCommandType::CREATE_INDEX: {
+            auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(command.get());
+
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            Status status = GetTableMeta(create_index_cmd->db_name_, create_index_cmd->table_name_, db_meta, table_meta);
+            if (!status.ok()) {
+                return status;
+            }
+            create_index_cmd->db_id_ = db_meta->db_id_str();
+            create_index_cmd->table_id_ = table_meta->table_id_str();
+            break;
+        }
+        case WalCommandType::APPEND: {
+            auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
+
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            String table_key;
+            Status status = GetTableMeta(append_cmd->db_name_, append_cmd->table_name_, db_meta, table_meta, &table_key);
+            if (!status.ok()) {
+                return status;
+            }
+            append_cmd->db_id_str_ = db_meta->db_id_str();
+            append_cmd->table_id_str_ = table_meta->table_id_str();
+            append_cmd->table_key_ = std::move(table_key);
+            break;
+        }
+        case WalCommandType::DELETE: {
+            auto *delete_cmd = static_cast<WalCmdDelete *>(command.get());
+
+            Optional<DBMeeta> db_meta;
+            Optional<TableMeeta> table_meta;
+            Status status = GetTableMeta(delete_cmd->db_name_, delete_cmd->table_name_, db_meta, table_meta);
+            if (!status.ok()) {
+                return status;
+            }
+            delete_cmd->db_id_str_ = db_meta->db_id_str();
+            delete_cmd->table_id_str_ = table_meta->table_id_str();
+            break;
+        }
+        case WalCommandType::IMPORT: {
+            auto *import_cmd = static_cast<WalCmdImport *>(command.get());
+
+            Status status = ReplayImport(import_cmd);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+    wal_entry_->cmds_.push_back(command);
+    return Status::OK();
+}
 
 } // namespace infinity

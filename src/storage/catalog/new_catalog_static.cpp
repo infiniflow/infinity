@@ -139,6 +139,10 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
     };
     auto IniSegmentIndex = [&](SegmentID segment_id, TableIndexMeeta &table_index_meta) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *kv_instance);
+        status = segment_index_meta.LoadSet();
+        if (!status.ok()) {
+            return status;
+        }
 
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
         status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);

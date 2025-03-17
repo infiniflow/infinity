@@ -149,6 +149,14 @@ Tuple<BufferObj *, Status> BlockMeta::GetVersionBuffer() {
     return {version_buffer_, Status::OK()};
 }
 
+Vector<String> BlockMeta::FilePaths() {
+    Vector<String> res;
+    SharedPtr<String> block_dir_ptr = this->GetBlockDir();
+    String version_filepath = *block_dir_ptr + "/" + String(BlockVersion::PATH);
+    res.push_back(version_filepath);
+    return res;
+}
+
 SharedPtr<String> BlockMeta::GetBlockDir() {
     if (block_dir_ == nullptr) {
         TableMeeta &table_meta = segment_meta_.table_meta();
