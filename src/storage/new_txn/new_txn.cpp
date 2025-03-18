@@ -1598,7 +1598,10 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table when rollback append txn");
+                    if (status.code() != ErrorCode::kNotFound) {
+                        // In some cases, the table may have been deleted, so the table cannot be unlocked
+                        UnrecoverableError("Fail to unlock table when rollback append txn");
+                    }
                 }
                 break;
             }
@@ -1867,7 +1870,7 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
         }
         case WalCommandType::COMPACT: {
             auto *compact_cmd = static_cast<WalCmdCompact *>(command.get());
-            
+
             Status status = ReplayCompact(compact_cmd);
             if (!status.ok()) {
                 return status;
