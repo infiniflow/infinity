@@ -1035,7 +1035,7 @@ Status NewTxn::PrepareCommit() {
                             LOG_DEBUG(fmt::format("Retry the append transaction, retry count: {}", attempt_count));
                         } else {
                             LOG_ERROR(fmt::format("Other append transaction error: {}", status.message()));
-                            break;
+                            return status;
                         }
                     }
                 }

@@ -2735,3 +2735,682 @@ TEST_P(TestImport, test_import) {
     NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
     EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
 }
+
+TEST_P(TestImport, test_import_append_table) {
+
+    using namespace infinity;
+
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+
+    u32 block_row_cnt = 8192;
+    auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+        for (u32 i = 0; i < block_row_cnt; i += 2) {
+            col.AppendValue(v1);
+            col.AppendValue(v2);
+        }
+    };
+
+    auto make_input_block = [&] {
+        auto input_block = MakeShared<DataBlock>();
+
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+
+    auto check_block = [&](BlockMeta &block_meta, TxnTimeStamp begin_ts) {
+        NewTxnGetVisibleRangeState state;
+        Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        EXPECT_TRUE(status.ok());
+
+        BlockOffset offset = 0;
+        Pair<BlockOffset, BlockOffset> range;
+        bool next = state.Next(offset, range);
+        EXPECT_TRUE(next);
+        EXPECT_EQ(range.first, 0);
+        EXPECT_EQ(range.second, block_row_cnt);
+        offset = range.second;
+        next = state.Next(offset, range);
+        EXPECT_FALSE(next);
+
+        SizeT row_count = state.block_offset_end();
+        {
+            SizeT column_idx = 0;
+            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnVector col;
+
+            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+            EXPECT_TRUE(status.ok());
+
+            EXPECT_EQ(col.GetValue(0), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValue(1), Value::MakeInt(2));
+            EXPECT_EQ(col.GetValue(8190), Value::MakeInt(1));
+            EXPECT_EQ(col.GetValue(8191), Value::MakeInt(2));
+        }
+        {
+            SizeT column_idx = 1;
+            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnVector col;
+
+            Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
+            EXPECT_TRUE(status.ok());
+
+            EXPECT_EQ(col.GetValue(0), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValue(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            EXPECT_EQ(col.GetValue(8190), Value::MakeVarchar("abc"));
+            EXPECT_EQ(col.GetValue(8191), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+        }
+    };
+
+    auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        auto [block_ids, status] = segment_meta.GetBlockIDs();
+        EXPECT_TRUE(status.ok());
+        //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
+
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        for (auto block_id : *block_ids) {
+            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            check_block(block_meta, begin_ts);
+        }
+    };
+
+    auto input_block1 = MakeShared<DataBlock>();
+    {
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
+            input_block1->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block1->InsertVector(col2, 1);
+        }
+        input_block1->Finalize();
+    }
+
+    //    t1      import      commit (success)
+    //    |----------|---------|
+    //                            |----------------------|----------|
+    //                           t2                  append   commit (success)
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Import two segments, each segments contains two blocks
+        for (SizeT i = 0; i < 2; ++i) {
+            auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+            status = txn3->Import(*db_name, *table_name, input_blocks);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn3);
+            EXPECT_TRUE(status.ok());
+        }
+
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 1"), TransactionType::kNormal);
+        status = txn6->Append(*db_name, *table_name, input_block1);
+        //        status = txn6->Append(*db_name, *table_name, input_block2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Scan and check
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1, 2}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
+            check_segment(segment_meta, txn5);
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn8->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      import                          commit (success)
+    //    |----------|--------------------------------|
+    //                            |----------------------|----------|
+    //                           t2                  append    commit (success)
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Import two segments, each segments contains two blocks
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        status = txn3->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->Append(*db_name, *table_name, input_block1);
+        //        status = txn6->Append(*db_name, *table_name, input_block2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Scan and check
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
+            check_segment(segment_meta, txn5);
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn8->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      import                               commit (success)
+    //    |----------|-----------------------------------------|
+    //                            |----------------------|----------|
+    //                           t2                  append    commit (success)
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Import two segments, each segments contains two blocks
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        status = txn3->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append"), TransactionType::kNormal);
+        status = txn6->Append(*db_name, *table_name, input_block1);
+        //        status = txn6->Append(*db_name, *table_name, input_block2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Scan and check
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
+            check_segment(segment_meta, txn5);
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn8->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      import                                          commit (success)
+    //    |----------|---------------------------------------------------|
+    //                            |----------------------|----------|
+    //                           t2                  append   commit (fail)
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Import two segments, each segments contains two blocks
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        status = txn3->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append"), TransactionType::kNormal);
+        status = txn6->Append(*db_name, *table_name, input_block1);
+        //        status = txn6->Append(*db_name, *table_name, input_block2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Scan and check
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
+            check_segment(segment_meta, txn5);
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn8->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      import                                          commit (success)
+    //    |----------|---------------------------------------------------|
+    //          |----------------------|---------------|
+    //         t2                  append    commit (fail)
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Import two segments, each segments contains two blocks
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append"), TransactionType::kNormal);
+
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        status = txn3->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->Append(*db_name, *table_name, input_block1);
+        //        status = txn6->Append(*db_name, *table_name, input_block2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Scan and check
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
+            check_segment(segment_meta, txn5);
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn8->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                t1      import                                          commit (fail)
+    //                |----------|---------------------------------------------------|
+    //          |----------------------|----------|
+    //         t2                  append   commit (fail)
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append"), TransactionType::kNormal);
+
+        // Import two segments, each segments contains two blocks
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        status = txn3->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->Append(*db_name, *table_name, input_block1);
+        //        status = txn6->Append(*db_name, *table_name, input_block2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Scan and check
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
+            check_segment(segment_meta, txn5);
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn8->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                           t1      import                                          commit (fail)
+    //                           |----------|---------------------------------------------------|
+    //          |----------------------|----------|
+    //         t2                  append   commit (fail)
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append"), TransactionType::kNormal);
+
+        // Import two segments, each segments contains two blocks
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+
+        status = txn6->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        status = txn3->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Scan and check
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
+            check_segment(segment_meta, txn5);
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn8->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                                     t1      import                                          commit (fail)
+    //                                     |----------|---------------------------------------------------|
+    //          |----------------------|----------|
+    //         t2                  append      commit (success)
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append"), TransactionType::kNormal);
+
+        // Import two segments, each segments contains two blocks
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+
+        status = txn6->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        status = txn3->Import(*db_name, *table_name, input_blocks);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Scan and check
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
+            check_segment(segment_meta, txn5);
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn8->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                                               t1      import (fail)                                         rollback
+    //                                               |----------|---------------------------------------------------|
+    //          |----------------------|----------|
+    //         t2                  dropdb      commit (success)
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append"), TransactionType::kNormal);
+        status = txn6->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Import two segments, each segments contains two blocks
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(), make_input_block()};
+        status = txn3->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Scan and check
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
+            check_segment(segment_meta, txn5);
+        }
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn8->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+}
