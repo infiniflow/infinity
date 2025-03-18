@@ -265,6 +265,16 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
+    { // Add import wal;
+        auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta));
+        wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(import_command));
+        txn_context_ptr_->AddOperation(MakeShared<String>(import_command->ToString()));
+        import_command->db_id_str_ = db_meta->db_id_str();
+        import_command->table_id_str_ = table_meta.table_id_str();
+        import_command->table_key_ = table_key;
+    }
+
+    // index
     Vector<String> *index_id_strs_ptr = nullptr;
     Vector<String> *index_names_ptr = nullptr;
     status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
@@ -286,13 +296,6 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     if (!status.ok()) {
         return status;
     }
-
-    auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta));
-    wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(import_command));
-    txn_context_ptr_->AddOperation(MakeShared<String>(import_command->ToString()));
-    import_command->db_id_str_ = db_meta->db_id_str();
-    import_command->table_id_str_ = table_meta.table_id_str();
-    import_command->table_key_ = table_key;
 
     return Status::OK();
 }
@@ -1292,6 +1295,7 @@ Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
         UnrecoverableError("Not implemented");
     }
     WalSegmentInfo &segment_info = segment_infos[0];
+    Vector<SegmentID> new_segment_ids{segment_info.segment_id_};
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta, table_meta.kv_instance());
@@ -1326,6 +1330,10 @@ Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
                 if (iter != deprecated_ids.end()) {
                     new_catalog->AddCleanedMeta(commit_ts, MakeUnique<SegmentIndexMetaKey>(db_id_str, table_id_str, index_id_str, segment_id));
                 }
+            }
+            status = table_index_meta.SetSegmentIDs(new_segment_ids);
+            if (!status.ok()) {
+                return status;
             }
         }
     }

@@ -616,7 +616,24 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
     dump_index_cmd->index_id_str_ = table_index_meta->index_id_str();
 
     SegmentID segment_id = dump_index_cmd->segment_id_;
-    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+    Optional<SegmentIndexMeta> segment_index_meta_opt;
+    {
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        Status status = table_index_meta->GetSegmentIDs(segment_ids_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        auto iter = std::find(segment_ids_ptr->begin(), segment_ids_ptr->end(), segment_id);
+        if (iter == segment_ids_ptr->end()) {
+            status = NewCatalog::AddNewSegmentIndex(*table_index_meta, segment_id, segment_index_meta_opt);
+            if (!status.ok()) {
+                return status;
+            }
+        } else {
+            segment_index_meta_opt.emplace(segment_id, *table_index_meta, table_index_meta->kv_instance());
+        }
+    }
+    SegmentIndexMeta &segment_index_meta = *segment_index_meta_opt;
 
     Vector<ChunkID> new_chunk_ids;
     {
@@ -1166,7 +1183,9 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
     std::sort(chunk_index_meta_infos.begin(), chunk_index_meta_infos.end(), [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) {
         return lhs.base_row_id_ < rhs.base_row_id_;
     });
-    RowID start_row_id(0, 0);
+    SegmentID segment_id = segment_meta.segment_id();
+
+    RowID start_row_id(segment_id, 0);
     for (const ChunkIndexMetaInfo &chunk_index_meta_info : chunk_index_meta_infos) {
         if (chunk_index_meta_info.base_row_id_ < start_row_id) {
             UnrecoverableError("chunk index range overlap");
@@ -1178,7 +1197,6 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
         }
     }
 
-    SegmentID segment_id = segment_meta.segment_id();
     SharedPtr<Vector<BlockID>> block_ids_ptr;
     std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs();
     if (!status.ok()) {
@@ -1194,7 +1212,10 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
         while (i < block_ids.size() && block_ids[i] != block_id) {
             ++i;
         }
-        if (i >= block_ids.size() || block_ids[i] != block_id) {
+        if (i >= block_ids.size()) {
+            return Status::OK();
+        }
+        if (block_ids[i] != block_id) {
             UnrecoverableError(fmt::format("block id {} not found in segment {}", block_id, segment_id));
         }
         for (; i < block_ids.size(); ++i) {

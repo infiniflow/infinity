@@ -220,7 +220,7 @@ Vector<SharedPtr<String>> WalManager::GetDiffWalEntryString(TxnTimeStamp start_t
                 String error_message = "Found unexpected bad wal entry";
                 UnrecoverableError(error_message);
             }
-            // LOG_TRACE(wal_entry->ToString());
+            LOG_INFO(wal_entry->ToString());
 
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
             if (wal_entry->IsCheckPoint(checkpoint_cmd)) {

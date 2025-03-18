@@ -959,9 +959,8 @@ TEST_P(NewCatalogTest, test_populate_index) {
         {
             auto [segment_ids, status] = table_meta->GetSegmentIDs();
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+            segment_id = 0;
         }
         SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
 
