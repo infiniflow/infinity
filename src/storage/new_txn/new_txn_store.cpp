@@ -43,7 +43,7 @@ import create_index_info;
 import persistence_manager;
 import infinity_context;
 import persist_result_handler;
-
+import wal_entry;
 import kv_store;
 
 namespace infinity {

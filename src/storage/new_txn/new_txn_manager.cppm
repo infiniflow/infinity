@@ -19,7 +19,6 @@ export module new_txn_manager;
 import stl;
 import buffer_manager;
 import txn_state;
-import wal_entry;
 import default_values;
 import txn_context;
 import txn_manager;

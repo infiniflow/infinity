@@ -23,7 +23,6 @@ import status;
 import internal_types;
 import index_base;
 import extra_ddl_info;
-import wal_entry;
 import column_def;
 import third_party;
 import logger;
@@ -48,6 +47,8 @@ class CatalogDeltaEntry;
 class BufferManager;
 
 class KVInstance;
+struct WalSegmentInfo;
+struct WalCmdDumpIndex;
 
 export struct NewTxnSegmentStore {
 public:

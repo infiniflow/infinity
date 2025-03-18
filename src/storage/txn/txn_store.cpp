@@ -22,7 +22,7 @@ module txn_store;
 
 import stl;
 import third_party;
-
+import wal_entry;
 import status;
 import infinity_exception;
 import data_block;

@@ -23,7 +23,7 @@ import new_txn;
 import txn_state;
 import stl;
 import third_party;
-
+import wal_entry;
 import infinity_exception;
 import logger;
 import buffer_manager;

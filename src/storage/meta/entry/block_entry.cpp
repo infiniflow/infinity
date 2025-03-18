@@ -40,6 +40,7 @@ import logical_type;
 import infinity_context;
 import virtual_store;
 import snapshot_info;
+import wal_entry;
 
 namespace infinity {
 

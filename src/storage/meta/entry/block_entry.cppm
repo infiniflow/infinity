@@ -32,7 +32,6 @@ import block_version;
 import fast_rough_filter;
 import value;
 import buffer_obj;
-import wal_entry;
 import column_def;
 import txn_store;
 import cleanup_scanner;
@@ -47,6 +46,7 @@ class BufferManager;
 struct SegmentEntry;
 struct TableEntry;
 class DataBlock;
+struct WalBlockInfo;
 
 /// class BlockEntry
 export struct BlockEntry final : public BaseEntry {
