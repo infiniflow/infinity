@@ -270,6 +270,10 @@ public:
 
     Status Compact(const String &db_name, const String &table_name);
 
+private:
+    Status ReplayCompact(WalCmdCompact *compact_cmd);
+
+public:
     // Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType
     // type);
 
@@ -401,7 +405,7 @@ private:
                          TableIndexMeeta &table_index_meta,
                          SegmentMeta &segment_meta);
 
-    Status ReplayPopulateIndex(WalCmdDumpIndex *dump_index_cmd);
+    Status ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
     Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id);
 

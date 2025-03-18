@@ -180,6 +180,9 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kEphemeral) {
         switch (status_) {
+            case BufferStatus::kNew: {
+                file_worker_->AllocateInMemory();
+            }
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));

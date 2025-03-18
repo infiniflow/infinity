@@ -1859,7 +1859,16 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
         case WalCommandType::DUMP_INDEX: {
             auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(command.get());
 
-            Status status = ReplayPopulateIndex(dump_index_cmd);
+            Status status = ReplayDumpIndex(dump_index_cmd);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::COMPACT: {
+            auto *compact_cmd = static_cast<WalCmdCompact *>(command.get());
+            
+            Status status = ReplayCompact(compact_cmd);
             if (!status.ok()) {
                 return status;
             }

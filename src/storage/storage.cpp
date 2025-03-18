@@ -858,8 +858,6 @@ void Storage::RecoverMemIndex(TxnTimeStamp system_start_ts) {
     if (!status.ok()) {
         UnrecoverableError("Failed to commit mem index in new catalog");
     }
-
-    new_txn_mgr_->PrintAllKeyValue();
 }
 
 void Storage::LoadFullCheckpoint(const String &checkpoint_path) {

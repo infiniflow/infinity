@@ -600,7 +600,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
     return Status::OK();
 }
 
-Status NewTxn::ReplayPopulateIndex(WalCmdDumpIndex *dump_index_cmd) {
+Status NewTxn::ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
     Status status;
 
     Optional<DBMeeta> db_meta;
@@ -626,18 +626,9 @@ Status NewTxn::ReplayPopulateIndex(WalCmdDumpIndex *dump_index_cmd) {
         if (!status.ok()) {
             return status;
         }
-        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
         for (ChunkID chunk_id : *chunk_ids_ptr) {
             if (!deprecate_chunk_ids.contains(chunk_id)) {
                 new_chunk_ids.push_back(chunk_id);
-            } else {
-                new_catalog->AddCleanedMeta(commit_ts,
-                                            MakeUnique<ChunkIndexMetaKey>(dump_index_cmd->db_id_str_,
-                                                                          dump_index_cmd->table_id_str_,
-                                                                          dump_index_cmd->index_id_str_,
-                                                                          segment_id,
-                                                                          chunk_id));
             }
         }
     }

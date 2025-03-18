@@ -457,6 +457,16 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     }
     TableMeeta &table_meta = *table_meta_opt;
 
+    Vector<SegmentID> segment_ids;
+    {
+        SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+        if (!status.ok()) {
+            return status;
+        }
+        segment_ids = *segment_ids_ptr;
+    }
+
     SegmentID new_segment_id = 0;
     status = table_meta.GetNextSegmentID(new_segment_id);
     if (!status.ok()) {
@@ -466,13 +476,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
 
     NewTxnCompactState compact_state(new_segment_id, table_meta);
 
-    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
-    if (!status.ok()) {
-        return status;
-    }
-
-    for (SegmentID segment_id : *segment_ids_ptr) {
+    for (SegmentID segment_id : segment_ids) {
         SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
 
         SharedPtr<Vector<BlockID>> block_ids_ptr;
@@ -517,7 +521,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         return status;
     }
     {
-        Vector<SegmentID> deprecated_segment_ids = *segment_ids_ptr;
+        Vector<SegmentID> deprecated_segment_ids = segment_ids;
         Vector<WalSegmentInfo> segment_infos;
         segment_infos.emplace_back(*compact_state.new_segment_meta_);
         auto compact_command = MakeShared<WalCmdCompact>(db_name, table_name, std::move(segment_infos), std::move(deprecated_segment_ids));
@@ -525,6 +529,63 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
         compact_command->db_id_str_ = db_meta->db_id_str();
         compact_command->table_id_str_ = table_meta.table_id_str();
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::ReplayCompact(WalCmdCompact *compact_cmd) {
+    Status status;
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    status = GetTableMeta(compact_cmd->db_name_, compact_cmd->table_name_, db_meta, table_meta_opt);
+    if (!status.ok()) {
+        return status;
+    }
+    TableMeeta &table_meta = *table_meta_opt;
+
+    compact_cmd->db_id_str_ = db_meta->db_id_str();
+    compact_cmd->table_id_str_ = table_meta.table_id_str();
+
+    for (const WalSegmentInfo &segment_info : compact_cmd->new_segment_infos_) {
+        SegmentID segment_id = 0;
+        status = table_meta.GetNextSegmentID(segment_id);
+        if (!status.ok()) {
+            return status;
+        }
+        if (segment_id != segment_info.segment_id_) {
+            UnrecoverableError(fmt::format("Segment id mismatch, expect: {}, actual: {}", segment_id, segment_info.segment_id_));
+        }
+        status = table_meta.SetNextSegmentID(segment_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+
+        TxnTimeStamp checkpoint_ts = txn_mgr_->max_committed_ts();
+        status = NewCatalog::LoadFlushedSegment(table_meta, segment_info, checkpoint_ts);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    {
+        SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+        if (!status.ok()) {
+            return status;
+        }
+        Vector<SegmentID> cur_segment_ids;
+        HashSet<SegmentID> deprecated_segment_id_set(compact_cmd->deprecated_segment_ids_.begin(), compact_cmd->deprecated_segment_ids_.end());
+        for (SegmentID segment_id : *segment_ids_ptr) {
+            if (!deprecated_segment_id_set.contains(segment_id)) {
+                cur_segment_ids.push_back(segment_id);
+            }
+        }
+        status = table_meta.SetSegmentIDs(cur_segment_ids);
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     return Status::OK();
