@@ -391,7 +391,7 @@ private:
 
     Status DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &column_ids);
 
-    Status AppendIndex(TableIndexMeeta &table_index_meta, const AppendState *append_state);
+    Status AppendIndex(TableIndexMeeta &table_index_meta, const Vector<AppendRange> &append_ranges);
 
     Status AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, const ColumnVector &col, BlockOffset offset, BlockOffset row_cnt);
 
@@ -400,6 +400,8 @@ private:
                          const String &index_name,
                          TableIndexMeeta &table_index_meta,
                          SegmentMeta &segment_meta);
+
+    Status ReplayPopulateIndex(WalCmdDumpIndex *dump_index_cmd);
 
     Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id);
 
@@ -441,6 +443,11 @@ private:
 
     Status CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option);
 
+    Status CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<AppendRange> &append_ranges);
+
+public:
+    Status RecoverMemIndex(TableIndexMeeta &table_index_meta);
+
 private:
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);
@@ -456,7 +463,7 @@ private:
     Status PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
     Status PostCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance);
     Status CommitCompact(WalCmdCompact *compact_cmd);
-    Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd);
+    Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInstance *kv_instance);
     Status CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd);
     Status CommitCheckpointDB(DBMeeta &db_meta, const WalCmdCheckpoint *checkpoint_cmd);
     Status CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpoint *checkpoint_cmd);

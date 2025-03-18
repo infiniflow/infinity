@@ -326,65 +326,8 @@ Status NewTxn::ReplayImport(WalCmdImport *import_cmd) {
         return status;
     }
 
-    Optional<SegmentMeta> segment_meta;
-    status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
-    if (!status.ok()) {
-        return status;
-    }
-    u64 column_count = segment_info.column_count_;
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
-        if (pm) {
-            block_info.addr_serializer_.AddToPersistenceManager(pm);
-        }
-
-        BlockID block_id = 0;
-        {
-            std::tie(block_id, status) = segment_meta->GetNextBlockID();
-            if (!status.ok()) {
-                return status;
-            }
-            if (block_id != block_info.block_id_) {
-                UnrecoverableError(fmt::format("Block id mismatch, expect: {}, actual: {}", block_id, block_info.block_id_));
-            }
-            status = segment_meta->SetNextBlockID(block_id + 1);
-            if (!status.ok()) {
-                return status;
-            }
-            status = segment_meta->AddBlockID(block_id);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        BlockMeta block_meta(block_id, *segment_meta, segment_meta->kv_instance());
-
-        TxnTimeStamp checkpoint_ts = txn_mgr_->max_committed_ts();
-        status = block_meta.LoadSet(checkpoint_ts);
-        if (!status.ok()) {
-            return status;
-        }
-
-        for (SizeT i = 0; i < column_count; ++i) {
-            const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[i];
-            ColumnMeta column_meta(i, block_meta, block_meta.kv_instance());
-            status = column_meta.SetChunkOffset(chunk_offset);
-            if (!status.ok()) {
-                return status;
-            }
-
-            status = column_meta.LoadSet();
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        status = block_meta.SetRowCnt(block_info.row_count_);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    status = segment_meta->SetRowCnt(segment_info.row_count_);
+    TxnTimeStamp checkpoint_ts = txn_mgr_->max_committed_ts();
+    status = NewCatalog::LoadFlushedSegment(table_meta, segment_info, checkpoint_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1222,19 +1165,21 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
             return status;
         }
     }
-    Vector<String> *index_id_strs = nullptr;
-    {
-        status = table_meta.GetIndexIDs(index_id_strs, nullptr);
-        if (!status.ok()) {
-            return status;
+    if (!this->IsReplay()) {
+        Vector<String> *index_id_strs = nullptr;
+        {
+            status = table_meta.GetIndexIDs(index_id_strs, nullptr);
+            if (!status.ok()) {
+                return status;
+            }
         }
-    }
-    for (SizeT i = 0; i < index_id_strs->size(); ++i) {
-        const String &index_id_str = (*index_id_strs)[i];
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
-        status = this->AppendIndex(table_index_meta, append_state);
-        if (!status.ok()) {
-            return status;
+        for (SizeT i = 0; i < index_id_strs->size(); ++i) {
+            const String &index_id_str = (*index_id_strs)[i];
+            TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
+            status = this->AppendIndex(table_index_meta, append_state->append_ranges_);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
 
@@ -1269,12 +1214,6 @@ Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_i
             if (!status.ok()) {
                 return status;
             }
-        }
-    }
-    {
-        Status status = kv_instance->Commit();
-        if (!status.ok()) {
-            return status;
         }
     }
     return Status::OK();

@@ -326,6 +326,60 @@ Status ChunkIndexMeta::UninitSet() {
     return Status::OK();
 }
 
+Status ChunkIndexMeta::SetChunkInfo(const ChunkIndexMetaInfo &chunk_info) {
+    chunk_info_ = chunk_info;
+    {
+        String chunk_info_key = GetChunkIndexTag("chunk_info");
+        nlohmann::json chunk_info_json;
+        chunk_info_->ToJson(chunk_info_json);
+        Status status = kv_instance_.Put(chunk_info_key, chunk_info_json.dump());
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status ChunkIndexMeta::FilePaths(Vector<String> &paths) {
+    Status status;
+
+    paths.clear();
+    TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
+    auto [index_def, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
+    }
+    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+    status = this->GetChunkInfo(chunk_info_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    SharedPtr<String> index_dir = table_index_meta.GetTableIndexDir();
+    switch (index_def->index_type_) {
+        case IndexType::kFullText: {
+            paths.push_back(fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + POSTING_SUFFIX));
+            paths.push_back(fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + DICT_SUFFIX));
+            paths.push_back(fmt::format("{}/{}", *index_dir, chunk_info_ptr->base_name_ + LENGTH_SUFFIX));
+            break;
+        }
+        case IndexType::kHnsw:
+        case IndexType::kEMVB:
+        case IndexType::kIVF:
+        case IndexType::kSecondary:
+        case IndexType::kBMP: {
+            String file_name = IndexFileName(segment_index_meta_.segment_id(), chunk_id_);
+            String file_path = fmt::format("{}/{}", *index_dir, file_name);
+            paths.push_back(file_path);
+            break;
+        }
+        default: {
+            String error_message = "Unsupported index type when add wal.";
+            UnrecoverableError(error_message);
+        }
+    }
+    return Status::OK();
+}
+
 Status ChunkIndexMeta::LoadChunkInfo() {
     String chunk_info_key = GetChunkIndexTag("chunk_info");
     String chunk_info_str;

@@ -184,6 +184,12 @@ Status SegmentIndexMeta::LoadSet() {
             return status;
         }
     }
+    {
+        Status status = SetNoMemIndex();
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 

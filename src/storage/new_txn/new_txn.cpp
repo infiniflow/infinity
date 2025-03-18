@@ -819,7 +819,7 @@ WalEntry *NewTxn::GetWALEntry() const { return wal_entry_.get(); }
 
 Status NewTxn::Commit() {
     DeferFn defer_op([&] { txn_store_.RevertTableStatus(); });
-    if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly()) {
+    if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly() && !this->IsReplay()) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetReadCommitTS(this);
         this->SetTxnCommitting(commit_ts);
@@ -992,6 +992,11 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(command.get());
+                Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
+                if (!status.ok()) {
+                    return status;
+                }
                 break;
             }
             case WalCommandType::APPEND: {
@@ -1039,10 +1044,7 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::DELETE: {
                 auto *delete_cmd = static_cast<WalCmdDelete *>(command.get());
 
-                KVStore *kv_store = txn_mgr_->kv_store();
-                UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
-
-                Status status = PostCommitDelete(delete_cmd, kv_instance.get());
+                Status status = PostCommitDelete(delete_cmd, kv_instance_.get());
                 if (!status.ok()) {
                     UnrecoverableError("PostCommitDelete failed");
                 }
@@ -1527,11 +1529,11 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX: {
-                auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
-                Status status = PostCommitDumpIndex(cmd);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to dump index");
-                }
+                // auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+                // Status status = PostCommitDumpIndex(cmd);
+                // if (!status.ok()) {
+                //     UnrecoverableError("Fail to dump index");
+                // }
                 break;
             }
             default: {
@@ -1849,6 +1851,15 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             auto *import_cmd = static_cast<WalCmdImport *>(command.get());
 
             Status status = ReplayImport(import_cmd);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::DUMP_INDEX: {
+            auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(command.get());
+
+            Status status = ReplayPopulateIndex(dump_index_cmd);
             if (!status.ok()) {
                 return status;
             }

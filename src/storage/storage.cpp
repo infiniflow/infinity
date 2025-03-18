@@ -336,6 +336,7 @@ Status Storage::AdminToWriter() {
     // recover index after start compact process
     catalog_->StartMemoryIndexCommit();
     catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
+    this->RecoverMemIndex(system_start_ts);
 
     if (periodic_trigger_thread_ != nullptr) {
         UnrecoverableError("periodic trigger was initialized before.");
@@ -844,6 +845,21 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
     if (!status.ok()) {
         UnrecoverableError(fmt::format("Commit catalog failed: {}", status.message()));
     }
+}
+
+void Storage::RecoverMemIndex(TxnTimeStamp system_start_ts) {
+    NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("recover mem index"), TransactionType::kNormal);
+    txn->SetReplay(true);
+    Status status = NewCatalog::MemIndexRecover(txn, system_start_ts);
+    if (!status.ok()) {
+        UnrecoverableError("Failed to recover mem index in new catalog");
+    }
+    status = new_txn_mgr_->CommitTxn(txn);
+    if (!status.ok()) {
+        UnrecoverableError("Failed to commit mem index in new catalog");
+    }
+
+    new_txn_mgr_->PrintAllKeyValue();
 }
 
 void Storage::LoadFullCheckpoint(const String &checkpoint_path) {

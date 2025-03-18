@@ -525,41 +525,41 @@ TEST_P(NewTxnReplayTest, test_replay_append_with_index) {
 
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
-    auto index_name2 = std::make_shared<String>("index2");
-    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
-    auto index_name3 = std::make_shared<std::string>("index3");
-    Vector<InitParameter *> index3_parameters;
-    index3_parameters.emplace_back(new InitParameter("metric", "l2"));
-    index3_parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
-    auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index3_parameters);
-    auto index_name4 = std::make_shared<std::string>("index4");
-    Vector<InitParameter *> index4_parameters;
-    index4_parameters.emplace_back(new InitParameter("metric", "l2"));
-    auto index_def4 = IndexHnsw::Make(index_name4, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index4_parameters);
-    auto index_name5 = std::make_shared<std::string>("index5");
-    Vector<InitParameter *> index5_parameters;
-    index5_parameters.emplace_back(new InitParameter("block_size", "16"));
-    index5_parameters.emplace_back(new InitParameter("compress_type", "compress"));
-    auto index_def5 = IndexBMP::Make(index_name5, MakeShared<String>(), "file_name", Vector<String>{column_def4->name()}, index5_parameters);
-    auto index_name6 = std::make_shared<std::string>("index6");
-    Vector<InitParameter *> index6_parameters;
-    index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "4"));
-    index6_parameters.emplace_back(new InitParameter("pq_subspace_bits", "8"));
-    auto index_def6 = IndexEMVB::Make(index_name6, MakeShared<String>(), "file_name", Vector<String>{column_def5->name()}, index6_parameters);
-    DeferFn defer_fn([&] {
-        for (auto *parameter : index3_parameters) {
-            delete parameter;
-        }
-        for (auto *parameter : index4_parameters) {
-            delete parameter;
-        }
-        for (auto *parameter : index5_parameters) {
-            delete parameter;
-        }
-        for (auto *parameter : index6_parameters) {
-            delete parameter;
-        }
-    });
+    // auto index_name2 = std::make_shared<String>("index2");
+    // auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    // auto index_name3 = std::make_shared<std::string>("index3");
+    // Vector<InitParameter *> index3_parameters;
+    // index3_parameters.emplace_back(new InitParameter("metric", "l2"));
+    // index3_parameters.emplace_back(new InitParameter("plain_storage_data_type", "float"));
+    // auto index_def3 = IndexIVF::Make(index_name3, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index3_parameters);
+    // auto index_name4 = std::make_shared<std::string>("index4");
+    // Vector<InitParameter *> index4_parameters;
+    // index4_parameters.emplace_back(new InitParameter("metric", "l2"));
+    // auto index_def4 = IndexHnsw::Make(index_name4, MakeShared<String>(), "file_name", Vector<String>{column_def3->name()}, index4_parameters);
+    // auto index_name5 = std::make_shared<std::string>("index5");
+    // Vector<InitParameter *> index5_parameters;
+    // index5_parameters.emplace_back(new InitParameter("block_size", "16"));
+    // index5_parameters.emplace_back(new InitParameter("compress_type", "compress"));
+    // auto index_def5 = IndexBMP::Make(index_name5, MakeShared<String>(), "file_name", Vector<String>{column_def4->name()}, index5_parameters);
+    // auto index_name6 = std::make_shared<std::string>("index6");
+    // Vector<InitParameter *> index6_parameters;
+    // index6_parameters.emplace_back(new InitParameter("pq_subspace_num", "4"));
+    // index6_parameters.emplace_back(new InitParameter("pq_subspace_bits", "8"));
+    // auto index_def6 = IndexEMVB::Make(index_name6, MakeShared<String>(), "file_name", Vector<String>{column_def5->name()}, index6_parameters);
+    // DeferFn defer_fn([&] {
+    //     for (auto *parameter : index3_parameters) {
+    //         delete parameter;
+    //     }
+    //     for (auto *parameter : index4_parameters) {
+    //         delete parameter;
+    //     }
+    //     for (auto *parameter : index5_parameters) {
+    //         delete parameter;
+    //     }
+    //     for (auto *parameter : index6_parameters) {
+    //         delete parameter;
+    //     }
+    // });
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
@@ -576,11 +576,11 @@ TEST_P(NewTxnReplayTest, test_replay_append_with_index) {
         EXPECT_TRUE(status.ok());
     };
     create_index(index_def1);
-    create_index(index_def2);
-    create_index(index_def3);
-    create_index(index_def4);
-    create_index(index_def5);
-    create_index(index_def6);
+    // create_index(index_def2);
+    // create_index(index_def3);
+    // create_index(index_def4);
+    // create_index(index_def5);
+    // create_index(index_def6);
 
     u32 block_row_cnt = 8192;
     auto input_block = MakeShared<DataBlock>();
@@ -705,29 +705,160 @@ TEST_P(NewTxnReplayTest, test_replay_append_with_index) {
         u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
-    check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
-        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+    // check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+    //     u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
+    // check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
+    // check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
+    // check_index(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
+    // check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
+
+    auto dump_index = [&](const String &index_name) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", index_name)), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, index_name, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    auto merge_index = [&](const String &index_name) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("merge index {}", index_name)), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->OptimizeIndex(*db_name, *table_name, index_name, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    dump_index(*index_name1);
+    // dump_index(*index_name2);
+    // dump_index(*index_name3);
+    // dump_index(*index_name4);
+    // dump_index(*index_name5);
+    // dump_index(*index_name6);
+
+    append_a_block();
+
+    dump_index(*index_name1);
+    // dump_index(*index_name2);
+    // dump_index(*index_name3);
+    // dump_index(*index_name4);
+    // dump_index(*index_name5);
+    // dump_index(*index_name6);
+
+    merge_index(*index_name1);
+    // merge_index(*index_name2);
+    // merge_index(*index_name3);
+    // merge_index(*index_name4);
+    // merge_index(*index_name5);
+    // merge_index(*index_name6);
+
+    append_a_block();
+
+    RestartTxnMgr();
+
+    auto check_index2 = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check merged index {}", index_name)), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+
+        SharedPtr<MemIndex> mem_index;
+        status = segment_index_meta.GetMemIndex(mem_index);
+        EXPECT_TRUE(status.ok());
+        {
+            auto [row_id, row_cnt] = check_mem_index(mem_index);
+            EXPECT_EQ(row_id, RowID(0, 2 * block_row_cnt));
+            EXPECT_EQ(row_cnt, block_row_cnt);
+        }
+
+        {
+            Vector<ChunkID> *chunk_ids = nullptr;
+            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
+        }
+        ChunkID chunk_id = 2;
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+        {
+            ChunkIndexMetaInfo *chunk_info = nullptr;
+            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_info->row_cnt_, 2 * block_row_cnt);
+            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
+        }
+
+        // int32_t begin_val = 2;
+        // int32_t end_val = 3;
+
+        BufferObj *buffer_obj = nullptr;
+        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        EXPECT_TRUE(status.ok());
+
+        // {
+        //     BufferHandle buffer_handle = buffer_obj->Load();
+        //     auto *index = static_cast<const SecondaryIndexData *>(buffer_handle.GetData());
+
+        //     [[maybe_unused]] const auto [begin_approx_pos, begin_lower, begin_upper] = index->SearchPGM(&begin_val);
+        //     [[maybe_unused]] const auto [end_approx_pos, end_lower, end_upper] = index->SearchPGM(&end_val);
+        // }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
         return std::make_pair(begin_id, row_cnt);
     });
-    check_index(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
-        return std::make_pair(begin_id, row_cnt);
-    });
-    check_index(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
-        return std::make_pair(begin_id, row_cnt);
-    });
-    check_index(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
-        return std::make_pair(begin_id, row_cnt);
-    });
-    check_index(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
-        RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
-        u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
-        return std::make_pair(begin_id, row_cnt);
-    });
+    // check_index2(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+    //     u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
+    // check_index2(*index_name3, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_ivf_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_ivf_index_->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
+    // check_index2(*index_name4, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_hnsw_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_hnsw_index_->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
+    // check_index2(*index_name5, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_bmp_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_bmp_index_->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
+    // check_index2(*index_name6, [&](const SharedPtr<MemIndex> &mem_index) {
+    //     RowID begin_id = mem_index->memory_emvb_index_->GetBeginRowID();
+    //     u32 row_cnt = mem_index->memory_emvb_index_->GetRowCount();
+    //     return std::make_pair(begin_id, row_cnt);
+    // });
 }

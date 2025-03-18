@@ -46,6 +46,10 @@ class KVInstance;
 class TableDef;
 class IndexBase;
 
+struct WalSegmentInfo;
+struct WalBlockInfo;
+struct WalChunkIndexInfo;
+
 enum class ColumnVectorTipe;
 
 export enum class LockType { kLocking, kLocked, kUnlocking, kUnlocked, kImmutable };
@@ -182,6 +186,8 @@ private:
 public:
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
 
+    static Status MemIndexRecover(NewTxn *txn, TxnTimeStamp system_start_ts);
+
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,
                            TxnTimeStamp commit_ts,
@@ -209,9 +215,13 @@ public:
 
     static Status AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta);
 
+    static Status LoadFlushedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
+
     static Status CleanSegment(SegmentMeta &segment_meta);
 
     static Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
+
+    static Status LoadFlushedBlock(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts, SizeT column_count);
 
     static Status CleanBlock(BlockMeta &block_meta);
 
@@ -230,6 +240,8 @@ public:
                                    const String &base_name,
                                    SizeT index_size,
                                    Optional<ChunkIndexMeta> &chunk_index_meta);
+
+    static Status LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info);
 
     static Status CleanChunkIndex(ChunkIndexMeta &chunk_index_meta);
 

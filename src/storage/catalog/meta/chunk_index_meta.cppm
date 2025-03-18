@@ -65,6 +65,10 @@ public:
 
     Status UninitSet();
 
+    Status SetChunkInfo(const ChunkIndexMetaInfo &chunk_info);
+
+    Status FilePaths(Vector<String> &paths);
+
 private:
     Status LoadChunkInfo();
 

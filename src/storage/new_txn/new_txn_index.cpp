@@ -259,13 +259,17 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             return status;
         }
     }
-    {
-        Vector<WalChunkIndexInfo> chunk_infos;
-        chunk_infos.emplace_back(*chunk_index_meta);
-        auto dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id, std::move(chunk_infos), std::move(deprecate_ids));
 
-        wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
-        txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
+    buffer_obj->Save();
+    if (index_base->index_type_ == IndexType::kHnsw || index_base->index_type_ == IndexType::kBMP) {
+        if (buffer_obj->type() != BufferType::kMmap) {
+            buffer_obj->ToMmap();
+        }
+    }
+
+    status = this->AddChunkWal(db_name, table_name, index_name, *chunk_index_meta, deprecate_ids, true);
+    if (!status.ok()) {
+        return status;
     }
     return Status::OK();
 }
@@ -287,7 +291,7 @@ Status NewTxn::ListIndex(const String &db_name, const String &table_name, Vector
     return Status::OK();
 }
 
-Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const AppendState *append_state) {
+Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<AppendRange> &append_ranges) {
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
         return index_status;
@@ -326,7 +330,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const AppendState 
         return Status::OK();
     };
 
-    for (const AppendRange &range : append_state->append_ranges_) {
+    for (const AppendRange &range : append_ranges) {
         if (!segment_meta || segment_meta->segment_id() != range.segment_id_) {
             segment_meta.emplace(range.segment_id_, table_index_meta.table_meta(), table_index_meta.kv_instance());
 
@@ -593,6 +597,63 @@ Status NewTxn::PopulateIndex(const String &db_name,
             return status;
         }
     }
+    return Status::OK();
+}
+
+Status NewTxn::ReplayPopulateIndex(WalCmdDumpIndex *dump_index_cmd) {
+    Status status;
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    status =
+        GetTableIndexMeta(dump_index_cmd->db_name_, dump_index_cmd->table_name_, dump_index_cmd->index_name_, db_meta, table_meta, table_index_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    dump_index_cmd->db_id_str_ = db_meta->db_id_str();
+    dump_index_cmd->table_id_str_ = table_meta->table_id_str();
+    dump_index_cmd->index_id_str_ = table_index_meta->index_id_str();
+
+    SegmentID segment_id = dump_index_cmd->segment_id_;
+    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+
+    Vector<ChunkID> new_chunk_ids;
+    {
+        HashSet<ChunkID> deprecate_chunk_ids(dump_index_cmd->deprecate_ids_.begin(), dump_index_cmd->deprecate_ids_.end());
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+        for (ChunkID chunk_id : *chunk_ids_ptr) {
+            if (!deprecate_chunk_ids.contains(chunk_id)) {
+                new_chunk_ids.push_back(chunk_id);
+            } else {
+                new_catalog->AddCleanedMeta(commit_ts,
+                                            MakeUnique<ChunkIndexMetaKey>(dump_index_cmd->db_id_str_,
+                                                                          dump_index_cmd->table_id_str_,
+                                                                          dump_index_cmd->index_id_str_,
+                                                                          segment_id,
+                                                                          chunk_id));
+            }
+        }
+    }
+    for (const WalChunkIndexInfo &chunk_info : dump_index_cmd->chunk_infos_) {
+        new_chunk_ids.push_back(chunk_info.chunk_id_);
+
+        status = NewCatalog::LoadFlushedChunkIndex(segment_index_meta, chunk_info);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    status = segment_index_meta.SetChunkIDs(new_chunk_ids);
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -908,10 +969,6 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
         }
 
         memory_hnsw_index->Dump(buffer_obj);
-        buffer_obj->Save();
-        if (buffer_obj->type() != BufferType::kMmap) {
-            buffer_obj->ToMmap();
-        }
     } else if (index_base->index_type_ == IndexType::kBMP) {
         auto memory_bmp_index = MakeShared<BMPIndexInMem>(base_rowid, index_base.get(), column_def.get(), nullptr);
 
@@ -934,10 +991,6 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
             memory_bmp_index->AddDocs(base_rowid.segment_offset_, col, offset, row_cnt);
         }
         memory_bmp_index->Dump(buffer_obj);
-        buffer_obj->Save();
-        if (buffer_obj->type() != BufferType::kMmap) {
-            buffer_obj->ToMmap();
-        }
     } else {
         UnrecoverableError("Not implemented yet");
     }
@@ -1102,6 +1155,116 @@ Status NewTxn::AddChunkWal(const String &db_name,
     return Status::OK();
 }
 
+Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<AppendRange> &append_ranges) {
+    Status status;
+    Vector<ChunkID> *chunk_ids_ptr = nullptr;
+    status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    Vector<ChunkIndexMetaInfo> chunk_index_meta_infos;
+    for (ChunkID chunk_id : *chunk_ids_ptr) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
+        ChunkIndexMetaInfo *chunk_index_meta_info_ptr = nullptr;
+        status = chunk_index_meta.GetChunkInfo(chunk_index_meta_info_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        chunk_index_meta_infos.push_back(*chunk_index_meta_info_ptr);
+    }
+    std::sort(chunk_index_meta_infos.begin(), chunk_index_meta_infos.end(), [](const ChunkIndexMetaInfo &lhs, const ChunkIndexMetaInfo &rhs) {
+        return lhs.base_row_id_ < rhs.base_row_id_;
+    });
+    RowID start_row_id(0, 0);
+    for (const ChunkIndexMetaInfo &chunk_index_meta_info : chunk_index_meta_infos) {
+        if (chunk_index_meta_info.base_row_id_ < start_row_id) {
+            UnrecoverableError("chunk index range overlap");
+        } else {
+            if (chunk_index_meta_info.base_row_id_ > start_row_id) {
+                UnrecoverableError("Not implemented");
+            }
+            start_row_id = chunk_index_meta_info.base_row_id_ + chunk_index_meta_info.row_cnt_;
+        }
+    }
+
+    SegmentID segment_id = segment_meta.segment_id();
+    SharedPtr<Vector<BlockID>> block_ids_ptr;
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs();
+    if (!status.ok()) {
+        return status;
+    }
+    SizeT block_capacity = DEFAULT_BLOCK_CAPACITY;
+    Vector<BlockID> block_ids = *block_ids_ptr;
+    sort(block_ids.begin(), block_ids.end());
+    BlockID block_id = start_row_id.segment_offset_ / block_capacity;
+    BlockOffset block_offset = start_row_id.segment_offset_ % block_capacity;
+    {
+        SizeT i = 0;
+        while (i < block_ids.size() && block_ids[i] != block_id) {
+            ++i;
+        }
+        if (i >= block_ids.size() || block_ids[i] != block_id) {
+            UnrecoverableError(fmt::format("block id {} not found in segment {}", block_id, segment_id));
+        }
+        for (; i < block_ids.size(); ++i) {
+            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+            SizeT block_row_cnt = 0;
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+            if (!status.ok()) {
+                return status;
+            }
+            append_ranges.emplace_back(segment_id, block_id, block_offset, block_row_cnt);
+            block_offset = 0;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
+    Status status;
+    TableMeeta &table_meta = table_index_meta.table_meta();
+
+    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    if (!status.ok()) {
+        return status;
+    }
+    Vector<SegmentID> *index_segment_ids_ptr = nullptr;
+    status = table_index_meta.GetSegmentIDs(index_segment_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    Vector<AppendRange> append_ranges;
+    HashSet<SegmentID> index_segment_ids_set(index_segment_ids_ptr->begin(), index_segment_ids_ptr->end());
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        if (!index_segment_ids_set.contains(segment_id)) {
+            LOG_WARN(fmt::format("Segment {} not in index {}", segment_id, table_index_meta.index_id_str()));
+            Optional<SegmentIndexMeta> segment_index_meta;
+            status = NewCatalog::AddNewSegmentIndex(table_index_meta, segment_id, segment_index_meta);
+            if (!status.ok()) {
+                return status;
+            }
+            status = CountMemIndexGapInSegment(*segment_index_meta, segment_meta, append_ranges);
+            if (!status.ok()) {
+                return status;
+            }
+        } else {
+            SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
+            status = CountMemIndexGapInSegment(segment_index_meta, segment_meta, append_ranges);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+    status = this->AppendIndex(table_index_meta, append_ranges);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
@@ -1151,9 +1314,7 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd) {
-    KVStore *kv_store = txn_mgr_->kv_store();
-    UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInstance *kv_instance) {
     const String &db_id_str = dump_index_cmd->db_id_str_;
     const String &table_id_str = dump_index_cmd->table_id_str_;
     const String &index_id_str = dump_index_cmd->index_id_str_;
@@ -1173,12 +1334,6 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd) {
             return status;
         }
         mem_index->Clear();
-    }
-    {
-        Status status = kv_instance->Commit();
-        if (!status.ok()) {
-            return status;
-        }
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;

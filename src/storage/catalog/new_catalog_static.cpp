@@ -26,6 +26,12 @@ import table_def;
 import kv_code;
 import kv_store;
 import column_vector;
+import wal_entry;
+import infinity_context;
+import logger;
+import default_values;
+import new_txn;
+import data_access_state;
 
 import catalog_meta;
 import db_meeta;
@@ -78,7 +84,6 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
 
 Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts) {
     Status status;
-    // BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance);
@@ -213,7 +218,10 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
             return status;
         }
         for (const String &table_id_str : *table_id_strs_ptr) {
-            IniTable(table_id_str, db_meta);
+            status = IniTable(table_id_str, db_meta);
+            if (!status.ok()) {
+                return status;
+            }
         }
         return Status::OK();
     };
@@ -224,6 +232,56 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         }
     }
 
+    return Status::OK();
+}
+
+Status NewCatalog::MemIndexRecover(NewTxn *txn, TxnTimeStamp system_start_ts) {
+    Status status;
+    KVInstance *kv_instance = txn->kv_instance();
+
+    Vector<String> *db_id_strs_ptr;
+    CatalogMeta catalog_meta(*kv_instance);
+    status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    auto IndexRecoverTable = [&](TableMeeta &table_meta) {
+        Vector<String> *index_id_strs_ptr = nullptr;
+        status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (const String &index_id_str : *index_id_strs_ptr) {
+            TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
+            status = txn->RecoverMemIndex(table_index_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    };
+    auto IndexRecoverDB = [&](DBMeeta &db_meta) {
+        Vector<String> *table_id_strs_ptr = nullptr;
+        status = db_meta.GetTableIDs(table_id_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (const String &table_id_str : *table_id_strs_ptr) {
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance);
+            status = IndexRecoverTable(table_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    };
+    for (const String &db_id_str : *db_id_strs_ptr) {
+        DBMeeta db_meta(db_id_str, *kv_instance);
+        status = IndexRecoverDB(db_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 
@@ -395,6 +453,31 @@ Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, O
     return Status::OK();
 }
 
+Status NewCatalog::LoadFlushedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
+    Status status;
+
+    Optional<SegmentMeta> segment_meta;
+    SegmentID segment_id = segment_info.segment_id_;
+    status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    u64 column_count = segment_info.column_count_;
+
+    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+        status = NewCatalog::LoadFlushedBlock(*segment_meta, block_info, checkpoint_ts, column_count);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    status = segment_meta->SetRowCnt(column_count);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::CleanSegment(SegmentMeta &segment_meta) {
     auto [block_ids, status] = segment_meta.GetBlockIDs();
     if (!status.ok()) {
@@ -441,6 +524,59 @@ Status NewCatalog::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Opti
         if (!status.ok()) {
             return status;
         }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::LoadFlushedBlock(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts, SizeT column_count) {
+    Status status;
+
+    auto *pm = InfinityContext::instance().persistence_manager();
+    if (pm) {
+        block_info.addr_serializer_.AddToPersistenceManager(pm);
+    }
+
+    BlockID block_id = 0;
+    {
+        std::tie(block_id, status) = segment_meta.GetNextBlockID();
+        if (!status.ok()) {
+            return status;
+        }
+        if (block_id != block_info.block_id_) {
+            UnrecoverableError(fmt::format("Block id mismatch, expect: {}, actual: {}", block_id, block_info.block_id_));
+        }
+        status = segment_meta.SetNextBlockID(block_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+        status = segment_meta.AddBlockID(block_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+
+    status = block_meta.LoadSet(checkpoint_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (SizeT i = 0; i < column_count; ++i) {
+        const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[i];
+        ColumnMeta column_meta(i, block_meta, block_meta.kv_instance());
+        status = column_meta.SetChunkOffset(chunk_offset);
+        if (!status.ok()) {
+            return status;
+        }
+
+        status = column_meta.LoadSet();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    status = block_meta.SetRowCnt(block_info.row_count_);
+    if (!status.ok()) {
+        return status;
     }
     return Status::OK();
 }
@@ -554,6 +690,53 @@ Status NewCatalog::AddNewChunkIndex(SegmentIndexMeta &segment_index_meta,
             return status;
         }
     }
+    return Status::OK();
+}
+
+Status NewCatalog::LoadFlushedChunkIndex(SegmentIndexMeta &segment_index_meta, const WalChunkIndexInfo &chunk_info) {
+    Status status;
+
+    auto *pm = InfinityContext::instance().persistence_manager();
+    if (pm) {
+        chunk_info.addr_serializer_.AddToPersistenceManager(pm);
+    }
+
+    ChunkID chunk_id = 0;
+    {
+        status = segment_index_meta.GetNextChunkID(chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+        if (chunk_id != chunk_info.chunk_id_) {
+            UnrecoverableError(fmt::format("Chunk id mismatch, expect: {}, actual: {}", chunk_id, chunk_info.chunk_id_));
+        }
+        status = segment_index_meta.SetNextChunkID(chunk_id + 1);
+        if (!status.ok()) {
+            return status;
+        }
+        status = segment_index_meta.AddChunkID(chunk_id);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
+
+    ChunkIndexMetaInfo chunk_meta_info;
+    {
+        chunk_meta_info.base_name_ = chunk_info.base_name_;
+        chunk_meta_info.base_row_id_ = chunk_info.base_rowid_;
+        chunk_meta_info.row_cnt_ = chunk_info.row_count_;
+        chunk_meta_info.index_size_ = 0;
+    }
+    status = chunk_index_meta.SetChunkInfo(chunk_meta_info);
+    if (!status.ok()) {
+        return status;
+    }
+    status = chunk_index_meta.LoadSet();
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 

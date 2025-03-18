@@ -17,7 +17,6 @@ module;
 import stl;
 import config;
 import catalog;
-import new_catalog;
 import txn_manager;
 import buffer_manager;
 import wal_manager;
@@ -38,6 +37,7 @@ namespace infinity {
 
 class CleanupInfoTracer;
 class ResultCacheManager;
+class NewCatalog;
 class NewTxnManager;
 
 export enum class ReaderInitPhase {
@@ -108,6 +108,7 @@ public:
 
     void AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos);
     void AttachCatalog(TxnTimeStamp checkpoint_ts);
+    void RecoverMemIndex(TxnTimeStamp system_start_ts);
     void LoadFullCheckpoint(const String &checkpoint_path);
     void AttachDeltaCheckpoint(const String &checkpoint_path);
 
