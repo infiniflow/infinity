@@ -338,25 +338,6 @@ Status Storage::AdminToWriter() {
     catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
     this->RecoverMemIndex(system_start_ts);
 
-    if (periodic_trigger_thread_ != nullptr) {
-        UnrecoverableError("periodic trigger was initialized before.");
-    }
-    periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
-
-    i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
-    i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
-    i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
-    i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
-
-    periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
-    periodic_trigger_thread_->delta_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
-    periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
-    periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
-
-    periodic_trigger_thread_->cleanup_trigger_ =
-        MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
-    bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
-
     if (new_txn_mgr_) {
         auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
 
@@ -369,17 +350,39 @@ Status Storage::AdminToWriter() {
         if (!status.ok()) {
             UnrecoverableError("Failed to commit txn for checkpoint");
         }
+    } else {
+        if (periodic_trigger_thread_ != nullptr) {
+            UnrecoverableError("periodic trigger was initialized before.");
+        }
+        periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+
+        i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+        i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
+
+        periodic_trigger_thread_->full_checkpoint_trigger_ =
+            MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
+        periodic_trigger_thread_->delta_checkpoint_trigger_ =
+            MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
+        periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+        periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
+
+        periodic_trigger_thread_->cleanup_trigger_ =
+            MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), catalog_.get(), txn_mgr_.get());
+        bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
+
+        auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
+        auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
+        bg_processor_->Submit(force_ckp_task);
+        force_ckp_task->Wait();
+        txn->AddOperation(MakeShared<String>("ForceCheckpointTask"));
+        txn->SetReaderAllowed(true);
+        txn_mgr_->CommitTxn(txn);
+
+        periodic_trigger_thread_->Start();
     }
 
-    //    auto txn = txn_mgr_->BeginTxn(MakeUnique<String>("ForceCheckpointTask"), TransactionType::kNormal);
-    //    auto force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true, system_start_ts);
-    //    bg_processor_->Submit(force_ckp_task);
-    //    force_ckp_task->Wait();
-    //    txn->AddOperation(MakeShared<String>("ForceCheckpointTask"));
-    //    txn->SetReaderAllowed(true);
-    //    txn_mgr_->CommitTxn(txn);
-
-    periodic_trigger_thread_->Start();
     return Status::OK();
 }
 
