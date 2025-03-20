@@ -136,6 +136,29 @@ Status SegmentMeta::LoadBlockIDs() {
     return Status::OK();
 }
 
+Status SegmentMeta::LoadBlockIDs1(TxnTimeStamp begin_ts) {
+    Vector<BlockID> block_ids;
+
+    String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(block_id_prefix);
+    while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
+        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+        if (commit_ts < begin_ts) {
+            iter->Next();
+            continue;
+        }
+        BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
+        block_ids.push_back(block_id);
+        iter->Next();
+    }
+
+    std::sort(block_ids.begin(), block_ids.end());
+    block_ids_ = MakeShared<Vector<BlockID>>(std::move(block_ids));
+
+    return Status::OK();
+}
+
 Status SegmentMeta::LoadNextBlockID() {
     String next_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
     String next_block_id_str;
@@ -225,6 +248,29 @@ Status SegmentMeta::AddBlockID(BlockID block_id) {
     return Status::OK();
 }
 
+Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
+    Status status;
+
+    BlockID block_id = 0;
+    {
+        SharedPtr<Vector<BlockID>> block_ids;
+        std::tie(block_ids, status) = GetBlockIDs();
+        if (!status.ok()) {
+            return {INVALID_BLOCK_ID, status};
+        }
+        block_id = block_ids->empty() ? 0 : block_ids->back() + 1;
+        block_ids_->push_back(block_id);
+    }
+
+    String block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
+    String commit_ts_str = fmt::format("{}", commit_ts);
+    status = kv_instance_.Put(block_id_key, commit_ts_str);
+    if (!status.ok()) {
+        return {0, status};
+    }
+    return {block_id, Status::OK()};
+}
+
 Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
     String seg_dir_key = GetSegmentTag("dir");
     String seg_dir;
@@ -244,6 +290,16 @@ Tuple<SharedPtr<Vector<BlockID>>, Status> SegmentMeta::GetBlockIDs() {
         }
     }
     return {MakeShared<Vector<BlockID>>(*block_ids_), Status::OK()};
+}
+
+Tuple<SharedPtr<Vector<BlockID>>, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp begin_ts) {
+    if (block_ids_ == nullptr) {
+        Status status = LoadBlockIDs1(begin_ts);
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
+    }
+    return {block_ids_, Status::OK()};
 }
 
 Tuple<SizeT, Status> SegmentMeta::GetRowCnt() {

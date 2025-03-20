@@ -44,6 +44,8 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 TEST_P(TableMeetaTest, table_meeta) {
     using namespace infinity;
 
+    Status status;
+
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -90,34 +92,29 @@ TEST_P(TableMeetaTest, table_meeta) {
             segment_meta.Init();
             segment_meta.SetRowCnt(1048);
             {
-                auto [block_id, block_status] = segment_meta.GetNextBlockID();
+                TxnTimeStamp begin_ts = 0;
+                auto [blocks, block_status] = segment_meta.GetBlockIDs1(begin_ts);
                 EXPECT_TRUE(block_status.ok());
-                EXPECT_EQ(block_id, 0);
-            }
-            {
-                auto [blocks, block_status] = segment_meta.GetBlockIDs();
                 EXPECT_EQ(blocks->size(), 0);
             }
             {
-                auto block_status = segment_meta.AddBlockID(0);
-                EXPECT_TRUE(block_status.ok());
+                TxnTimeStamp commit_ts = 1;
 
-                block_status = segment_meta.AddBlockID(1);
-                EXPECT_TRUE(block_status.ok());
+                BlockID block_id = 0;
+                std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(block_id, 0);
 
-                block_status = segment_meta.SetNextBlockID(1);
-                EXPECT_TRUE(block_status.ok());
-            }
-
-            {
-                auto [block_id, block_status] = segment_meta.GetNextBlockID();
-                EXPECT_TRUE(block_status.ok());
+                std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
+                EXPECT_TRUE(status.ok());
                 EXPECT_EQ(block_id, 1);
             }
 
             {
-                auto [blocks, block_status] = segment_meta.GetBlockIDs();
-                EXPECT_EQ(blocks->size(), 2);
+                TxnTimeStamp begin_ts = 2;
+                auto [blocks, block_status] = segment_meta.GetBlockIDs1(begin_ts);
+                EXPECT_TRUE(block_status.ok());
+                EXPECT_EQ(*blocks, std::vector<BlockID>({0, 1}));
             }
 
             {

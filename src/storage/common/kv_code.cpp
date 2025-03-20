@@ -181,8 +181,11 @@ String KeyEncode::CatalogTableSegmentKey(const String &db_id, const String &tabl
 String KeyEncode::CatalogTableSegmentTagKey(const String &db_id, const String &table_id, SegmentID segment_id, const String &tag_name) {
     return fmt::format("seg|{}|{}|{}|{}", db_id, table_id, segment_id, tag_name);
 }
-String KeyEncode::CatalogTableSegmentBlockKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id, TxnTimeStamp ts) {
-    return fmt::format("catalog|blk|{}|{}|{}|{}|{}", db_id, table_id, segment_id, block_id, ts);
+String KeyEncode::CatalogTableSegmentBlockKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id) {
+    return fmt::format("catalog|blk|{}|{}|{}|{}", db_id, table_id, segment_id, block_id);
+}
+String KeyEncode::CatalogTableSegmentBlockKeyPrefix(const String &db_id, const String &table_id, SegmentID segment_id) {
+    return fmt::format("catalog|blk|{}|{}|{}|", db_id, table_id, segment_id);
 }
 String KeyEncode::CatalogTableSegmentBlockTagKey(const String &db_id,
                                                  const String &table_id,

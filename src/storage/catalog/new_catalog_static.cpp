@@ -528,6 +528,37 @@ Status NewCatalog::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Opti
     return Status::OK();
 }
 
+Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
+    Status status;
+
+    BlockID block_id;
+    std::tie(block_id, status) = segment_meta.AddBlockID1(commit_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    block_meta.emplace(block_id, segment_meta, segment_meta.kv_instance());
+    status = block_meta->InitSet();
+    if (!status.ok()) {
+        return status;
+    }
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    {
+        TableMeeta &table_meta = segment_meta.table_meta();
+        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    for (const auto &column_def : *column_defs_ptr) {
+        ColumnMeta column_meta(column_def->id(), *block_meta, block_meta->kv_instance());
+        status = column_meta.InitSet();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::LoadFlushedBlock(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts, SizeT column_count) {
     Status status;
 
@@ -578,6 +609,55 @@ Status NewCatalog::LoadFlushedBlock(SegmentMeta &segment_meta, const WalBlockInf
     if (!status.ok()) {
         return status;
     }
+    return Status::OK();
+}
+
+Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts) {
+    Status status;
+
+    auto *pm = InfinityContext::instance().persistence_manager();
+    if (pm) {
+        block_info.addr_serializer_.AddToPersistenceManager(pm);
+    }
+
+    BlockID block_id = 0;
+    std::tie(block_id, status) = segment_meta.AddBlockID1(checkpoint_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
+    BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+    status = block_meta.LoadSet(checkpoint_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    {
+        TableMeeta &table_meta = segment_meta.table_meta();
+        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    for (const auto &column_def : *column_defs_ptr) {
+        const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[column_def->id()];
+        ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+        status = column_meta.SetChunkOffset(chunk_offset);
+        if (!status.ok()) {
+            return status;
+        }
+
+        status = column_meta.LoadSet();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    status = block_meta.SetRowCnt(block_info.row_count_);
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 

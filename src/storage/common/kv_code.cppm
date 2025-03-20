@@ -131,7 +131,8 @@ public:
 
     static String CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id);
     static String CatalogTableSegmentTagKey(const String &db_id, const String &table_id, SegmentID segment_id, const String &tag_name);
-    static String CatalogTableSegmentBlockKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id, TxnTimeStamp ts);
+    static String CatalogTableSegmentBlockKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id);
+    static String CatalogTableSegmentBlockKeyPrefix(const String &db_id, const String &table_id, SegmentID segment_id);
     static String
     CatalogTableSegmentBlockTagKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id, const String &tag_name);
     static String CatalogTableSegmentBlockColumnKey(const String &db_id,
