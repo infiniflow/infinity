@@ -178,6 +178,9 @@ String KeyEncode::TableColumnTagKey(const String &db_id, const String &table_id,
 String KeyEncode::CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id) {
     return fmt::format("catalog|seg|{}|{}|{}", db_id, table_id, segment_id);
 }
+String KeyEncode::CatalogTableSegmentKeyPrefix(const String &db_id, const String &table_id) {
+    return fmt::format("catalog|seg|{}|{}|", db_id, table_id);
+}
 String KeyEncode::CatalogTableSegmentTagKey(const String &db_id, const String &table_id, SegmentID segment_id, const String &tag_name) {
     return fmt::format("seg|{}|{}|{}|{}", db_id, table_id, segment_id, tag_name);
 }

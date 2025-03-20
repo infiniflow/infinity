@@ -453,6 +453,21 @@ Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, O
     return Status::OK();
 }
 
+Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
+    Status status;
+    SegmentID segment_id = 0;
+    std::tie(segment_id, status) = table_meta.AddSegmentID1(commit_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    segment_meta.emplace(segment_id, table_meta, table_meta.kv_instance());
+    status = segment_meta->InitSet();
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Status NewCatalog::LoadFlushedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
     Status status;
 
@@ -471,7 +486,38 @@ Status NewCatalog::LoadFlushedSegment(TableMeeta &table_meta, const WalSegmentIn
         }
     }
 
-    status = segment_meta->SetRowCnt(column_count);
+    status = segment_meta->SetRowCnt(segment_info.row_count_);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
+    Status status;
+
+    SegmentID segment_id = 0;
+    std::tie(segment_id, status) = table_meta.AddSegmentID1(checkpoint_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    if (segment_id != segment_info.segment_id_) {
+        UnrecoverableError(fmt::format("Segment id mismatch, expect: {}, actual: {}", segment_id, segment_info.segment_id_));
+    }
+
+    SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+    status = segment_meta.InitSet();
+    if (!status.ok()) {
+        return status;
+    }
+    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+        status = NewCatalog::LoadFlushedBlock1(segment_meta, block_info, checkpoint_ts);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    status = segment_meta.SetRowCnt(segment_info.row_count_);
     if (!status.ok()) {
         return status;
     }
@@ -624,6 +670,9 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
     std::tie(block_id, status) = segment_meta.AddBlockID1(checkpoint_ts);
     if (!status.ok()) {
         return status;
+    }
+    if (block_id != block_info.block_id_) {
+        UnrecoverableError(fmt::format("Block id mismatch, expect: {}, actual: {}", block_info.block_id_, block_id));
     }
 
     BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());

@@ -1074,6 +1074,8 @@ Status NewTxn::CommitImport(WalCmdImport *import_cmd) {
 
 Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance) {
     Status status;
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     const String &db_id_str = append_cmd->db_id_str_;
     const String &table_id_str = append_cmd->table_id_str_;
@@ -1100,22 +1102,31 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
         if (status.code() != ErrorCode::kNotFound) {
             return status;
         }
-        SegmentID next_segment_id = 0;
-        status = table_meta.GetNextSegmentID(next_segment_id);
-        if (!status.ok()) {
-            return status;
-        }
-        unsealed_segment_id = next_segment_id;
-        status = table_meta.SetUnsealedSegmentID(next_segment_id);
-        if (!status.ok()) {
-            return status;
-        }
-        status = table_meta.SetNextSegmentID(next_segment_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
+        // SegmentID next_segment_id = 0;
+        // status = table_meta.GetNextSegmentID(next_segment_id);
+        // if (!status.ok()) {
+        //     return status;
+        // }
+        // unsealed_segment_id = next_segment_id;
+        // status = table_meta.SetUnsealedSegmentID(next_segment_id);
+        // if (!status.ok()) {
+        //     return status;
+        // }
+        // status = table_meta.SetNextSegmentID(next_segment_id + 1);
+        // if (!status.ok()) {
+        //     return status;
+        // }
 
-        status = NewCatalog::AddNewSegment(table_meta, unsealed_segment_id, segment_meta);
+        // status = NewCatalog::AddNewSegment(table_meta, unsealed_segment_id, segment_meta);
+        // if (!status.ok()) {
+        //     return status;
+        // }
+        status = NewCatalog::AddNewSegment1(table_meta, commit_ts, segment_meta);
+        if (!status.ok()) {
+            return status;
+        }
+        SegmentID segment_id = segment_meta->segment_id();
+        status = table_meta.SetUnsealedSegmentID(segment_id);
         if (!status.ok()) {
             return status;
         }
@@ -1123,26 +1134,43 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
         segment_meta.emplace(unsealed_segment_id, table_meta, *kv_instance);
     }
 
-    BlockID next_block_id = 0;
-    std::tie(next_block_id, status) = segment_meta->GetNextBlockID();
+    // BlockID next_block_id = 0;
+    // std::tie(next_block_id, status) = segment_meta->GetNextBlockID();
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    // Optional<BlockMeta> block_meta;
+    // if (next_block_id == 0) {
+    //     BlockID block_id = 0;
+    //     status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    //     status = segment_meta->SetNextBlockID(block_id + 1);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // } else {
+    //     BlockID block_id = next_block_id - 1;
+    //     block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
+    // }
+
+    SharedPtr<Vector<BlockID>> block_ids_ptr;
+    std::tie(block_ids_ptr, status) = segment_meta->GetBlockIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
     Optional<BlockMeta> block_meta;
-    if (next_block_id == 0) {
-        BlockID block_id = 0;
-        status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_meta->SetNextBlockID(block_id + 1);
+    if (block_ids_ptr->empty()) {
+        status = NewCatalog::AddNewBlock1(*segment_meta, commit_ts, block_meta);
         if (!status.ok()) {
             return status;
         }
     } else {
-        BlockID block_id = next_block_id - 1;
+        BlockID block_id = block_ids_ptr->back();
         block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
     }
+
     while (true) {
         bool block_full = false;
         bool segment_full = false;
@@ -1154,42 +1182,55 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
             break;
         }
         if (segment_full) {
-            SegmentID next_segment_id = 0;
-            status = table_meta.GetNextSegmentID(next_segment_id);
+            // SegmentID next_segment_id = 0;
+            // status = table_meta.GetNextSegmentID(next_segment_id);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            // status = NewCatalog::AddNewSegment(table_meta, next_segment_id, segment_meta);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            // status = table_meta.SetUnsealedSegmentID(next_segment_id);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            // ++next_segment_id;
+            // status = table_meta.SetNextSegmentID(next_segment_id);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            status = NewCatalog::AddNewSegment1(table_meta, commit_ts, segment_meta);
             if (!status.ok()) {
                 return status;
             }
-            status = NewCatalog::AddNewSegment(table_meta, next_segment_id, segment_meta);
-            if (!status.ok()) {
-                return status;
-            }
-            status = table_meta.SetUnsealedSegmentID(next_segment_id);
-            if (!status.ok()) {
-                return status;
-            }
-            ++next_segment_id;
-            status = table_meta.SetNextSegmentID(next_segment_id);
-            if (!status.ok()) {
-                return status;
-            }
-            BlockID block_id = 0;
-            status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
-            if (!status.ok()) {
-                return status;
-            }
-            next_block_id = 1;
-            status = segment_meta->SetNextBlockID(next_block_id);
+
+            // BlockID block_id = 0;
+            // status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            // next_block_id = 1;
+            // status = segment_meta->SetNextBlockID(next_block_id);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            status = NewCatalog::AddNewBlock1(*segment_meta, commit_ts, block_meta);
             if (!status.ok()) {
                 return status;
             }
         } else if (block_full) {
-            BlockID block_id = next_block_id;
-            status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
-            if (!status.ok()) {
-                return status;
-            }
-            ++next_block_id;
-            status = segment_meta->SetNextBlockID(next_block_id);
+            // BlockID block_id = next_block_id;
+            // status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            // ++next_block_id;
+            // status = segment_meta->SetNextBlockID(next_block_id);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            status = NewCatalog::AddNewBlock1(*segment_meta, commit_ts, block_meta);
             if (!status.ok()) {
                 return status;
             }

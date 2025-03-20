@@ -145,7 +145,7 @@ Status SegmentMeta::LoadBlockIDs1(TxnTimeStamp begin_ts) {
             block_ids_ = MakeShared<Vector<BlockID>>();
         }
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts < begin_ts) {
+        if (commit_ts > begin_ts) {
             iter->Next();
             continue;
         }
@@ -253,7 +253,7 @@ Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
     BlockID block_id = 0;
     {
         SharedPtr<Vector<BlockID>> block_ids;
-        std::tie(block_ids, status) = GetBlockIDs();
+        std::tie(block_ids, status) = GetBlockIDs1(commit_ts);
         if (!status.ok()) {
             return {INVALID_BLOCK_ID, status};
         }

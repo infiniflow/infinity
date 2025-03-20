@@ -130,6 +130,7 @@ public:
     static String TableColumnTagKey(const String &db_id, const String &table_id, const String &column_id, const String &tag_name);
 
     static String CatalogTableSegmentKey(const String &db_id, const String &table_id, SegmentID segment_id);
+    static String CatalogTableSegmentKeyPrefix(const String &db_id, const String &table_id);
     static String CatalogTableSegmentTagKey(const String &db_id, const String &table_id, SegmentID segment_id, const String &tag_name);
     static String CatalogTableSegmentBlockKey(const String &db_id, const String &table_id, SegmentID segment_id, BlockID block_id);
     static String CatalogTableSegmentBlockKeyPrefix(const String &db_id, const String &table_id, SegmentID segment_id);
