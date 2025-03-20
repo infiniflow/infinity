@@ -137,25 +137,24 @@ Status SegmentMeta::LoadBlockIDs() {
 }
 
 Status SegmentMeta::LoadBlockIDs1(TxnTimeStamp begin_ts) {
-    Vector<BlockID> block_ids;
-
     String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
     auto iter = kv_instance_.GetIterator();
     iter->Seek(block_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
+        if (block_ids_ == nullptr) {
+            block_ids_ = MakeShared<Vector<BlockID>>();
+        }
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
         if (commit_ts < begin_ts) {
             iter->Next();
             continue;
         }
         BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
-        block_ids.push_back(block_id);
+        block_ids_->push_back(block_id);
         iter->Next();
     }
 
-    std::sort(block_ids.begin(), block_ids.end());
-    block_ids_ = MakeShared<Vector<BlockID>>(std::move(block_ids));
-
+    std::sort(block_ids_->begin(), block_ids_->end());
     return Status::OK();
 }
 
