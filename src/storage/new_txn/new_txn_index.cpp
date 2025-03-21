@@ -89,6 +89,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 }
 
 Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     Status status;
 
     Optional<DBMeeta> db_meta;
@@ -212,7 +213,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
 
             BufferHandle buffer_handle = buffer_obj->Load();
             auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
-            data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def);
+            data_ptr->BuildIVFIndex(segment_meta, row_cnt, column_def, begin_ts);
             break;
         }
         case IndexType::kHnsw:
@@ -666,6 +667,8 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
 }
 
 Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+
     auto [block_ids, status] = segment_meta.GetBlockIDs();
     if (!status.ok()) {
         return status;
@@ -675,7 +678,8 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
         SizeT row_cnt = 0;
-        std::tie(row_cnt, status) = block_meta.GetRowCnt();
+        // std::tie(row_cnt, status) = block_meta.GetRowCnt();
+        std::tie(row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -698,6 +702,8 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
 
 Status
 NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+
     if (index_base->index_type_ != IndexType::kFullText) {
         UnrecoverableError("Invalid index type");
     }
@@ -730,7 +736,8 @@ NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
         SizeT row_cnt = 0;
-        std::tie(row_cnt, status) = block_meta.GetRowCnt();
+        // std::tie(row_cnt, status) = block_meta.GetRowCnt();
+        std::tie(row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -764,10 +771,12 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
                                      SegmentMeta &segment_meta,
                                      SharedPtr<ColumnDef> column_def,
                                      ChunkID &new_chunk_id) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     u32 row_count = 0;
     {
-        auto [rc, status] = segment_meta.GetRowCnt();
+        auto [rc, status] = segment_meta.GetRowCnt1(begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -801,7 +810,7 @@ Status NewTxn::PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
     {
         BufferHandle buffer_handle = buffer_obj->Load();
         auto *data_ptr = static_cast<IVFIndexInChunk *>(buffer_handle.GetDataMut());
-        data_ptr->BuildIVFIndex(segment_meta, row_count, column_def);
+        data_ptr->BuildIVFIndex(segment_meta, row_count, column_def, begin_ts);
     }
     buffer_obj->Save();
     return Status::OK();
@@ -812,10 +821,12 @@ Status NewTxn::PopulateEmvbIndexInner(SharedPtr<IndexBase> index_base,
                                       SegmentMeta &segment_meta,
                                       SharedPtr<ColumnDef> column_def,
                                       ChunkID &new_chunk_id) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+
     RowID base_row_id(segment_index_meta.segment_id(), 0);
     u32 row_count = 0;
     {
-        auto [rc, status] = segment_meta.GetRowCnt();
+        auto [rc, status] = segment_meta.GetRowCnt1(begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -945,6 +956,8 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
                                 RowID base_rowid,
                                 u32 total_row_cnt,
                                 BufferObj *buffer_obj) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+
     auto [block_ids, status] = segment_meta.GetBlockIDs();
     if (!status.ok()) {
         return status;
@@ -960,7 +973,8 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+            // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
             if (!status.ok()) {
                 return status;
             }
@@ -983,7 +997,8 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
         for (BlockID block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+            // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
             if (!status.ok()) {
                 return status;
             }
@@ -1164,6 +1179,8 @@ Status NewTxn::AddChunkWal(const String &db_name,
 }
 
 Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, Vector<AppendRange> &append_ranges) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+
     Status status;
     Vector<ChunkID> *chunk_ids_ptr = nullptr;
     status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
@@ -1221,7 +1238,8 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
         for (; i < block_ids.size(); ++i) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+            // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
             if (!status.ok()) {
                 return status;
             }

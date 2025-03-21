@@ -131,6 +131,7 @@ TEST_P(TestColumn, test_add_columns) {
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -144,7 +145,9 @@ TEST_P(TestColumn, test_add_columns) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
 
         SizeT row_count = 0;
-        std::tie(row_count, status) = block_meta.GetRowCnt();
+        // std::tie(row_count, status) = block_meta.GetRowCnt();
+        std::tie(row_count, status) = block_meta.GetRowCnt1(begin_ts);
+
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(row_count, block_row_cnt);
 

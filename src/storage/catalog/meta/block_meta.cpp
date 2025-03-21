@@ -1,4 +1,4 @@
-// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
+// Copyri1ht(C) 2024 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@ import buffer_manager;
 import block_version;
 import version_file_worker;
 
+import buffer_handle;
+
 namespace infinity {
 
 BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta, KVInstance &kv_instance)
@@ -45,23 +47,23 @@ Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     return Status::OK();
 }
 
-Status BlockMeta::SetRowCnt(SizeT row_cnt) {
-    row_cnt_ = row_cnt;
-    String block_dir_key = GetBlockTag("row_cnt");
-    Status status = kv_instance_.Put(block_dir_key, fmt::format("{}", row_cnt));
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
+// Status BlockMeta::SetRowCnt(SizeT row_cnt) {
+//     row_cnt_ = row_cnt;
+//     String block_dir_key = GetBlockTag("row_cnt");
+//     Status status = kv_instance_.Put(block_dir_key, fmt::format("{}", row_cnt));
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     return Status::OK();
+// }
 
 Status BlockMeta::InitSet() {
-    {
-        Status status = SetRowCnt(0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // {
+    //     Status status = SetRowCnt(0);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {
         String block_lock_key = GetBlockTag("lock");
@@ -166,16 +168,16 @@ SharedPtr<String> BlockMeta::GetBlockDir() {
     return block_dir_;
 }
 
-Status BlockMeta::LoadRowCnt() {
-    String row_cnt_key = GetBlockTag("row_cnt");
-    String row_cnt_str;
-    Status status = kv_instance_.Get(row_cnt_key, row_cnt_str);
-    if (!status.ok()) {
-        return status;
-    }
-    row_cnt_ = std::stoull(row_cnt_str);
-    return Status::OK();
-}
+// Status BlockMeta::LoadRowCnt() {
+//     String row_cnt_key = GetBlockTag("row_cnt");
+//     String row_cnt_str;
+//     Status status = kv_instance_.Get(row_cnt_key, row_cnt_str);
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     row_cnt_ = std::stoull(row_cnt_str);
+//     return Status::OK();
+// }
 
 Status BlockMeta::LoadVersionBuffer() {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
@@ -195,14 +197,43 @@ String BlockMeta::GetBlockTag(const String &tag) const {
     return KeyEncode::CatalogTableSegmentBlockTagKey(table_meta.db_id_str(), table_meta.table_id_str(), segment_meta_.segment_id(), block_id_, tag);
 }
 
-Tuple<SizeT, Status> BlockMeta::GetRowCnt() {
-    if (!row_cnt_) {
-        Status status = LoadRowCnt();
-        if (!status.ok()) {
-            return {0, status};
-        }
+// Tuple<SizeT, Status> BlockMeta::GetRowCnt() {
+//     if (!row_cnt_) {
+//         Status status = LoadRowCnt();
+//         if (!status.ok()) {
+//             return {0, status};
+//         }
+//     }
+//     return {*row_cnt_, Status::OK()};
+// }
+
+Tuple<SizeT, Status> BlockMeta::GetRowCnt1(TxnTimeStamp begin_ts) {
+    if (row_cnt_ && row_cnt_->first == begin_ts) {
+        return {row_cnt_->second, Status::OK()};
     }
-    return {*row_cnt_, Status::OK()};
+    Status status;
+
+    SharedPtr<BlockLock> block_lock;
+    status = this->GetBlockLock(block_lock);
+    if (!status.ok()) {
+        return {0, status};
+    }
+    BufferObj *version_buffer;
+    std::tie(version_buffer, status) = this->GetVersionBuffer();
+    if (!status.ok()) {
+        return {0, status};
+    }
+
+    BufferHandle buffer_handle = version_buffer->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+
+    SizeT row_cnt = 0;
+    {
+        std::shared_lock lock(block_lock->mtx_);
+        row_cnt = block_version->GetRowCount(begin_ts);
+    }
+    row_cnt_ = {begin_ts, row_cnt};
+    return {row_cnt, Status::OK()};
 }
 
 } // namespace infinity

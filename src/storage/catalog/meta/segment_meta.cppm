@@ -42,7 +42,7 @@ public:
 
     Status SetNextBlockID(BlockID next_block_id);
 
-    Status SetRowCnt(SizeT row_cnt);
+    // Status SetRowCnt(SizeT row_cnt);
 
     Status InitSet();
 
@@ -59,7 +59,8 @@ public:
 
     Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs1(TxnTimeStamp begin_ts);
 
-    Tuple<SizeT, Status> GetRowCnt();
+    // Tuple<SizeT, Status> GetRowCnt();
+    Tuple<SizeT, Status> GetRowCnt1(TxnTimeStamp begin_ts);
     Tuple<BlockID, Status> GetNextBlockID();
 
 private:
@@ -69,7 +70,7 @@ private:
 
     Status LoadNextBlockID();
 
-    Status LoadRowCnt();
+    // Status LoadRowCnt();
 
     String GetSegmentTag(const String &tag) const;
 
@@ -81,7 +82,8 @@ private:
 
     SharedPtr<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;
-    Optional<SizeT> row_cnt_;
+    // Optional<SizeT> row_cnt_;
+    Optional<Pair<TxnTimeStamp, SizeT>> row_cnt_;
 };
 
 } // namespace infinity

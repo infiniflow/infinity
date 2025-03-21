@@ -74,10 +74,11 @@ struct NewTxnCompactState {
         Status status;
 
         if (block_meta_) {
-            status = block_meta_->SetRowCnt(cur_block_row_cnt_);
-            if (!status.ok()) {
-                return status;
-            }
+            // status = block_meta_->SetRowCnt(cur_block_row_cnt_);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            // segment_row_cnt_ += cur_block_row_cnt_;
             block_meta_.reset();
         }
 
@@ -113,10 +114,11 @@ struct NewTxnCompactState {
 
     Status FinalizeBlock() {
         if (block_meta_) {
-            Status status = block_meta_->SetRowCnt(cur_block_row_cnt_);
-            if (!status.ok()) {
-                return status;
-            }
+            // Status status = block_meta_->SetRowCnt(cur_block_row_cnt_);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            // segment_row_cnt_ += cur_block_row_cnt_;
         }
         for (ColumnID i = 0; i < column_cnt_; ++i) {
             ColumnMeta column_meta(i, *block_meta_, block_meta_->kv_instance());
@@ -141,13 +143,13 @@ struct NewTxnCompactState {
         if (!status.ok()) {
             return status;
         }
-        status = new_segment_meta_->SetRowCnt(segment_row_cnt_);
+        // status = new_segment_meta_->SetRowCnt(segment_row_cnt_);
         return status;
     }
 
     Optional<SegmentMeta> new_segment_meta_;
     Optional<BlockMeta> block_meta_;
-    SizeT segment_row_cnt_ = 0;
+    // SizeT segment_row_cnt_ = 0;
     BlockOffset cur_block_row_cnt_ = 0;
     Vector<ColumnVector> column_vectors_;
     SizeT column_cnt_ = 0;
@@ -183,7 +185,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
-    SizeT segment_row_cnt = 0;
+    // SizeT segment_row_cnt = 0;
     for (SizeT j = 0; j < input_blocks.size(); ++j) {
         const SharedPtr<DataBlock> &input_block = input_blocks[j];
         if (!input_block->Finalized()) {
@@ -254,16 +256,16 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
             }
         }
 
-        status = block_meta->SetRowCnt(row_cnt);
-        if (!status.ok()) {
-            return status;
-        }
-        segment_row_cnt += row_cnt;
+        // status = block_meta->SetRowCnt(row_cnt);
+        // if (!status.ok()) {
+        //     return status;
+        // }
+        // segment_row_cnt += row_cnt;
     }
-    status = segment_meta->SetRowCnt(segment_row_cnt);
-    if (!status.ok()) {
-        return status;
-    }
+    // status = segment_meta->SetRowCnt(segment_row_cnt);
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
     { // Add import wal;
         auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta));
@@ -595,6 +597,13 @@ Status NewTxn::ReplayCompact(WalCmdCompact *compact_cmd) {
 }
 
 Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_state, bool &block_full, bool &segment_full) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+
+    auto [segment_row_count, segment_status] = block_meta.segment_meta().GetRowCnt1(begin_ts);
+    if (!segment_status.ok()) {
+        return segment_status;
+    }
+
     while (append_state->current_block_ < append_state->blocks_.size()) {
         DataBlock *input_block = append_state->blocks_[append_state->current_block_].get();
         SizeT to_append_rows = input_block->row_count() - append_state->current_block_offset_;
@@ -603,7 +612,8 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
             append_state->current_block_offset_ = 0;
             continue;
         }
-        auto [block_row_count, block_status] = block_meta.GetRowCnt();
+        // auto [block_row_count, block_status] = block_meta.GetRowCnt();
+        auto [block_row_count, block_status] = block_meta.GetRowCnt1(begin_ts);
         if (!block_status.ok()) {
             return block_status;
         }
@@ -625,26 +635,28 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
             //                                 append_state->current_block_offset_,
             //                                 block_id,
             //                                 block_row_count));
-            Status status = block_meta.SetRowCnt(block_row_count + actual_append);
-            if (!status.ok()) {
-                return status;
-            }
+            // Status status = block_meta.SetRowCnt(block_row_count + actual_append);
+            // if (!status.ok()) {
+            //     return status;
+            // }
         }
 
         block_full = block_row_count + actual_append >= block_meta.block_capacity();
 
-        auto [segment_row_count, segment_status] = block_meta.segment_meta().GetRowCnt();
-        if (!segment_status.ok()) {
-            return segment_status;
-        }
+        // auto [segment_row_count, segment_status] = block_meta.segment_meta().GetRowCnt();
+        // if (!segment_status.ok()) {
+        //     return segment_status;
+        // }
 
         if (actual_append) {
-            Status status = block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
-            if (!status.ok()) {
-                return status;
-            }
+            // Status status = block_meta.segment_meta().SetRowCnt(segment_row_count + actual_append);
+            // if (!status.ok()) {
+            //     return status;
+            // }
+            segment_row_count += actual_append;
         }
-        segment_full = segment_row_count + actual_append >= block_meta.segment_meta().segment_capacity();
+        // segment_full = segment_row_count + actual_append >= block_meta.segment_meta().segment_capacity();
+        segment_full = segment_row_count >= block_meta.segment_meta().segment_capacity();
 
         if (actual_append) {
             append_state->current_count_ += actual_append;
@@ -890,7 +902,10 @@ NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPt
 }
 
 Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
-    auto [block_row_count, status] = block_meta.GetRowCnt();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+
+    // auto [block_row_count, status] = block_meta.GetRowCnt();
+    auto [block_row_count, status] = block_meta.GetRowCnt1(begin_ts);
     if (!status.ok()) {
         return status;
     }

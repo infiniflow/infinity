@@ -486,7 +486,7 @@ Status NewCatalog::LoadFlushedSegment(TableMeeta &table_meta, const WalSegmentIn
         }
     }
 
-    status = segment_meta->SetRowCnt(segment_info.row_count_);
+    // status = segment_meta->SetRowCnt(segment_info.row_count_);
     if (!status.ok()) {
         return status;
     }
@@ -517,10 +517,6 @@ Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentI
         }
     }
 
-    status = segment_meta.SetRowCnt(segment_info.row_count_);
-    if (!status.ok()) {
-        return status;
-    }
     return Status::OK();
 }
 
@@ -651,10 +647,10 @@ Status NewCatalog::LoadFlushedBlock(SegmentMeta &segment_meta, const WalBlockInf
             return status;
         }
     }
-    status = block_meta.SetRowCnt(block_info.row_count_);
-    if (!status.ok()) {
-        return status;
-    }
+    // status = block_meta.SetRowCnt(block_info.row_count_);
+    // if (!status.ok()) {
+    //     return status;
+    // }
     return Status::OK();
 }
 
@@ -702,10 +698,10 @@ Status NewCatalog::LoadFlushedBlock1(SegmentMeta &segment_meta, const WalBlockIn
             return status;
         }
     }
-    status = block_meta.SetRowCnt(block_info.row_count_);
-    if (!status.ok()) {
-        return status;
-    }
+    // status = block_meta.SetRowCnt(block_info.row_count_);
+    // if (!status.ok()) {
+    //     return status;
+    // }
 
     return Status::OK();
 }

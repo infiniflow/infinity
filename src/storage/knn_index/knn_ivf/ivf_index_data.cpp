@@ -88,7 +88,8 @@ private:
 
 class NewIVFDataAccessor : public IVFDataAccessorBase {
 public:
-    NewIVFDataAccessor(SegmentMeta &segment_meta, ColumnID column_id) : segment_meta_(segment_meta), column_id_(column_id) {}
+    NewIVFDataAccessor(SegmentMeta &segment_meta, ColumnID column_id, TxnTimeStamp begin_ts)
+        : segment_meta_(segment_meta), column_id_(column_id), begin_ts_(begin_ts) {}
 
     const_ptr_t GetEmbedding(SizeT offset) override {
         SizeT block_offset = UpdateColumnVector(offset);
@@ -107,7 +108,8 @@ private:
         if (block_id != last_block_id_) {
             last_block_id_ = block_id;
             BlockMeta block_meta(block_id, segment_meta_, segment_meta_.kv_instance());
-            auto [row_cnt, status] = block_meta.GetRowCnt();
+            // auto [row_cnt, status] = block_meta.GetRowCnt();
+            auto [row_cnt, status] = block_meta.GetRowCnt1(begin_ts_);
             if (!status.ok()) {
                 UnrecoverableError("Get row count failed");
             }
@@ -124,6 +126,7 @@ private:
 private:
     SegmentMeta &segment_meta_;
     ColumnID column_id_;
+    TxnTimeStamp begin_ts_;
 
     BlockID last_block_id_ = std::numeric_limits<BlockID>::max();
     ColumnVector cur_column_vector_;
@@ -144,9 +147,9 @@ void IVFIndexInChunk::BuildIVFIndex(const RowID base_rowid,
     BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
 }
 
-void IVFIndexInChunk::BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def) {
+void IVFIndexInChunk::BuildIVFIndex(SegmentMeta &segment_meta, u32 row_count, SharedPtr<ColumnDef> column_def, TxnTimeStamp begin_ts) {
     RowID base_rowid(segment_meta.segment_id(), 0);
-    NewIVFDataAccessor data_accessor(segment_meta, column_def->id());
+    NewIVFDataAccessor data_accessor(segment_meta, column_def->id(), begin_ts);
     BuildIVFIndex(base_rowid, row_count, &data_accessor, column_def);
 }
 

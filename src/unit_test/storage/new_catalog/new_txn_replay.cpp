@@ -15,6 +15,8 @@
 #include "gtest/gtest.h"
 
 import base_test;
+import replay_test;
+
 import stl;
 import third_party;
 import status;
@@ -78,30 +80,11 @@ import buffer_handle;
 
 using namespace infinity;
 
-class NewTxnReplayTest : public BaseTestParamStr {
-protected:
-    void RestartTxnMgr() {
-        new_txn_mgr->PrintAllKeyValue();
-        infinity::InfinityContext::instance().UnInit();
-
-        InfinityContext::instance().InitPhase1(this->config_path);
-        InfinityContext::instance().InitPhase2();
-        new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
-        new_txn_mgr->PrintAllKeyValue();
-    }
-
-    void SetUp() override {
-        BaseTestParamStr::SetUp();
-        new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-    }
-
-    NewTxnManager *new_txn_mgr = nullptr;
-};
+class NewTxnReplayTest : public NewReplayTest {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          NewTxnReplayTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(NewTxnReplayTest::NULL_CONFIG_PATH, NewTxnReplayTest::VFS_OFF_CONFIG_PATH));
 
 TEST_P(NewTxnReplayTest, test_replay_create_db) {
     using namespace infinity;

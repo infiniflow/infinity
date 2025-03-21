@@ -90,7 +90,7 @@ TEST_P(TableMeetaTest, table_meeta) {
         {
             SegmentMeta segment_meta(0, table_meta, *kv_instance);
             segment_meta.Init();
-            segment_meta.SetRowCnt(1048);
+            // segment_meta.SetRowCnt(1048);
             {
                 TxnTimeStamp begin_ts = 0;
                 auto [blocks, block_status] = segment_meta.GetBlockIDs1(begin_ts);
@@ -117,10 +117,10 @@ TEST_P(TableMeetaTest, table_meeta) {
                 EXPECT_EQ(*blocks, std::vector<BlockID>({0, 1}));
             }
 
-            {
-                auto [row_count, block_status] = segment_meta.GetRowCnt();
-                EXPECT_EQ(row_count, 1048);
-            }
+            // {
+            //     auto [row_count, block_status] = segment_meta.GetRowCnt();
+            //     EXPECT_EQ(row_count, 1048);
+            // }
         }
     }
 

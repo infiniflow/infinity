@@ -44,7 +44,9 @@ import default_values;
 
 using namespace infinity;
 
-class TestAppend : public BaseTestParamStr {};
+class TestAppend : public BaseTestParamStr {
+public:
+};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestAppend,
@@ -106,10 +108,7 @@ TEST_P(TestAppend, test_append0) {
         EXPECT_TRUE(status.ok());
     };
     append();
-    new_txn_mgr->PrintAllKeyValue();
-
     append();
-    new_txn_mgr->PrintAllKeyValue();
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
@@ -128,10 +127,21 @@ TEST_P(TestAppend, test_append0) {
         SegmentID segment_id = (*segment_ids_ptr)[0];
 
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+
+        SizeT segment_row_cnt = 0;
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(begin_ts);
+        EXPECT_EQ(segment_row_cnt, 8);
+
         SharedPtr<Vector<BlockID>> block_ids_ptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+
+        BlockID block_id = (*block_ids_ptr)[0];
+        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+        SizeT block_row_cnt = 0;
+        std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
+        EXPECT_EQ(block_row_cnt, 8);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

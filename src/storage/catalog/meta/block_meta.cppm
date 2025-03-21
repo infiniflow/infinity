@@ -43,7 +43,7 @@ public:
 
     Status GetBlockLock(SharedPtr<BlockLock> &block_lock);
 
-    Status SetRowCnt(SizeT row_cnt);
+    // Status SetRowCnt(SizeT row_cnt);
 
     Status InitSet();
 
@@ -51,14 +51,16 @@ public:
 
     Status UninitSet();
 
-    Tuple<SizeT, Status> GetRowCnt();
+    // Tuple<SizeT, Status> GetRowCnt();
+
+    Tuple<SizeT, Status> GetRowCnt1(TxnTimeStamp begin_ts);
 
     Tuple<BufferObj *, Status> GetVersionBuffer();
 
     Vector<String> FilePaths();
 
 private:
-    Status LoadRowCnt();
+    // Status LoadRowCnt();
 
     Status LoadVersionBuffer();
 
@@ -70,7 +72,7 @@ private:
     BlockID block_id_;
 
     SharedPtr<String> block_dir_;
-    Optional<SizeT> row_cnt_;
+    Optional<Pair<TxnTimeStamp, SizeT>> row_cnt_;
 
     BufferObj *version_buffer_ = nullptr;
 };

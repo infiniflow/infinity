@@ -25,6 +25,8 @@ import default_values;
 import table_meeta;
 import logger;
 
+import block_meta;
+
 namespace infinity {
 
 SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta, KVInstance &kv_instance)
@@ -67,16 +69,16 @@ Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
     return Status::OK();
 }
 
-Status SegmentMeta::SetRowCnt(SizeT row_cnt) {
-    row_cnt_ = row_cnt;
-    String row_cnt_key = GetSegmentTag("row_cnt");
-    String row_cnt_str = fmt::format("{}", row_cnt);
-    Status status = kv_instance_.Put(row_cnt_key, row_cnt_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
+// Status SegmentMeta::SetRowCnt(SizeT row_cnt) {
+//     row_cnt_ = row_cnt;
+//     String row_cnt_key = GetSegmentTag("row_cnt");
+//     String row_cnt_str = fmt::format("{}", row_cnt);
+//     Status status = kv_instance_.Put(row_cnt_key, row_cnt_str);
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     return Status::OK();
+// }
 
 Status SegmentMeta::InitSet() {
     {
@@ -91,12 +93,12 @@ Status SegmentMeta::InitSet() {
             return status;
         }
     }
-    {
-        Status status = SetRowCnt(0);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // {
+    //     Status status = SetRowCnt(0);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
     return Status::OK();
 }
 
@@ -169,16 +171,16 @@ Status SegmentMeta::LoadNextBlockID() {
     return Status::OK();
 }
 
-Status SegmentMeta::LoadRowCnt() {
-    String row_cnt_key = GetSegmentTag("row_cnt");
-    String row_cnt_str;
-    Status status = kv_instance_.Get(row_cnt_key, row_cnt_str);
-    if (!status.ok()) {
-        return status;
-    }
-    row_cnt_ = std::stoull(row_cnt_str);
-    return Status::OK();
-}
+// Status SegmentMeta::LoadRowCnt() {
+//     String row_cnt_key = GetSegmentTag("row_cnt");
+//     String row_cnt_str;
+//     Status status = kv_instance_.Get(row_cnt_key, row_cnt_str);
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     row_cnt_ = std::stoull(row_cnt_str);
+//     return Status::OK();
+// }
 
 String SegmentMeta::GetSegmentTag(const String &tag) const {
     return KeyEncode::CatalogTableSegmentTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, tag);
@@ -301,14 +303,40 @@ Tuple<SharedPtr<Vector<BlockID>>, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp
     return {block_ids_, Status::OK()};
 }
 
-Tuple<SizeT, Status> SegmentMeta::GetRowCnt() {
-    if (!row_cnt_) {
-        Status status = LoadRowCnt();
-        if (!status.ok()) {
-            return {0, status};
+// Tuple<SizeT, Status> SegmentMeta::GetRowCnt() {
+//     if (!row_cnt_) {
+//         Status status = LoadRowCnt();
+//         if (!status.ok()) {
+//             return {0, status};
+//         }
+//     }
+//     return {row_cnt_.value(), Status::OK()};
+// }
+
+Tuple<SizeT, Status> SegmentMeta::GetRowCnt1(TxnTimeStamp begin_ts) {
+    if (row_cnt_ && row_cnt_->first == begin_ts) {
+        return {row_cnt_->second, Status::OK()};
+    }
+    Status status;
+
+    SizeT row_cnt = 0;
+    {
+        SharedPtr<Vector<BlockID>> block_ids;
+        std::tie(block_ids, status) = GetBlockIDs1(begin_ts);
+        if (block_ids->size() > 0) {
+            row_cnt += DEFAULT_BLOCK_CAPACITY * (block_ids->size() - 1);
+
+            BlockMeta block_meta(block_ids->back(), *this, kv_instance_);
+            SizeT block_row_cnt;
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
+            if (!status.ok()) {
+                return {0, status};
+            }
+            row_cnt += block_row_cnt;
         }
     }
-    return {row_cnt_.value(), Status::OK()};
+    row_cnt_ = {begin_ts, row_cnt};
+    return {row_cnt, Status::OK()};
 }
 
 Tuple<BlockID, Status> SegmentMeta::GetNextBlockID() {

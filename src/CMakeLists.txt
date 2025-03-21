@@ -529,6 +529,7 @@ file(GLOB_RECURSE
         CONFIGURE_DEPENDS
         unit_test/base_test.cppm
         unit_test/test_helper/sql_runner.cppm
+        unit_test/*.cppm
 )
 
 add_executable(unit_test
