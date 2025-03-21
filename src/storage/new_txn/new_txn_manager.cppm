@@ -68,7 +68,7 @@ public:
 
     bool Stopped();
 
-    Status CommitTxn(NewTxn *txn);
+    Status CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr = nullptr);
 
     Status RollBackTxn(NewTxn *txn);
 
@@ -95,6 +95,8 @@ public:
     u64 total_rollbacked_txn_count() const { return total_rollbacked_txn_count_; }
 
     WalManager *wal_manager() const { return wal_mgr_; }
+
+    void CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id);
 
 private:
     void CleanupTxn(NewTxn *txn, bool commit);
@@ -132,6 +134,7 @@ private:
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> current_ts_{}; // The next txn ts
+    TxnTimeStamp current_commit_ts_{};
     Atomic<TxnTimeStamp> max_committed_ts_{};
     Atomic<TxnTimeStamp> ckp_begin_ts_ =
         UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer

@@ -41,7 +41,8 @@ import new_catalog;
 namespace infinity {
 
 NewTxnManager::NewTxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, KVStore *kv_store, TxnTimeStamp start_ts)
-    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), kv_store_(kv_store), current_ts_(start_ts), max_committed_ts_(start_ts), is_running_(false) {
+    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), kv_store_(kv_store), current_ts_(start_ts), current_commit_ts_(start_ts),
+      max_committed_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxnManager");
 #endif
@@ -155,8 +156,8 @@ TxnTimeStamp NewTxnManager::GetReadCommitTS(NewTxn *txn) {
 // Prepare to commit WriteTxn
 TxnTimeStamp NewTxnManager::GetWriteCommitTS(NewTxn *txn) {
     std::lock_guard guard(locker_);
-    current_ts_ += 2;
-    TxnTimeStamp commit_ts = current_ts_;
+    current_commit_ts_ += 2;
+    TxnTimeStamp commit_ts = current_commit_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     committing_txns_.emplace(commit_ts, txn);
     txn->SetTxnWrite();
@@ -165,8 +166,8 @@ TxnTimeStamp NewTxnManager::GetWriteCommitTS(NewTxn *txn) {
 
 TxnTimeStamp NewTxnManager::GetReplayWriteCommitTS(NewTxn *txn) {
     std::lock_guard guard(locker_);
-    current_ts_ += 2;
-    TxnTimeStamp commit_ts = current_ts_;
+    current_commit_ts_ += 2;
+    TxnTimeStamp commit_ts = current_commit_ts_;
     committing_txns_.emplace(commit_ts, txn);
     txn->SetTxnWrite();
     return commit_ts;
@@ -240,6 +241,7 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
         wait_conflict_ck_.at(commit_ts) = txn;
     } else {
         wait_conflict_ck_.erase(commit_ts); // rollback
+        current_ts_ = std::max(current_ts_.load(), commit_ts);
     }
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
         Vector<NewTxn *> txn_array;
@@ -281,8 +283,11 @@ void NewTxnManager::Stop() {
 
 bool NewTxnManager::Stopped() { return !is_running_.load(); }
 
-Status NewTxnManager::CommitTxn(NewTxn *txn) {
+Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
     Status status = txn->Commit();
+    if (commit_ts_ptr) {
+        *commit_ts_ptr = txn->CommitTS();
+    }
     if (status.ok()) {
         if (txn->GetTxnType() == TransactionType::kCheckpoint) {
             std::lock_guard guard(locker_);
@@ -382,6 +387,14 @@ TxnTimeStamp NewTxnManager::GetCleanupScanTS() {
 
     LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", least_ts, last_checkpoint_ts));
     return least_ts;
+}
+
+void NewTxnManager::CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id) {
+    std::lock_guard guard(locker_);
+    if (current_ts_ >= commit_ts || commit_ts > current_commit_ts_) {
+        UnrecoverableError(fmt::format("Commit ts error: {}, {}, {}", current_ts_, commit_ts, current_commit_ts_));
+    }
+    current_ts_ = std::max(current_ts_.load(), commit_ts);
 }
 
 void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {

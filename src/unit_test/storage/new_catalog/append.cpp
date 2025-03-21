@@ -110,6 +110,8 @@ TEST_P(TestAppend, test_append0) {
     append();
     append();
 
+    new_txn_mgr->PrintAllKeyValue();
+
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 

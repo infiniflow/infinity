@@ -878,23 +878,29 @@ Status NewTxn::Commit() {
             return status;
         }
         this->CommitBottom();
-    } else {
-        Status status = this->PrepareCommit();
-        if (!status.ok()) {
-            PostRollback(commit_ts);
-            wal_entry_ = nullptr;
-            txn_mgr_->SendToWAL(this);
-            return status;
-        }
-
-        // Put wal entry to the manager in the same order as commit_ts.
-        wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
-        txn_mgr_->SendToWAL(this);
-
-        // Wait until CommitTxnBottom is done.
-        std::unique_lock<std::mutex> lk(commit_lock_);
-        commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
+        PostCommit();
+        return Status::OK();
     }
+
+    Status status = this->PrepareCommit();
+    if (!status.ok()) {
+        PostRollback(commit_ts);
+        wal_entry_ = nullptr;
+        txn_mgr_->SendToWAL(this);
+        return status;
+    }
+    status = kv_instance_->Commit();
+    if (!status.ok()) {
+        UnrecoverableError("KV instance commit failed");
+    }
+
+    // Put wal entry to the manager in the same order as commit_ts.
+    wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
+    txn_mgr_->SendToWAL(this);
+
+    // Wait until CommitTxnBottom is done.
+    std::unique_lock<std::mutex> lk(commit_lock_);
+    commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
     PostCommit();
 
@@ -1418,6 +1424,13 @@ Optional<String> NewTxn::CheckConflict(NewTxn *other_txn) {
 }
 
 void NewTxn::CommitBottom() {
+    // update txn manager ts to commit_ts
+    // erase txn_id from not_committed_txns_
+
+    TransactionID txn_id = this->TxnID();
+    TxnTimeStamp commit_ts = this->CommitTS();
+    txn_mgr_->CommitBottom(commit_ts, txn_id);
+
     LOG_TRACE(fmt::format("NewTxn bottom: {} is started.", txn_context_ptr_->txn_id_));
     // prepare to commit txn local data into table
     //    TxnTimeStamp commit_ts = this->CommitTS();
@@ -1439,10 +1452,10 @@ void NewTxn::CommitBottom() {
     //        }
     //    }
 
-    Status status = kv_instance_->Commit();
-    if (!status.ok()) {
-        UnrecoverableError("KV instance commit failed");
-    }
+    // Status status = kv_instance_->Commit();
+    // if (!status.ok()) {
+    //     UnrecoverableError("KV instance commit failed");
+    // }
 
     //    txn_store_.PrepareCommit(txn_context_ptr_->txn_id_, commit_ts, buffer_mgr_);
     //
