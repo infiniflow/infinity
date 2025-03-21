@@ -391,6 +391,30 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
         return status;
     }
 
+    Vector<String> *index_id_strs_ptr = nullptr;
+    table_meta->GetIndexIDs(index_id_strs_ptr);
+
+    for (const String &index_id : *index_id_strs_ptr) {
+        TableIndexMeeta table_index_meta(index_id, *table_meta, table_meta->kv_instance());
+        auto [index_base, index_status] = table_index_meta.GetIndexBase();
+        if (!index_status.ok()) {
+            status = new_catalog_->MutateTable(table_key, txn_context_ptr_->txn_id_);
+            if (!status.ok()) {
+                UnrecoverableError(fmt::format("Can't mutable table: {}, cause: {}", table_name, status.message()));
+            }
+            return index_status;
+        }
+        for (const String &column_name : column_names) {
+            if (IsEqual(index_base->column_name(), column_name)) {
+                status = new_catalog_->MutateTable(table_key, txn_context_ptr_->txn_id_);
+                if (!status.ok()) {
+                    UnrecoverableError(fmt::format("Can't mutable table: {}, cause: {}", table_name, status.message()));
+                }
+                return Status::IndexOnColumn(column_name);
+            }
+        }
+    }
+
     SharedPtr<WalCmdDropColumns> wal_command = MakeShared<WalCmdDropColumns>(db_name, table_name, column_names);
     wal_command->table_key_ = table_key;
     wal_command->column_ids_ = std::move(column_ids);
@@ -611,6 +635,12 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     if (!status.ok()) {
         return status;
     }
+
+    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     String index_key;
     String index_id;
     status = table_meta->GetIndexID(index_name, index_key, index_id);
@@ -618,12 +648,45 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
         }
+        status = new_catalog_->DecreaseTableWriteCount(table_key);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
         return status;
     }
 
-    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    TableIndexMeeta table_index_meta(index_id, *table_meta, table_meta->kv_instance());
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        status = new_catalog_->DecreaseTableWriteCount(table_key);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
+        return index_status;
+    }
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+    std::tie(column_defs, status) = table_meta->GetColumnDefs();
     if (!status.ok()) {
         return status;
+    }
+
+    // Check if the column existence
+    for (const auto &column_name : index_base->column_names_) {
+        bool exist = false;
+        for (const auto &column_def : *column_defs) {
+            if (IsEqual(column_def->name(), column_name)) {
+                exist = true;
+                break;
+            }
+        }
+        if (!exist) {
+            status = new_catalog_->DecreaseTableWriteCount(table_key);
+            if (!status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
+            return Status::ColumnNotExist(column_name);
+        }
     }
 
     SharedPtr<WalCmdDropIndex> wal_command = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
