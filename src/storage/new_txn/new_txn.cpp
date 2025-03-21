@@ -561,7 +561,8 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -577,9 +578,15 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         return status;
     }
 
+    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     SharedPtr<WalCmdCreateIndex> wal_command = MakeShared<WalCmdCreateIndex>(db_name, table_name, index_base);
     wal_command->db_id_ = db_meta->db_id_str();
     wal_command->table_id_ = table_meta->table_id_str();
+    wal_command->table_key_ = std::move(table_key);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -599,7 +606,8 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -613,11 +621,17 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         return status;
     }
 
+    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     SharedPtr<WalCmdDropIndex> wal_command = MakeShared<WalCmdDropIndex>(db_name, table_name, index_name);
     wal_command->db_id_ = std::move(db_meta->db_id_str());
     wal_command->table_id_ = std::move(table_meta->table_id_str());
     wal_command->index_id_ = std::move(index_id);
     wal_command->index_key_ = std::move(index_key);
+    wal_command->table_key_ = std::move(table_key);
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
@@ -1512,6 +1526,22 @@ void NewTxn::PostCommit() {
                 }
                 break;
             }
+            case WalCommandType::CREATE_INDEX: {
+                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
+            case WalCommandType::DROP_INDEX: {
+                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
             case WalCommandType::ADD_COLUMNS: {
                 auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
                 Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
@@ -1581,6 +1611,22 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             case WalCommandType::RENAME_TABLE: {
                 auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(cmd->old_table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
+            case WalCommandType::CREATE_INDEX: {
+                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
+                break;
+            }
+            case WalCommandType::DROP_INDEX: {
+                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table");
                 }

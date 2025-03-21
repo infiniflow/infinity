@@ -264,6 +264,8 @@ export struct WalCmdDropTable final : public WalCmd {
 
     String db_name_{};
     String table_name_{};
+
+    // Used in commit phase
     String db_id_{};
     String table_id_{};
     String table_key_{};
@@ -290,8 +292,11 @@ export struct WalCmdCreateIndex final : public WalCmd {
     String table_name_{};
     String index_dir_tail_{};
     SharedPtr<IndexBase> index_base_{};
+
+    // Used in commit phase
     String db_id_{};
     String table_id_{};
+    String table_key_{};
 };
 
 export struct WalCmdDropIndex final : public WalCmd {
@@ -308,10 +313,13 @@ export struct WalCmdDropIndex final : public WalCmd {
     String db_name_{};
     String table_name_{};
     String index_name_{};
+
+    // Used in commit phase
     String db_id_{};
     String table_id_{};
     String index_id_{};
     String index_key_{};
+    String table_key_{};
 };
 
 export struct WalCmdImport final : public WalCmd {
@@ -329,6 +337,7 @@ export struct WalCmdImport final : public WalCmd {
     String table_name_{};
     WalSegmentInfo segment_info_;
 
+    // Used in commit phase
     String db_id_str_{};
     String table_id_str_{};
     String table_key_{};
@@ -349,6 +358,7 @@ export struct WalCmdAppend final : public WalCmd {
     String table_name_{};
     SharedPtr<DataBlock> block_{};
 
+    // Used in commit phase
     String db_id_str_{};
     String table_id_str_{};
     String table_key_{};
@@ -369,6 +379,7 @@ export struct WalCmdDelete final : public WalCmd {
     String table_name_{};
     Vector<RowID> row_ids_{};
 
+    // Used in commit phase
     String db_id_str_{};
     String table_id_str_{};
 };
@@ -462,6 +473,7 @@ export struct WalCmdCompact final : public WalCmd {
     Vector<WalSegmentInfo> new_segment_infos_{};
     const Vector<SegmentID> deprecated_segment_ids_{};
 
+    // Used in commit phase
     String db_id_str_;
     String table_id_str_;
 };
@@ -530,6 +542,8 @@ export struct WalCmdRenameTable : public WalCmd {
     String db_name_{};
     String table_name_{};
     String new_table_name_{};
+
+    // Used in commit phase
     String old_db_id_{};
     String old_table_id_{};
     String old_table_key_{};
@@ -568,6 +582,7 @@ export struct WalCmdDropColumns : public WalCmd {
     String table_key_{};
     Vector<String> column_names_{};
 
+    // Used in commit phase
     Vector<ColumnID> column_ids_{};
 };
 
