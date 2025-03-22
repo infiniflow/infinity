@@ -23,7 +23,6 @@ import status;
 import internal_types;
 import index_base;
 import extra_ddl_info;
-import wal_entry;
 
 namespace infinity {
 
@@ -43,6 +42,7 @@ class TxnManager;
 enum class CompactStatementType;
 class CatalogDeltaEntry;
 class BufferManager;
+struct WalSegmentInfo;
 
 export struct TxnSegmentStore {
 public:

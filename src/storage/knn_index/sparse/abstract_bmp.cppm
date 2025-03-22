@@ -40,6 +40,8 @@ class BufferManager;
 struct ChunkIndexEntry;
 struct SegmentIndexEntry;
 struct BlockColumnEntry;
+class ColumnVector;
+class BufferObj;
 
 export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
                                         BMPAlg<f32, i32, BMPCompressType::kRaw> *,
@@ -147,9 +149,15 @@ public:
 
     ~BMPIndexInMem();
 
+    RowID GetBeginRowID() const { return begin_row_id_; }
+
     SizeT GetRowCount() const;
 
+    SizeT GetSizeInBytes() const;
+
     void AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count);
+
+    void AddDocs(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count);
 
     void AddDocs(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts);
 
@@ -158,6 +166,8 @@ public:
     AbstractBMP &get_ref() { return bmp_; }
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
+
+    void Dump(BufferObj *buffer_obj, SizeT *dump_size = nullptr);
 
 private:
     RowID begin_row_id_ = {};

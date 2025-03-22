@@ -31,7 +31,6 @@ import value;
 import cleanup_scanner;
 import logger;
 import roaring_bitmap;
-import wal_entry;
 import column_def;
 import constant_expr;
 import snapshot_info;
@@ -45,6 +44,7 @@ struct TxnSegmentStore;
 struct TableEntry;
 class CompactStateData;
 class BlockEntryIter;
+struct WalSegmentInfo;
 
 export struct BlocksGuard {
     const Vector<SharedPtr<BlockEntry>> &block_entries_;

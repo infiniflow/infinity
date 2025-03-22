@@ -19,11 +19,12 @@ import admin_statement;
 import query_context;
 import query_result;
 import stl;
-import wal_entry;
 import catalog;
 import status;
 
 namespace infinity {
+
+struct WalEntry;
 
 export class AdminExecutor {
 public:

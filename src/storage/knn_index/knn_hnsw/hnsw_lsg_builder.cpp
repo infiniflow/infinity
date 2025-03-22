@@ -249,8 +249,8 @@ UniquePtr<IVFIndexInChunk> HnswLSGBuilder::MakeIVFIndex() {
         parameters.push_back(new InitParameter("metric", std::move(metric)));
     }
     // {
-    //     String sample_raito_ = std::to_string(lsg_config_.sample_raito_);
-    //     parameters.push_back(new InitParameter("centroids_num_ratio", std::move(sample_raito_)));
+    //     String sample_ratio_ = std::to_string(lsg_config_.sample_ratio_);
+    //     parameters.push_back(new InitParameter("centroids_num_ratio", std::move(sample_ratio_)));
     // }
     parameters.push_back(new InitParameter("storage_type", "plain"));
     {
@@ -291,7 +291,7 @@ UniquePtr<float[]> HnswLSGBuilder::GetAvgByIVF(Iter iter, SizeT row_count) {
     const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
 
     IterIVFDataAccessor iter_accessor;
-    SampleIter<Iter> sample_iter(iter, lsg_config.sample_raito_);
+    SampleIter<Iter> sample_iter(iter, lsg_config.sample_ratio_);
     iter_accessor.InitEmbedding(std::move(sample_iter));
     SizeT sample_count = iter_accessor.size();
     RowID base_row_id(0, 0);
@@ -328,8 +328,8 @@ UniquePtr<float[]> HnswLSGBuilder::GetAvgBF(Iter iter, SizeT row_count) {
     SizeT dim = embedding_info->Dimension();
     const LSGConfig &lsg_config = *index_hnsw_->lsg_config_;
 
-    SampleIter<Iter> sample_iter(iter, lsg_config.sample_raito_);
-    SizeT sample_count = row_count * lsg_config.sample_raito_;
+    SampleIter<Iter> sample_iter(iter, lsg_config.sample_ratio_);
+    SizeT sample_count = row_count * lsg_config.sample_ratio_;
     auto sample_data = MakeUnique<DataType[]>(sample_count * dim);
     {
         SizeT i;

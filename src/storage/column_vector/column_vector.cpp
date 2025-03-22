@@ -54,36 +54,9 @@ import block_column_entry;
 
 namespace infinity {
 
-VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
-    if (initialized) {
-        String error_message = "Column vector is already initialized.";
-        UnrecoverableError(error_message);
-    }
-    initialized = true;
-    if (data_type_->type() == LogicalType::kInvalid) {
-        String error_message = "Attempt to initialize column vector to invalid type.";
-        UnrecoverableError(error_message);
-    }
-    if (vector_type == ColumnVectorType::kInvalid) {
-        String error_message = "Attempt to initialize column vector to invalid type.";
-        UnrecoverableError(error_message);
-    }
-
-    // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
-    // if ColumnVectorType::kFlat is used, change it to ColumnVectorType::kCompactBit
-    if (data_type_->type() == LogicalType::kBoolean && vector_type == ColumnVectorType::kFlat) {
-        vector_type = ColumnVectorType::kCompactBit;
-    }
-
-    // TODO: No check on capacity value.
-
-    vector_type_ = vector_type;
-    capacity_ = capacity;
-
-    tail_index_ = 0;
-    data_type_size_ = data_type_->Size();
+VectorBufferType ColumnVector::GetVectorBufferType(const DataType &data_type) {
     VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
-    switch (data_type_->type()) {
+    switch (data_type.type()) {
             //        case LogicalType::kBlob:
             //        case LogicalType::kBitmap:
             //        case LogicalType::kPolygon:
@@ -112,6 +85,37 @@ VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, Si
         }
     }
     return vector_buffer_type;
+}
+
+VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
+    if (initialized) {
+        String error_message = "Column vector is already initialized.";
+        UnrecoverableError(error_message);
+    }
+    initialized = true;
+    if (data_type_->type() == LogicalType::kInvalid) {
+        String error_message = "Attempt to initialize column vector to invalid type.";
+        UnrecoverableError(error_message);
+    }
+    if (vector_type == ColumnVectorType::kInvalid) {
+        String error_message = "Attempt to initialize column vector to invalid type.";
+        UnrecoverableError(error_message);
+    }
+
+    // require BooleanT vector to be initialized with ColumnVectorType::kConstant or ColumnVectorType::kCompactBit
+    // if ColumnVectorType::kFlat is used, change it to ColumnVectorType::kCompactBit
+    if (data_type_->type() == LogicalType::kBoolean && vector_type == ColumnVectorType::kFlat) {
+        vector_type = ColumnVectorType::kCompactBit;
+    }
+
+    // TODO: No check on capacity value.
+
+    vector_type_ = vector_type;
+    capacity_ = capacity;
+
+    tail_index_ = 0;
+    data_type_size_ = data_type_->Size();
+    return GetVectorBufferType(*data_type_);
 }
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
@@ -164,6 +168,62 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr,
     }
     tail_index_ = current_row_count;
 }
+
+void ColumnVector::Initialize(BufferObj *buffer_obj,
+                              BufferObj *outline_buffer_obj,
+                              SizeT current_row_count,
+                              ColumnVectorTipe vector_tipe,
+                              ColumnVectorType vector_type,
+                              SizeT capacity) {
+    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
+
+    if (buffer_.get() != nullptr) {
+        String error_message = "Column vector is already initialized.";
+        UnrecoverableError(error_message);
+    }
+
+    if (vector_type_ == ColumnVectorType::kConstant) {
+        buffer_ = VectorBuffer::Make(buffer_obj, outline_buffer_obj, data_type_size_, 1, vector_buffer_type);
+        nulls_ptr_ = Bitmask::MakeSharedAllTrue(1);
+    } else {
+        buffer_ = VectorBuffer::Make(buffer_obj, outline_buffer_obj, data_type_size_, capacity_, vector_buffer_type);
+        nulls_ptr_ = Bitmask::MakeSharedAllTrue(capacity_);
+    }
+    switch (vector_tipe) {
+        case ColumnVectorTipe::kReadWrite: {
+            data_ptr_ = buffer_->GetDataMut();
+            break;
+        }
+        case ColumnVectorTipe::kReadOnly: {
+            data_ptr_ = const_cast<ptr_t>(buffer_->GetData());
+            break;
+        }
+    }
+    tail_index_ = current_row_count;
+}
+
+void ColumnVector::SetToCatalog(BufferObj *buffer_obj, BufferObj *outline_buffer_obj, ColumnVectorTipe vector_tipe) {
+    if (buffer_.get() == nullptr) {
+        UnrecoverableError("Column vector is not initialized.");
+    }
+
+    if (vector_type_ == ColumnVectorType::kConstant) {
+        UnrecoverableError("Constant column vector cannot be set to catalog.");
+    } else {
+        buffer_->SetToCatalog(buffer_obj, outline_buffer_obj);
+    }
+    switch (vector_tipe) {
+        case ColumnVectorTipe::kReadWrite: {
+            data_ptr_ = buffer_->GetDataMut();
+            break;
+        }
+        case ColumnVectorTipe::kReadOnly: {
+            data_ptr_ = const_cast<ptr_t>(buffer_->GetData());
+            break;
+        }
+    }
+}
+
 
 void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_select) {
     ColumnVectorType vector_type = other.vector_type_;

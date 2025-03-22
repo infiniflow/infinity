@@ -26,6 +26,10 @@ import virtual_store;
 import logger;
 import global_resource_usage;
 
+import kv_store;
+import kv_code;
+import infinity_context;
+
 namespace fs = std::filesystem;
 
 namespace infinity {
@@ -43,6 +47,11 @@ void ObjAddr::Deserialize(const nlohmann::json &obj) {
     obj_key_ = obj["obj_key"];
     part_offset_ = obj["part_offset"];
     part_size_ = obj["part_size"];
+}
+
+void ObjAddr::Deserialize(const String &str) {
+    nlohmann::json obj = nlohmann::json::parse(str);
+    Deserialize(obj);
 }
 
 SizeT ObjAddr::GetSizeInBytes() const { return sizeof(int32_t) + obj_key_.size() + sizeof(SizeT) + sizeof(SizeT); }
@@ -135,6 +144,8 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         }
         std::lock_guard<std::mutex> lock(mtx_);
         local_path_obj_[local_path] = obj_addr;
+        AddObjAddrToKVStore(file_path, obj_addr);
+
         result.persist_keys_.push_back(ObjAddr::KeyEmpty);
         result.obj_addr_ = obj_addr;
         return result;
@@ -153,6 +164,8 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         LOG_TRACE(fmt::format("Persist added dedicated object {}", obj_key));
 
         local_path_obj_[local_path] = obj_addr;
+        AddObjAddrToKVStore(file_path, obj_addr);
+
         LOG_TRACE(fmt::format("Persist local path {} to dedicated ObjAddr ({}, {}, {})",
                               local_path,
                               obj_addr.obj_key_,
@@ -176,6 +189,8 @@ PersistWriteResult PersistenceManager::Persist(const String &file_path, const St
         }
 
         local_path_obj_[local_path] = obj_addr;
+        AddObjAddrToKVStore(file_path, obj_addr);
+
         LOG_TRACE(fmt::format("Persist local path {} to composed ObjAddr ({}, {}, {})",
                               local_path,
                               obj_addr.obj_key_,
@@ -504,6 +519,8 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
         objects_->Invalidate(object_addr.obj_key_);
         LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
     }
+
+    objects_->PutNoCount(object_addr.obj_key_, *obj_stat);
 }
 
 ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
@@ -544,6 +561,19 @@ void PersistenceManager::SaveLocalPath(const String &file_path, const ObjAddr &o
 void PersistenceManager::SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat) {
     std::lock_guard<std::mutex> lock(mtx_);
     objects_->PutNoCount(obj_addr.obj_key_, obj_stat);
+}
+
+void PersistenceManager::AddObjAddrToKVStore(const String &path, const ObjAddr &obj_addr) {
+    KVStore *kv_store = InfinityContext::instance().storage()->kv_store();
+    if (!kv_store) {
+        return;
+    }
+    String key = KeyEncode::PMObjectKey(RemovePrefix(path));
+    String value = obj_addr.Serialize().dump();
+    Status status = kv_store->Put(key, value);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
 }
 
 String PersistenceManager::RemovePrefix(const String &path) {
@@ -610,6 +640,24 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
         obj_addr.Deserialize(json_pair["obj_addr"]);
         local_path_obj_.emplace(path, obj_addr);
         LOG_TRACE(fmt::format("Deserialize added local path {}", path));
+    }
+}
+
+void PersistenceManager::Deserialize(KVInstance *kv_instance) {
+    objects_->Deserialize(kv_instance);
+
+    const String &obj_prefix = KeyEncode::PMObjectPrefix();
+    SizeT obj_prefix_len = obj_prefix.size();
+
+    auto iter = kv_instance->GetIterator();
+    iter->Seek(obj_prefix);
+    while (iter->Valid() && iter->Key().starts_with(obj_prefix)) {
+        String path = iter->Key().ToString().substr(obj_prefix_len);
+        ObjAddr obj_addr;
+        obj_addr.Deserialize(iter->Value().ToString());
+        local_path_obj_.emplace(path, obj_addr);
+        LOG_TRACE(fmt::format("Deserialize added local path {}", path));
+        iter->Next();
     }
 }
 

@@ -481,7 +481,8 @@ Bitmask IndexFilterEvaluatorFulltext::Evaluate(const SegmentID segment_id, const
     result.SetAllFalse();
     const RowID begin_rowid(segment_id, 0);
     const RowID end_rowid(segment_id, segment_row_count);
-    const CreateSearchParams params{table_info_, index_reader_.get(), early_term_algo_, ft_similarity_, bm25_params_, minimum_should_match_, 0u, index_names_};
+    const CreateSearchParams
+        params{table_info_, index_reader_.get(), early_term_algo_, ft_similarity_, bm25_params_, minimum_should_match_, 0u, index_names_};
     auto ft_iter = query_tree_->CreateSearch(params);
     if (ft_iter && score_threshold_ > 0.0f) {
         auto new_ft_iter = MakeUnique<ScoreThresholdIterator>(std::move(ft_iter), score_threshold_);
@@ -610,13 +611,22 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType> {
     using KeyType = typename TrunkReader<ColumnValueType>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
     SharedPtr<ChunkIndexEntry> chunk_index_entry_;
+    const SecondaryIndexData *index_ = nullptr;
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
     TrunkReaderT(const u32 segment_row_count, const SharedPtr<ChunkIndexEntry> &chunk_index_entry)
         : segment_row_count_(segment_row_count), chunk_index_entry_(chunk_index_entry) {}
+    TrunkReaderT(const u32 segment_row_count, const SecondaryIndexData *index)
+        : segment_row_count_(segment_row_count), index_(index) {}
     u32 GetResultCnt(const Pair<KeyType, KeyType> interval_range) override {
-        const BufferHandle index_handle = chunk_index_entry_->GetIndex();
-        const auto index = static_cast<const SecondaryIndexData *>(index_handle.GetData());
+        Optional<BufferHandle> index_handle;
+        const SecondaryIndexData *index = nullptr;
+        if (chunk_index_entry_) {
+            index_handle = chunk_index_entry_->GetIndex();
+            index = static_cast<const SecondaryIndexData *>(index_handle->GetData());
+        } else {
+            index = index_;
+        }
         const u32 index_data_num = index->GetChunkRowCount();
         const auto [begin_val, end_val] = interval_range;
         // 1. search PGM and get approximate search range
