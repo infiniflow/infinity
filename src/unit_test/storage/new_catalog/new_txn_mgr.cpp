@@ -132,4 +132,43 @@ TEST_F(NewTxnManagerTest, test_ts) {
 
     EXPECT_GE(begin_tss[4], commit_tss[3]);
     EXPECT_LT(begin_tss[4], commit_tss[4]);
+
+    EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
+}
+
+TEST_F(NewTxnManagerTest, test_parallel_ts) {
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+
+    SizeT thread_num = 4;
+    SizeT loop_num = 128;
+    Vector<std::thread> worker_threads;
+
+    for (SizeT thread_i = 0; thread_i < thread_num; ++thread_i) {
+        worker_threads.push_back(std::thread([&, thread_i] {
+            std::cout << "Thread " << thread_i << " start" << std::endl;
+            for (SizeT loop_i = 0; loop_i < loop_num; ++loop_i) {
+                Status status;
+                {
+                    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+                    status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+                    if (status.ok()) {
+                        status = new_txn_mgr->CommitTxn(txn);
+                    }
+                }
+                {
+                    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop"), TransactionType::kNormal);
+                    status = txn->DropDatabase(*db_name, ConflictType::kError);
+                    if (status.ok()) {
+                        status = new_txn_mgr->CommitTxn(txn);
+                    }
+                }
+            }
+        }));
+    }
+    for (SizeT thread_i = 0; thread_i < thread_num; ++thread_i) {
+        worker_threads[thread_i].join();
+    }
+
+    EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
 }

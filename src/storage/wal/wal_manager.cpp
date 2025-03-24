@@ -446,6 +446,11 @@ void WalManager::NewFlush() {
             }
 
             WalEntry *entry = txn->GetWALEntry();
+            if (entry == nullptr) {
+                // rollback txn
+                // need calls CommitBottom to update NewTxnManager::current_ts_ to NewTxnManager::prepare_commit_ts_
+                continue;
+            }
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
 
             if (entry->cmds_.empty()) {

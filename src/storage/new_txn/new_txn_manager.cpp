@@ -224,7 +224,6 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
     }
 
     TxnTimeStamp commit_ts = txn->CommitTS();
-    WalEntry *wal_entry = txn->GetWALEntry();
 
     std::lock_guard guard(locker_);
     if (wait_conflict_ck_.empty()) {
@@ -237,12 +236,7 @@ void NewTxnManager::SendToWAL(NewTxn *txn) {
                                            txn->CommitTS());
         UnrecoverableError(error_message);
     }
-    if (wal_entry) {
-        wait_conflict_ck_.at(commit_ts) = txn;
-    } else {
-        wait_conflict_ck_.erase(commit_ts); // rollback
-        current_ts_ = std::max(current_ts_.load(), commit_ts);
-    }
+    wait_conflict_ck_.at(commit_ts) = txn;
     if (!wait_conflict_ck_.empty() && wait_conflict_ck_.begin()->second != nullptr) {
         Vector<NewTxn *> txn_array;
         do {
@@ -355,8 +349,6 @@ Vector<SharedPtr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
     return txn_context_histories;
 }
 
-TxnTimeStamp NewTxnManager::CurrentTS() const { return current_ts_; }
-
 TxnTimeStamp NewTxnManager::GetNewTimeStamp() { return current_ts_ + 1; }
 
 TxnTimeStamp NewTxnManager::GetCleanupScanTS() {
@@ -391,10 +383,10 @@ TxnTimeStamp NewTxnManager::GetCleanupScanTS() {
 
 void NewTxnManager::CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id) {
     std::lock_guard guard(locker_);
-    if (commit_ts > prepare_commit_ts_) {
+    if (current_ts_ > commit_ts || commit_ts > prepare_commit_ts_) {
         UnrecoverableError(fmt::format("Commit ts error: {}, {}, {}", current_ts_, commit_ts, prepare_commit_ts_));
     }
-    current_ts_ = std::max(current_ts_.load(), commit_ts);
+    current_ts_ = commit_ts;
 }
 
 void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {

@@ -80,7 +80,9 @@ public:
 
     Vector<SharedPtr<TxnContext>> GetTxnContextHistories() const;
 
-    TxnTimeStamp CurrentTS() const;
+    TxnTimeStamp CurrentTS() const { return current_ts_; }
+
+    TxnTimeStamp PrepareCommitTS() const { return prepare_commit_ts_; }
 
     TxnTimeStamp GetNewTimeStamp();
 
