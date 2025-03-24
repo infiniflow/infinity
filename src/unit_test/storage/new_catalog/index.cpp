@@ -3423,3 +3423,1273 @@ TEST_P(TestIndex, drop_index_and_drop_index) {
 
     new_txn_mgr->PrintAllKeyValue();
 }
+
+TEST_P(TestIndex, drop_index_add_column) {
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    {
+        // add column and drop index
+        //  t1            add column   commit (success)
+        //  |--------------|---------------|
+        //                                     |------------------|------------------|
+        //                                    t2                drop index          commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
+        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // add column and drop index
+        //  t1            add column   commit (success)
+        //  |--------------|---------------|
+        //                        |------------------|------------------|
+        //                       t2                drop index      commit (success)
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
+        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // add column and drop index
+        //  t1            add column   commit (success)
+        //  |--------------|---------------|
+        //                        |------|------------------|
+        //                       t2    drop index (fail)   rollback
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
+        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // add column and drop index
+        //  t1            add column             commit (success)
+        //  |--------------|----------------------------|
+        //       |-----------|------------------|
+        //       t2       drop index (fail)   rollback
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
+        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // add column and drop index
+        //  t1               add column (fail)            rollback
+        //  |-------------------|----------------------------|
+        //       |-----------|------------------|
+        //       t2      drop index          commit (success)
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
+        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // add column and drop index
+        //  t1                                add column             commit (fail)
+        //  |-------------------------------------|----------------------------|
+        //       |-----------|------------------|
+        //       t2       drop index          commit (success)
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        auto column_def3 = std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>());
+        auto column_def4 = std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>());
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    new_txn_mgr->PrintAllKeyValue();
+}
+
+TEST_P(TestIndex, drop_index_drop_column) {
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    {
+        // drop index and drop column
+        //  t1            drop index   commit (success)
+        //  |--------------|---------------|
+        //                                     |------------------|------------------|
+        //                                    t2                drop column          commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // drop columns
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        Vector<String> column_names;
+        column_names.push_back(column_def1->name());
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and drop column
+        //  t1            drop index   commit (success)
+        //  |--------------|---------------|
+        //                          |------------------|------------------|
+        //                         t2                drop column          commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        // drop columns
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        Vector<String> column_names;
+        column_names.push_back(column_def1->name());
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and drop column
+        //  t1                       drop index   commit (success)
+        //  |----------------------------|---------------|
+        //         |--------------------------|---------------------|
+        //        t2                        drop column (fail)     rollback
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        // drop columns
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        Vector<String> column_names;
+        column_names.push_back(column_def1->name());
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and drop column
+        //  t1                       drop index               commit (success)
+        //  |----------------------------|-----------------------------|
+        //         |--------------------------|---------------------|
+        //        t2                        drop column (fail)     rollback
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        // drop columns
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        Vector<String> column_names;
+        column_names.push_back(column_def1->name());
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and drop column
+        //  t1                                 drop index                     commit
+        //  |---------------------------------------|-----------------------------|
+        //         |--------------------------|---------------------|
+        //        t2                        drop column (fail)    commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        // drop columns
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        Vector<String> column_names;
+        column_names.push_back(column_def1->name());
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_FALSE(status.ok());
+
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and drop column
+        //                    t1                                 drop index                      commit
+        //                     |---------------------------------------|-----------------------------|
+        //         |--------------------------|---------------------|
+        //        t2                        drop column       commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop columns
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        Vector<String> column_names;
+        column_names.push_back(column_def1->name());
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    new_txn_mgr->PrintAllKeyValue();
+}
+
+TEST_P(TestIndex, drop_index_and_rename_table) {
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto new_table_name = std::make_shared<std::string>("tb2");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    {
+        // drop index and rename table
+        //  t1            drop index   commit (success)
+        //  |--------------|---------------|
+        //                                     |------------------|------------------|
+        //                                    t2                rename          commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // rename
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
+        status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *new_table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and rename table
+        //  t1            drop index   commit (success)
+        //  |--------------|---------------|
+        //                           |------------------|------------------|
+        //                          t2                rename          commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        // rename
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *new_table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and rename table
+        //  t1            drop index   commit (success)
+        //  |--------------|---------------|
+        //               |---------------------|------------------|
+        //              t2                 rename          commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        // rename
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
+
+        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *new_table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and rename table
+        //  t1            drop index   commit (success)
+        //  |--------------|---------------|
+        //               |---------------|------------------|
+        //              t2              rename          commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        // rename
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
+
+        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *new_table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and rename table
+        //  t1                 drop index   commit (success)
+        //  |--------------------|---------------|
+        //      |-------------|----------------------|
+        //      t2            rename              commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        // rename
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
+        status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *new_table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and rename table
+        //  t1                 drop index        commit (success)
+        //  |--------------------|-----------------------|
+        //      |-------------|----------------------|
+        //      t2            rename              commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        // rename
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
+        status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *new_table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and rename table
+        //            t1                 drop index        commit (success)
+        //             |--------------------|-----------------------|
+        //      |-------------|----------------------|
+        //      t2            rename              commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // rename
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *new_table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        // drop index and rename table
+        //                                t1                 drop index        commit (success)
+        //                                |--------------------|-----------------------|
+        //      |-------------|----------------------|
+        //      t2            rename              commit
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        // create table
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // create index idx1
+        auto index_name1 = std::make_shared<String>("idx1");
+        auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+        status = txn3->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // rename
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
+        status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
+        EXPECT_TRUE(status.ok());
+
+        // drop index
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // drop table
+        auto *txn8 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+        status = txn8->DropTable(*db_name, *new_table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn8);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn7->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    new_txn_mgr->PrintAllKeyValue();
+}
