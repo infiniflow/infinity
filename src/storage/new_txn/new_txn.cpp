@@ -648,8 +648,8 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
         }
-        status = new_catalog_->DecreaseTableWriteCount(table_key);
-        if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(table_key);
+        if (!ref_cnt_status.ok()) {
             UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
         }
         return status;
