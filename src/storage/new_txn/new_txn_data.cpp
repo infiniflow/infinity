@@ -169,23 +169,26 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     }
     TableMeeta &table_meta = *table_meta_opt;
 
-    SegmentID segment_id = 0;
-    status = table_meta.GetNextSegmentID(segment_id);
-    if (!status.ok()) {
-        return status;
-    }
-    status = table_meta.SetNextSegmentID(segment_id + 1);
-    if (!status.ok()) {
-        return status;
-    }
+    // SegmentID segment_id = 0;
+    // status = table_meta.GetNextSegmentID(segment_id);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    // status = table_meta.SetNextSegmentID(segment_id + 1);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     Optional<SegmentMeta> segment_meta;
-    status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
+    // status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
+    status = NewCatalog::AddNewSegment1(table_meta, fake_commit_ts, segment_meta);
     if (!status.ok()) {
         return status;
     }
 
-    // SizeT segment_row_cnt = 0;
+    SizeT segment_row_cnt = 0;
+    Vector<SizeT> block_row_cnts;
     for (SizeT j = 0; j < input_blocks.size(); ++j) {
         const SharedPtr<DataBlock> &input_block = input_blocks[j];
         if (!input_block->Finalized()) {
@@ -193,19 +196,20 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         }
         u32 row_cnt = input_block->row_count();
 
-        BlockID block_id = 0;
-        {
-            std::tie(block_id, status) = segment_meta->GetNextBlockID();
-            if (!status.ok()) {
-                return status;
-            }
-            status = segment_meta->SetNextBlockID(block_id + 1);
-            if (!status.ok()) {
-                return status;
-            }
-        }
+        // BlockID block_id = 0;
+        // {
+        //     std::tie(block_id, status) = segment_meta->GetNextBlockID();
+        //     if (!status.ok()) {
+        //         return status;
+        //     }
+        //     status = segment_meta->SetNextBlockID(block_id + 1);
+        //     if (!status.ok()) {
+        //         return status;
+        //     }
+        // }
         Optional<BlockMeta> block_meta;
-        status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
+        // status = NewCatalog::AddNewBlock(*segment_meta, block_id, block_meta);
+        status = NewCatalog::AddNewBlock1(*segment_meta, fake_commit_ts, block_meta);
         if (!status.ok()) {
             return status;
         }
@@ -260,7 +264,8 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         // if (!status.ok()) {
         //     return status;
         // }
-        // segment_row_cnt += row_cnt;
+        block_row_cnts.push_back(row_cnt);
+        segment_row_cnt += row_cnt;
     }
     // status = segment_meta->SetRowCnt(segment_row_cnt);
     // if (!status.ok()) {
@@ -269,6 +274,14 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
     { // Add import wal;
         auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta));
+        if (block_row_cnts.size() != import_command->segment_info_.block_infos_.size()) {
+            UnrecoverableError("Block row count mismatch");
+        }
+        for (SizeT i = 0; i < block_row_cnts.size(); ++i) {
+            import_command->segment_info_.block_infos_[i].row_count_ = block_row_cnts[i];
+        }
+        import_command->segment_info_.row_count_ = segment_row_cnt;
+
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(import_command));
         txn_context_ptr_->AddOperation(MakeShared<String>(import_command->ToString()));
         import_command->db_id_str_ = db_meta->db_id_str();
@@ -619,7 +632,7 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
         }
         BufferHandle buffer_handle = version_buffer->Load();
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
-        
+
         // auto [block_row_count, block_status] = block_meta.GetRowCnt();
         // auto [block_row_count, block_status] = block_meta.GetRowCnt1(begin_ts);
         auto [block_row_count, block_status] = block_version->GetRowCountForUpdate(begin_ts);
@@ -1069,6 +1082,9 @@ Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOptio
 }
 
 Status NewTxn::CommitImport(WalCmdImport *import_cmd) {
+    Status status;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
     const String &db_id_str = import_cmd->db_id_str_;
     const String &table_id_str = import_cmd->table_id_str_;
 
@@ -1092,7 +1108,19 @@ Status NewTxn::CommitImport(WalCmdImport *import_cmd) {
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get());
     SegmentMeta segment_meta(segment_info.segment_id_, table_meta, table_meta.kv_instance());
 
-    Status status = this->CommitSegmentVersion(segment_info, segment_meta);
+    status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
+        BlockID block_id = block_info.block_id_;
+        status = segment_meta.CommitBlock(block_id, commit_ts);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    status = this->CommitSegmentVersion(segment_info, segment_meta);
     if (!status.ok()) {
         return status;
     }
@@ -1445,7 +1473,7 @@ Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp ch
 }
 
 Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta) {
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    // BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
     auto *pm = InfinityContext::instance().persistence_manager();
 
@@ -1453,13 +1481,9 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         BlockMeta block_meta(block_info.block_id_, segment_meta, segment_meta.kv_instance());
         SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
 
-        BufferObj *version_buffer = nullptr;
-        {
-            String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
-            version_buffer = buffer_mgr->GetBufferObject(version_filepath);
-            if (version_buffer == nullptr) {
-                return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
-            }
+        auto [version_buffer, status] = block_meta.GetVersionBuffer();
+        if (!status.ok()) {
+            return status;
         }
         BufferHandle buffer_handle = version_buffer->Load();
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
@@ -1468,7 +1492,7 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
         version_buffer->Save(VersionFileWorkerSaveCtx(commit_ts));
 
         SharedPtr<BlockLock> block_lock;
-        Status status = block_meta.GetBlockLock(block_lock);
+        status = block_meta.GetBlockLock(block_lock);
         if (!status.ok()) {
             return status;
         }

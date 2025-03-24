@@ -272,6 +272,16 @@ Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
     return {block_id, Status::OK()};
 }
 
+Status SegmentMeta::CommitBlock(BlockID block_id, TxnTimeStamp commit_ts) {
+    String block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
+    String commit_ts_str = fmt::format("{}", commit_ts);
+    Status status = kv_instance_.Put(block_id_key, commit_ts_str);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
     String seg_dir_key = GetSegmentTag("dir");
     String seg_dir;

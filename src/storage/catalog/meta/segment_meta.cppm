@@ -54,6 +54,8 @@ public:
 
     Pair<BlockID, Status> AddBlockID1(TxnTimeStamp commit_ts);
 
+    Status CommitBlock(BlockID block_id, TxnTimeStamp commit_ts);
+
     Tuple<SharedPtr<String>, Status> GetSegmentDir();
     Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
 

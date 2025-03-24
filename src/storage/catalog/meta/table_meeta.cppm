@@ -86,6 +86,8 @@ public:
 
     Pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
 
+    Status CommitSegment(SegmentID segment_id, TxnTimeStamp commit_ts);
+
     Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
     SharedPtr<String> GetTableDir();
     Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs();
