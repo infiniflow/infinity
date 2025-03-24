@@ -391,7 +391,7 @@ TxnTimeStamp NewTxnManager::GetCleanupScanTS() {
 
 void NewTxnManager::CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id) {
     std::lock_guard guard(locker_);
-    if (current_ts_ >= commit_ts || commit_ts > current_commit_ts_) {
+    if (commit_ts > current_commit_ts_) {
         UnrecoverableError(fmt::format("Commit ts error: {}, {}, {}", current_ts_, commit_ts, current_commit_ts_));
     }
     current_ts_ = std::max(current_ts_.load(), commit_ts);

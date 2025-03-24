@@ -408,7 +408,7 @@ TEST_P(TestAppend, test_append2) {
     //    t1      append                 commit (success)
     //    |----------|-------------------------|
     //            |----------------------|----------|
-    //           t2                  append      commit (success)
+    //           t2                  append      commit (fail)
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 1"), TransactionType::kNormal);
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("concurrent append 2"), TransactionType::kNormal);
@@ -421,9 +421,9 @@ TEST_P(TestAppend, test_append2) {
         status1 = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status1.ok());
         status2 = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status2.ok());
+        EXPECT_FALSE(status2.ok());
     }
-    SizeT total_row_count = insert_row * 4;
+    SizeT total_row_count = insert_row * 3;
 
     // Check the appended data.
     {
@@ -435,7 +435,7 @@ TEST_P(TestAppend, test_append2) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(segment_ids->size(), 1);
         SegmentID segment_id = segment_ids->at(0);
@@ -443,7 +443,7 @@ TEST_P(TestAppend, test_append2) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         SharedPtr<Vector<BlockID>> block_ids;
-        std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+        std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
         EXPECT_TRUE(status.ok());
 
@@ -2932,21 +2932,17 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
             EXPECT_TRUE(seg_status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            SegmentID segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(block_ids->size(), 1);
-            BlockID block_id = block_ids->at(0);
-            EXPECT_EQ(block_id, 0);
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            EXPECT_EQ(*block_ids, Vector<BlockID>({0}));
+            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -2990,7 +2986,7 @@ TEST_P(TestAppend, test_append_append) {
     //    t1      append      commit (success)
     //    |----------|---------|
     //                    |----------------------|----------|
-    //                    t2                  append    commit (success)
+    //                    t2                  append    commit (fail)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -3018,7 +3014,7 @@ TEST_P(TestAppend, test_append_append) {
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         {
@@ -3030,21 +3026,17 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
             EXPECT_TRUE(seg_status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            SegmentID segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+            SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
 
             SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(block_ids->size(), 1);
-            BlockID block_id = block_ids->at(0);
-            EXPECT_EQ(block_id, 0);
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            EXPECT_EQ(*block_ids, Vector<BlockID>({0}));
+            BlockMeta block_meta((*block_ids)[0], segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3055,14 +3047,14 @@ TEST_P(TestAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 8192);
+            EXPECT_EQ(row_count, 4096);
         }
 
         // drop database
@@ -3088,7 +3080,7 @@ TEST_P(TestAppend, test_append_append) {
     //    t1      append                       commit (success)
     //    |----------|--------------------------------|
     //                    |-----------------------|-------------------------|
-    //                    t2                  append             commit (success)
+    //                    t2                  append             commit (fail)
     {
         SharedPtr<String> db_name = std::make_shared<String>("db1");
         auto table_name = std::make_shared<std::string>("tb1");
@@ -3116,7 +3108,7 @@ TEST_P(TestAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         {
@@ -3128,21 +3120,17 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
             EXPECT_TRUE(seg_status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            SegmentID segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(block_ids->size(), 1);
-            BlockID block_id = block_ids->at(0);
-            EXPECT_EQ(block_id, 0);
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            EXPECT_EQ(*block_ids, Vector<BlockID>({0}));
+            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3153,14 +3141,14 @@ TEST_P(TestAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 8192);
+            EXPECT_EQ(row_count, 4096);
         }
 
         // drop database
@@ -3183,7 +3171,7 @@ TEST_P(TestAppend, test_append_append) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1      append                                   commit (success)
+    //    t1      append                                   commit (fail)
     //    |----------|------------------------------------------|
     //                    |-------------|-------------------|
     //                    t2        append           commit (success)
@@ -3213,7 +3201,7 @@ TEST_P(TestAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         {
@@ -3225,21 +3213,17 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
             EXPECT_TRUE(seg_status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            SegmentID segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
+            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(block_ids->size(), 1);
-            BlockID block_id = block_ids->at(0);
-            EXPECT_EQ(block_id, 0);
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            EXPECT_EQ(*block_ids, Vector<BlockID>{0});
+            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3250,14 +3234,14 @@ TEST_P(TestAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 8192);
+            EXPECT_EQ(row_count, 4096);
         }
 
         // drop database
@@ -3280,7 +3264,7 @@ TEST_P(TestAppend, test_append_append) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1                                      append                                   commit (success)
+    //    t1                                      append                                   commit (fail)
     //    |------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  append   commit (success)
@@ -3312,7 +3296,7 @@ TEST_P(TestAppend, test_append_append) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         {
@@ -3324,21 +3308,17 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
             EXPECT_TRUE(seg_status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            SegmentID segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
+            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(block_ids->size(), 1);
-            BlockID block_id = block_ids->at(0);
-            EXPECT_EQ(block_id, 0);
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            EXPECT_EQ(*block_ids, Vector<BlockID>{0});
+            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3349,14 +3329,14 @@ TEST_P(TestAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 8192);
+            EXPECT_EQ(row_count, 4096);
         }
 
         // drop database
@@ -3379,7 +3359,7 @@ TEST_P(TestAppend, test_append_append) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    t1                                                   append                                   commit (success)
+    //    t1                                                   append                                   commit (fail)
     //    |------------------------------------------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  add column  commit (success)
@@ -3409,7 +3389,7 @@ TEST_P(TestAppend, test_append_append) {
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         {
@@ -3421,21 +3401,17 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
             EXPECT_TRUE(seg_status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            SegmentID segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
+            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(block_ids->size(), 1);
-            BlockID block_id = block_ids->at(0);
-            EXPECT_EQ(block_id, 0);
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            EXPECT_EQ(*block_ids, Vector<BlockID>{0});
+            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3446,14 +3422,14 @@ TEST_P(TestAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 8192);
+            EXPECT_EQ(row_count, 4096);
         }
 
         // drop database
@@ -3476,7 +3452,7 @@ TEST_P(TestAppend, test_append_append) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                                                  t1                  append                                   commit (success)
+    //                                                  t1                  append                                   commit (fail)
     //                                                  |--------------------|------------------------------------------|
     //                    |----------------------|----------|
     //                    t2                  append   commit (success)
@@ -3507,7 +3483,7 @@ TEST_P(TestAppend, test_append_append) {
         status = txn3->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Check the appended data.
         {
@@ -3519,21 +3495,17 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
             EXPECT_TRUE(seg_status.ok());
-            EXPECT_EQ(segment_ids->size(), 1);
-            SegmentID segment_id = segment_ids->at(0);
-            EXPECT_EQ(segment_id, 0);
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
+            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(block_ids->size(), 1);
-            BlockID block_id = block_ids->at(0);
-            EXPECT_EQ(block_id, 0);
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            EXPECT_EQ(*block_ids, Vector<BlockID>{0});
+            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3544,14 +3516,14 @@ TEST_P(TestAppend, test_append_append) {
                 bool has_next = state.Next(offset, range);
                 EXPECT_TRUE(has_next);
                 EXPECT_EQ(range.first, 0);
-                EXPECT_EQ(range.second, static_cast<BlockOffset>(8192));
+                EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
                 offset = range.second;
                 has_next = state.Next(offset, range);
                 EXPECT_FALSE(has_next);
             }
 
             SizeT row_count = state.block_offset_end();
-            EXPECT_EQ(row_count, 8192);
+            EXPECT_EQ(row_count, 4096);
         }
 
         // drop database
@@ -3636,18 +3608,19 @@ TEST_P(TestAppend, test_append_append_concurrent) {
         EXPECT_TRUE(status.ok());
 
         std::vector<std::thread> worker_threads;
-        SizeT thread_count = 16;
+        SizeT thread_count = 4;
         SizeT loop_count = 128;
+        SizeT block_num = thread_count * loop_count / 2;
         for (SizeT i = 0; i < thread_count; ++i) {
             worker_threads.emplace_back([&] {
                 for (SizeT j = 0; j < loop_count; ++j) {
-                    auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-                    status = txn3->Append(*db_name, *table_name, input_block1);
-                    EXPECT_TRUE(status.ok());
-                    status = new_txn_mgr->CommitTxn(txn3);
-                    if (!status.ok()) {
-                        std::cout << "Fail to commit txn3" << std::endl;
-                    }
+                    Status status;
+                    do {
+                        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+                        status = txn3->Append(*db_name, *table_name, input_block1);
+                        EXPECT_TRUE(status.ok());
+                        status = new_txn_mgr->CommitTxn(txn3);
+                    } while (!status.ok());
                 }
             });
         }
@@ -3665,7 +3638,7 @@ TEST_P(TestAppend, test_append_append_concurrent) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(segment_ids->size(), 1);
             {
@@ -3674,10 +3647,10 @@ TEST_P(TestAppend, test_append_append_concurrent) {
                 SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
                 SharedPtr<Vector<BlockID>> block_ids;
-                std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+                std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
                 EXPECT_TRUE(status.ok());
-                EXPECT_EQ(block_ids->size(), 1024);
+                EXPECT_EQ(block_ids->size(), block_num);
                 for (SizeT idx = 0; idx < block_ids->size(); ++idx) {
                     BlockID block_id = block_ids->at(idx);
                     EXPECT_EQ(block_id, idx);
