@@ -215,6 +215,8 @@ TEST_P(TestAppend, test_append1) {
         EXPECT_TRUE(status.ok());
     }
 
+    new_txn_mgr->PrintAllKeyValue();
+
     //    t1      append                 commit (success)
     //    |----------|-------------------------|
     //            |----------------------|----------|
@@ -230,10 +232,13 @@ TEST_P(TestAppend, test_append1) {
 
         status1 = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status1.ok());
+
+        new_txn_mgr->PrintAllKeyValue();
+
         status2 = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_TRUE(status2.ok());
+        EXPECT_FALSE(status2.ok());
     }
-    SizeT total_row_count = 8;
+    SizeT total_row_count = 6;
 
     // Check the appended data.
     {
@@ -245,21 +250,17 @@ TEST_P(TestAppend, test_append1) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
         EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(segment_ids->size(), 1);
-        SegmentID segment_id = segment_ids->at(0);
-        EXPECT_EQ(segment_id, 0);
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
+        SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
 
         SharedPtr<Vector<BlockID>> block_ids;
-        std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+        std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
 
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(block_ids->size(), 1);
-        BlockID block_id = block_ids->at(0);
-        EXPECT_EQ(block_id, 0);
-        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+        EXPECT_EQ(*block_ids, Vector<BlockID>({0}));
+        BlockMeta block_meta((*block_ids)[0], segment_meta, *txn->kv_instance());
 
         NewTxnGetVisibleRangeState state;
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);

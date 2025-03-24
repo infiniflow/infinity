@@ -28,7 +28,6 @@ import roaring_bitmap;
 import internal_types;
 import base_entry;
 import block_column_entry;
-import block_version;
 import fast_rough_filter;
 import value;
 import buffer_obj;
@@ -186,7 +185,7 @@ public:
 
     i32 GetAvailableCapacity();
 
-    String VersionFilePath() { return VirtualStore::ConcatenatePath(*block_dir_, String(BlockVersion::PATH)); }
+    String VersionFilePath();
 
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
 

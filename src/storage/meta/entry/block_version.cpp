@@ -79,6 +79,15 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
     return iter->row_count_;
 }
 
+Tuple<i32, Status> BlockVersion::GetRowCountForUpdate(TxnTimeStamp begin_ts) const {
+    // check read-write conflict
+    if (!created_.empty() && created_.back().create_ts_ >= begin_ts) {
+        return {0, Status::TxnConflict(0, fmt::format("Append conflict, begin_ts: {}, last_create_ts: {}", begin_ts, created_.back().create_ts_))};
+    }
+    i32 row_count = created_.empty() ? 0 : created_.back().row_count_;
+    return {row_count, Status::OK()};
+}
+
 void BlockVersion::SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handle) const {
     BlockOffset create_size = created_.size();
     while (create_size > 0 && created_[create_size - 1].create_ts_ > checkpoint_ts) {

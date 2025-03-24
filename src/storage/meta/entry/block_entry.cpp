@@ -730,6 +730,8 @@ i32 BlockEntry::GetAvailableCapacity() {
     return this->row_capacity_ - this->block_row_count_;
 }
 
+String BlockEntry::VersionFilePath() { return VirtualStore::ConcatenatePath(*block_dir_, String(BlockVersion::PATH)); }
+
 SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID block_id) {
     SharedPtr<String> relative_dir = MakeShared<String>(fmt::format("{}/blk_{}", parent_dir, block_id));
     String full_dir = Path(InfinityContext::instance().config()->DataDir()) / *relative_dir;

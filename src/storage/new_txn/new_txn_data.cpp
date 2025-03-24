@@ -612,8 +612,17 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
             append_state->current_block_offset_ = 0;
             continue;
         }
+
+        auto [version_buffer, status] = block_meta.GetVersionBuffer();
+        if (!status.ok()) {
+            return status;
+        }
+        BufferHandle buffer_handle = version_buffer->Load();
+        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        
         // auto [block_row_count, block_status] = block_meta.GetRowCnt();
-        auto [block_row_count, block_status] = block_meta.GetRowCnt1(begin_ts);
+        // auto [block_row_count, block_status] = block_meta.GetRowCnt1(begin_ts);
+        auto [block_row_count, block_status] = block_version->GetRowCountForUpdate(begin_ts);
         if (!block_status.ok()) {
             return block_status;
         }
@@ -673,14 +682,18 @@ Status NewTxn::PrepareAppendInBlock(BlockMeta &block_meta, AppendState *append_s
 
 Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT append_rows, const DataBlock *input_block, SizeT input_offset) {
     SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
-    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    BufferObj *version_buffer = nullptr;
-    {
-        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
-        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
-        if (version_buffer == nullptr) {
-            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
-        }
+    // BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+    // BufferObj *version_buffer = nullptr;
+    // {
+    //     String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+    //     version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+    //     if (version_buffer == nullptr) {
+    //         return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+    //     }
+    // }
+    auto [version_buffer, status] = block_meta.GetVersionBuffer();
+    if (!status.ok()) {
+        return status;
     }
 
     SharedPtr<BlockLock> block_lock;

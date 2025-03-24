@@ -18,6 +18,7 @@ export module block_version;
 
 import stl;
 import local_file_handle;
+import status;
 
 namespace infinity {
 
@@ -49,6 +50,8 @@ export struct BlockVersion {
     bool operator!=(const BlockVersion &rhs) const { return !(*this == rhs); };
 
     i32 GetRowCount(TxnTimeStamp begin_ts) const;
+
+    Tuple<i32, Status> GetRowCountForUpdate(TxnTimeStamp begin_ts) const;
 
     void SaveToFile(TxnTimeStamp checkpoint_ts, LocalFileHandle &file_handler) const;
 
