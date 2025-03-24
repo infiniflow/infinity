@@ -134,7 +134,7 @@ private:
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> current_ts_{}; // The next txn ts
-    TxnTimeStamp current_commit_ts_{};
+    TxnTimeStamp prepare_commit_ts_{};
     Atomic<TxnTimeStamp> max_committed_ts_{};
     Atomic<TxnTimeStamp> ckp_begin_ts_ =
         UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
