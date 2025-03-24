@@ -208,7 +208,7 @@ WalSegmentInfo::WalSegmentInfo(SegmentEntry *segment_entry)
     }
 }
 
-WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta) : segment_id_(segment_meta.segment_id()) {
+WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts) : segment_id_(segment_meta.segment_id()) {
     Status status;
 
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
@@ -218,14 +218,14 @@ WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta) : segment_id_(segment_
     }
     column_count_ = column_defs_ptr->size();
 
-    SharedPtr<Vector<BlockID>> block_ids;
-    std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
     // SizeT row_count = 0;
-    for (BlockID block_id : *block_ids) {
+    for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         block_infos_.emplace_back(block_meta);
 

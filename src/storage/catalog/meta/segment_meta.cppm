@@ -59,7 +59,7 @@ public:
     Tuple<SharedPtr<String>, Status> GetSegmentDir();
     Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
 
-    Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs1(TxnTimeStamp begin_ts);
+    Tuple<Vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp begin_ts);
 
     // Tuple<SizeT, Status> GetRowCnt();
     Tuple<SizeT, Status> GetRowCnt1(TxnTimeStamp begin_ts);
@@ -85,6 +85,8 @@ private:
     SharedPtr<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;
     // Optional<SizeT> row_cnt_;
+
+    Optional<Pair<TxnTimeStamp, Vector<BlockID>>> block_ids1_;
     Optional<Pair<TxnTimeStamp, SizeT>> row_cnt_;
 };
 

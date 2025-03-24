@@ -132,7 +132,7 @@ TEST_P(ReplayAppendTest, test_append0) {
         std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(begin_ts);
         EXPECT_EQ(segment_row_cnt, 8);
 
-        SharedPtr<Vector<BlockID>> block_ids_ptr;
+        Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));

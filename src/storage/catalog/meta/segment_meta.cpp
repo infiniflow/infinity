@@ -139,24 +139,24 @@ Status SegmentMeta::LoadBlockIDs() {
 }
 
 Status SegmentMeta::LoadBlockIDs1(TxnTimeStamp begin_ts) {
+    block_ids1_ = {begin_ts, Vector<BlockID>()};
+    Vector<BlockID> &block_ids = block_ids1_->second;
+
     String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
     auto iter = kv_instance_.GetIterator();
     iter->Seek(block_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
-        if (block_ids_ == nullptr) {
-            block_ids_ = MakeShared<Vector<BlockID>>();
-        }
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
         if (commit_ts > begin_ts) {
             iter->Next();
             continue;
         }
         BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
-        block_ids_->push_back(block_id);
+        block_ids.push_back(block_id);
         iter->Next();
     }
 
-    std::sort(block_ids_->begin(), block_ids_->end());
+    std::sort(block_ids.begin(), block_ids.end());
     return Status::OK();
 }
 
@@ -254,13 +254,13 @@ Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
 
     BlockID block_id = 0;
     {
-        SharedPtr<Vector<BlockID>> block_ids;
-        std::tie(block_ids, status) = GetBlockIDs1(commit_ts);
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = GetBlockIDs1(commit_ts);
         if (!status.ok()) {
             return {INVALID_BLOCK_ID, status};
         }
-        block_id = block_ids->empty() ? 0 : block_ids->back() + 1;
-        block_ids_->push_back(block_id);
+        block_id = block_ids_ptr->empty() ? 0 : block_ids_ptr->back() + 1;
+        block_ids1_->second.push_back(block_id);
     }
 
     String block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
@@ -303,14 +303,14 @@ Tuple<SharedPtr<Vector<BlockID>>, Status> SegmentMeta::GetBlockIDs() {
     return {MakeShared<Vector<BlockID>>(*block_ids_), Status::OK()};
 }
 
-Tuple<SharedPtr<Vector<BlockID>>, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp begin_ts) {
-    if (block_ids_ == nullptr) {
+Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp begin_ts) {
+    if (!block_ids1_ || block_ids1_->first != begin_ts) {
         Status status = LoadBlockIDs1(begin_ts);
         if (!status.ok()) {
             return {nullptr, status};
         }
     }
-    return {block_ids_, Status::OK()};
+    return {&block_ids1_->second, Status::OK()};
 }
 
 // Tuple<SizeT, Status> SegmentMeta::GetRowCnt() {
@@ -331,12 +331,12 @@ Tuple<SizeT, Status> SegmentMeta::GetRowCnt1(TxnTimeStamp begin_ts) {
 
     SizeT row_cnt = 0;
     {
-        SharedPtr<Vector<BlockID>> block_ids;
-        std::tie(block_ids, status) = GetBlockIDs1(begin_ts);
-        if (block_ids->size() > 0) {
-            row_cnt += DEFAULT_BLOCK_CAPACITY * (block_ids->size() - 1);
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = GetBlockIDs1(begin_ts);
+        if (block_ids_ptr->size() > 0) {
+            row_cnt += DEFAULT_BLOCK_CAPACITY * (block_ids_ptr->size() - 1);
 
-            BlockMeta block_meta(block_ids->back(), *this, kv_instance_);
+            BlockMeta block_meta(block_ids_ptr->back(), *this, kv_instance_);
             SizeT block_row_cnt;
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
             if (!status.ok()) {

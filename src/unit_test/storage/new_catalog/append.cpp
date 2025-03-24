@@ -134,7 +134,7 @@ TEST_P(TestAppend, test_append0) {
         std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(begin_ts);
         EXPECT_EQ(segment_row_cnt, 8);
 
-        SharedPtr<Vector<BlockID>> block_ids_ptr;
+        Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
@@ -255,12 +255,12 @@ TEST_P(TestAppend, test_append1) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
 
-        SharedPtr<Vector<BlockID>> block_ids;
-        std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*block_ids, Vector<BlockID>({0}));
-        BlockMeta block_meta((*block_ids)[0], segment_meta, *txn->kv_instance());
+        EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+        BlockMeta block_meta((*block_ids_ptr)[0], segment_meta, *txn->kv_instance());
 
         NewTxnGetVisibleRangeState state;
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -442,16 +442,16 @@ TEST_P(TestAppend, test_append2) {
         EXPECT_EQ(segment_id, 0);
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
-        SharedPtr<Vector<BlockID>> block_ids;
-        std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
         EXPECT_TRUE(status.ok());
 
         SizeT block_count = (total_row_count / DEFAULT_BLOCK_CAPACITY) + (total_row_count % DEFAULT_BLOCK_CAPACITY == 0 ? 0 : 1);
-        EXPECT_EQ(block_ids->size(), block_count);
+        EXPECT_EQ(block_ids_ptr->size(), block_count);
 
         for (SizeT idx = 0; idx < block_count; ++idx) {
-            BlockID block_id = block_ids->at(idx);
+            BlockID block_id = block_ids_ptr->at(idx);
             EXPECT_EQ(block_id, idx);
             BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
             NewTxnGetVisibleRangeState state;
@@ -2937,11 +2937,11 @@ TEST_P(TestAppend, test_append_append) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
-            SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids, Vector<BlockID>({0}));
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
             BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
@@ -3031,12 +3031,12 @@ TEST_P(TestAppend, test_append_append) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
 
-            SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids, Vector<BlockID>({0}));
-            BlockMeta block_meta((*block_ids)[0], segment_meta, *txn->kv_instance());
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+            BlockMeta block_meta((*block_ids_ptr)[0], segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3125,11 +3125,11 @@ TEST_P(TestAppend, test_append_append) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
-            SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids, Vector<BlockID>({0}));
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
             BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
@@ -3218,11 +3218,11 @@ TEST_P(TestAppend, test_append_append) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
-            SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids, Vector<BlockID>{0});
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
             BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
@@ -3313,11 +3313,11 @@ TEST_P(TestAppend, test_append_append) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
-            SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids, Vector<BlockID>{0});
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
             BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
@@ -3406,11 +3406,11 @@ TEST_P(TestAppend, test_append_append) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
-            SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+            Vector<BlockID> *block_ids_ptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids, Vector<BlockID>{0});
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
             BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
@@ -3500,11 +3500,11 @@ TEST_P(TestAppend, test_append_append) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
-            SharedPtr<Vector<BlockID>> block_ids;
-            std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+            Vector<BlockID> *block_ids_ptr = nullptr;
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
             EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*block_ids, Vector<BlockID>{0});
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
             BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
 
             NewTxnGetVisibleRangeState state;
@@ -3646,13 +3646,13 @@ TEST_P(TestAppend, test_append_append_concurrent) {
                 EXPECT_EQ(segment_id, 0);
                 SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
-                SharedPtr<Vector<BlockID>> block_ids;
-                std::tie(block_ids, status) = segment_meta.GetBlockIDs1(begin_ts);
+                Vector<BlockID> *block_ids_ptr = nullptr;
+                std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
 
                 EXPECT_TRUE(status.ok());
-                EXPECT_EQ(block_ids->size(), block_num);
-                for (SizeT idx = 0; idx < block_ids->size(); ++idx) {
-                    BlockID block_id = block_ids->at(idx);
+                EXPECT_EQ(block_ids_ptr->size(), block_num);
+                for (SizeT idx = 0; idx < block_ids_ptr->size(); ++idx) {
+                    BlockID block_id = block_ids_ptr->at(idx);
                     EXPECT_EQ(block_id, idx);
                     BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
 

@@ -298,15 +298,37 @@ TEST_P(TestImport, test_import_drop_db) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs();
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
             check_block(block_meta, begin_ts);
         }
+    };
+    auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            check_segment(segment_meta, txn);
+        }
+    };
+    auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        SegmentID segment_id = 0;
+        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        check_segment(segment_meta, txn);
     };
 
     //    t1      import      commit (success)
@@ -344,14 +366,8 @@ TEST_P(TestImport, test_import_drop_db) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+        check_table_2segments(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -405,14 +421,8 @@ TEST_P(TestImport, test_import_drop_db) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table_1segment(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -467,14 +477,8 @@ TEST_P(TestImport, test_import_drop_db) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table_1segment(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -834,15 +838,37 @@ TEST_P(TestImport, test_import_drop_table) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs();
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
             check_block(block_meta, begin_ts);
         }
+    };
+    auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            check_segment(segment_meta, txn);
+        }
+    };
+    auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        SegmentID segment_id = 0;
+        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        check_segment(segment_meta, txn);
     };
 
     //    t1      import      commit (success)
@@ -880,14 +906,8 @@ TEST_P(TestImport, test_import_drop_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+        check_table_2segments(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -947,14 +967,8 @@ TEST_P(TestImport, test_import_drop_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table_1segment(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -1015,14 +1029,8 @@ TEST_P(TestImport, test_import_drop_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table_1segment(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -1426,15 +1434,37 @@ TEST_P(TestImport, test_import_add_columns) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs();
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
             check_block(block_meta, begin_ts);
         }
+    };
+    auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            check_segment(segment_meta, txn);
+        }
+    };
+    auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        SegmentID segment_id = 0;
+        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        check_segment(segment_meta, txn);
     };
 
     //    t1      import      commit (success)
@@ -1486,14 +1516,8 @@ TEST_P(TestImport, test_import_add_columns) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+        check_table_2segments(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -1555,14 +1579,8 @@ TEST_P(TestImport, test_import_add_columns) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table_1segment(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -1624,14 +1642,8 @@ TEST_P(TestImport, test_import_add_columns) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table_1segment(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -2070,15 +2082,36 @@ TEST_P(TestImport, test_import_drop_columns) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs();
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
             check_block(block_meta, begin_ts);
         }
+    };
+    auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+        for (auto segment_id : *segment_ids) {
+            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            check_segment(segment_meta, txn);
+        }
+    };
+    auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+
+        SegmentID segment_id = 0;
+        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        check_segment(segment_meta, txn);
     };
 
     //    t1      import      commit (success)
@@ -2125,14 +2158,8 @@ TEST_P(TestImport, test_import_drop_columns) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+        check_table_2segments(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -2189,14 +2216,8 @@ TEST_P(TestImport, test_import_drop_columns) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table_1segment(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -2253,14 +2274,8 @@ TEST_P(TestImport, test_import_drop_columns) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table_1segment(*table_meta, txn5);
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -2667,10 +2682,6 @@ TEST_P(TestImport, test_import) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
-
         auto check_block = [&](BlockMeta &block_meta) {
             NewTxnGetVisibleRangeState state;
             Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -2716,7 +2727,9 @@ TEST_P(TestImport, test_import) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs();
+            TxnTimeStamp begin_ts = txn->BeginTS();
+
+            auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -2726,10 +2739,20 @@ TEST_P(TestImport, test_import) {
             }
         };
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
-            check_segment(segment_meta);
-        }
+        auto check_table = [&](TableMeeta &table_meta) {
+            TxnTimeStamp begin_ts = txn->BeginTS();
+
+            auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+            EXPECT_TRUE(seg_status.ok());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+
+            for (SegmentID segment_id : *segment_ids) {
+                SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+                check_segment(segment_meta);
+            }
+        };
+
+        check_table(*table_meta);
     }
 
     NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
@@ -2821,14 +2844,28 @@ TEST_P(TestImport, test_import_append_table) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs();
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
         EXPECT_TRUE(status.ok());
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
             check_block(block_meta, begin_ts);
+        }
+    };
+
+    auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, const Vector<SegmentID> &segment_ids) {
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
+        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids_ptr, segment_ids);
+
+        for (auto segment_id : *segment_ids_ptr) {
+            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            check_segment(segment_meta, txn);
         }
     };
 
@@ -2891,14 +2928,8 @@ TEST_P(TestImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1, 2}));
+        check_table(*table_meta, txn5, {0, 1, 2});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -2915,7 +2946,7 @@ TEST_P(TestImport, test_import_append_table) {
     //    t1      import                          commit (success)
     //    |----------|--------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  append    commit (success)
+    //                           t2                  append    commit (fail)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -2944,7 +2975,7 @@ TEST_P(TestImport, test_import_append_table) {
         //        status = txn6->Append(*db_name, *table_name, input_block2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -2954,14 +2985,8 @@ TEST_P(TestImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -2978,7 +3003,7 @@ TEST_P(TestImport, test_import_append_table) {
     //    t1      import                               commit (success)
     //    |----------|-----------------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  append    commit (success)
+    //                           t2                  append    commit (fail)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3007,7 +3032,7 @@ TEST_P(TestImport, test_import_append_table) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn6);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -3017,14 +3042,8 @@ TEST_P(TestImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3079,14 +3098,8 @@ TEST_P(TestImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3143,14 +3156,8 @@ TEST_P(TestImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3164,7 +3171,7 @@ TEST_P(TestImport, test_import_append_table) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                t1      import                                          commit (fail)
+    //                t1      import                                          commit (success)
     //                |----------|---------------------------------------------------|
     //          |----------------------|----------|
     //         t2                  append   commit (fail)
@@ -3207,14 +3214,8 @@ TEST_P(TestImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3228,7 +3229,7 @@ TEST_P(TestImport, test_import_append_table) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                           t1      import                                          commit (fail)
+    //                           t1      import                                          commit (success)
     //                           |----------|---------------------------------------------------|
     //          |----------------------|----------|
     //         t2                  append   commit (fail)
@@ -3271,14 +3272,8 @@ TEST_P(TestImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3292,10 +3287,10 @@ TEST_P(TestImport, test_import_append_table) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //                                     t1      import                                          commit (fail)
+    //                                     t1      import                                          commit (success)
     //                                     |----------|---------------------------------------------------|
     //          |----------------------|----------|
-    //         t2                  append      commit (success)
+    //         t2                  append      commit (fail)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3333,14 +3328,8 @@ TEST_P(TestImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3393,14 +3382,8 @@ TEST_P(TestImport, test_import_append_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+        check_table(*table_meta, txn5, {0, 1});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3500,14 +3483,29 @@ TEST_P(TestImport, test_import_import_table) {
     };
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs();
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
         EXPECT_TRUE(status.ok());
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
         for (auto block_id : *block_ids) {
             BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
             check_block(block_meta, begin_ts);
+        }
+    };
+
+    auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, Vector<SegmentID> segment_ids) {
+        new_txn_mgr->PrintAllKeyValue();
+
+        TxnTimeStamp begin_ts = txn->BeginTS();
+        auto [seg_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*seg_ids, segment_ids);
+
+        for (auto segment_id : segment_ids) {
+            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            check_segment(segment_meta, txn);
         }
     };
 
@@ -3568,14 +3566,8 @@ TEST_P(TestImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
+        check_table(*table_meta, txn5, {0, 1});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3631,14 +3623,8 @@ TEST_P(TestImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3655,7 +3641,7 @@ TEST_P(TestImport, test_import_import_table) {
     //    t1      import                               commit (success)
     //    |----------|-----------------------------------------|
     //                            |----------------------|----------|
-    //                           t2                  import    commit (success)
+    //                           t2              import (fail)     rollback (success)
     {
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
@@ -3696,12 +3682,9 @@ TEST_P(TestImport, test_import_import_table) {
 
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
         EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
+        check_table(*table_meta, txn5, {0});
+
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3756,14 +3739,8 @@ TEST_P(TestImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3820,14 +3797,8 @@ TEST_P(TestImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -3884,14 +3855,8 @@ TEST_P(TestImport, test_import_import_table) {
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        check_table(*table_meta, txn5, {0});
 
-        for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn5->kv_instance());
-            check_segment(segment_meta, txn5);
-        }
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 

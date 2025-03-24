@@ -124,7 +124,7 @@ export struct WalSegmentInfo {
 
     explicit WalSegmentInfo(SegmentEntry *segment_entry);
 
-    explicit WalSegmentInfo(SegmentMeta &segment_meta);
+    explicit WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts);
 
     bool operator==(const WalSegmentInfo &other) const;
 

@@ -128,6 +128,8 @@ private:
     Optional<String> comment_;
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
     Optional<Vector<SegmentID>> segment_ids_;
+    Optional<Pair<TxnTimeStamp, Vector<SegmentID>>> segment_ids1_;
+
     Optional<Vector<String>> index_id_strs_;
     Optional<Vector<String>> index_names_;
     Optional<SegmentID> next_segment_id_;

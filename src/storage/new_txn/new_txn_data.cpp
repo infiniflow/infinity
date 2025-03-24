@@ -159,6 +159,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     this->CheckTxn(db_name);
 
     Status status;
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
@@ -273,7 +274,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     // }
 
     { // Add import wal;
-        auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta));
+        auto import_command = MakeShared<WalCmdImport>(db_name, table_name, WalSegmentInfo(*segment_meta, begin_ts));
         if (block_row_cnts.size() != import_command->segment_info_.block_infos_.size()) {
             UnrecoverableError("Block row count mismatch");
         }
@@ -466,6 +467,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     Status status;
 
     this->CheckTxn(db_name);
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
@@ -541,7 +543,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     {
         Vector<SegmentID> deprecated_segment_ids = segment_ids;
         Vector<WalSegmentInfo> segment_infos;
-        segment_infos.emplace_back(*compact_state.new_segment_meta_);
+        segment_infos.emplace_back(*compact_state.new_segment_meta_, begin_ts);
         auto compact_command = MakeShared<WalCmdCompact>(db_name, table_name, std::move(segment_infos), std::move(deprecated_segment_ids));
         wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
         txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
@@ -1211,7 +1213,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
     //     block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
     // }
 
-    SharedPtr<Vector<BlockID>> block_ids_ptr;
+    Vector<BlockID> *block_ids_ptr = nullptr;
     std::tie(block_ids_ptr, status) = segment_meta->GetBlockIDs1(begin_ts);
     if (!status.ok()) {
         return status;

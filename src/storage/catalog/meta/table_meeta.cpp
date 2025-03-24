@@ -138,6 +138,7 @@ Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
             return {0, status};
         }
         segment_id = segment_ids_ptr->empty() ? 0 : segment_ids_ptr->back() + 1;
+        segment_ids1_->second.push_back(segment_id);
     }
 
     String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
@@ -377,7 +378,8 @@ Status TableMeeta::LoadSegmentIDs() {
 }
 
 Status TableMeeta::LoadSegmentIDs1(TxnTimeStamp begin_ts) {
-    segment_ids_ = Vector<SegmentID>();
+    segment_ids1_ = {begin_ts, Vector<SegmentID>()};
+    Vector<SegmentID> &segment_ids = segment_ids1_->second;
 
     String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str_, table_id_str_);
     auto iter = kv_instance_.GetIterator();
@@ -389,10 +391,10 @@ Status TableMeeta::LoadSegmentIDs1(TxnTimeStamp begin_ts) {
             continue;
         }
         SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
-        segment_ids_->push_back(segment_id);
+        segment_ids.push_back(segment_id);
         iter->Next();
     }
-    std::sort(segment_ids_->begin(), segment_ids_->end());
+    std::sort(segment_ids.begin(), segment_ids.end());
     return Status::OK();
 }
 
@@ -494,13 +496,13 @@ Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() {
 }
 
 Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1(TxnTimeStamp begin_ts) {
-    if (!segment_ids_) {
+    if (!segment_ids1_ || segment_ids1_->first != begin_ts) {
         auto status = LoadSegmentIDs1(begin_ts);
         if (!status.ok()) {
             return {nullptr, status};
         }
     }
-    return {&*segment_ids_, Status::OK()};
+    return {&segment_ids1_->second, Status::OK()};
 }
 
 Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs() {
