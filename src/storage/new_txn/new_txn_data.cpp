@@ -302,7 +302,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         const String &index_name = (*index_names_ptr)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
 
-        status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *segment_meta);
+        status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *segment_meta, segment_row_cnt);
         if (!status.ok()) {
             return status;
         }
@@ -530,7 +530,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         const String &index_name = (*index_name_ptr)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
 
-        status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *compact_state.new_segment_meta_);
+        status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *compact_state.new_segment_meta_, 0);
         if (!status.ok()) {
             return status;
         }

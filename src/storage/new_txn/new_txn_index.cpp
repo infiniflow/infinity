@@ -519,7 +519,8 @@ Status NewTxn::PopulateIndex(const String &db_name,
                              const String &table_name,
                              const String &index_name,
                              TableIndexMeeta &table_index_meta,
-                             SegmentMeta &segment_meta) {
+                             SegmentMeta &segment_meta,
+                             SizeT segment_row_cnt) {
     Optional<SegmentIndexMeta> segment_index_meta;
     {
         Status status = NewCatalog::AddNewSegmentIndex(table_index_meta, segment_meta.segment_id(), segment_index_meta);
@@ -566,14 +567,14 @@ Status NewTxn::PopulateIndex(const String &db_name,
             case IndexType::kSecondary:
             case IndexType::kHnsw:
             case IndexType::kBMP: {
-                Status status = this->PopulateIndexToMem(*segment_index_meta, segment_meta, column_id);
+                Status status = this->PopulateIndexToMem(*segment_index_meta, segment_meta, column_id, segment_row_cnt);
                 if (!status.ok()) {
                     return status;
                 }
                 break;
             }
             case IndexType::kFullText: {
-                Status status = this->PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id);
+                Status status = this->PopulateFtIndexInner(index_base, *segment_index_meta, segment_meta, column_id, segment_row_cnt);
                 if (!status.ok()) {
                     return status;
                 }
@@ -666,23 +667,19 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
     return Status::OK();
 }
 
-Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id) {
+Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, SizeT segment_row_cnt) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
-    auto [block_ids, status] = segment_meta.GetBlockIDs();
+    auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
+    SizeT block_capacity = DEFAULT_BLOCK_CAPACITY;
     for (BlockID block_id : *block_ids) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
-        SizeT row_cnt = 0;
-        // std::tie(row_cnt, status) = block_meta.GetRowCnt();
-        std::tie(row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
-        if (!status.ok()) {
-            return status;
-        }
+        SizeT row_cnt = block_id == block_ids->back() ? segment_row_cnt % block_capacity : block_capacity;
 
         ColumnVector col;
         status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
@@ -700,8 +697,11 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
     return Status::OK();
 }
 
-Status
-NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id) {
+Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
+                                    SegmentIndexMeta &segment_index_meta,
+                                    SegmentMeta &segment_meta,
+                                    ColumnID column_id,
+                                    SizeT segment_row_cnt) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
     if (index_base->index_type_ != IndexType::kFullText) {
@@ -725,22 +725,18 @@ NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &
         MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_, nullptr);
     MemoryIndexer *memory_indexer = mem_index->memory_indexer_.get();
 
-    SharedPtr<Vector<BlockID>> block_ids;
+    Vector<BlockID> *block_ids_ptr = nullptr;
 
-    std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
-    for (BlockID block_id : *block_ids) {
+    for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
-        SizeT row_cnt = 0;
-        // std::tie(row_cnt, status) = block_meta.GetRowCnt();
-        std::tie(row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
-        if (!status.ok()) {
-            return status;
-        }
+        SizeT row_cnt = block_id == block_ids_ptr->back() ? segment_row_cnt % DEFAULT_BLOCK_CAPACITY : DEFAULT_BLOCK_CAPACITY;
+
         ColumnVector col;
         status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
         if (!status.ok()) {
@@ -1296,6 +1292,7 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
 }
 
 Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
     const String &db_name = create_index_cmd->db_name_;
@@ -1325,7 +1322,11 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
         }
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
-            Status status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, segment_meta);
+            auto [segment_row_cnt, status] = segment_meta.GetRowCnt1(begin_ts);
+            if (!status.ok()) {
+                return status;
+            }
+            status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, segment_meta, segment_row_cnt);
             if (!status.ok()) {
                 return status;
             }

@@ -403,13 +403,18 @@ private:
                          const String &table_name,
                          const String &index_name,
                          TableIndexMeeta &table_index_meta,
-                         SegmentMeta &segment_meta);
+                         SegmentMeta &segment_meta,
+                         SizeT segment_row_cnt);
 
     Status ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
-    Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id);
+    Status PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id, SizeT segment_row_cnt);
 
-    Status PopulateFtIndexInner(SharedPtr<IndexBase> index_base, SegmentIndexMeta &segment_index_meta, SegmentMeta &segment_meta, ColumnID column_id);
+    Status PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
+                                SegmentIndexMeta &segment_index_meta,
+                                SegmentMeta &segment_meta,
+                                ColumnID column_id,
+                                SizeT segment_row_cnt);
 
     Status PopulateIvfIndexInner(SharedPtr<IndexBase> index_base,
                                  SegmentIndexMeta &segment_index_meta,
