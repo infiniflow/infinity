@@ -679,7 +679,7 @@ Status NewTxn::PopulateIndexToMem(SegmentIndexMeta &segment_index_meta, SegmentM
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
-        SizeT row_cnt = block_id == block_ids->back() ? segment_row_cnt % block_capacity : block_capacity;
+        SizeT row_cnt = block_id == block_ids->back() ? segment_row_cnt - block_capacity * (block_ids->size() - 1) : block_capacity;
 
         ColumnVector col;
         status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);
@@ -731,11 +731,13 @@ Status NewTxn::PopulateFtIndexInner(SharedPtr<IndexBase> index_base,
     if (!status.ok()) {
         return status;
     }
+    SizeT block_capacity = DEFAULT_BLOCK_CAPACITY;
+
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
 
-        SizeT row_cnt = block_id == block_ids_ptr->back() ? segment_row_cnt % DEFAULT_BLOCK_CAPACITY : DEFAULT_BLOCK_CAPACITY;
+        SizeT row_cnt = block_id == block_ids_ptr->back() ? segment_row_cnt - block_capacity * (block_ids_ptr->size() - 1) : block_capacity;
 
         ColumnVector col;
         status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, col);

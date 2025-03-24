@@ -372,33 +372,38 @@ TEST_P(TestImport, test_import_with_index) {
         Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta);
         EXPECT_TRUE(status.ok());
 
+        auto check_segment = [&](SegmentID segment_id) {
+            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+
+            {
+                Vector<ChunkID> *chunk_ids = nullptr;
+                Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
+            }
+            ChunkID chunk_id = 0;
+            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+            {
+                ChunkIndexMetaInfo *chunk_info = nullptr;
+                Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+                EXPECT_TRUE(status.ok());
+                EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt * 2);
+                EXPECT_EQ(chunk_info->base_row_id_, RowID(segment_id, 0));
+            }
+
+            BufferObj *buffer_obj = nullptr;
+            status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+            EXPECT_TRUE(status.ok());
+        };
         {
             auto [segment_ids, status] = table_meta->GetSegmentIDs1(begin_ts);
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
-        }
-        SegmentID segment_id = 0;
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
 
-        {
-            Vector<ChunkID> *chunk_ids = nullptr;
-            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
+            for (auto segment_id : *segment_ids) {
+                check_segment(segment_id);
+            }
         }
-        ChunkID chunk_id = 0;
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
-        {
-            ChunkIndexMetaInfo *chunk_info = nullptr;
-            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
-            EXPECT_TRUE(status.ok());
-            EXPECT_EQ(chunk_info->row_cnt_, block_row_cnt);
-            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
-        }
-
-        BufferObj *buffer_obj = nullptr;
-        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
-        EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
