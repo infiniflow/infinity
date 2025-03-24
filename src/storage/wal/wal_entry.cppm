@@ -382,6 +382,7 @@ export struct WalCmdDelete final : public WalCmd {
     // Used in commit phase
     String db_id_str_{};
     String table_id_str_{};
+    String table_key_{};
 };
 
 // used when append op turn an old unsealed segment full and sealed

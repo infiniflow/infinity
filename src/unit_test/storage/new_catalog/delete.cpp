@@ -899,3 +899,675 @@ TEST_P(TestDelete, test_delete_and_drop_table) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 }
+
+TEST_P(TestDelete, test_delete_and_add_column) {
+    using namespace infinity;
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    auto input_block1 = MakeShared<DataBlock>();
+    SizeT insert_row = 8192;
+    {
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            for (SizeT i = 0; i < insert_row; ++i) {
+                col1->AppendValue(Value::MakeInt(i));
+            }
+
+            input_block1->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            for (SizeT i = 0; i < insert_row; ++i) {
+                col2->AppendValue(Value::MakeVarchar(fmt::format("abc_{}", i)));
+            }
+
+            //            col2->AppendValue(Value::MakeVarchar("abc"));
+            //            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block1->InsertVector(col2, 1);
+        }
+        input_block1->Finalize();
+    }
+
+    auto check_data = [&]() {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        NewTxnGetVisibleRangeState state;
+
+        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+        for (const auto block_id : *block_ids_ptr) {
+            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+
+            status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+            EXPECT_TRUE(status.ok());
+            Pair<BlockOffset, BlockOffset> range;
+            BlockOffset offset = 0;
+            SizeT row_id = 0;
+            while (true) {
+                bool has_next = state.Next(offset, range);
+                if (!has_next) {
+                    break;
+                }
+                EXPECT_EQ(range.first, row_id);
+                EXPECT_EQ(range.second, row_id + 1);
+                offset = range.second;
+                row_id += 2;
+            }
+        }
+    };
+
+    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    default_varchar->str_value_ = strdup("");
+
+    //    t1      delete      commit (success)
+    //    |----------|---------|
+    //                            |----------------------|----------|
+    //                           t2                  add column    commit (success)
+    {
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Append data
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Delete data
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, *table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // Add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto column_def4 =
+            std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // Check data
+        check_data();
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Check the appended data.
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      delete      commit (success)
+    //    |----------|---------|
+    //                    |----------------------|----------|
+    //                    t2                  add column   commit (success)
+    {
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Append data
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Delete data
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, *table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+
+        // Add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto column_def4 =
+            std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // Check data
+        check_data();
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Check the appended data.
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      delete                       commit (success)
+    //    |----------|--------------------------------|
+    //                    |-----------------------|-------------------------|
+    //                    t2                  add column (fail)       rollback (success)
+    {
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Append data
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Delete data
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, *table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+
+        // Add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto column_def4 =
+            std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // Check data
+        check_data();
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Check the appended data.
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      delete                                   commit (success)
+    //    |----------|------------------------------------------|
+    //                    |-------------|-------------------|
+    //                    t2        add column (fail)   rollback (success)
+    {
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Append data
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Delete data
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, *table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+
+        // Add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto column_def4 =
+            std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // Check data
+        check_data();
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Check the appended data.
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1                                      delete (fail)                               rollback (success)
+    //    |------------------------------------------|------------------------------------------|
+    //                    |----------------------|----------|
+    //                    t2                  add column   commit (success)
+    {
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Append data
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Delete data
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+
+        // Add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto column_def4 =
+            std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, *table_name, row_ids);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Check the appended data.
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1                                                   delete                                   commit (success)
+    //    |------------------------------------------------------|------------------------------------------|
+    //                    |----------------------|----------|
+    //                    t2                  add column  commit (success)
+    {
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Append data
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Delete data
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+
+        // Add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto column_def4 =
+            std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, *table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Check the appended data.
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                                                  t1                  delete                                   commit (success)
+    //                                                  |--------------------|------------------------------------------|
+    //                    |----------------------|----------|
+    //                    t2                  add column   commit (success)
+    {
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Append data
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto column_def4 =
+            std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+
+        // Delete data
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, *table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Check the appended data.
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                                                           t1                  append(fail)                          rollback (success)
+    //                                                          |--------------------|------------------------------------------|
+    //                    |----------------------|----------|
+    //                    t2                  add column   commit (success)
+    {
+        SharedPtr<String> db_name = std::make_shared<String>("db1");
+        auto table_name = std::make_shared<std::string>("tb1");
+        auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        status = txn2->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Append data
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // Add columns
+        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        auto column_def4 =
+            std::make_shared<ColumnDef>(3, std::make_shared<DataType>(LogicalType::kVarchar), "col4", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns;
+        columns.emplace_back(column_def3);
+        columns.emplace_back(column_def4);
+        status = txn5->AddColumns(*db_name, *table_name, columns);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn5);
+        EXPECT_TRUE(status.ok());
+
+        // Delete data
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, *table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase("db1", ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        // Check the appended data.
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        status = txn7->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_EQ(status.code(), ErrorCode::kDBNotExist);
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    RemoveDbDirs();
+}

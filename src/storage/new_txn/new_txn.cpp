@@ -1587,11 +1587,13 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::DELETE: {
-                // auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
-                // Status status = PostCommitDelete(delete_cmd);
-                // if (!status.ok()) {
-                //     UnrecoverableError("PostCommitDelete failed");
-                // }
+                if (!this->IsReplay()) {
+                    auto *cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
+                    Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                    if (!status.ok()) {
+                        UnrecoverableError(fmt::format("Fail to unlock table on post commit phase: {}", status.message()));
+                    }
+                }
                 break;
             }
             case WalCommandType::CHECKPOINT: {
@@ -1727,6 +1729,14 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
             case WalCommandType::APPEND: {
                 auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table when rollback append txn");
+                }
+                break;
+            }
+            case WalCommandType::DELETE: {
+                auto *cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table when rollback append txn");

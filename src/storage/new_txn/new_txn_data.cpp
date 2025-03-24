@@ -364,6 +364,12 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     if (!status.ok()) {
         return status;
     }
+
+    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     TableMeeta &table_meta = *table_meta_opt;
 
     auto append_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
@@ -371,11 +377,6 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         append_command->db_id_str_ = db_meta->db_id_str();
         append_command->table_id_str_ = table_meta.table_id_str();
         append_command->table_key_ = table_key;
-    }
-
-    status = new_catalog_->IncreaseTableWriteCount(table_key);
-    if (!status.ok()) {
-        return status;
     }
 
     // Read col definition in new rocksdb transaction
@@ -441,20 +442,26 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
 Status NewTxn::Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids) {
     this->CheckTxn(db_name);
 
-    auto delete_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
-    {
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta_opt;
-        Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt);
-        if (!status.ok()) {
-            return status;
-        }
-        const String &db_id_str = db_meta->db_id_str();
-        const String &table_id_str = table_meta_opt->table_id_str();
-
-        delete_command->db_id_str_ = db_id_str;
-        delete_command->table_id_str_ = table_id_str;
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    if (!status.ok()) {
+        return status;
     }
+
+    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    auto delete_command = MakeShared<WalCmdDelete>(db_name, table_name, row_ids);
+    const String &db_id_str = db_meta->db_id_str();
+    const String &table_id_str = table_meta_opt->table_id_str();
+
+    delete_command->db_id_str_ = db_id_str;
+    delete_command->table_id_str_ = table_id_str;
+    delete_command->table_key_ = table_key;
 
     auto wal_command = static_pointer_cast<WalCmd>(delete_command);
     wal_entry_->cmds_.push_back(wal_command);
