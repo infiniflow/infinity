@@ -82,6 +82,8 @@ public:
 
     Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
+    Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids, TxnTimeStamp begin_ts);
+
     Status AddSegmentID(SegmentID segment_id);
 
     Pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);

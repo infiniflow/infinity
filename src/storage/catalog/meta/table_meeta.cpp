@@ -107,6 +107,45 @@ Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
     return Status::OK();
 }
 
+Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids, TxnTimeStamp begin_ts) {
+    HashSet<SegmentID> segment_ids_set(segment_ids.begin(), segment_ids.end());
+
+    String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str_, table_id_str_);
+    auto iter = kv_instance_.GetIterator();
+    iter->Seek(segment_id_prefix);
+    Vector<String> delete_keys;
+    while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
+        TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+        SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
+        if (segment_ids_set.contains(segment_id)) {
+            if (commit_ts > begin_ts) {
+                UnrecoverableError(
+                    fmt::format("Segment id: {} is not allowed to be removed. commit_ts: {}, begin_ts: {}", segment_id, commit_ts, begin_ts));
+            }
+            delete_keys.push_back(iter->Key().ToString());
+        }
+        iter->Next();
+    }
+    for (const String &key : delete_keys) {
+        Status status = kv_instance_.Delete(key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    if (segment_ids1_ && segment_ids1_->first == begin_ts) {
+        for (auto iter = segment_ids1_->second.begin(); iter != segment_ids1_->second.end();) {
+            if (segment_ids_set.contains(*iter)) {
+                iter = segment_ids1_->second.erase(iter);
+            } else {
+                ++iter;
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
 Status TableMeeta::AddSegmentID(SegmentID segment_id) {
     if (!segment_ids_) {
         Status status = LoadSegmentIDs();
