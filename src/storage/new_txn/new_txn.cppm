@@ -383,7 +383,9 @@ private:
 
     Status AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT append_rows, const ColumnVector &column_vector, SizeT source_offset);
 
-    Status DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets);
+    Status DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets, Vector<BlockOffset> &undo_block_offsets);
+
+    Status RollbackDeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets);
 
     Status CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state);
 
@@ -470,7 +472,8 @@ private:
     Status CommitImport(WalCmdImport *import_cmd);
     Status CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
     Status PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);
-    Status PostCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance);
+    Status PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance);
+    Status RollbackDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance);
     Status CommitCompact(WalCmdCompact *compact_cmd);
     Status PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInstance *kv_instance);
     Status CommitCheckpoint(const WalCmdCheckpoint *checkpoint_cmd);

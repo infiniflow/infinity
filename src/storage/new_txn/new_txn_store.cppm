@@ -232,10 +232,12 @@ public:
     AppendState *append_state() const { return append_state_.get(); }
 
     const DeleteState &delete_state() const { return delete_state_; }
+    DeleteState &undo_delete_state() { return undo_delete_state_; }
 
 private:
     UniquePtr<AppendState> append_state_{};
-    DeleteState delete_state_{};
+    DeleteState delete_state_{};      // Used for commit delete operation
+    DeleteState undo_delete_state_{}; // Used for rollback delete operation
 };
 
 export class NewTxnStore {

@@ -186,13 +186,16 @@ void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
     latest_change_ts_ = commit_ts;
 }
 
-void BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
+Status BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
     if (deleted_[offset] != 0) {
-        UnrecoverableError(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
+        return Status::TxnWWConflict(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
     }
     deleted_[offset] = commit_ts;
     latest_change_ts_ = commit_ts;
+    return Status::OK();
 }
+
+void BlockVersion::RollbackDelete(i32 offset) { deleted_[offset] = 0; } // FIXME latest_change_ts_ ?
 
 bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
     if (SizeT(offset) >= deleted_.size()) {

@@ -797,7 +797,7 @@ Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT 
     return Status::OK();
 }
 
-Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets) {
+Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets, Vector<BlockOffset> &undo_block_offsets) {
     SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
     Status status;
     BufferObj *version_buffer = nullptr;
@@ -815,13 +815,47 @@ Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &b
         }
         std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
-        block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts);
+        // delete in version file
+        BufferHandle buffer_handle = version_buffer->Load();
+        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        undo_block_offsets.reserve(block_offsets.size());
+        for (BlockOffset block_offset : block_offsets) {
+            Status status = block_version->Delete(block_offset, commit_ts);
+            if (!status.ok()) {
+                return status;
+            }
+            undo_block_offsets.push_back(block_offset);
+        }
+        block_lock->max_ts_ = std::max(block_lock->max_ts_, commit_ts); // FIXME: remove max_ts, undo delete should not revert max_ts
+    }
+    return Status::OK();
+}
+
+Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets) {
+    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
+    BufferObj *version_buffer = nullptr;
+    {
+        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
+        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
+        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
+        if (version_buffer == nullptr) {
+            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
+        }
+    }
+
+    {
+        SharedPtr<BlockLock> block_lock;
+        Status status = block_meta.GetBlockLock(block_lock);
+        if (!status.ok()) {
+            return status;
+        }
+        std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
 
         // delete in version file
         BufferHandle buffer_handle = version_buffer->Load();
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
         for (BlockOffset block_offset : block_offsets) {
-            block_version->Delete(block_offset, commit_ts);
+            block_version->RollbackDelete(block_offset);
         }
     }
     return Status::OK();
@@ -1379,7 +1413,7 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
     return Status::OK();
 }
 
-Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance) {
+Status NewTxn::PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance) {
     const String &db_id_str = delete_cmd->db_id_str_;
     const String &table_id_str = delete_cmd->table_id_str_;
 
@@ -1394,16 +1428,51 @@ Status NewTxn::PostCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_i
         return delete_status;
     }
     const DeleteState &delete_state = txn_table_store->delete_state();
+    DeleteState &undo_delete_state = txn_table_store->undo_delete_state();
     for (const auto &[segment_id, block_map] : delete_state.rows_) {
         if (!segment_meta || segment_id != segment_meta->segment_id()) {
             segment_meta.emplace(segment_id, table_meta, *kv_instance);
             block_meta.reset();
         }
+        auto &undo_segment_map = undo_delete_state.rows_[segment_id];
         for (const auto &[block_id, block_offsets] : block_map) {
             if (!block_meta || block_id != block_meta->block_id()) {
                 block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
             }
-            Status status = this->DeleteInBlock(*block_meta, block_offsets);
+            auto &undo_block_offsets = undo_segment_map[block_id];
+            Status status = this->DeleteInBlock(*block_meta, block_offsets, undo_block_offsets);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::RollbackDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance) {
+    const String &db_id_str = delete_cmd->db_id_str_;
+    const String &table_id_str = delete_cmd->table_id_str_;
+
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance);
+
+    Optional<SegmentMeta> segment_meta;
+    Optional<BlockMeta> block_meta;
+
+    // Get undo delete state
+    NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
+    DeleteState &undo_delete_state = txn_table_store->undo_delete_state();
+
+    for (const auto &[segment_id, block_map] : undo_delete_state.rows_) {
+        if (!segment_meta || segment_id != segment_meta->segment_id()) {
+            segment_meta.emplace(segment_id, table_meta, *kv_instance);
+            block_meta.reset();
+        }
+        auto &undo_block_map = undo_delete_state.rows_[segment_id];
+        for (const auto &[block_id, block_offsets] : undo_block_map) {
+            if (!block_meta || block_id != block_meta->block_id()) {
+                block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
+            }
+            Status status = this->RollbackDeleteInBlock(*block_meta, block_offsets);
             if (!status.ok()) {
                 return status;
             }

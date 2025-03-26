@@ -64,7 +64,9 @@ export struct BlockVersion {
 
     void Append(TxnTimeStamp commit_ts, i32 row_count);
 
-    void Delete(i32 offset, TxnTimeStamp commit_ts);
+    Status Delete(i32 offset, TxnTimeStamp commit_ts);
+
+    void RollbackDelete(i32 offset);
 
     bool CheckDelete(i32 offset, TxnTimeStamp check_ts) const;
 
@@ -75,7 +77,7 @@ private:
                                     // risk to write uninitialized buffer. (ts, rows)
     Vector<TxnTimeStamp> deleted_{};
 
-    TxnTimeStamp latest_change_ts_{};
+    TxnTimeStamp latest_change_ts_{}; // used by checkpoint to decide if the version file need to be flushed or not.
 };
 
 } // namespace infinity

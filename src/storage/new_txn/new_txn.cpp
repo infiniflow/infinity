@@ -938,6 +938,8 @@ Status NewTxn::Commit() {
     Status status = this->PrepareCommit();
     if (!status.ok()) {
         if (!this->IsReplay()) {
+            // If prepare commit fail and not replay, rollback the transaction
+
             SharedPtr<WalEntry> wal_entry = std::exchange(wal_entry_, nullptr);
             txn_mgr_->SendToWAL(this);
     
@@ -951,6 +953,7 @@ Status NewTxn::Commit() {
         return status;
     }
 
+    // Try to commit the transaction
     status = kv_instance_->Commit();
     if (!status.ok()) {
         return status;
@@ -1140,9 +1143,9 @@ Status NewTxn::PrepareCommit() {
             case WalCommandType::DELETE: {
                 auto *delete_cmd = static_cast<WalCmdDelete *>(command.get());
 
-                Status status = PostCommitDelete(delete_cmd, kv_instance_.get());
+                Status status = PrepareCommitDelete(delete_cmd, kv_instance_.get());
                 if (!status.ok()) {
-                    UnrecoverableError("PostCommitDelete failed");
+                    return status;
                 }
                 break;
             }
@@ -1736,6 +1739,10 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table when rollback append txn");
+                }
+                status = RollbackDelete(cmd, kv_instance_.get());
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to rollback delete operation");
                 }
                 break;
             }

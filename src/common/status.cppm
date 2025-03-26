@@ -151,6 +151,8 @@ export enum class ErrorCode : long {
     // 4. Txn fail
     kTxnRollback = 4001,
     kTxnConflict = 4002,
+    kTxnWWConflict = 4003,
+    kTxnRWConflict = 4004,
 
     // 5. Insufficient resource or exceed limits
     kDiskFull = 5001,
@@ -337,8 +339,10 @@ public:
     static Status IndexOnColumn(const String &column_name);
 
     // 4. TXN fail
-    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no re\anson gived");
+    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reason");
     static Status TxnConflict(u64 txn_id, const String &conflict_reason);
+    static Status TxnWWConflict(const String &detailed_message);
+    static Status TxnRWConflict(const String &detailed_message);
 
     // 5. Insufficient resource or exceed limits
     static Status DiskFull(const String &detailed_info);
