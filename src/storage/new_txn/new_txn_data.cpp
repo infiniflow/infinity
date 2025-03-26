@@ -799,14 +799,11 @@ Status NewTxn::AppendInColumn(ColumnMeta &column_meta, SizeT dest_offset, SizeT 
 
 Status NewTxn::DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets) {
     SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
+    Status status;
     BufferObj *version_buffer = nullptr;
-    {
-        String version_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + String(BlockVersion::PATH);
-        BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-        version_buffer = buffer_mgr->GetBufferObject(version_filepath);
-        if (version_buffer == nullptr) {
-            return Status::BufferManagerError(fmt::format("Get version buffer failed: {}", version_filepath));
-        }
+    std::tie(version_buffer, status) = block_meta.GetVersionBuffer();
+    if (!status.ok()) {
+        return status;
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
@@ -1062,23 +1059,23 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
 }
 
 Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOption &option) {
-    // TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
     Status status;
 
-    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(checkpoint_ts);
     if (!status.ok()) {
         return status;
     }
 
-    SharedPtr<Vector<BlockID>> block_ids;
+    Vector<BlockID> *block_ids_ptr = nullptr;
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
-        std::tie(block_ids, status) = segment_meta.GetBlockIDs();
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(checkpoint_ts);
         if (!status.ok()) {
             return status;
         }
-        for (BlockID block_id : *block_ids) {
+        for (BlockID block_id : *block_ids_ptr) {
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
 
             SharedPtr<BlockLock> block_lock;

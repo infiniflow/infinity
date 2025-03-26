@@ -43,6 +43,7 @@ import chunk_index_meta;
 import db_meeta;
 import constant_expr;
 import default_values;
+import internal_types;
 
 class ReplayAppendTest : public NewReplayTest {
 public:
@@ -111,8 +112,7 @@ TEST_P(ReplayAppendTest, test_append0) {
     RestartTxnMgr();
 
     {
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
-
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
         TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
@@ -139,11 +139,130 @@ TEST_P(ReplayAppendTest, test_append0) {
 
         BlockID block_id = (*block_ids_ptr)[0];
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
-        SizeT block_row_cnt = 0;
-        std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
-        EXPECT_EQ(block_row_cnt, 8);
 
+        NewTxnGetVisibleRangeState state;
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        EXPECT_TRUE(status.ok());
+        {
+            Pair<BlockOffset, BlockOffset> range;
+            BlockOffset offset = 0;
+            bool has_next = state.Next(offset, range);
+            EXPECT_TRUE(has_next);
+            EXPECT_EQ(range.first, 0);
+            EXPECT_EQ(range.second, 8);
+            offset = range.second;
+            has_next = state.Next(offset, range);
+            EXPECT_FALSE(has_next);
+        }
+    }
+}
+
+TEST_P(ReplayAppendTest, test_replay_append_delete) {
+    using namespace infinity;
+
+    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+    }
+
+    auto input_block = MakeShared<DataBlock>();
+    {
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            col1->AppendValue(Value::MakeInt(1));
+            col1->AppendValue(Value::MakeInt(2));
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            col2->AppendValue(Value::MakeVarchar("abc"));
+            col2->AppendValue(Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+    }
+    for (int i = 0; i < 2; ++i) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+
+        Status status = txn->Append(*db_name, *table_name, input_block);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    RestartTxnMgr();
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        row_ids.push_back(RowID(0, 1));
+        row_ids.push_back(RowID(0, 3));
+        Status status = txn->Delete(*db_name, *table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    RestartTxnMgr();
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+        TxnTimeStamp begin_ts = txn->BeginTS();
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(begin_ts);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
+        SegmentID segment_id = (*segment_ids_ptr)[0];
+
+        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+
+        SizeT segment_row_cnt = 0;
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(begin_ts);
+        EXPECT_EQ(segment_row_cnt, 4);
+
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+        BlockID block_id = (*block_ids_ptr)[0];
+
+        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+
+        NewTxnGetVisibleRangeState state;
+        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
+        EXPECT_TRUE(status.ok());
+        {
+            Pair<BlockOffset, BlockOffset> range;
+            BlockOffset offset = 0;
+            bool has_next = state.Next(offset, range);
+            EXPECT_TRUE(has_next);
+            EXPECT_EQ(range.first, 0);
+            EXPECT_EQ(range.second, 1);
+            offset = range.second;
+            has_next = state.Next(offset, range);
+            EXPECT_TRUE(has_next);
+            EXPECT_EQ(range.first, 2);
+            EXPECT_EQ(range.second, 3);
+            offset = range.second;
+            has_next = state.Next(offset, range);
+            EXPECT_FALSE(has_next);
+        }
     }
 }

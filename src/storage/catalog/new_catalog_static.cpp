@@ -84,6 +84,7 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
 
 Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts) {
     Status status;
+    TxnTimeStamp begin_ts = checkpoint_ts;
 
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance);
@@ -119,8 +120,8 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
 
         return Status::OK();
     };
-    auto IniSegment = [&](SegmentMeta &segment_meta) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs();
+    auto InitSegment = [&](SegmentMeta &segment_meta) {
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
         if (!status.ok()) {
             return status;
         }
@@ -134,7 +135,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
 
         return Status::OK();
     };
-    auto IniChunkIndex = [&](ChunkID chunk_id, SegmentIndexMeta &segment_index_meta) {
+    auto InitChunkIndex = [&](ChunkID chunk_id, SegmentIndexMeta &segment_index_meta) {
         ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *kv_instance);
         Status status = chunk_index_meta.LoadSet();
         if (!status.ok()) {
@@ -142,7 +143,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         }
         return Status::OK();
     };
-    auto IniSegmentIndex = [&](SegmentID segment_id, TableIndexMeeta &table_index_meta) {
+    auto InitSegmentIndex = [&](SegmentID segment_id, TableIndexMeeta &table_index_meta) {
         SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, *kv_instance);
         status = segment_index_meta.LoadSet();
         if (!status.ok()) {
@@ -155,14 +156,14 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
             return status;
         }
         for (ChunkID chunk_id : *chunk_ids_ptr) {
-            status = IniChunkIndex(chunk_id, segment_index_meta);
+            status = InitChunkIndex(chunk_id, segment_index_meta);
             if (!status.ok()) {
                 return status;
             }
         }
         return Status::OK();
     };
-    auto IniTableIndex = [&](const String &index_id_str, TableMeeta &table_meta) {
+    auto InitTableIndex = [&](const String &index_id_str, TableMeeta &table_meta) {
         TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
@@ -171,24 +172,24 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
             return status;
         }
         for (SegmentID segment_id : *segment_ids_ptr) {
-            status = IniSegmentIndex(segment_id, table_index_meta);
+            status = InitSegmentIndex(segment_id, table_index_meta);
             if (!status.ok()) {
                 return status;
             }
         }
         return Status::OK();
     };
-    auto IniTable = [&](const String &table_id_str, DBMeeta &db_meta) {
+    auto InitTable = [&](const String &table_id_str, DBMeeta &db_meta) {
         TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance);
 
-        SharedPtr<Vector<SegmentID>> segment_ids_ptr;
-        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
         if (!status.ok()) {
             return status;
         }
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentMeta segment_meta(segment_id, table_meta, *kv_instance);
-            status = IniSegment(segment_meta);
+            status = InitSegment(segment_meta);
             if (!status.ok()) {
                 return status;
             }
@@ -201,7 +202,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         }
         for (const String &index_id_str : *index_id_strs_ptr) {
             TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
-            status = IniTableIndex(index_id_str, table_meta);
+            status = InitTableIndex(index_id_str, table_meta);
             if (!status.ok()) {
                 return status;
             }
@@ -209,7 +210,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
 
         return Status::OK();
     };
-    auto IniDB = [&](const String &db_id_str) {
+    auto InitDB = [&](const String &db_id_str) {
         DBMeeta db_meta(db_id_str, *kv_instance);
 
         Vector<String> *table_id_strs_ptr = nullptr;
@@ -218,7 +219,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
             return status;
         }
         for (const String &table_id_str : *table_id_strs_ptr) {
-            status = IniTable(table_id_str, db_meta);
+            status = InitTable(table_id_str, db_meta);
             if (!status.ok()) {
                 return status;
             }
@@ -226,7 +227,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return Status::OK();
     };
     for (const String &db_id_str : *db_id_strs_ptr) {
-        status = IniDB(db_id_str);
+        status = InitDB(db_id_str);
         if (!status.ok()) {
             return status;
         }
