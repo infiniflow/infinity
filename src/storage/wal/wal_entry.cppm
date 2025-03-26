@@ -164,6 +164,26 @@ export struct WalChunkIndexInfo {
     String ToString() const;
 };
 
+export struct WalSegmentIndexInfo {
+    SegmentID segment_id_ = -1;
+    Vector<WalChunkIndexInfo> chunk_infos_;
+
+    WalSegmentIndexInfo() = default;
+
+    WalSegmentIndexInfo(SegmentID segment_id, Vector<WalChunkIndexInfo> chunk_infos)
+        : segment_id_(segment_id), chunk_infos_(std::move(chunk_infos)) {}
+
+    bool operator==(const WalSegmentIndexInfo &other) const;
+
+    [[nodiscard]] i32 GetSizeInBytes() const;
+
+    void WriteBufferAdv(char *&buf) const;
+
+    static WalSegmentIndexInfo ReadBufferAdv(const char *&ptr);
+
+    String ToString() const;
+};
+
 // WalCommandType -> String
 export struct WalCmd {
     WalCmd() {
@@ -292,6 +312,7 @@ export struct WalCmdCreateIndex final : public WalCmd {
     String table_name_{};
     String index_dir_tail_{};
     SharedPtr<IndexBase> index_base_{};
+    Vector<WalSegmentIndexInfo> segment_index_infos_;
 
     // Used in commit phase
     String db_id_{};

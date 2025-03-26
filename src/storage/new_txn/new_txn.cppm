@@ -410,7 +410,8 @@ private:
                          const String &index_name,
                          TableIndexMeeta &table_index_meta,
                          SegmentMeta &segment_meta,
-                         SizeT segment_row_cnt);
+                         SizeT segment_row_cnt,
+                         WalCmdCreateIndex *create_index_cmd_ptr = nullptr);
 
     Status ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd);
 
@@ -471,7 +472,7 @@ private:
     Status CommitRenameTable(const WalCmdRenameTable *create_table_cmd);
     Status CommitAddColumns(const WalCmdAddColumns *add_columns_cmd);
     Status CommitDropColumns(const WalCmdDropColumns *drop_columns_cmd);
-    Status CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd);
+    Status CommitCreateIndex(WalCmdCreateIndex *create_index_cmd);
     Status CommitDropIndex(const WalCmdDropIndex *drop_index_cmd);
     Status CommitImport(WalCmdImport *import_cmd);
     Status CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_instance);

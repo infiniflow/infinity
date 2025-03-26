@@ -403,6 +403,42 @@ String WalChunkIndexInfo::ToString() const {
     return std::move(ss).str();
 }
 
+bool WalSegmentIndexInfo::operator==(const WalSegmentIndexInfo &other) const = default;
+
+i32 WalSegmentIndexInfo::GetSizeInBytes() const {
+    i32 size = sizeof(SegmentID) + sizeof(i32);
+    for (const auto &chunk_info : chunk_infos_) {
+        size += chunk_info.GetSizeInBytes();
+    }
+    return size;
+}
+
+void WalSegmentIndexInfo::WriteBufferAdv(char *&buf) const {
+    WriteBufAdv(buf, segment_id_);
+    WriteBufAdv(buf, static_cast<i32>(chunk_infos_.size()));
+    for (const auto &chunk_info : chunk_infos_) {
+        chunk_info.WriteBufferAdv(buf);
+    }
+}
+
+WalSegmentIndexInfo WalSegmentIndexInfo::ReadBufferAdv(const char *&ptr) {
+    SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
+    i32 count = ReadBufAdv<i32>(ptr);
+    WalSegmentIndexInfo segment_index_info;
+    segment_index_info.segment_id_ = segment_id;
+    for (i32 i = 0; i < count; i++) {
+        segment_index_info.chunk_infos_.push_back(WalChunkIndexInfo::ReadBufferAdv(ptr));
+    }
+
+    return segment_index_info;
+}
+
+String WalSegmentIndexInfo::ToString() const {
+    std::stringstream ss;
+    ss << "segment_id: " << segment_id_ << ", chunk_info count: " << chunk_infos_.size() << std::endl;
+    return std::move(ss).str();
+}
+
 SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
     const char *const ptr_end = ptr + max_bytes;
     SharedPtr<WalCmd> cmd = nullptr;
@@ -508,7 +544,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             String table_name = ReadBufAdv<String>(ptr);
             String index_dir_tail = ReadBufAdv<String>(ptr);
             SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateIndex>(std::move(db_name), std::move(table_name), std::move(index_dir_tail), std::move(index_base));
+            auto create_index_cmd = MakeShared<WalCmdCreateIndex>(std::move(db_name), std::move(table_name), std::move(index_dir_tail), std::move(index_base));
+            i32 segment_info_n = ReadBufAdv<i32>(ptr);
+            for (i32 i = 0; i < segment_info_n; ++i) {
+                WalSegmentIndexInfo segment_index_info = WalSegmentIndexInfo::ReadBufferAdv(ptr);
+                create_index_cmd->segment_index_infos_.push_back(std::move(segment_index_info));
+            }
+            cmd = std::move(create_index_cmd);
             break;
         }
         case WalCommandType::DROP_INDEX: {
@@ -624,7 +666,7 @@ bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ &&
            IsEqual(index_dir_tail_, other_cmd->index_dir_tail_) && index_base_.get() != nullptr && other_cmd->index_base_.get() != nullptr &&
-           *index_base_ == *other_cmd->index_base_;
+           *index_base_ == *other_cmd->index_base_ && segment_index_infos_ == other_cmd->segment_index_infos_;
 }
 
 bool WalCmdDropIndex::operator==(const WalCmd &other) const {
@@ -758,8 +800,13 @@ i32 WalCmdCreateTable::GetSizeInBytes() const {
 }
 
 i32 WalCmdCreateIndex::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
-           this->index_dir_tail_.size() + this->index_base_->GetSizeInBytes();
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+               this->index_dir_tail_.size() + this->index_base_->GetSizeInBytes();
+    size += sizeof(i32);
+    for (const auto &segment_index_info : segment_index_infos_) {
+        size += segment_index_info.GetSizeInBytes();
+    }
+    return size;
 }
 
 i32 WalCmdDropTable::GetSizeInBytes() const {
@@ -883,6 +930,10 @@ void WalCmdCreateIndex::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_dir_tail_);
     index_base_->WriteAdv(buf);
+    WriteBufAdv(buf, static_cast<i32>(segment_index_infos_.size()));
+    for (const auto &segment_index_info : segment_index_infos_) {
+        segment_index_info.WriteBufferAdv(buf);
+    }
 }
 
 void WalCmdDropTable::WriteAdv(char *&buf) const {
@@ -1070,6 +1121,9 @@ String WalCmdCreateIndex::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "index def: " << index_base_->ToString() << std::endl;
+    for (const auto &segment_index_info : segment_index_infos_) {
+        ss << segment_index_info.ToString() << std::endl;
+    }
     return std::move(ss).str();
 }
 

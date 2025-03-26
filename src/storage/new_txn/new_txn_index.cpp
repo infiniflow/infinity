@@ -520,7 +520,8 @@ Status NewTxn::PopulateIndex(const String &db_name,
                              const String &index_name,
                              TableIndexMeeta &table_index_meta,
                              SegmentMeta &segment_meta,
-                             SizeT segment_row_cnt) {
+                             SizeT segment_row_cnt,
+                             WalCmdCreateIndex *create_index_cmd_ptr) {
     Optional<SegmentIndexMeta> segment_index_meta;
     {
         Status status = NewCatalog::AddNewSegmentIndex(table_index_meta, segment_meta.segment_id(), segment_index_meta);
@@ -592,8 +593,15 @@ Status NewTxn::PopulateIndex(const String &db_name,
             }
         }
     }
-    {
-        ChunkIndexMeta chunk_index_meta(new_chunk_id, *segment_index_meta, segment_meta.kv_instance());
+
+    ChunkIndexMeta chunk_index_meta(new_chunk_id, *segment_index_meta, segment_meta.kv_instance());
+    if (create_index_cmd_ptr) {
+        WalCmdCreateIndex &create_index_cmd = *create_index_cmd_ptr;
+        Vector<WalChunkIndexInfo> chunk_infos;
+        chunk_infos.emplace_back(chunk_index_meta);
+
+        create_index_cmd.segment_index_infos_.emplace_back(segment_meta.segment_id(), std::move(chunk_infos));
+    } else {
         Status status = this->AddChunkWal(db_name, table_name, index_name, chunk_index_meta, old_chunk_ids, false);
         if (!status.ok()) {
             return status;
@@ -1295,7 +1303,7 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
     return Status::OK();
 }
 
-Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
+Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
 
@@ -1319,18 +1327,32 @@ Status NewTxn::CommitCreateIndex(const WalCmdCreateIndex *create_index_cmd) {
         return status;
     }
     TableIndexMeeta &table_index_meta = *table_index_meta_opt;
-    {
-        auto [segment_ids_ptr, status] = table_meta.GetSegmentIDs();
-        if (!status.ok()) {
-            return status;
+
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (this->IsReplay()) {
+        WalCmdDumpIndex dump_index_cmd(db_name, table_name, index_name, 0);
+        for (const WalSegmentIndexInfo &segment_index_info : create_index_cmd->segment_index_infos_) {
+            dump_index_cmd.segment_id_ = segment_index_info.segment_id_;
+            dump_index_cmd.chunk_infos_ = segment_index_info.chunk_infos_;
+
+            status = this->ReplayDumpIndex(&dump_index_cmd);
+            if (!status.ok()) {
+                return status;
+            }
         }
+    } else {
         for (SegmentID segment_id : *segment_ids_ptr) {
             SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
             auto [segment_row_cnt, status] = segment_meta.GetRowCnt1(begin_ts);
             if (!status.ok()) {
                 return status;
             }
-            status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, segment_meta, segment_row_cnt);
+            status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, segment_meta, segment_row_cnt, create_index_cmd);
             if (!status.ok()) {
                 return status;
             }
