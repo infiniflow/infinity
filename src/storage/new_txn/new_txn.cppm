@@ -22,7 +22,6 @@ import table_def;
 import index_base;
 import data_block;
 import meta_state;
-import data_access_state;
 import buffer_manager;
 import txn_state;
 import new_txn_store;
@@ -88,6 +87,9 @@ class DBMeeta;
 struct MemIndex;
 
 struct NewTxnCompactState;
+
+struct AppendState;
+struct AppendRange;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;

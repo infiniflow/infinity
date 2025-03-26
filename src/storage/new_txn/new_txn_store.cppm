@@ -18,7 +18,6 @@ export module new_txn_store;
 
 import stl;
 
-import data_access_state;
 import status;
 import internal_types;
 import index_base;
@@ -49,6 +48,10 @@ class BufferManager;
 class KVInstance;
 struct WalSegmentInfo;
 struct WalCmdDumpIndex;
+
+struct AppendState;
+struct DeleteState;
+struct AccessState;
 
 export struct NewTxnSegmentStore {
 public:
@@ -107,7 +110,9 @@ export struct NewTxnCompactStore {
 
 export class NewTxnTableStore {
 public:
-    explicit inline NewTxnTableStore(NewTxn *txn, const String &table_name) : txn_(txn), table_name_(table_name) {}
+    NewTxnTableStore(NewTxn *txn, const String &table_name);
+
+    ~NewTxnTableStore();
 
     Tuple<UniquePtr<String>, Status> Import(SharedPtr<SegmentEntry> segment_entry, NewTxn *txn);
 
@@ -169,9 +174,9 @@ public: // Setter, Getter
 
     inline bool HasUpdate() const { return has_update_; }
 
-    DeleteState &GetDeleteStateRef() { return delete_state_; }
+    DeleteState &GetDeleteStateRef() { return *delete_state_; }
 
-    inline DeleteState *GetDeleteStatePtr() { return &delete_state_; }
+    inline DeleteState *GetDeleteStatePtr() { return delete_state_.get(); }
 
     inline AppendState *GetAppendState() const { return append_state_.get(); }
 
@@ -195,7 +200,7 @@ private:
     NewTxn *const txn_{};
 
     UniquePtr<AppendState> append_state_{};
-    DeleteState delete_state_{};
+    UniquePtr<DeleteState> delete_state_{};
 
 private:
     TableEntry *table_entry_{};
@@ -223,23 +228,25 @@ private:
 
 export class NewTxnTableStore1 {
 public:
-    NewTxnTableStore1() = default;
+    NewTxnTableStore1();
+
+    ~NewTxnTableStore1();
 
     Status Append(const SharedPtr<DataBlock> &input_block);
 
     Status Delete(const Vector<RowID> &row_ids);
 
-    AccessState GetAccessState(const Vector<RowID> &row_ids);
+    void GetAccessState(const Vector<RowID> &row_ids, AccessState &access_state);
 
     AppendState *append_state() const { return append_state_.get(); }
 
-    const DeleteState &delete_state() const { return delete_state_; }
-    DeleteState &undo_delete_state() { return undo_delete_state_; }
+    const DeleteState &delete_state() const { return *delete_state_; }
+    DeleteState &undo_delete_state() { return *undo_delete_state_; }
 
 private:
     UniquePtr<AppendState> append_state_{};
-    DeleteState delete_state_{};      // Used for commit delete operation
-    DeleteState undo_delete_state_{}; // Used for rollback delete operation
+    UniquePtr<DeleteState> delete_state_{};      // Used for commit delete operation
+    UniquePtr<DeleteState> undo_delete_state_{}; // Used for rollback delete operation
 };
 
 export class NewTxnStore {

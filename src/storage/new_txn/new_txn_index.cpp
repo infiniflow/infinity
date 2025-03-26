@@ -56,6 +56,7 @@ import index_bmp;
 import emvb_index_in_mem;
 import emvb_index;
 import meta_key;
+import data_access_state;
 
 namespace infinity {
 

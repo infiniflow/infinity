@@ -33,6 +33,7 @@ import logger;
 import var_buffer;
 import wal_entry;
 import data_type;
+import data_access_state;
 import column_meta;
 import block_meta;
 import segment_meta;
@@ -496,7 +497,8 @@ Status NewTxn::PrintVersion(const String &db_name, const String &table_name, con
     Optional<BlockMeta> block_meta;
 
     NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
-    AccessState access_state = txn_table_store->GetAccessState(row_ids);
+    AccessState access_state;
+    txn_table_store->GetAccessState(row_ids, access_state);
     for (const auto &[segment_id, block_map] : access_state.rows_) {
         if (!segment_meta || segment_id != segment_meta->segment_id()) {
             segment_meta.emplace(segment_id, table_meta, *kv_instance_);

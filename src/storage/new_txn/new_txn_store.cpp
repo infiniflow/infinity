@@ -159,6 +159,10 @@ Pair<std::shared_lock<std::shared_mutex>, const HashMap<String, UniquePtr<NewTxn
     return std::make_pair(std::move(lock), std::cref(txn_indexes_store_));
 }
 
+NewTxnTableStore::NewTxnTableStore(NewTxn *txn, const String &table_name) : txn_(txn), table_name_(table_name) {}
+
+NewTxnTableStore::~NewTxnTableStore() = default;
+
 Tuple<UniquePtr<String>, Status> NewTxnTableStore::Import(SharedPtr<SegmentEntry> segment_entry, NewTxn *txn) {
     // this->AddSegmentStore(segment_entry.get());
     // this->AddSealedSegment(segment_entry.get());
@@ -297,7 +301,7 @@ bool NewTxnTableStore::CheckConflict(Catalog *catalog, NewTxn *txn) const {
             return true;
         }
     }
-    for (const auto &[segment_id, block_map] : delete_state_.rows_) {
+    for (const auto &[segment_id, block_map] : delete_state_->rows_) {
         if (auto *segment_entry = table_entry_->GetSegmentEntry(segment_id); segment_entry != nullptr) {
             for (const auto &[block_id, block_offsets] : block_map) {
                 if (auto block_entry = segment_entry->GetBlockEntryByID(block_id); block_entry.get() != nullptr) {
@@ -350,11 +354,11 @@ Optional<String> NewTxnTableStore::CheckConflict(const NewTxnTableStore *other_t
         }
     }
 
-    const auto &delete_state = delete_state_;
-    const auto &other_delete_state = other_table_store->delete_state_;
-    if (delete_state.rows_.empty() || other_delete_state.rows_.empty()) {
+    if (!delete_state_ || !other_table_store->delete_state_) {
         return None;
     }
+    const auto &delete_state = *delete_state_;
+    const auto &other_delete_state = *other_table_store->delete_state_;
     for (const auto &[segment_id, block_map] : delete_state.rows_) {
         auto other_iter = other_delete_state.rows_.find(segment_id);
         if (other_iter == other_delete_state.rows_.end()) {
@@ -417,7 +421,7 @@ void NewTxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_t
     //        Catalog::CommitCompact(table_entry_, txn_id, commit_ts, compact_state_);
     //    }
 
-    Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
+    Catalog::Delete(table_entry_, txn_id, this, commit_ts, *delete_state_);
 
     for (auto *sealed_segment : set_sealed_segments_) {
         if (!sealed_segment->SetSealed()) {
@@ -458,7 +462,7 @@ void NewTxnTableStore::MaintainCompactionAlg() {
     for (auto *sealed_segment : set_sealed_segments_) {
         table_entry_->AddSegmentToCompactionAlg(sealed_segment);
     }
-    for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
+    for (const auto &[segment_id, delete_map] : delete_state_->rows_) {
         table_entry_->AddDeleteToCompactionAlg(segment_id);
     }
 
@@ -541,6 +545,10 @@ void NewTxnTableStore::TryRevert() {
     }
 }
 
+NewTxnTableStore1::NewTxnTableStore1() = default;
+
+NewTxnTableStore1::~NewTxnTableStore1() = default;
+
 Status NewTxnTableStore1::Append(const SharedPtr<DataBlock> &input_block) {
     if (input_block->row_count() == 0) {
         UnrecoverableError("Attempt to append empty data block into transaction table store");
@@ -580,7 +588,7 @@ Status NewTxnTableStore1::Append(const SharedPtr<DataBlock> &input_block) {
 }
 
 Status NewTxnTableStore1::Delete(const Vector<RowID> &row_ids) {
-    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = delete_state_.rows_;
+    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = delete_state_->rows_;
     for (auto row_id : row_ids) {
         BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = row_id.segment_offset_ % DEFAULT_BLOCK_CAPACITY;
@@ -596,8 +604,7 @@ Status NewTxnTableStore1::Delete(const Vector<RowID> &row_ids) {
     return Status::OK();
 }
 
-AccessState NewTxnTableStore1::GetAccessState(const Vector<RowID> &row_ids) {
-    AccessState access_state;
+void NewTxnTableStore1::GetAccessState(const Vector<RowID> &row_ids, AccessState &access_state) {
     HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = access_state.rows_;
     for (auto row_id : row_ids) {
         BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
@@ -610,8 +617,6 @@ AccessState NewTxnTableStore1::GetAccessState(const Vector<RowID> &row_ids) {
             UnrecoverableError(error_message);
         }
     }
-
-    return access_state;
 }
 
 NewTxnStore::NewTxnStore(NewTxn *txn) : txn_(txn) {}
