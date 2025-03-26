@@ -1212,28 +1212,29 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
         }
     }
 
-    SharedPtr<Vector<BlockID>> block_ids_ptr;
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs();
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
     SizeT block_capacity = DEFAULT_BLOCK_CAPACITY;
     Vector<BlockID> block_ids = *block_ids_ptr;
     sort(block_ids.begin(), block_ids.end());
-    BlockID block_id = start_row_id.segment_offset_ / block_capacity;
+    BlockID start_block_id = start_row_id.segment_offset_ / block_capacity;
     BlockOffset block_offset = start_row_id.segment_offset_ % block_capacity;
     {
         SizeT i = 0;
-        while (i < block_ids.size() && block_ids[i] != block_id) {
+        while (i < block_ids.size() && block_ids[i] != start_block_id) {
             ++i;
         }
         if (i >= block_ids.size()) {
             return Status::OK();
         }
-        if (block_ids[i] != block_id) {
-            UnrecoverableError(fmt::format("block id {} not found in segment {}", block_id, segment_id));
+        if (block_ids[i] != start_block_id) {
+            UnrecoverableError(fmt::format("block id {} not found in segment {}", start_block_id, segment_id));
         }
         for (; i < block_ids.size(); ++i) {
+            BlockID block_id = block_ids[i];
             BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
             SizeT block_row_cnt = 0;
             // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
@@ -1250,10 +1251,11 @@ Status NewTxn::CountMemIndexGapInSegment(SegmentIndexMeta &segment_index_meta, S
 
 Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
     Status status;
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TableMeeta &table_meta = table_index_meta.table_meta();
 
-    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }

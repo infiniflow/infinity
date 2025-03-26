@@ -942,11 +942,11 @@ Status NewTxn::Commit() {
 
             SharedPtr<WalEntry> wal_entry = std::exchange(wal_entry_, nullptr);
             txn_mgr_->SendToWAL(this);
-    
+
             // Wait until CommitTxnBottom is done.
             std::unique_lock<std::mutex> lk(commit_lock_);
             commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
-    
+
             wal_entry_ = wal_entry;
             PostRollback(commit_ts);
         }
@@ -1622,9 +1622,11 @@ void NewTxn::PostCommit() {
             }
             case WalCommandType::CREATE_INDEX: {
                 auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                if (!this->IsReplay()) {
+                    Status status = new_catalog_->DecreaseTableWriteCount(cmd->table_key_);
+                    if (!status.ok()) {
+                        UnrecoverableError("Fail to unlock table");
+                    }
                 }
                 break;
             }
@@ -1966,12 +1968,14 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
 
             Optional<DBMeeta> db_meta;
             Optional<TableMeeta> table_meta;
-            Status status = GetTableMeta(create_index_cmd->db_name_, create_index_cmd->table_name_, db_meta, table_meta);
+            String table_key;
+            Status status = GetTableMeta(create_index_cmd->db_name_, create_index_cmd->table_name_, db_meta, table_meta, &table_key);
             if (!status.ok()) {
                 return status;
             }
             create_index_cmd->db_id_ = db_meta->db_id_str();
             create_index_cmd->table_id_ = table_meta->table_id_str();
+            create_index_cmd->table_key_ = std::move(table_key);
             break;
         }
         case WalCommandType::APPEND: {

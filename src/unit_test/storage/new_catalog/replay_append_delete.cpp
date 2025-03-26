@@ -45,6 +45,13 @@ import constant_expr;
 import default_values;
 import internal_types;
 
+import index_secondary;
+import index_full_text;
+import statement_common;
+import mem_index;
+import index_base;
+import buffer_obj;
+
 class ReplayAppendTest : public NewReplayTest {
 public:
 };
@@ -265,4 +272,120 @@ TEST_P(ReplayAppendTest, test_replay_append_delete) {
             EXPECT_FALSE(has_next);
         }
     }
+}
+
+TEST_P(ReplayAppendTest, test_replay_append_with_index0) {
+    using namespace infinity;
+
+    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+
+    auto index_name1 = std::make_shared<std::string>("index1");
+    auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
+    auto index_name2 = std::make_shared<String>("index2");
+    auto index_def2 = IndexFullText::Make(index_name2, MakeShared<String>(), "file_name", {column_def2->name()}, {});
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, table_def, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    auto create_index = [&](const SharedPtr<IndexBase> &index_base) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("create index {}", *index_base->index_name_)), TransactionType::kNormal);
+        Status status = txn->CreateIndex(*db_name, *table_name, index_base, ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    create_index(index_def1);
+    create_index(index_def2);
+
+    u32 block_row_cnt = 8192;
+    auto make_input_block = [&] {
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, Value v1, Value v2) {
+            for (u32 i = 0; i < block_row_cnt; i += 2) {
+                col.AppendValue(v1);
+                col.AppendValue(v2);
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, Value::MakeInt(1), Value::MakeInt(2));
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, Value::MakeVarchar("abc"), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+
+    for (int i = 0; i < 2; ++i) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        Status status = txn->Append(*db_name, *table_name, make_input_block());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    RestartTxnMgr();
+
+    auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta, const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
+        
+        SharedPtr<MemIndex> mem_index;
+        status = segment_index_meta.GetMemIndex(mem_index);
+        EXPECT_TRUE(status.ok());
+
+        auto [row_id, row_cnt] = check_mem_index(mem_index);
+        EXPECT_EQ(row_id, RowID(0, 0));
+        EXPECT_EQ(row_cnt, block_row_cnt * 2);
+    };
+
+    auto check_index = [&](const String &index_name, const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+
+        status = table_index_meta->GetSegmentIDs(segment_ids_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
+
+        for (SegmentID segment_id : *segment_ids_ptr) {
+            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, *txn->kv_instance());
+            check_segment_index(segment_index_meta, check_mem_index);
+        }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+    check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+        u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+        return std::make_pair(begin_id, row_cnt);
+    });
+    check_index(*index_name2, [&](const SharedPtr<MemIndex> &mem_index) {
+        RowID begin_id = mem_index->memory_indexer_->GetBaseRowId();
+        u32 row_cnt = mem_index->memory_indexer_->GetDocCount();
+        return std::make_pair(begin_id, row_cnt);
+    });
 }
