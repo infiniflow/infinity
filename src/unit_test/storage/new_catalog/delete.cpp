@@ -5859,6 +5859,11 @@ TEST_P(TestDelete, test_delete_and_delete) {
 
         // drop database
         auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+//        row_ids.clear();
+//        for (SizeT row_id = 0; row_id < 8192; row_id += 1) {
+//            row_ids.push_back(RowID(0, row_id));
+//        }
+//        txn7->PrintVersion(*db_name, *table_name, row_ids, false);
         status = txn7->DropDatabase("db1", ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);

@@ -82,7 +82,9 @@ export struct DeleteState {
     HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> rows_; // use segment id, as the first level key, block id as the second level key
 };
 
-export struct GetState {};
+export struct AccessState {
+    HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> rows_;
+};
 
 export enum class ScanStateType {
     kTableScan,

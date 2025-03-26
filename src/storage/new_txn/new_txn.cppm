@@ -345,6 +345,8 @@ public:
 
     KVInstance *kv_instance() const { return kv_instance_.get(); }
 
+    Status PrintVersion(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool ignore_invisible);
+
 private:
     void CheckTxnStatus();
 
@@ -386,6 +388,8 @@ private:
     Status DeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets, Vector<BlockOffset> &undo_block_offsets);
 
     Status RollbackDeleteInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets);
+
+    Status PrintVersionInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets, bool ignore_invisible);
 
     Status CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_state);
 

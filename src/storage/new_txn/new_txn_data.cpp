@@ -477,6 +477,46 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
     return Status::OK();
 }
 
+Status NewTxn::PrintVersion(const String &db_name, const String &table_name, const Vector<RowID> &row_ids, bool ignore_invisible) {
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
+    const String &db_id_str = db_meta->db_id_str();
+    const String &table_id_str = table_meta_opt->table_id_str();
+
+    TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_);
+
+    Optional<SegmentMeta> segment_meta;
+    Optional<BlockMeta> block_meta;
+
+    NewTxnTableStore1 *txn_table_store = txn_store_.GetNewTxnTableStore1(db_id_str, table_id_str);
+    AccessState access_state = txn_table_store->GetAccessState(row_ids);
+    for (const auto &[segment_id, block_map] : access_state.rows_) {
+        if (!segment_meta || segment_id != segment_meta->segment_id()) {
+            segment_meta.emplace(segment_id, table_meta, *kv_instance_);
+            block_meta.reset();
+        }
+        LOG_INFO(fmt::format("Segment {} version: ", segment_id));
+        for (const auto &[block_id, block_offsets] : block_map) {
+            if (!block_meta || block_id != block_meta->block_id()) {
+                block_meta.emplace(block_id, segment_meta.value(), *kv_instance_);
+            }
+            LOG_INFO(fmt::format("Block {} version: ", block_id));
+            Status status = this->PrintVersionInBlock(*block_meta, block_offsets, ignore_invisible);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+    return Status::OK();
+}
+
 Status NewTxn::Compact(const String &db_name, const String &table_name) {
     Status status;
 
@@ -850,6 +890,37 @@ Status NewTxn::RollbackDeleteInBlock(BlockMeta &block_meta, const Vector<BlockOf
         auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
         for (BlockOffset block_offset : block_offsets) {
             block_version->RollbackDelete(block_offset);
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::PrintVersionInBlock(BlockMeta &block_meta, const Vector<BlockOffset> &block_offsets, bool ignore_invisible) {
+    SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
+    Status status;
+    BufferObj *version_buffer = nullptr;
+    std::tie(version_buffer, status) = block_meta.GetVersionBuffer();
+    if (!status.ok()) {
+        return status;
+    }
+
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    {
+        SharedPtr<BlockLock> block_lock;
+        Status status = block_meta.GetBlockLock(block_lock);
+        if (!status.ok()) {
+            return status;
+        }
+        std::unique_lock<std::shared_mutex> lock(block_lock->mtx_);
+
+        // delete in version file
+        BufferHandle buffer_handle = version_buffer->Load();
+        auto *block_version = reinterpret_cast<BlockVersion *>(buffer_handle.GetDataMut());
+        for (BlockOffset block_offset : block_offsets) {
+            Status status = block_version->Print(begin_ts, block_offset, ignore_invisible);
+            if (!status.ok()) {
+                return status;
+            }
         }
     }
     return Status::OK();

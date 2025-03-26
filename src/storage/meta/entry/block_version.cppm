@@ -70,6 +70,8 @@ export struct BlockVersion {
 
     bool CheckDelete(i32 offset, TxnTimeStamp check_ts) const;
 
+    Status Print(TxnTimeStamp commit_ts, i32 offset, bool ignore_invisible);
+
     TxnTimeStamp latest_change_ts() const { return latest_change_ts_; }
 
 private:

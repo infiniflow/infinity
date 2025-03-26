@@ -204,4 +204,31 @@ bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
     return deleted_[offset] != 0 && deleted_[offset] <= check_ts;
 }
 
+Status BlockVersion::Print(TxnTimeStamp begin_ts, i32 offset, bool ignore_invisible) {
+    i32 row_count = 0;
+    for (const auto &created_range : created_) {
+        if (offset < row_count + created_range.row_count_) {
+            if (ignore_invisible) {
+                if (begin_ts < created_range.create_ts_) {
+                    // Can't see the record
+                    ;
+                } else if (begin_ts >= created_range.create_ts_ && (begin_ts < deleted_[offset] or deleted_[offset] == 0)) {
+                    LOG_INFO(fmt::format("Row {} created: {}", offset, created_range.create_ts_));
+                } else if (begin_ts >= deleted_[offset]) {
+                    // Can't see the record
+                    ;
+                } else {
+                    return Status::UnexpectedError(
+                        fmt::format("BeginTS is invalid: {}, create_ts: {}, delete_ts: {}", begin_ts, created_range.create_ts_, deleted_[offset]));
+                }
+            } else {
+                LOG_INFO(fmt::format("Row {}, created: {}, deleted: {}", offset, created_range.create_ts_, deleted_[offset]));
+            }
+            return Status::OK();
+        }
+        row_count += created_range.row_count_;
+    }
+    return Status::UnexpectedError(fmt::format("Offset {} out of range", offset));
+}
+
 } // namespace infinity
