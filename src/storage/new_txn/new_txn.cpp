@@ -935,44 +935,40 @@ Status NewTxn::Commit() {
     //     return Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", *conflict_reason));
     // }
 
-    if (this->IsReplay()) {
-        Status status = this->PrepareCommit();
-        if (!status.ok()) {
-            return status;
+    Status status = this->PrepareCommit();
+    if (!status.ok()) {
+        if (!this->IsReplay()) {
+            SharedPtr<WalEntry> wal_entry = std::exchange(wal_entry_, nullptr);
+            txn_mgr_->SendToWAL(this);
+    
+            // Wait until CommitTxnBottom is done.
+            std::unique_lock<std::mutex> lk(commit_lock_);
+            commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
+    
+            wal_entry_ = wal_entry;
+            PostRollback(commit_ts);
         }
-        this->CommitBottom();
-        PostCommit();
-        return Status::OK();
+        return status;
     }
 
-    Status status = this->PrepareCommit();
-    if (status.ok()) {
-        status = kv_instance_->Commit();
-    }
+    status = kv_instance_->Commit();
     if (!status.ok()) {
-        SharedPtr<WalEntry> wal_entry = std::exchange(wal_entry_, nullptr);
+        return status;
+    }
+    if (this->IsReplay()) {
+        this->CommitBottom();
+        PostCommit();
+    } else {
+        // Put wal entry to the manager in the same order as commit_ts.
+        wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
         txn_mgr_->SendToWAL(this);
 
         // Wait until CommitTxnBottom is done.
         std::unique_lock<std::mutex> lk(commit_lock_);
         commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-        wal_entry_ = wal_entry;
-        PostRollback(commit_ts);
-
-        return status;
+        PostCommit();
     }
-
-    // Put wal entry to the manager in the same order as commit_ts.
-    wal_entry_->txn_id_ = txn_context_ptr_->txn_id_;
-    txn_mgr_->SendToWAL(this);
-
-    // Wait until CommitTxnBottom is done.
-    std::unique_lock<std::mutex> lk(commit_lock_);
-    commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
-
-    PostCommit();
-
     return Status::OK();
 }
 
