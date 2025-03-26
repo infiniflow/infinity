@@ -325,6 +325,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
 
 Status NewTxn::ReplayImport(WalCmdImport *import_cmd) {
     Status status;
+    TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
@@ -352,8 +353,7 @@ Status NewTxn::ReplayImport(WalCmdImport *import_cmd) {
         return status;
     }
 
-    TxnTimeStamp checkpoint_ts = txn_mgr_->max_committed_ts();
-    status = NewCatalog::LoadFlushedSegment(table_meta, segment_info, checkpoint_ts);
+    status = NewCatalog::LoadFlushedSegment1(table_meta, segment_info, fake_commit_ts);
     if (!status.ok()) {
         return status;
     }
@@ -589,6 +589,8 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
 
 Status NewTxn::ReplayCompact(WalCmdCompact *compact_cmd) {
     Status status;
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
@@ -615,27 +617,19 @@ Status NewTxn::ReplayCompact(WalCmdCompact *compact_cmd) {
             return status;
         }
 
-        TxnTimeStamp checkpoint_ts = txn_mgr_->max_committed_ts();
-        status = NewCatalog::LoadFlushedSegment(table_meta, segment_info, checkpoint_ts);
+        status = NewCatalog::LoadFlushedSegment1(table_meta, segment_info, fake_commit_ts);
         if (!status.ok()) {
             return status;
         }
     }
 
     {
-        SharedPtr<Vector<SegmentID>> segment_ids_ptr;
-        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
         if (!status.ok()) {
             return status;
         }
-        Vector<SegmentID> cur_segment_ids;
-        HashSet<SegmentID> deprecated_segment_id_set(compact_cmd->deprecated_segment_ids_.begin(), compact_cmd->deprecated_segment_ids_.end());
-        for (SegmentID segment_id : *segment_ids_ptr) {
-            if (!deprecated_segment_id_set.contains(segment_id)) {
-                cur_segment_ids.push_back(segment_id);
-            }
-        }
-        status = table_meta.SetSegmentIDs(cur_segment_ids);
+        status = table_meta.RemoveSegmentIDs1(compact_cmd->deprecated_segment_ids_, begin_ts);
         if (!status.ok()) {
             return status;
         }

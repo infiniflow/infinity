@@ -469,31 +469,6 @@ Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts
     return Status::OK();
 }
 
-Status NewCatalog::LoadFlushedSegment(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
-    Status status;
-
-    Optional<SegmentMeta> segment_meta;
-    SegmentID segment_id = segment_info.segment_id_;
-    status = NewCatalog::AddNewSegment(table_meta, segment_id, segment_meta);
-    if (!status.ok()) {
-        return status;
-    }
-    u64 column_count = segment_info.column_count_;
-
-    for (const WalBlockInfo &block_info : segment_info.block_infos_) {
-        status = NewCatalog::LoadFlushedBlock(*segment_meta, block_info, checkpoint_ts, column_count);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
-    // status = segment_meta->SetRowCnt(segment_info.row_count_);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
-
 Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts) {
     Status status;
 
@@ -599,59 +574,6 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
             return status;
         }
     }
-    return Status::OK();
-}
-
-Status NewCatalog::LoadFlushedBlock(SegmentMeta &segment_meta, const WalBlockInfo &block_info, TxnTimeStamp checkpoint_ts, SizeT column_count) {
-    Status status;
-
-    auto *pm = InfinityContext::instance().persistence_manager();
-    if (pm) {
-        block_info.addr_serializer_.AddToPersistenceManager(pm);
-    }
-
-    BlockID block_id = 0;
-    {
-        std::tie(block_id, status) = segment_meta.GetNextBlockID();
-        if (!status.ok()) {
-            return status;
-        }
-        if (block_id != block_info.block_id_) {
-            UnrecoverableError(fmt::format("Block id mismatch, expect: {}, actual: {}", block_id, block_info.block_id_));
-        }
-        status = segment_meta.SetNextBlockID(block_id + 1);
-        if (!status.ok()) {
-            return status;
-        }
-        status = segment_meta.AddBlockID(block_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-
-    status = block_meta.LoadSet(checkpoint_ts);
-    if (!status.ok()) {
-        return status;
-    }
-
-    for (SizeT i = 0; i < column_count; ++i) {
-        const auto &[chunk_idx, chunk_offset] = block_info.outline_infos_[i];
-        ColumnMeta column_meta(i, block_meta, block_meta.kv_instance());
-        status = column_meta.SetChunkOffset(chunk_offset);
-        if (!status.ok()) {
-            return status;
-        }
-
-        status = column_meta.LoadSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    // status = block_meta.SetRowCnt(block_info.row_count_);
-    // if (!status.ok()) {
-    //     return status;
-    // }
     return Status::OK();
 }
 
