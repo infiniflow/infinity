@@ -272,7 +272,10 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
         SizeT buffer_size = buffer_obj->GetBufferSize();
         [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_size);
         if (memory_size < buffer_size) {
-            UnrecoverableError(fmt::format("BufferManager::AddToCleanList: memory_size < buffer_size: {} < {}", memory_size, buffer_size));
+            String err_msg = fmt::format("BufferManager::AddToCleanList: memory_size < buffer_size: {} < {}", memory_size, buffer_size);
+            LOG_WARN(err_msg);
+            current_memory_size_ = 0;
+            // UnrecoverableError(err_msg);
         }
         if (!RemoveFromGCQueue(buffer_obj)) {
             String error_message = fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename());
