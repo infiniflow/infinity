@@ -71,11 +71,23 @@ using namespace infinity;
 
 class TestCleanup : public BaseTestParamStr {
 protected:
-    void MakeFullFilePaths(Vector<String> &file_paths) {
-        for (auto &file_path : file_paths) {
+    void CheckFilePaths() {
+        for (auto &file_path : file_paths_) {
             file_path = String(this->GetFullDataDir()) + "/" + file_path;
         }
+
+        for (const auto &file_path : file_paths_) {
+            if (!std::filesystem::path(file_path).is_absolute()) {
+                ADD_FAILURE() << "File path is not absolute: " << file_path;
+            }
+            EXPECT_FALSE(std::filesystem::exists(file_path));
+        }
+
+        file_paths_.clear();
     }
+
+protected:
+    Vector<String> file_paths_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TestCleanup, ::testing::Values(BaseTestParamStr::VFS_OFF_CONFIG_PATH));
@@ -126,16 +138,14 @@ TEST_P(TestCleanup, test_cleanup_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    Vector<String> file_paths;
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
         CheckpointOption option;
         Status status = txn->Checkpoint(option);
         EXPECT_TRUE(status.ok());
 
-        status = txn->GetTableFilePaths(*db_name, *table_name, file_paths);
+        status = txn->GetTableFilePaths(*db_name, *table_name, file_paths_);
         EXPECT_TRUE(status.ok());
-        this->MakeFullFilePaths(file_paths);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -154,12 +164,7 @@ TEST_P(TestCleanup, test_cleanup_table) {
         EXPECT_TRUE(status.ok());
     }
 
-    for (const auto &file_path : file_paths) {
-        if (!std::filesystem::path(file_path).is_absolute()) {
-            ADD_FAILURE() << "File path is not absolute: " << file_path;
-        }
-        EXPECT_FALSE(std::filesystem::exists(file_path));
-    }
+    this->CheckFilePaths();
 }
 
 TEST_P(TestCleanup, test_cleanup_index) {
@@ -225,16 +230,14 @@ TEST_P(TestCleanup, test_cleanup_index) {
 
     new_txn_mgr->PrintAllKeyValue();
 
-    Vector<String> file_paths;
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
         CheckpointOption option;
         Status status = txn->Checkpoint(option);
         EXPECT_TRUE(status.ok());
 
-        status = txn->GetTableIndexFilePaths(*db_name, *table_name, *index_name1, file_paths);
+        status = txn->GetTableIndexFilePaths(*db_name, *table_name, *index_name1, file_paths_);
         EXPECT_TRUE(status.ok());
-        this->MakeFullFilePaths(file_paths);
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -252,20 +255,13 @@ TEST_P(TestCleanup, test_cleanup_index) {
         Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
         EXPECT_TRUE(status.ok());
     }
-    for (const auto &file_path : file_paths) {
-        if (!std::filesystem::path(file_path).is_absolute()) {
-            ADD_FAILURE() << "File path is not absolute: " << file_path;
-        }
-        EXPECT_FALSE(std::filesystem::exists(file_path));
-    }
-    file_paths.clear();
+    this->CheckFilePaths();
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
 
-        Status status = txn->GetTableFilePaths(*db_name, *table_name, file_paths);
+        Status status = txn->GetTableFilePaths(*db_name, *table_name, file_paths_);
         EXPECT_TRUE(status.ok());
-        this->MakeFullFilePaths(file_paths);
 
         status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -277,12 +273,7 @@ TEST_P(TestCleanup, test_cleanup_index) {
         Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
         EXPECT_TRUE(status.ok());
     }
-    for (const auto &file_path : file_paths) {
-        if (!std::filesystem::path(file_path).is_absolute()) {
-            ADD_FAILURE() << "File path is not absolute: " << file_path;
-        }
-        EXPECT_FALSE(std::filesystem::exists(file_path));
-    }
+    this->CheckFilePaths();
 }
 
 TEST_P(TestCleanup, test_cleanup_compact) {
@@ -346,14 +337,12 @@ TEST_P(TestCleanup, test_cleanup_compact) {
         EXPECT_TRUE(status.ok());
     };
 
-    Vector<String> file_paths;
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         Status status;
 
-        status = txn->GetTableFilePaths(*db_name, *table_name, file_paths);
+        status = txn->GetTableFilePaths(*db_name, *table_name, file_paths_);
         EXPECT_TRUE(status.ok());
-        this->MakeFullFilePaths(file_paths);
 
         status = txn->Compact(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
@@ -364,21 +353,13 @@ TEST_P(TestCleanup, test_cleanup_compact) {
         Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
         EXPECT_TRUE(status.ok());
     }
-
-    for (const auto &file_path : file_paths) {
-        if (!std::filesystem::path(file_path).is_absolute()) {
-            ADD_FAILURE() << "File path is not absolute: " << file_path;
-        }
-        EXPECT_FALSE(std::filesystem::exists(file_path));
-    }
-    file_paths.clear();
+    this->CheckFilePaths();
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
 
-        Status status = txn->GetTableFilePaths(*db_name, *table_name, file_paths);
+        Status status = txn->GetTableFilePaths(*db_name, *table_name, file_paths_);
         EXPECT_TRUE(status.ok());
-        this->MakeFullFilePaths(file_paths);
 
         status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -390,12 +371,7 @@ TEST_P(TestCleanup, test_cleanup_compact) {
         Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
         EXPECT_TRUE(status.ok());
     }
-    for (const auto &file_path : file_paths) {
-        if (!std::filesystem::path(file_path).is_absolute()) {
-            ADD_FAILURE() << "File path is not absolute: " << file_path;
-        }
-        EXPECT_FALSE(std::filesystem::exists(file_path));
-    }
+    this->CheckFilePaths();
 }
 
 TEST_P(TestCleanup, test_cleanup_optimize) {
@@ -472,17 +448,12 @@ TEST_P(TestCleanup, test_cleanup_optimize) {
         dump_index(*index_name2);
     };
 
-    Vector<String> file_paths;
     auto merge_index = [&](SegmentID segment_id, const String &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("merge index {}", index_name)), TransactionType::kNormal);
 
         {
-            Vector<String> paths;
-            Status status = txn->GetSegmentIndexFilepaths(*db_name, *table_name, index_name, segment_id, paths);
+            Status status = txn->GetSegmentIndexFilepaths(*db_name, *table_name, index_name, segment_id, file_paths_);
             EXPECT_TRUE(status.ok());
-            this->MakeFullFilePaths(paths);
-
-            file_paths.insert(file_paths.end(), std::make_move_iterator(paths.begin()), std::make_move_iterator(paths.end()));
         }
 
         Status status = txn->OptimizeIndex(*db_name, *table_name, index_name, segment_id);
@@ -497,21 +468,13 @@ TEST_P(TestCleanup, test_cleanup_optimize) {
         Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
         EXPECT_TRUE(status.ok());
     }
-
-    for (const auto &file_path : file_paths) {
-        if (!std::filesystem::path(file_path).is_absolute()) {
-            ADD_FAILURE() << "File path is not absolute: " << file_path;
-        }
-        EXPECT_FALSE(std::filesystem::exists(file_path));
-    }
-    file_paths.clear();
+    this->CheckFilePaths();
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
 
-        Status status = txn->GetTableFilePaths(*db_name, *table_name, file_paths);
+        Status status = txn->GetTableFilePaths(*db_name, *table_name, file_paths_);
         EXPECT_TRUE(status.ok());
-        this->MakeFullFilePaths(file_paths);
 
         status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
@@ -523,12 +486,7 @@ TEST_P(TestCleanup, test_cleanup_optimize) {
         Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
         EXPECT_TRUE(status.ok());
     }
-    for (const auto &file_path : file_paths) {
-        if (!std::filesystem::path(file_path).is_absolute()) {
-            ADD_FAILURE() << "File path is not absolute: " << file_path;
-        }
-        EXPECT_FALSE(std::filesystem::exists(file_path));
-    }
+    this->CheckFilePaths();
 }
 
 TEST_P(TestCleanup, test_cleanup_drop_column) {
@@ -592,13 +550,11 @@ TEST_P(TestCleanup, test_cleanup_drop_column) {
         EXPECT_TRUE(status.ok());
     }
 
-    Vector<String> file_paths;
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
 
-        Status status = txn->GetColumnFilePaths(*db_name, *table_name, column_def2->name_, file_paths);
+        Status status = txn->GetColumnFilePaths(*db_name, *table_name, column_def2->name_, file_paths_);
         EXPECT_TRUE(status.ok());
-        this->MakeFullFilePaths(file_paths);
 
         Vector<String> column_names = {column_def2->name_};
         status = txn->DropColumns(*db_name, *table_name, column_names);
@@ -611,10 +567,5 @@ TEST_P(TestCleanup, test_cleanup_drop_column) {
         Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
         EXPECT_TRUE(status.ok());
     }
-    for (const auto &file_path : file_paths) {
-        if (!std::filesystem::path(file_path).is_absolute()) {
-            ADD_FAILURE() << "File path is not absolute: " << file_path;
-        }
-        EXPECT_FALSE(std::filesystem::exists(file_path));
-    }
+    this->CheckFilePaths();
 }

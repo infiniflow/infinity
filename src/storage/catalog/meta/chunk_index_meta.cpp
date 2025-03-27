@@ -382,8 +382,6 @@ Status ChunkIndexMeta::SetChunkInfo(const ChunkIndexMetaInfo &chunk_info) {
 
 Status ChunkIndexMeta::FilePaths(Vector<String> &paths) {
     Status status;
-
-    paths.clear();
     TableIndexMeeta &table_index_meta = segment_index_meta_.table_index_meta();
     auto [index_def, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {

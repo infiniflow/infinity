@@ -157,7 +157,6 @@ Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outlin
 }
 
 Status ColumnMeta::FilePaths(Vector<String> &paths) {
-    paths.clear();
     String col_filename = std::to_string(column_idx_) + ".col";
     paths.push_back(*block_meta_.GetBlockDir() + "/" + col_filename);
 
