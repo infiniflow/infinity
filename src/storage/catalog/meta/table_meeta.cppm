@@ -80,11 +80,11 @@ public:
 
     Status SetUnsealedSegmentID(SegmentID unsealed_segment_id);
 
-    Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
+    // Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
     Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids, TxnTimeStamp begin_ts);
 
-    Status AddSegmentID(SegmentID segment_id);
+    // Status AddSegmentID(SegmentID segment_id);
 
     Pair<SegmentID, Status> AddSegmentID1(TxnTimeStamp commit_ts);
 
@@ -92,7 +92,7 @@ public:
 
     Tuple<ColumnID, Status> GetColumnIDByColumnName(const String &column_name);
     SharedPtr<String> GetTableDir();
-    Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs();
+    // Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs();
 
     Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1(TxnTimeStamp begin_ts);
 
@@ -110,7 +110,7 @@ private:
 
     Status LoadColumnDefs();
 
-    Status LoadSegmentIDs();
+    // Status LoadSegmentIDs();
 
     Status LoadSegmentIDs1(TxnTimeStamp begin_ts);
 
@@ -129,7 +129,7 @@ private:
 
     Optional<String> comment_;
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
-    Optional<Vector<SegmentID>> segment_ids_;
+    // Optional<Vector<SegmentID>> segment_ids_;
     Optional<Pair<TxnTimeStamp, Vector<SegmentID>>> segment_ids1_;
 
     Optional<Vector<String>> index_id_strs_;

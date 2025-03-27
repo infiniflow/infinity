@@ -32,16 +32,16 @@ namespace infinity {
 SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta, KVInstance &kv_instance)
     : kv_instance_(kv_instance), table_meta_(table_meta), segment_id_(segment_id) {}
 
-Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
-    block_ids_ = MakeShared<Vector<BlockID>>(block_ids);
-    String block_ids_key = GetSegmentTag("block_ids");
-    String block_ids_str = nlohmann::json(block_ids).dump();
-    Status status = kv_instance_.Put(block_ids_key, block_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
+// Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
+//     block_ids_ = MakeShared<Vector<BlockID>>(block_ids);
+//     String block_ids_key = GetSegmentTag("block_ids");
+//     String block_ids_str = nlohmann::json(block_ids).dump();
+//     Status status = kv_instance_.Put(block_ids_key, block_ids_str);
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     return Status::OK();
+// }
 
 // Status SegmentMeta::AddBlockID(BlockID block_id) {
 //     if (!block_ids_) {
@@ -81,12 +81,12 @@ Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
 // }
 
 Status SegmentMeta::InitSet() {
-    {
-        Status status = SetBlockIDs(Vector<BlockID>());
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // {
+    //     Status status = SetBlockIDs(Vector<BlockID>());
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
     {
         Status status = SetNextBlockID(0);
         if (!status.ok()) {
@@ -127,16 +127,16 @@ Status SegmentMeta::UninitSet() {
     return Status::OK();
 }
 
-Status SegmentMeta::LoadBlockIDs() {
-    String block_ids_key = GetSegmentTag("block_ids");
-    String block_ids_str;
-    Status status = kv_instance_.Get(block_ids_key, block_ids_str);
-    if (!status.ok()) {
-        return status;
-    }
-    block_ids_ = MakeShared<Vector<BlockID>>(nlohmann::json::parse(block_ids_str).get<Vector<BlockID>>());
-    return Status::OK();
-}
+// Status SegmentMeta::LoadBlockIDs() {
+//     String block_ids_key = GetSegmentTag("block_ids");
+//     String block_ids_str;
+//     Status status = kv_instance_.Get(block_ids_key, block_ids_str);
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     block_ids_ = MakeShared<Vector<BlockID>>(nlohmann::json::parse(block_ids_str).get<Vector<BlockID>>());
+//     return Status::OK();
+// }
 
 Status SegmentMeta::LoadBlockIDs1(TxnTimeStamp begin_ts) {
     block_ids1_ = {begin_ts, Vector<BlockID>()};
@@ -187,9 +187,9 @@ String SegmentMeta::GetSegmentTag(const String &tag) const {
 }
 
 Status SegmentMeta::Init() {
-    {
-        table_meta_.AddSegmentID(segment_id_);
-    }
+    // {
+    //     table_meta_.AddSegmentID(segment_id_);
+    // }
     {
         String latest_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
         String latest_block_id_str;
@@ -230,24 +230,24 @@ Status SegmentMeta::Init() {
     return Status::OK();
 }
 
-Status SegmentMeta::AddBlockID(BlockID block_id) {
-    if (block_ids_ == nullptr) {
-        Status status = LoadBlockIDs();
-        if (!status.ok()) {
-            return status;
-        }
-    }
+// Status SegmentMeta::AddBlockID(BlockID block_id) {
+//     if (block_ids_ == nullptr) {
+//         Status status = LoadBlockIDs();
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
 
-    block_ids_->push_back(block_id);
-    String block_ids_key = GetSegmentTag("block_ids");
-    String block_ids_str = nlohmann::json(*block_ids_).dump();
-    Status status = kv_instance_.Put(block_ids_key, block_ids_str);
-    if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to add block_id: {} to key: {}", block_id, block_ids_key));
-        return status;
-    }
-    return Status::OK();
-}
+//     block_ids_->push_back(block_id);
+//     String block_ids_key = GetSegmentTag("block_ids");
+//     String block_ids_str = nlohmann::json(*block_ids_).dump();
+//     Status status = kv_instance_.Put(block_ids_key, block_ids_str);
+//     if (!status.ok()) {
+//         LOG_ERROR(fmt::format("Fail to add block_id: {} to key: {}", block_id, block_ids_key));
+//         return status;
+//     }
+//     return Status::OK();
+// }
 
 Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
     Status status;
@@ -293,15 +293,15 @@ Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
     return {MakeShared<String>(seg_dir), Status::OK()};
 }
 
-Tuple<SharedPtr<Vector<BlockID>>, Status> SegmentMeta::GetBlockIDs() {
-    if (block_ids_ == nullptr) {
-        Status status = LoadBlockIDs();
-        if (!status.ok()) {
-            return {nullptr, status};
-        }
-    }
-    return {MakeShared<Vector<BlockID>>(*block_ids_), Status::OK()};
-}
+// Tuple<SharedPtr<Vector<BlockID>>, Status> SegmentMeta::GetBlockIDs() {
+//     if (block_ids_ == nullptr) {
+//         Status status = LoadBlockIDs();
+//         if (!status.ok()) {
+//             return {nullptr, status};
+//         }
+//     }
+//     return {MakeShared<Vector<BlockID>>(*block_ids_), Status::OK()};
+// }
 
 Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp begin_ts) {
     if (!block_ids1_ || block_ids1_->first != begin_ts) {

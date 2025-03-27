@@ -124,38 +124,38 @@ TEST_P(TableMeetaTest, table_meeta) {
         }
     }
 
-    {
-        Status status = table_meta.SetNextSegmentID(1);
-        EXPECT_TRUE(status.ok());
+    // {
+    //     Status status = table_meta.SetNextSegmentID(1);
+    //     EXPECT_TRUE(status.ok());
 
-        status = table_meta.AddSegmentID(1);
-        EXPECT_TRUE(status.ok());
+    //     status = table_meta.AddSegmentID(1);
+    //     EXPECT_TRUE(status.ok());
 
-        status = table_meta.SetNextSegmentID(2);
-        EXPECT_TRUE(status.ok());
+    //     status = table_meta.SetNextSegmentID(2);
+    //     EXPECT_TRUE(status.ok());
 
-        status = table_meta.AddSegmentID(2);
-        EXPECT_TRUE(status.ok());
+    //     status = table_meta.AddSegmentID(2);
+    //     EXPECT_TRUE(status.ok());
 
-        SegmentID segment_id = 0;
-        auto segment_status = table_meta.GetNextSegmentID(segment_id);
-        EXPECT_TRUE(segment_status.ok());
-        EXPECT_EQ(segment_id, 2);
-    }
+    //     SegmentID segment_id = 0;
+    //     auto segment_status = table_meta.GetNextSegmentID(segment_id);
+    //     EXPECT_TRUE(segment_status.ok());
+    //     EXPECT_EQ(segment_id, 2);
+    // }
 
-    {
-        auto dir_ptr = table_meta.GetTableDir();
-        EXPECT_STREQ(dir_ptr->c_str(), "1");
-    }
+    // {
+    //     auto dir_ptr = table_meta.GetTableDir();
+    //     EXPECT_STREQ(dir_ptr->c_str(), "1");
+    // }
 
-    {
-        auto [segments_ptr, segments_status] = table_meta.GetSegmentIDs();
-        EXPECT_TRUE(segments_status.ok());
-        EXPECT_EQ(segments_ptr->size(), 3);
-        EXPECT_EQ(segments_ptr->at(0), 0);
-        EXPECT_EQ(segments_ptr->at(1), 1);
-        EXPECT_EQ(segments_ptr->at(2), 2);
-    }
+    // {
+    //     auto [segments_ptr, segments_status] = table_meta.GetSegmentIDs();
+    //     EXPECT_TRUE(segments_status.ok());
+    //     EXPECT_EQ(segments_ptr->size(), 3);
+    //     EXPECT_EQ(segments_ptr->at(0), 0);
+    //     EXPECT_EQ(segments_ptr->at(1), 1);
+    //     EXPECT_EQ(segments_ptr->at(2), 2);
+    // }
 
     {
         auto [def_vectors, def_status] = table_meta.GetColumnDefs();

@@ -38,7 +38,7 @@ public:
 
     SizeT segment_capacity() const { return DEFAULT_SEGMENT_CAPACITY; }
 
-    Status SetBlockIDs(const Vector<BlockID> &block_ids);
+    // Status SetBlockIDs(const Vector<BlockID> &block_ids);
 
     Status SetNextBlockID(BlockID next_block_id);
 
@@ -50,14 +50,14 @@ public:
 
     // New
     Status Init();
-    Status AddBlockID(BlockID block_id);
+    // Status AddBlockID(BlockID block_id);
 
     Pair<BlockID, Status> AddBlockID1(TxnTimeStamp commit_ts);
 
     Status CommitBlock(BlockID block_id, TxnTimeStamp commit_ts);
 
     Tuple<SharedPtr<String>, Status> GetSegmentDir();
-    Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
+    // Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
 
     Tuple<Vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp begin_ts);
 
@@ -66,7 +66,7 @@ public:
     Tuple<BlockID, Status> GetNextBlockID();
 
 private:
-    Status LoadBlockIDs();
+    // Status LoadBlockIDs();
 
     Status LoadBlockIDs1(TxnTimeStamp begin_ts);
 
@@ -82,7 +82,7 @@ private:
     SegmentID segment_id_;
     Optional<String> segment_dir_;
 
-    SharedPtr<Vector<BlockID>> block_ids_;
+    // SharedPtr<Vector<BlockID>> block_ids_;
     Optional<BlockID> next_block_id_;
     // Optional<SizeT> row_cnt_;
 

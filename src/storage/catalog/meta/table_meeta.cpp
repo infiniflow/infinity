@@ -95,17 +95,17 @@ Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const S
     return {ColumnDef::FromJson(nlohmann::json::parse(column_def_str)), Status::OK()};
 }
 
-Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
-    segment_ids_ = segment_ids;
-    String segment_ids_key = GetTableTag("segment_ids");
-    String segment_ids_str = nlohmann::json(segment_ids).dump();
-    Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
-    if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to set segment ids to kv store, key: {}, cause: {}", segment_ids_key, status.message()));
-        return status;
-    }
-    return Status::OK();
-}
+// Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
+//     segment_ids_ = segment_ids;
+//     String segment_ids_key = GetTableTag("segment_ids");
+//     String segment_ids_str = nlohmann::json(segment_ids).dump();
+//     Status status = kv_instance_.Put(segment_ids_key, segment_ids_str);
+//     if (!status.ok()) {
+//         LOG_ERROR(fmt::format("Fail to set segment ids to kv store, key: {}, cause: {}", segment_ids_key, status.message()));
+//         return status;
+//     }
+//     return Status::OK();
+// }
 
 Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids, TxnTimeStamp begin_ts) {
     HashSet<SegmentID> segment_ids_set(segment_ids.begin(), segment_ids.end());
@@ -146,25 +146,25 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids, TxnTi
     return Status::OK();
 }
 
-Status TableMeeta::AddSegmentID(SegmentID segment_id) {
-    if (!segment_ids_) {
-        Status status = LoadSegmentIDs();
-        //        if (!status.ok() && status.code() != ErrorCode::kNotFound) {
-        //            return status;
-        //        }
-        //        segment_ids_ = Vector<SegmentID>();
-        if (!status.ok()) {
-            return status;
-        }
-    }
+// Status TableMeeta::AddSegmentID(SegmentID segment_id) {
+//     if (!segment_ids_) {
+//         Status status = LoadSegmentIDs();
+//         //        if (!status.ok() && status.code() != ErrorCode::kNotFound) {
+//         //            return status;
+//         //        }
+//         //        segment_ids_ = Vector<SegmentID>();
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
 
-    segment_ids_->emplace_back(segment_id);
-    Status status = SetSegmentIDs(*segment_ids_);
-    if (!status.ok()) {
-        return status;
-    }
-    return Status::OK();
-}
+//     segment_ids_->emplace_back(segment_id);
+//     Status status = SetSegmentIDs(*segment_ids_);
+//     if (!status.ok()) {
+//         return status;
+//     }
+//     return Status::OK();
+// }
 
 Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
     Status status;
@@ -404,17 +404,17 @@ Status TableMeeta::LoadColumnDefs() {
     return Status::OK();
 }
 
-Status TableMeeta::LoadSegmentIDs() {
-    String segment_ids_key = GetTableTag("segment_ids");
-    String segment_ids_str;
-    Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
-    if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to get segment ids from kv store, key: {}, cause: {}", segment_ids_key, status.message()));
-        return status;
-    }
-    segment_ids_ = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
-    return Status::OK();
-}
+// Status TableMeeta::LoadSegmentIDs() {
+//     String segment_ids_key = GetTableTag("segment_ids");
+//     String segment_ids_str;
+//     Status status = kv_instance_.Get(segment_ids_key, segment_ids_str);
+//     if (!status.ok()) {
+//         LOG_ERROR(fmt::format("Fail to get segment ids from kv store, key: {}, cause: {}", segment_ids_key, status.message()));
+//         return status;
+//     }
+//     segment_ids_ = nlohmann::json::parse(segment_ids_str).get<Vector<SegmentID>>();
+//     return Status::OK();
+// }
 
 Status TableMeeta::LoadSegmentIDs1(TxnTimeStamp begin_ts) {
     segment_ids1_ = {begin_ts, Vector<SegmentID>()};
@@ -520,19 +520,19 @@ Tuple<ColumnID, Status> TableMeeta::GetColumnIDByColumnName(const String &column
 
 SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_id_str_)}; }
 
-Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() {
-    if (!segment_ids_) {
-        auto status = LoadSegmentIDs();
-        if (!status.ok()) {
-            //            if (status.code() == ErrorCode::kNotFound) {
-            //                return {MakeShared<Vector<SegmentID>>(), Status::OK()};
-            //            } else {
-            return {nullptr, status};
-            //            }
-        }
-    }
-    return {MakeShared<Vector<SegmentID>>(segment_ids_.value()), Status::OK()};
-}
+// Tuple<SharedPtr<Vector<SegmentID>>, Status> TableMeeta::GetSegmentIDs() {
+//     if (!segment_ids_) {
+//         auto status = LoadSegmentIDs();
+//         if (!status.ok()) {
+//             //            if (status.code() == ErrorCode::kNotFound) {
+//             //                return {MakeShared<Vector<SegmentID>>(), Status::OK()};
+//             //            } else {
+//             return {nullptr, status};
+//             //            }
+//         }
+//     }
+//     return {MakeShared<Vector<SegmentID>>(segment_ids_.value()), Status::OK()};
+// }
 
 Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1(TxnTimeStamp begin_ts) {
     if (!segment_ids1_ || segment_ids1_->first != begin_ts) {

@@ -437,22 +437,22 @@ Status NewCatalog::CleanTableIndex(TableIndexMeeta &table_index_meta) {
     return Status::OK();
 }
 
-Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
-    {
-        Status status = table_meta.AddSegmentID(segment_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    segment_meta.emplace(segment_id, table_meta, table_meta.kv_instance());
-    {
-        Status status = segment_meta->InitSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
+// Status NewCatalog::AddNewSegment(TableMeeta &table_meta, SegmentID segment_id, Optional<SegmentMeta> &segment_meta) {
+//     {
+//         Status status = table_meta.AddSegmentID(segment_id);
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
+//     segment_meta.emplace(segment_id, table_meta, table_meta.kv_instance());
+//     {
+//         Status status = segment_meta->InitSet();
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
+//     return Status::OK();
+// }
 
 Status NewCatalog::AddNewSegment1(TableMeeta &table_meta, TxnTimeStamp commit_ts, Optional<SegmentMeta> &segment_meta) {
     Status status;
@@ -513,38 +513,38 @@ Status NewCatalog::CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts
     return Status::OK();
 }
 
-Status NewCatalog::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta) {
-    {
-        Status status = segment_meta.AddBlockID(block_id);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    block_meta.emplace(block_id, segment_meta, segment_meta.kv_instance());
-    {
-        Status status = block_meta->InitSet();
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    SizeT column_num = 0;
-    {
-        TableMeeta &table_meta = segment_meta.table_meta();
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        column_num = column_defs_ptr->size();
-    }
-    for (SizeT column_idx = 0; column_idx < column_num; ++column_idx) {
-        [[maybe_unused]] Optional<ColumnMeta> column_meta;
-        Status status = NewCatalog::AddNewBlockColumn(*block_meta, column_idx, column_meta);
-        if (!status.ok()) {
-            return status;
-        }
-    }
-    return Status::OK();
-}
+// Status NewCatalog::AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta) {
+//     {
+//         Status status = segment_meta.AddBlockID(block_id);
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
+//     block_meta.emplace(block_id, segment_meta, segment_meta.kv_instance());
+//     {
+//         Status status = block_meta->InitSet();
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
+//     SizeT column_num = 0;
+//     {
+//         TableMeeta &table_meta = segment_meta.table_meta();
+//         auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
+//         if (!status.ok()) {
+//             return status;
+//         }
+//         column_num = column_defs_ptr->size();
+//     }
+//     for (SizeT column_idx = 0; column_idx < column_num; ++column_idx) {
+//         [[maybe_unused]] Optional<ColumnMeta> column_meta;
+//         Status status = NewCatalog::AddNewBlockColumn(*block_meta, column_idx, column_meta);
+//         if (!status.ok()) {
+//             return status;
+//         }
+//     }
+//     return Status::OK();
+// }
 
 Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_ts, Optional<BlockMeta> &block_meta) {
     Status status;
