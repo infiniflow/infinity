@@ -121,7 +121,7 @@ TEST_P(ReplayImportTest, test_import0) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -170,7 +170,7 @@ TEST_P(ReplayImportTest, test_import0) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+            auto [block_ids, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 

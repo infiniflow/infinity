@@ -149,7 +149,6 @@ TEST_P(NewCheckpointTest, test_checkpoint0) {
 
     auto check_table = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
         Status status;
 
         Optional<DBMeeta> db_meta;
@@ -163,7 +162,7 @@ TEST_P(NewCheckpointTest, test_checkpoint0) {
 
             SizeT row_count = 0;
             // std::tie(row_count, status) = block_meta.GetRowCnt();
-            std::tie(row_count, status) = block_meta.GetRowCnt1(begin_ts);
+            std::tie(row_count, status) = block_meta.GetRowCnt1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_count, block_row_cnt);
 
@@ -184,7 +183,7 @@ TEST_P(NewCheckpointTest, test_checkpoint0) {
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 
@@ -196,7 +195,7 @@ TEST_P(NewCheckpointTest, test_checkpoint0) {
 
         {
             Vector<SegmentID> *segment_ids_ptr = nullptr;
-            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(begin_ts);
+            std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status.ok());
 
             EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));

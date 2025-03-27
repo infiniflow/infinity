@@ -53,7 +53,7 @@ public:
 
     // Tuple<SizeT, Status> GetRowCnt();
 
-    Tuple<SizeT, Status> GetRowCnt1(TxnTimeStamp begin_ts);
+    Tuple<SizeT, Status> GetRowCnt1();
 
     Tuple<BufferObj *, Status> GetVersionBuffer();
 
@@ -67,12 +67,13 @@ private:
     String GetBlockTag(const String &tag) const;
 
 private:
+    TxnTimeStamp begin_ts_ = 0;
     KVInstance &kv_instance_;
     SegmentMeta &segment_meta_;
     BlockID block_id_;
 
     SharedPtr<String> block_dir_;
-    Optional<Pair<TxnTimeStamp, SizeT>> row_cnt_;
+    Optional<SizeT> row_cnt_;
 
     BufferObj *version_buffer_ = nullptr;
 };

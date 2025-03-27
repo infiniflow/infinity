@@ -254,7 +254,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
         index_reader->column_index_readers_ = MakeShared<FlatHashMap<u64, SharedPtr<Map<String, SharedPtr<ColumnIndexReader>>>, detail::Hash<u64>>>();
         // result.column2analyzer_ = MakeShared<Map<String, String>>();
 
-        TableMeeta table_meta(db_id_str_, table_id_str_, *txn->kv_instance());
+        TableMeeta table_meta(db_id_str_, table_id_str_, *txn->kv_instance(), begin_ts);
         Vector<String> *index_id_strs = nullptr;
         {
             Status status = table_meta.GetIndexIDs(index_id_strs, nullptr);

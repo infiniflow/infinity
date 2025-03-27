@@ -184,7 +184,7 @@ TEST_P(TestAlter, add_column0) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+            auto [block_ids, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -194,7 +194,7 @@ TEST_P(TestAlter, add_column0) {
             }
         };
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -307,7 +307,7 @@ TEST_P(TestAlter, drop_column0) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+            auto [block_ids, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -317,7 +317,7 @@ TEST_P(TestAlter, drop_column0) {
             }
         };
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 

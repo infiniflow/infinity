@@ -132,12 +132,12 @@ TEST_P(ReplayCompactTest, test_compact0) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(block_status.ok());
 
         auto check_block = [&](BlockID block_id, const Value &v1, const Value &v2) {

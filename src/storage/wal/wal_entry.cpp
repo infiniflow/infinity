@@ -219,7 +219,7 @@ WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts)
     column_count_ = column_defs_ptr->size();
 
     Vector<BlockID> *block_ids_ptr = nullptr;
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         UnrecoverableError(status.message());
     }

@@ -30,6 +30,8 @@ export class SegmentMeta {
 public:
     SegmentMeta(SegmentID segment_id, TableMeeta &table_meta, KVInstance &kv_instance);
 
+    TxnTimeStamp begin_ts() const { return begin_ts_; }
+
     KVInstance &kv_instance() { return kv_instance_; }
 
     TableMeeta &table_meta() { return table_meta_; }
@@ -59,16 +61,16 @@ public:
     Tuple<SharedPtr<String>, Status> GetSegmentDir();
     // Tuple<SharedPtr<Vector<BlockID>>, Status> GetBlockIDs();
 
-    Tuple<Vector<BlockID> *, Status> GetBlockIDs1(TxnTimeStamp begin_ts);
+    Tuple<Vector<BlockID> *, Status> GetBlockIDs1();
 
     // Tuple<SizeT, Status> GetRowCnt();
-    Tuple<SizeT, Status> GetRowCnt1(TxnTimeStamp begin_ts);
+    Tuple<SizeT, Status> GetRowCnt1();
     Tuple<BlockID, Status> GetNextBlockID();
 
 private:
     // Status LoadBlockIDs();
 
-    Status LoadBlockIDs1(TxnTimeStamp begin_ts);
+    Status LoadBlockIDs1();
 
     Status LoadNextBlockID();
 
@@ -77,6 +79,7 @@ private:
     String GetSegmentTag(const String &tag) const;
 
 private:
+    TxnTimeStamp begin_ts_;
     KVInstance &kv_instance_;
     TableMeeta &table_meta_;
     SegmentID segment_id_;
@@ -86,8 +89,8 @@ private:
     Optional<BlockID> next_block_id_;
     // Optional<SizeT> row_cnt_;
 
-    Optional<Pair<TxnTimeStamp, Vector<BlockID>>> block_ids1_;
-    Optional<Pair<TxnTimeStamp, SizeT>> row_cnt_;
+    Optional<Vector<BlockID>> block_ids1_;
+    Optional<SizeT> row_cnt_;
 };
 
 } // namespace infinity

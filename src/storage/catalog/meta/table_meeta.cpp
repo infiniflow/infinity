@@ -32,8 +32,8 @@ import infinity_context;
 
 namespace infinity {
 
-TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance)
-    : kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
+TableMeeta::TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts)
+    : begin_ts_(begin_ts), kv_instance_(kv_instance), db_id_str_(db_id_str), table_id_str_(table_id_str) {}
 
 Status TableMeeta::GetIndexIDs(Vector<String> *&index_id_strs, Vector<String> **index_names) {
     if (!index_id_strs_ || !index_names_) {
@@ -107,7 +107,7 @@ Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const S
 //     return Status::OK();
 // }
 
-Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids, TxnTimeStamp begin_ts) {
+Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids) {
     HashSet<SegmentID> segment_ids_set(segment_ids.begin(), segment_ids.end());
 
     String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str_, table_id_str_);
@@ -118,9 +118,9 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids, TxnTi
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
         SegmentID segment_id = std::stoull(iter->Key().ToString().substr(segment_id_prefix.size()));
         if (segment_ids_set.contains(segment_id)) {
-            if (commit_ts > begin_ts) {
+            if (commit_ts > begin_ts_) {
                 UnrecoverableError(
-                    fmt::format("Segment id: {} is not allowed to be removed. commit_ts: {}, begin_ts: {}", segment_id, commit_ts, begin_ts));
+                    fmt::format("Segment id: {} is not allowed to be removed. commit_ts: {}, begin_ts: {}", segment_id, commit_ts, begin_ts_));
             }
             delete_keys.push_back(iter->Key().ToString());
         }
@@ -133,10 +133,10 @@ Status TableMeeta::RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids, TxnTi
         }
     }
 
-    if (segment_ids1_ && segment_ids1_->first == begin_ts) {
-        for (auto iter = segment_ids1_->second.begin(); iter != segment_ids1_->second.end();) {
+    if (segment_ids1_) {
+        for (auto iter = segment_ids1_->begin(); iter != segment_ids1_->end();) {
             if (segment_ids_set.contains(*iter)) {
-                iter = segment_ids1_->second.erase(iter);
+                iter = segment_ids1_->erase(iter);
             } else {
                 ++iter;
             }
@@ -172,12 +172,12 @@ Pair<SegmentID, Status> TableMeeta::AddSegmentID1(TxnTimeStamp commit_ts) {
     SegmentID segment_id = 0;
     {
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = GetSegmentIDs1(commit_ts);
+        std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
         if (!status.ok()) {
             return {0, status};
         }
         segment_id = segment_ids_ptr->empty() ? 0 : segment_ids_ptr->back() + 1;
-        segment_ids1_->second.push_back(segment_id);
+        segment_ids1_->push_back(segment_id);
     }
 
     String segment_id_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
@@ -416,16 +416,16 @@ Status TableMeeta::LoadColumnDefs() {
 //     return Status::OK();
 // }
 
-Status TableMeeta::LoadSegmentIDs1(TxnTimeStamp begin_ts) {
-    segment_ids1_ = {begin_ts, Vector<SegmentID>()};
-    Vector<SegmentID> &segment_ids = segment_ids1_->second;
+Status TableMeeta::LoadSegmentIDs1() {
+    segment_ids1_ = Vector<SegmentID>();
+    Vector<SegmentID> &segment_ids = *segment_ids1_;
 
     String segment_id_prefix = KeyEncode::CatalogTableSegmentKeyPrefix(db_id_str_, table_id_str_);
     auto iter = kv_instance_.GetIterator();
     iter->Seek(segment_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(segment_id_prefix)) {
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts) {
+        if (commit_ts > begin_ts_) {
             iter->Next();
             continue;
         }
@@ -534,14 +534,14 @@ SharedPtr<String> TableMeeta::GetTableDir() { return {MakeShared<String>(table_i
 //     return {MakeShared<Vector<SegmentID>>(segment_ids_.value()), Status::OK()};
 // }
 
-Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1(TxnTimeStamp begin_ts) {
-    if (!segment_ids1_ || segment_ids1_->first != begin_ts) {
-        auto status = LoadSegmentIDs1(begin_ts);
+Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
+    if (!segment_ids1_) {
+        auto status = LoadSegmentIDs1();
         if (!status.ok()) {
             return {nullptr, status};
         }
     }
-    return {&segment_ids1_->second, Status::OK()};
+    return {&*segment_ids1_, Status::OK()};
 }
 
 Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs() {

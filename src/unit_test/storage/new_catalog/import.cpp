@@ -149,7 +149,7 @@ TEST_P(TestImport, test_import1) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -198,7 +198,7 @@ TEST_P(TestImport, test_import1) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+            auto [block_ids, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -291,7 +291,6 @@ TEST_P(TestImport, test_import_with_index) {
     }
     auto check_index = [&](const String &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -323,7 +322,7 @@ TEST_P(TestImport, test_import_with_index) {
             EXPECT_TRUE(status.ok());
         };
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -410,14 +409,13 @@ TEST_P(TestImport, test_insert_and_import) {
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -445,32 +443,31 @@ TEST_P(TestImport, test_insert_and_import) {
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1, 2}));
 
         {
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(begin_ts);
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         }
         {
             SegmentMeta segment_meta(1, *table_meta, *txn->kv_instance());
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(begin_ts);
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         }
         {
             SegmentMeta segment_meta(2, *table_meta, *txn->kv_instance());
-            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(begin_ts);
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         }
@@ -565,7 +562,7 @@ TEST_P(TestImport, test_import_drop_db) {
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -575,8 +572,7 @@ TEST_P(TestImport, test_import_drop_db) {
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -586,8 +582,7 @@ TEST_P(TestImport, test_import_drop_db) {
         }
     };
     auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -1105,7 +1100,7 @@ TEST_P(TestImport, test_import_drop_table) {
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -1115,8 +1110,7 @@ TEST_P(TestImport, test_import_drop_table) {
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -1126,8 +1120,7 @@ TEST_P(TestImport, test_import_drop_table) {
         }
     };
     auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -1701,7 +1694,7 @@ TEST_P(TestImport, test_import_add_columns) {
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -1711,8 +1704,7 @@ TEST_P(TestImport, test_import_add_columns) {
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -1722,8 +1714,7 @@ TEST_P(TestImport, test_import_add_columns) {
         }
     };
     auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -2348,7 +2339,7 @@ TEST_P(TestImport, test_import_drop_columns) {
 
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -2358,8 +2349,7 @@ TEST_P(TestImport, test_import_drop_columns) {
         }
     };
     auto check_table_2segments = [&](TableMeeta &table_meta, NewTxn *txn) {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -2369,8 +2359,7 @@ TEST_P(TestImport, test_import_drop_columns) {
         }
     };
     auto check_table_1segment = [&](TableMeeta &table_meta, NewTxn *txn) {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
@@ -2992,9 +2981,7 @@ TEST_P(TestImport, test_import) {
         };
 
         auto check_segment = [&](SegmentMeta &segment_meta) {
-            TxnTimeStamp begin_ts = txn->BeginTS();
-
-            auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+            auto [block_ids, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -3005,9 +2992,7 @@ TEST_P(TestImport, test_import) {
         };
 
         auto check_table = [&](TableMeeta &table_meta) {
-            TxnTimeStamp begin_ts = txn->BeginTS();
-
-            auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+            auto [segment_ids, seg_status] = table_meta.GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
@@ -3111,7 +3096,7 @@ TEST_P(TestImport, test_import_append_table) {
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -3122,9 +3107,7 @@ TEST_P(TestImport, test_import_append_table) {
     };
 
     auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, const Vector<SegmentID> &segment_ids) {
-        TxnTimeStamp begin_ts = txn->BeginTS();
-
-        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
@@ -3750,7 +3733,7 @@ TEST_P(TestImport, test_import_import_table) {
     auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
@@ -3763,8 +3746,7 @@ TEST_P(TestImport, test_import_import_table) {
     auto check_table = [&](TableMeeta &table_meta, NewTxn *txn, Vector<SegmentID> segment_ids) {
         new_txn_mgr->PrintAllKeyValue();
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
-        auto [seg_ids, seg_status] = table_meta.GetSegmentIDs1(begin_ts);
+        auto [seg_ids, seg_status] = table_meta.GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*seg_ids, segment_ids);
 
@@ -3939,14 +3921,13 @@ TEST_P(TestImport, test_import_import_table) {
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn5->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
 
         check_table(*table_meta, txn5, {0});

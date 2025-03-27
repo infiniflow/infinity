@@ -155,7 +155,6 @@ TEST_P(TestIndexInternal, test_index0) {
 
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -164,7 +163,7 @@ TEST_P(TestIndexInternal, test_index0) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -454,7 +453,6 @@ TEST_P(TestIndexInternal, test_index) {
 
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -463,7 +461,7 @@ TEST_P(TestIndexInternal, test_index) {
         EXPECT_TRUE(status.ok());
 
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
@@ -828,7 +826,6 @@ TEST_P(TestIndexInternal, test_populate_index) {
 
     auto check_index = [&](const String &index_name, std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> check_mem_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("check index {}", index_name)), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -838,7 +835,7 @@ TEST_P(TestIndexInternal, test_populate_index) {
 
         SegmentID segment_id = 0;
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             segment_id = 0;

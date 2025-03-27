@@ -115,15 +115,13 @@ TEST_P(TestAppend, test_append0) {
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
 
-        TxnTimeStamp begin_ts = txn->BeginTS();
-
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1(begin_ts);
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
@@ -131,18 +129,18 @@ TEST_P(TestAppend, test_append0) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         SizeT segment_row_cnt = 0;
-        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1(begin_ts);
+        std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
         EXPECT_EQ(segment_row_cnt, 8);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
         BlockID block_id = (*block_ids_ptr)[0];
         BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
         SizeT block_row_cnt = 0;
-        std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
+        std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
         EXPECT_EQ(block_row_cnt, 8);
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -250,13 +248,13 @@ TEST_P(TestAppend, test_append1) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
@@ -435,7 +433,7 @@ TEST_P(TestAppend, test_append2) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(segment_ids->size(), 1);
         SegmentID segment_id = segment_ids->at(0);
@@ -443,7 +441,7 @@ TEST_P(TestAppend, test_append2) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
         EXPECT_TRUE(status.ok());
 
@@ -2932,13 +2930,13 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
@@ -3026,13 +3024,13 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
@@ -3120,13 +3118,13 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
@@ -3213,13 +3211,13 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
@@ -3308,13 +3306,13 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
@@ -3401,13 +3399,13 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
@@ -3495,13 +3493,13 @@ TEST_P(TestAppend, test_append_append) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
             SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
@@ -3638,7 +3636,7 @@ TEST_P(TestAppend, test_append_append_concurrent) {
             Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
             EXPECT_TRUE(status.ok());
 
-            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(segment_ids->size(), 1);
             {
@@ -3647,7 +3645,7 @@ TEST_P(TestAppend, test_append_append_concurrent) {
                 SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
                 Vector<BlockID> *block_ids_ptr = nullptr;
-                std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+                std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
                 EXPECT_TRUE(status.ok());
                 EXPECT_EQ(block_ids_ptr->size(), block_num);

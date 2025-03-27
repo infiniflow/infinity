@@ -35,7 +35,7 @@ import buffer_handle;
 namespace infinity {
 
 BlockMeta::BlockMeta(BlockID block_id, SegmentMeta &segment_meta, KVInstance &kv_instance)
-    : kv_instance_(kv_instance), segment_meta_(segment_meta), block_id_(block_id) {}
+    : begin_ts_(segment_meta.begin_ts()), kv_instance_(kv_instance), segment_meta_(segment_meta), block_id_(block_id) {}
 
 Status BlockMeta::GetBlockLock(SharedPtr<BlockLock> &block_lock) {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
@@ -207,9 +207,9 @@ String BlockMeta::GetBlockTag(const String &tag) const {
 //     return {*row_cnt_, Status::OK()};
 // }
 
-Tuple<SizeT, Status> BlockMeta::GetRowCnt1(TxnTimeStamp begin_ts) {
-    if (row_cnt_ && row_cnt_->first == begin_ts) {
-        return {row_cnt_->second, Status::OK()};
+Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
+    if (row_cnt_) {
+        return {*row_cnt_, Status::OK()};
     }
     Status status;
 
@@ -230,9 +230,9 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1(TxnTimeStamp begin_ts) {
     SizeT row_cnt = 0;
     {
         std::shared_lock lock(block_lock->mtx_);
-        row_cnt = block_version->GetRowCount(begin_ts);
+        row_cnt = block_version->GetRowCount(begin_ts_);
     }
-    row_cnt_ = {begin_ts, row_cnt};
+    row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
 }
 

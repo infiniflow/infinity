@@ -106,7 +106,7 @@ void EMVBIndexInMem::Insert(BlockEntry *block_entry, SizeT column_idx, BufferMan
     }
 }
 
-void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, KVInstance &kv_instance) {
+void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts) {
     std::unique_lock lock(rw_mutex_);
     if (is_built_.test(std::memory_order_acquire)) {
         for (u32 i = 0; i < row_count; ++i) {
@@ -126,7 +126,7 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u
             emvb_index_ =
                 MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
 
-            TableMeeta table_meta(db_id_str_, table_id_str_, kv_instance);
+            TableMeeta table_meta(db_id_str_, table_id_str_, kv_instance, begin_ts);
             SegmentMeta segment_meta(segment_id_, table_meta, table_meta.kv_instance());
             emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_meta, column_def_);
             if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {

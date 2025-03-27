@@ -28,7 +28,9 @@ class TableInfo;
 
 export class TableMeeta {
 public:
-    TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance);
+    TableMeeta(const String &db_id_str, const String &table_id_str, KVInstance &kv_instance, TxnTimeStamp begin_ts);
+
+    TxnTimeStamp begin_ts() const { return begin_ts_; }
 
     KVInstance &kv_instance() const { return kv_instance_; }
 
@@ -82,7 +84,7 @@ public:
 
     // Status SetSegmentIDs(const Vector<SegmentID> &segment_ids);
 
-    Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids, TxnTimeStamp begin_ts);
+    Status RemoveSegmentIDs1(const Vector<SegmentID> &segment_ids);
 
     // Status AddSegmentID(SegmentID segment_id);
 
@@ -94,7 +96,7 @@ public:
     SharedPtr<String> GetTableDir();
     // Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs();
 
-    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1(TxnTimeStamp begin_ts);
+    Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
 
     Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name);
@@ -112,7 +114,7 @@ private:
 
     // Status LoadSegmentIDs();
 
-    Status LoadSegmentIDs1(TxnTimeStamp begin_ts);
+    Status LoadSegmentIDs1();
 
     Status LoadIndexIDs();
 
@@ -123,6 +125,7 @@ private:
     String GetTableTag(const String &tag) const;
 
 private:
+    TxnTimeStamp begin_ts_ = 0;
     KVInstance &kv_instance_;
     String db_id_str_;
     String table_id_str_;
@@ -130,7 +133,7 @@ private:
     Optional<String> comment_;
     Optional<Vector<SharedPtr<ColumnDef>>> column_defs_;
     // Optional<Vector<SegmentID>> segment_ids_;
-    Optional<Pair<TxnTimeStamp, Vector<SegmentID>>> segment_ids1_;
+    Optional<Vector<SegmentID>> segment_ids1_;
 
     Optional<Vector<String>> index_id_strs_;
     Optional<Vector<String>> index_names_;

@@ -80,7 +80,7 @@ TEST_P(TableMeetaTest, table_meeta) {
     EXPECT_TRUE(get_status.ok());
 
     UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
-    TableMeeta table_meta(table_info->db_id_, table_info->table_id_, *kv_instance);
+    TableMeeta table_meta(table_info->db_id_, table_info->table_id_, *kv_instance, txn2->BeginTS());
 
     {
         SegmentID segment_id = 0;
@@ -92,8 +92,7 @@ TEST_P(TableMeetaTest, table_meeta) {
             segment_meta.Init();
             // segment_meta.SetRowCnt(1048);
             {
-                TxnTimeStamp begin_ts = 0;
-                auto [blocks, block_status] = segment_meta.GetBlockIDs1(begin_ts);
+                auto [blocks, block_status] = segment_meta.GetBlockIDs1();
                 EXPECT_TRUE(block_status.ok());
                 EXPECT_EQ(blocks->size(), 0);
             }
@@ -111,8 +110,7 @@ TEST_P(TableMeetaTest, table_meeta) {
             }
 
             {
-                TxnTimeStamp begin_ts = 2;
-                auto [blocks, block_status] = segment_meta.GetBlockIDs1(begin_ts);
+                auto [blocks, block_status] = segment_meta.GetBlockIDs1();
                 EXPECT_TRUE(block_status.ok());
                 EXPECT_EQ(*blocks, std::vector<BlockID>({0, 1}));
             }
@@ -149,7 +147,7 @@ TEST_P(TableMeetaTest, table_meeta) {
     // }
 
     // {
-    //     auto [segments_ptr, segments_status] = table_meta.GetSegmentIDs();
+    //     auto [segments_ptr, segments_status] = table_meta.GetSegmentIDs1();
     //     EXPECT_TRUE(segments_status.ok());
     //     EXPECT_EQ(segments_ptr->size(), 3);
     //     EXPECT_EQ(segments_ptr->at(0), 0);

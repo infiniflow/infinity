@@ -84,7 +84,6 @@ bool NewTxnGetVisibleRangeState::Next(BlockOffset block_offset_begin, Pair<Block
 
 Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts) {
     Status status;
-    TxnTimeStamp begin_ts = checkpoint_ts;
 
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance);
@@ -121,7 +120,7 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return Status::OK();
     };
     auto InitSegment = [&](SegmentMeta &segment_meta) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, status] = segment_meta.GetBlockIDs1();
         if (!status.ok()) {
             return status;
         }
@@ -180,10 +179,10 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
         return Status::OK();
     };
     auto InitTable = [&](const String &table_id_str, DBMeeta &db_meta) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance);
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, checkpoint_ts);
 
         Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
+        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
         if (!status.ok()) {
             return status;
         }
@@ -268,7 +267,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn, TxnTimeStamp system_start_ts) {
             return status;
         }
         for (const String &table_id_str : *table_id_strs_ptr) {
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance);
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, system_start_ts);
             status = IndexRecoverTable(table_meta);
             if (!status.ok()) {
                 return status;
@@ -317,7 +316,7 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts) {
     }
 
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance());
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts);
         status = NewCatalog::CleanTable(table_meta, begin_ts);
         if (!status.ok()) {
             return status;
@@ -334,6 +333,7 @@ Status NewCatalog::CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts) {
 
 Status NewCatalog::AddNewTable(DBMeeta &db_meta,
                                const String &table_id_str,
+                               TxnTimeStamp begin_ts,
                                TxnTimeStamp commit_ts,
                                const SharedPtr<TableDef> &table_def,
                                Optional<TableMeeta> &table_meta) {
@@ -345,7 +345,7 @@ Status NewCatalog::AddNewTable(DBMeeta &db_meta,
         return status;
     }
 
-    table_meta.emplace(db_meta.db_id_str(), table_id_str, db_meta.kv_instance());
+    table_meta.emplace(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts);
     status = table_meta->InitSet(table_def);
     if (!status.ok()) {
         return status;
@@ -358,7 +358,7 @@ Status NewCatalog::CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts) {
     Status status;
 
     Vector<SegmentID> *segment_ids_ptr = nullptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -497,7 +497,7 @@ Status NewCatalog::LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentI
 }
 
 Status NewCatalog::CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts) {
-    auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
+    auto [block_ids, status] = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -846,7 +846,7 @@ Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vecto
         return status;
     }
     for (const String &table_id_str : *table_id_strs_ptr) {
-        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance());
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance(), begin_ts);
         status = GetTableFilePaths(begin_ts, table_meta, file_paths);
         if (!status.ok()) {
             return status;
@@ -858,7 +858,7 @@ Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vecto
 Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def) {
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     Status status;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
     if (!status.ok()) {
         return status;
     }
@@ -888,7 +888,7 @@ Status
 NewCatalog::GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def) {
     Vector<BlockID> *block_ids_ptr = nullptr;
     Status status;
-    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
     if (!status.ok()) {
         return status;
     }

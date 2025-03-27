@@ -161,13 +161,13 @@ TEST_P(TestCompact, test_compact) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
 
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3}));
 
@@ -348,13 +348,13 @@ TEST_P(TestCompact, test_compact_with_index) {
         Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
 
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1(begin_ts);
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
         SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
 
-        auto [block_ids, block_status] = segment_meta.GetBlockIDs1(begin_ts);
+        auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3}));
 
@@ -436,7 +436,6 @@ TEST_P(TestCompact, test_compact_with_index) {
     }
     auto check_index = [&](const String &index_name) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -446,7 +445,7 @@ TEST_P(TestCompact, test_compact_with_index) {
 
         SegmentID segment_id = 0;
         {
-            auto [segment_ids, status] = table_meta->GetSegmentIDs1(begin_ts);
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
             segment_id = (*segment_ids)[0];

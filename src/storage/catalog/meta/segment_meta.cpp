@@ -30,7 +30,7 @@ import block_meta;
 namespace infinity {
 
 SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta, KVInstance &kv_instance)
-    : kv_instance_(kv_instance), table_meta_(table_meta), segment_id_(segment_id) {}
+    : begin_ts_(table_meta.begin_ts()), kv_instance_(kv_instance), table_meta_(table_meta), segment_id_(segment_id) {}
 
 // Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
 //     block_ids_ = MakeShared<Vector<BlockID>>(block_ids);
@@ -138,16 +138,16 @@ Status SegmentMeta::UninitSet() {
 //     return Status::OK();
 // }
 
-Status SegmentMeta::LoadBlockIDs1(TxnTimeStamp begin_ts) {
-    block_ids1_ = {begin_ts, Vector<BlockID>()};
-    Vector<BlockID> &block_ids = block_ids1_->second;
+Status SegmentMeta::LoadBlockIDs1() {
+    block_ids1_ = Vector<BlockID>();
+    Vector<BlockID> &block_ids = *block_ids1_;
 
     String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
     auto iter = kv_instance_.GetIterator();
     iter->Seek(block_id_prefix);
     while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
         TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
-        if (commit_ts > begin_ts) {
+        if (commit_ts > begin_ts_) {
             iter->Next();
             continue;
         }
@@ -255,12 +255,12 @@ Pair<BlockID, Status> SegmentMeta::AddBlockID1(TxnTimeStamp commit_ts) {
     BlockID block_id = 0;
     {
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = GetBlockIDs1(commit_ts);
+        std::tie(block_ids_ptr, status) = GetBlockIDs1();
         if (!status.ok()) {
             return {INVALID_BLOCK_ID, status};
         }
         block_id = block_ids_ptr->empty() ? 0 : block_ids_ptr->back() + 1;
-        block_ids1_->second.push_back(block_id);
+        block_ids1_->push_back(block_id);
     }
 
     String block_id_key = KeyEncode::CatalogTableSegmentBlockKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, block_id);
@@ -303,14 +303,14 @@ Tuple<SharedPtr<String>, Status> SegmentMeta::GetSegmentDir() {
 //     return {MakeShared<Vector<BlockID>>(*block_ids_), Status::OK()};
 // }
 
-Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp begin_ts) {
-    if (!block_ids1_ || block_ids1_->first != begin_ts) {
-        Status status = LoadBlockIDs1(begin_ts);
+Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1() {
+    if (!block_ids1_) {
+        Status status = LoadBlockIDs1();
         if (!status.ok()) {
             return {nullptr, status};
         }
     }
-    return {&block_ids1_->second, Status::OK()};
+    return {&*block_ids1_, Status::OK()};
 }
 
 // Tuple<SizeT, Status> SegmentMeta::GetRowCnt() {
@@ -323,29 +323,29 @@ Tuple<Vector<BlockID> *, Status> SegmentMeta::GetBlockIDs1(TxnTimeStamp begin_ts
 //     return {row_cnt_.value(), Status::OK()};
 // }
 
-Tuple<SizeT, Status> SegmentMeta::GetRowCnt1(TxnTimeStamp begin_ts) {
-    if (row_cnt_ && row_cnt_->first == begin_ts) {
-        return {row_cnt_->second, Status::OK()};
+Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
+    if (row_cnt_) {
+        return {*row_cnt_, Status::OK()};
     }
     Status status;
 
     SizeT row_cnt = 0;
     {
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = GetBlockIDs1();
         if (block_ids_ptr->size() > 0) {
             row_cnt += DEFAULT_BLOCK_CAPACITY * (block_ids_ptr->size() - 1);
 
             BlockMeta block_meta(block_ids_ptr->back(), *this, kv_instance_);
             SizeT block_row_cnt;
-            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1(begin_ts);
+            std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
             if (!status.ok()) {
                 return {0, status};
             }
             row_cnt += block_row_cnt;
         }
     }
-    row_cnt_ = {begin_ts, row_cnt};
+    row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
 }
 

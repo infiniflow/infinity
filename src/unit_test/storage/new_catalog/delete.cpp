@@ -240,7 +240,7 @@ TEST_P(TestDelete, test_delete_multiple_blocks) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         for (const auto block_id : *block_ids_ptr) {
@@ -316,7 +316,7 @@ TEST_P(TestDelete, test_delete_and_drop_db) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
@@ -620,7 +620,7 @@ TEST_P(TestDelete, test_delete_and_drop_table) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
@@ -952,7 +952,7 @@ TEST_P(TestDelete, test_delete_and_add_column) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
@@ -1624,7 +1624,7 @@ TEST_P(TestDelete, test_delete_and_drop_column) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
@@ -2265,7 +2265,7 @@ TEST_P(TestDelete, test_delete_and_rename) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
@@ -2893,7 +2893,7 @@ TEST_P(TestDelete, test_delete_and_create_index) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
@@ -3537,7 +3537,7 @@ TEST_P(TestDelete, test_delete_and_drop_index) {
         SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
         Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
@@ -4264,7 +4264,7 @@ TEST_P(TestDelete, test_delete_and_import) {
             SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
             for (const auto block_id : *block_ids_ptr) {
@@ -4295,7 +4295,7 @@ TEST_P(TestDelete, test_delete_and_import) {
             SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
             for (const auto block_id : *block_ids_ptr) {
@@ -5032,7 +5032,7 @@ TEST_P(TestDelete, test_delete_and_append) {
             SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 
@@ -5757,7 +5757,7 @@ TEST_P(TestDelete, test_delete_and_delete) {
             SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
 
             Vector<BlockID> *block_ids_ptr = nullptr;
-            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
+            std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 

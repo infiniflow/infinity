@@ -199,6 +199,7 @@ public:
 
     static Status AddNewTable(DBMeeta &db_meta,
                               const String &table_id_str,
+                              TxnTimeStamp begin_ts,
                               TxnTimeStamp commit_ts,
                               const SharedPtr<TableDef> &table_def,
                               Optional<TableMeeta> &table_meta);
