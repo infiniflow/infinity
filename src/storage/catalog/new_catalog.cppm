@@ -255,13 +255,17 @@ public:
 
     static Status GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vector<String> &file_paths);
 
-    static Status GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths);
+    static Status
+    GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def = nullptr);
 
-    static Status GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, Vector<String> &file_paths);
+    static Status
+    GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def = nullptr);
 
-    static Status GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file_paths);
+    static Status GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def = nullptr);
 
     static Status GetBlockColumnFilePaths(ColumnMeta &column_meta, Vector<String> &file_paths);
+
+    static Status GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, SharedPtr<ColumnDef> column_def, Vector<String> &file_paths);
 
     static Status GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vector<String> &file_paths);
 

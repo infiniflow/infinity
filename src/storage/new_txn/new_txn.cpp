@@ -2108,9 +2108,31 @@ Status NewTxn::GetBlockColumnFilePaths(const String &db_name,
     return NewCatalog::GetBlockColumnFilePaths(column_meta, file_paths);
 }
 
-Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_name, ColumnID column_id, Vector<String> &file_paths) {
-    // TODO
-    return Status::OK();
+Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_name, const String &column_name, Vector<String> &file_paths) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    SharedPtr<ColumnDef> column_def;
+    {
+        auto [column_defs, status] = table_meta->GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        for (auto &column : *column_defs) {
+            if (column->name() == column_name) {
+                column_def = column;
+                break;
+            }
+        }
+        if (!column_def) {
+            UnrecoverableError(fmt::format("Column {} not found in table {}", column_name, table_name));
+        }
+    }
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    return NewCatalog::GetColumnFilePaths(begin_ts, *table_meta, column_def, file_paths);
 }
 
 Status NewTxn::GetTableIndexFilePaths(const String &db_name, const String &table_name, const String &index_name, Vector<String> &file_paths) {

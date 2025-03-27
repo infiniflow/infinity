@@ -514,7 +514,7 @@ public:
                                    BlockID block_id,
                                    ColumnID column_id,
                                    Vector<String> &file_paths);
-    Status GetColumnFilePaths(const String &db_name, const String &table_name, ColumnID column_id, Vector<String> &file_paths);
+    Status GetColumnFilePaths(const String &db_name, const String &table_name, const String &column_name, Vector<String> &file_paths);
     Status GetTableIndexFilePaths(const String &db_name, const String &table_name, const String &index_name, Vector<String> &file_paths);
     Status GetSegmentIndexFilepaths(const String &db_name,
                                     const String &table_name,

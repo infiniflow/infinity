@@ -855,7 +855,7 @@ Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vecto
     return Status::OK();
 }
 
-Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths) {
+Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def) {
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     Status status;
     std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
@@ -864,7 +864,7 @@ Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_me
     }
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
-        status = GetSegmentFilePaths(begin_ts, segment_meta, file_paths);
+        status = GetSegmentFilePaths(begin_ts, segment_meta, file_paths, column_def);
         if (!status.ok()) {
             return status;
         }
@@ -884,7 +884,8 @@ Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_me
     return Status::OK();
 }
 
-Status NewCatalog::GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, Vector<String> &file_paths) {
+Status
+NewCatalog::GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def) {
     Vector<BlockID> *block_ids_ptr = nullptr;
     Status status;
     std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
@@ -893,7 +894,7 @@ Status NewCatalog::GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segme
     }
     for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-        status = GetBlockFilePaths(block_meta, file_paths);
+        status = GetBlockFilePaths(block_meta, file_paths, column_def);
         if (!status.ok()) {
             return status;
         }
@@ -901,22 +902,30 @@ Status NewCatalog::GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segme
     return Status::OK();
 }
 
-Status NewCatalog::GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file_paths) {
+Status NewCatalog::GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file_paths, SharedPtr<ColumnDef> column_def) {
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
     Status status;
     std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
     if (!status.ok()) {
         return status;
     }
-    for (const auto &column_def : *column_defs_ptr) {
+    if (!column_def) {
+        for (const auto &column_def : *column_defs_ptr) {
+            ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+            status = GetBlockColumnFilePaths(column_meta, file_paths);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        Vector<String> paths = block_meta.FilePaths();
+        file_paths.insert(file_paths.end(), std::make_move_iterator(paths.begin()), std::make_move_iterator(paths.end()));
+    } else {
         ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
         status = GetBlockColumnFilePaths(column_meta, file_paths);
         if (!status.ok()) {
             return status;
         }
     }
-    Vector<String> paths = block_meta.FilePaths();
-    file_paths.insert(file_paths.end(), std::make_move_iterator(paths.begin()), std::make_move_iterator(paths.end()));
     return Status::OK();
 }
 
@@ -929,6 +938,10 @@ Status NewCatalog::GetBlockColumnFilePaths(ColumnMeta &column_meta, Vector<Strin
     }
     file_paths.insert(file_paths.end(), std::make_move_iterator(paths.begin()), std::make_move_iterator(paths.end()));
     return Status::OK();
+}
+
+Status NewCatalog::GetColumnFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, SharedPtr<ColumnDef> column_def, Vector<String> &file_paths) {
+    return NewCatalog::GetTableFilePaths(begin_ts, table_meta, file_paths, column_def);
 }
 
 Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vector<String> &file_paths) {
