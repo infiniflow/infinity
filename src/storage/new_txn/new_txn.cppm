@@ -504,6 +504,30 @@ public:
 
     Status ReplayWalCmd(const SharedPtr<WalCmd> &wal_cmd);
 
+    Status GetDBFilePaths(const String &db_name, Vector<String> &file_paths);
+    Status GetTableFilePaths(const String &db_name, const String &table_name, Vector<String> &file_paths);
+    Status GetSegmentFilePaths(const String &db_name, const String &table_name, SegmentID segment_id, Vector<String> &file_paths);
+    Status GetBlockFilePaths(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, Vector<String> &file_paths);
+    Status GetBlockColumnFilePaths(const String &db_name,
+                                   const String &table_name,
+                                   SegmentID segment_id,
+                                   BlockID block_id,
+                                   ColumnID column_id,
+                                   Vector<String> &file_paths);
+    Status GetColumnFilePaths(const String &db_name, const String &table_name, ColumnID column_id, Vector<String> &file_paths);
+    Status GetIndexFilePaths(const String &db_name, const String &table_name, const String &index_name, Vector<String> &file_paths);
+    Status GetSegmentIndexFilepaths(const String &db_name,
+                                    const String &table_name,
+                                    const String &index_name,
+                                    SegmentID segment_id,
+                                    Vector<String> &file_paths);
+    Status GetChunkIndexFilePaths(const String &db_name,
+                                  const String &table_name,
+                                  const String &index_name,
+                                  SegmentID segment_id,
+                                  ChunkID chunk_id,
+                                  Vector<String> &file_paths);
+
 private:
     // Reference to external class
     NewTxnManager *txn_mgr_{};

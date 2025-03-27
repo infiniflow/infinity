@@ -72,7 +72,7 @@ using namespace infinity;
 class TestCleanup : public BaseTestParamStr {
 protected:
     Status GetTableFilePaths(NewTxn *txn, const String &db_name, const String &table_name, Vector<String> &file_paths) {
-        Status status = NewCatalog::GetTableFilePaths(txn, db_name, table_name, file_paths);
+        Status status = txn->GetTableFilePaths(db_name, table_name, file_paths);
         if (!status.ok()) {
             return status;
         }

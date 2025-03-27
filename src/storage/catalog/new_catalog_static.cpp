@@ -839,76 +839,83 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
     return Status::OK();
 }
 
-Status NewCatalog::GetTableFilePaths(NewTxn *txn, const String &db_name, const String &table_name, Vector<String> &file_paths) {
+Status NewCatalog::GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vector<String> &file_paths) {
+    Vector<String> *table_id_strs_ptr = nullptr;
+    Status status = db_meta.GetTableIDs(table_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &table_id_str : *table_id_strs_ptr) {
+        TableMeeta table_meta(db_meta.db_id_str(), table_id_str, db_meta.kv_instance());
+        status = GetTableFilePaths(begin_ts, table_meta, file_paths);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths) {
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
     Status status;
-    file_paths.clear();
-    TxnTimeStamp begin_ts = txn->BeginTS();
-
-    Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta;
-    status = txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
-
-    auto traverse_block = [&](BlockMeta &block_meta) -> Status {
-        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
-        std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        status = GetSegmentFilePaths(begin_ts, segment_meta, file_paths);
         if (!status.ok()) {
             return status;
         }
+    }
+    return Status::OK();
+}
 
-        for (const auto &column_def : *column_defs_ptr) {
-            ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
-            Vector<String> paths;
-            status = column_meta.FilePaths(paths);
-            if (!status.ok()) {
-                return status;
-            }
-            file_paths.insert(file_paths.end(), paths.begin(), paths.end());
-        }
-
-        Vector<String> paths = block_meta.FilePaths();
-        file_paths.insert(file_paths.end(), paths.begin(), paths.end());
-
-        return Status::OK();
-    };
-
-    auto traverse_segment = [&](SegmentMeta &segment_meta) -> Status {
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
-        if (!status.ok()) {
-            return status;
-        }
-        for (BlockID block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-            traverse_block(block_meta);
-        }
-        return Status::OK();
-    };
-
-    auto traverse_table = [&](TableMeeta &table_meta) -> Status {
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
-        if (!status.ok()) {
-            return status;
-        }
-
-        for (SegmentID segment_id : *segment_ids_ptr) {
-            SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
-            status = traverse_segment(segment_meta);
-            if (!status.ok()) {
-                return status;
-            }
-        }
-        return Status::OK();
-    };
-
-    status = traverse_table(*table_meta);
+Status NewCatalog::GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, Vector<String> &file_paths) {
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    Status status;
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        status = GetBlockFilePaths(block_meta, file_paths);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
 
+Status NewCatalog::GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file_paths) {
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    Status status;
+    std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        return status;
+    }
+    for (const auto &column_def : *column_defs_ptr) {
+        ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+        status = GetBlockColumnFilePaths(column_meta, file_paths);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    Vector<String> paths = block_meta.FilePaths();
+    file_paths.insert(file_paths.end(), std::make_move_iterator(paths.begin()), std::make_move_iterator(paths.end()));
+    return Status::OK();
+}
+
+Status NewCatalog::GetBlockColumnFilePaths(ColumnMeta &column_meta, Vector<String> &file_paths) {
+    Status status;
+    Vector<String> paths;
+    status = column_meta.FilePaths(paths);
+    if (!status.ok()) {
+        return status;
+    }
+    file_paths.insert(file_paths.end(), std::make_move_iterator(paths.begin()), std::make_move_iterator(paths.end()));
     return Status::OK();
 }
 

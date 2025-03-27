@@ -253,7 +253,15 @@ public:
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, NewTxnGetVisibleRangeState &state);
 
-    static Status GetTableFilePaths(NewTxn *txn, const String &db_name, const String &table_name, Vector<String> &file_paths);
+    static Status GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vector<String> &file_paths);
+
+    static Status GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_meta, Vector<String> &file_paths);
+
+    static Status GetSegmentFilePaths(TxnTimeStamp begin_ts, SegmentMeta &segment_meta, Vector<String> &file_paths);
+
+    static Status GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file_paths);
+
+    static Status GetBlockColumnFilePaths(ColumnMeta &column_meta, Vector<String> &file_paths);
 };
 
 } // namespace infinity

@@ -2044,4 +2044,97 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
     return Status::OK();
 }
 
+Status NewTxn::GetDBFilePaths(const String &db_name, Vector<String> &file_paths) {
+    Optional<DBMeeta> db_meta;
+    Status status = this->GetDBMeta(db_name, db_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    return NewCatalog::GetDBFilePaths(begin_ts, *db_meta, file_paths);
+}
+
+Status NewTxn::GetTableFilePaths(const String &db_name, const String &table_name, Vector<String> &file_paths) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    return NewCatalog::GetTableFilePaths(begin_ts, *table_meta, file_paths);
+}
+
+Status NewTxn::GetSegmentFilePaths(const String &db_name, const String &table_name, SegmentID segment_id, Vector<String> &file_paths) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    SegmentMeta segment_meta(segment_id, *table_meta, *kv_instance_);
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    return NewCatalog::GetSegmentFilePaths(begin_ts, segment_meta, file_paths);
+}
+
+Status
+NewTxn::GetBlockFilePaths(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, Vector<String> &file_paths) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    SegmentMeta segment_meta(segment_id, *table_meta, *kv_instance_);
+    BlockMeta block_meta(block_id, segment_meta, *kv_instance_);
+    return NewCatalog::GetBlockFilePaths(block_meta, file_paths);
+}
+
+Status NewTxn::GetBlockColumnFilePaths(const String &db_name,
+                                       const String &table_name,
+                                       SegmentID segment_id,
+                                       BlockID block_id,
+                                       ColumnID column_id,
+                                       Vector<String> &file_paths) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    SegmentMeta segment_meta(segment_id, *table_meta, *kv_instance_);
+    BlockMeta block_meta(block_id, segment_meta, *kv_instance_);
+    ColumnMeta column_meta(column_id, block_meta, *kv_instance_);
+    return NewCatalog::GetBlockColumnFilePaths(column_meta, file_paths);
+}
+
+Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_name, ColumnID column_id, Vector<String> &file_paths) {
+    //
+    return Status::OK();
+}
+
+Status NewTxn::GetIndexFilePaths(const String &db_name, const String &table_name, const String &index_name, Vector<String> &file_paths) {
+    //
+    return Status::OK();
+}
+
+Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
+                                        const String &table_name,
+                                        const String &index_name,
+                                        SegmentID segment_id,
+                                        Vector<String> &file_paths) {
+    //
+    return Status::OK();
+}
+
+Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
+                                      const String &table_name,
+                                      const String &index_name,
+                                      SegmentID segment_id,
+                                      ChunkID chunk_id,
+                                      Vector<String> &file_paths) {
+    //
+    return Status::OK();
+}
+
 } // namespace infinity
