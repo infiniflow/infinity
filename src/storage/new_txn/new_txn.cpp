@@ -1864,6 +1864,7 @@ void NewTxn::AddWriteTxnNum(TableEntry *table_entry) {
 
 Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
 
     Vector<UniquePtr<MetaKey>> metas;
     new_catalog->GetCleanedMeta(ts, metas);
@@ -1873,7 +1874,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             case MetaKey::Type::kDB: {
                 auto *db_meta_key = static_cast<DBMetaKey *>(meta.get());
                 DBMeeta db_meta(db_meta_key->db_id_str_, *kv_instance);
-                Status status = NewCatalog::CleanDB(db_meta);
+                Status status = NewCatalog::CleanDB(db_meta, ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1882,7 +1883,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             case MetaKey::Type::kTable: {
                 auto *table_meta_key = static_cast<TableMetaKey *>(meta.get());
                 TableMeeta table_meta(table_meta_key->db_id_str_, table_meta_key->table_id_str_, *kv_instance);
-                Status status = NewCatalog::CleanTable(table_meta);
+                Status status = NewCatalog::CleanTable(table_meta, ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1892,7 +1893,7 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
                 auto *segment_meta_key = static_cast<SegmentMetaKey *>(meta.get());
                 TableMeeta table_meta(segment_meta_key->db_id_str_, segment_meta_key->table_id_str_, *kv_instance);
                 SegmentMeta segment_meta(segment_meta_key->segment_id_, table_meta, *kv_instance);
-                Status status = NewCatalog::CleanSegment(segment_meta);
+                Status status = NewCatalog::CleanSegment(segment_meta, ts);
                 if (!status.ok()) {
                     return status;
                 }
@@ -1956,6 +1957,8 @@ Status NewTxn::Cleanup(TxnTimeStamp ts, KVInstance *kv_instance) {
             }
         }
     }
+
+    buffer_mgr->RemoveClean();
 
     return Status::OK();
 }

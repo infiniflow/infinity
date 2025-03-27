@@ -195,7 +195,7 @@ public:
                            const String *db_comment,
                            Optional<DBMeeta> &db_meta);
 
-    static Status CleanDB(DBMeeta &db_meta);
+    static Status CleanDB(DBMeeta &db_meta, TxnTimeStamp begin_ts);
 
     static Status AddNewTable(DBMeeta &db_meta,
                               const String &table_id_str,
@@ -203,7 +203,7 @@ public:
                               const SharedPtr<TableDef> &table_def,
                               Optional<TableMeeta> &table_meta);
 
-    static Status CleanTable(TableMeeta &table_meta);
+    static Status CleanTable(TableMeeta &table_meta, TxnTimeStamp begin_ts);
 
     static Status AddNewTableIndex(TableMeeta &table_meta,
                                    const String &index_id_str,
@@ -219,7 +219,7 @@ public:
 
     static Status LoadFlushedSegment1(TableMeeta &table_meta, const WalSegmentInfo &segment_info, TxnTimeStamp checkpoint_ts);
 
-    static Status CleanSegment(SegmentMeta &segment_meta);
+    static Status CleanSegment(SegmentMeta &segment_meta, TxnTimeStamp begin_ts);
 
     static Status AddNewBlock(SegmentMeta &segment_meta, BlockID block_id, Optional<BlockMeta> &block_meta);
 
@@ -252,6 +252,8 @@ public:
     static Status GetColumnVector(ColumnMeta &column_meta, SizeT row_count, const ColumnVectorTipe &tipe, ColumnVector &column_vector);
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, NewTxnGetVisibleRangeState &state);
+
+    static Status GetTableFilePaths(NewTxn *txn, const String &db_name, const String &table_name, Vector<String> &file_paths);
 };
 
 } // namespace infinity
