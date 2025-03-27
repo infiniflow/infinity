@@ -40,7 +40,7 @@ export struct ChunkIndexMetaInfo {
 
 export class ChunkIndexMeta {
 public:
-    ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta, KVInstance &kv_instance);
+    ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta);
 
     ChunkID chunk_id() const { return chunk_id_; }
 

@@ -129,8 +129,8 @@ TEST_P(TestColumn, test_add_columns) {
         SegmentID segment_id = 0;
         BlockID block_id = 0;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, table_meta->kv_instance());
-        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
+        BlockMeta block_meta(block_id, segment_meta);
 
         SizeT row_count = 0;
         // std::tie(row_count, status) = block_meta.GetRowCnt();
@@ -139,7 +139,7 @@ TEST_P(TestColumn, test_add_columns) {
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(row_count, block_row_cnt);
 
-        ColumnMeta column_meta(1, block_meta, block_meta.kv_instance());
+        ColumnMeta column_meta(1, block_meta);
 
         ColumnVector col;
         status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -801,8 +801,8 @@ TEST_P(TestColumn, add_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -846,8 +846,8 @@ TEST_P(TestColumn, add_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -898,8 +898,8 @@ TEST_P(TestColumn, add_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -950,8 +950,8 @@ TEST_P(TestColumn, add_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
     {
@@ -1003,8 +1003,8 @@ TEST_P(TestColumn, add_column_and_add_column) {
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
 
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        //  TODO:      EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
     new_txn_mgr->PrintAllKeyValue();
 }

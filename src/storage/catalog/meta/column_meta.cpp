@@ -34,8 +34,8 @@ import column_vector;
 
 namespace infinity {
 
-ColumnMeta::ColumnMeta(SizeT column_idx, BlockMeta &block_meta, KVInstance &kv_instance)
-    : kv_instance_(kv_instance), block_meta_(block_meta), column_idx_(column_idx) {}
+ColumnMeta::ColumnMeta(SizeT column_idx, BlockMeta &block_meta)
+    : kv_instance_(block_meta.kv_instance()), block_meta_(block_meta), column_idx_(column_idx) {}
 
 Status ColumnMeta::SetChunkOffset(SizeT chunk_offset) {
     chunk_offset_ = chunk_offset;

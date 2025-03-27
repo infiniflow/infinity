@@ -248,7 +248,7 @@ TEST_P(ReplayIndexTest, test_replay_append_with_index) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         }
         SegmentID segment_id = 0;
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
@@ -355,7 +355,7 @@ TEST_P(ReplayIndexTest, test_replay_append_with_index) {
         EXPECT_TRUE(status.ok());
 
         SegmentID segment_id = 0;
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
@@ -373,7 +373,7 @@ TEST_P(ReplayIndexTest, test_replay_append_with_index) {
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({2}));
         }
         ChunkID chunk_id = 2;
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
             Status status = chunk_index_meta.GetChunkInfo(chunk_info);
@@ -614,7 +614,7 @@ TEST_P(ReplayIndexTest, test_populate_index) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
             segment_id = 0;
         }
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
@@ -634,7 +634,7 @@ TEST_P(ReplayIndexTest, test_populate_index) {
             chunk_id = chunk_ids->at(0);
             EXPECT_EQ(chunk_id, 0);
         }
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
             Status status = chunk_index_meta.GetChunkInfo(chunk_info);
@@ -681,4 +681,3 @@ TEST_P(ReplayIndexTest, test_populate_index) {
         return std::make_pair(begin_id, row_cnt);
     });
 }
-

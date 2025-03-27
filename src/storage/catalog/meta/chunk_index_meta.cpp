@@ -65,8 +65,8 @@ void ChunkIndexMetaInfo::FromJson(const nlohmann::json &json) {
     index_size_ = json["index_size"].get<u64>();
 }
 
-ChunkIndexMeta::ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta, KVInstance &kv_instance)
-    : kv_instance_(kv_instance), segment_index_meta_(segment_index_meta), chunk_id_(chunk_id) {}
+ChunkIndexMeta::ChunkIndexMeta(ChunkID chunk_id, SegmentIndexMeta &segment_index_meta)
+    : kv_instance_(segment_index_meta.kv_instance()), segment_index_meta_(segment_index_meta), chunk_id_(chunk_id) {}
 
 Status ChunkIndexMeta::GetIndexBuffer(BufferObj *&index_buffer) {
     if (!index_buffer_) {

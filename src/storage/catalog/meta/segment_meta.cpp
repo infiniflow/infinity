@@ -29,8 +29,8 @@ import block_meta;
 
 namespace infinity {
 
-SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta, KVInstance &kv_instance)
-    : begin_ts_(table_meta.begin_ts()), kv_instance_(kv_instance), table_meta_(table_meta), segment_id_(segment_id) {}
+SegmentMeta::SegmentMeta(SegmentID segment_id, TableMeeta &table_meta)
+    : begin_ts_(table_meta.begin_ts()), kv_instance_(table_meta.kv_instance()), table_meta_(table_meta), segment_id_(segment_id) {}
 
 // Status SegmentMeta::SetBlockIDs(const Vector<BlockID> &block_ids) {
 //     block_ids_ = MakeShared<Vector<BlockID>>(block_ids);
@@ -336,7 +336,7 @@ Tuple<SizeT, Status> SegmentMeta::GetRowCnt1() {
         if (block_ids_ptr->size() > 0) {
             row_cnt += DEFAULT_BLOCK_CAPACITY * (block_ids_ptr->size() - 1);
 
-            BlockMeta block_meta(block_ids_ptr->back(), *this, kv_instance_);
+            BlockMeta block_meta(block_ids_ptr->back(), *this);
             SizeT block_row_cnt;
             std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
             if (!status.ok()) {

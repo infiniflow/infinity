@@ -28,7 +28,7 @@ class ColumnDef;
 
 export class ColumnMeta {
 public:
-    ColumnMeta(SizeT column_idx, BlockMeta &block_meta, KVInstance &kv_instance);
+    ColumnMeta(SizeT column_idx, BlockMeta &block_meta);
 
     KVInstance &kv_instance() const { return kv_instance_; }
 

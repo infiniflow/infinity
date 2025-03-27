@@ -100,7 +100,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
     u32 column_len_cnt = 0;
     // need to ensure that segment_id is in ascending order
     for (SegmentID segment_id : *segment_ids_ptr) {
-        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
         {
             Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
@@ -109,7 +109,7 @@ Status ColumnIndexReader::Open(optionflag_t flag, TableIndexMeeta &table_index_m
             }
         }
         for (ChunkID chunk_id : *chunk_ids_ptr) {
-            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
+            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
             {
                 Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
@@ -263,7 +263,7 @@ SharedPtr<IndexReader> TableIndexReaderCache::GetIndexReader(NewTxn *txn) {
             }
         }
         for (const String &index_id_str : *index_id_strs) {
-            TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+            TableIndexMeeta table_index_meta(index_id_str, table_meta);
             auto [index_base, index_status] = table_index_meta.GetIndexBase();
             if (!index_status.ok()) {
                 UnrecoverableError("Fail to get index definition");

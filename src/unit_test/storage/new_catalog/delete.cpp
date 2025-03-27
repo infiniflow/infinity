@@ -131,8 +131,8 @@ TEST_P(TestDelete, test_delete) {
         BlockID block_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
-        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
+        BlockMeta block_meta(block_id, segment_meta);
 
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
         EXPECT_TRUE(status.ok());
@@ -237,14 +237,14 @@ TEST_P(TestDelete, test_delete_multiple_blocks) {
         SegmentID segment_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         for (const auto block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -313,14 +313,14 @@ TEST_P(TestDelete, test_delete_and_drop_db) {
         SegmentID segment_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -617,14 +617,14 @@ TEST_P(TestDelete, test_delete_and_drop_table) {
         SegmentID segment_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -949,14 +949,14 @@ TEST_P(TestDelete, test_delete_and_add_column) {
         SegmentID segment_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -1621,14 +1621,14 @@ TEST_P(TestDelete, test_delete_and_drop_column) {
         SegmentID segment_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -2262,14 +2262,14 @@ TEST_P(TestDelete, test_delete_and_rename) {
         SegmentID segment_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -2890,14 +2890,14 @@ TEST_P(TestDelete, test_delete_and_create_index) {
         SegmentID segment_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -3534,14 +3534,14 @@ TEST_P(TestDelete, test_delete_and_drop_index) {
         SegmentID segment_id = 0;
         NewTxnGetVisibleRangeState state;
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         for (const auto block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -4261,14 +4261,14 @@ TEST_P(TestDelete, test_delete_and_import) {
             SegmentID segment_id = 0;
             NewTxnGetVisibleRangeState state;
 
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
             for (const auto block_id : *block_ids_ptr) {
-                BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(block_id, segment_meta);
 
                 status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
                 EXPECT_TRUE(status.ok());
@@ -4292,14 +4292,14 @@ TEST_P(TestDelete, test_delete_and_import) {
             SegmentID segment_id = 1;
             NewTxnGetVisibleRangeState state;
 
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
             for (const auto block_id : *block_ids_ptr) {
-                BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(block_id, segment_meta);
 
                 status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
                 EXPECT_TRUE(status.ok());
@@ -5029,7 +5029,7 @@ TEST_P(TestDelete, test_delete_and_append) {
             SegmentID segment_id = 0;
             NewTxnGetVisibleRangeState state;
 
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
@@ -5037,7 +5037,7 @@ TEST_P(TestDelete, test_delete_and_append) {
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 
             {
-                BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(0, segment_meta);
 
                 status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
                 EXPECT_TRUE(status.ok());
@@ -5056,7 +5056,7 @@ TEST_P(TestDelete, test_delete_and_append) {
                 }
             }
             {
-                BlockMeta block_meta(1, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(1, segment_meta);
 
                 status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
                 EXPECT_TRUE(status.ok());
@@ -5754,7 +5754,7 @@ TEST_P(TestDelete, test_delete_and_delete) {
             SegmentID segment_id = 0;
             NewTxnGetVisibleRangeState state;
 
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
@@ -5762,7 +5762,7 @@ TEST_P(TestDelete, test_delete_and_delete) {
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
             {
-                BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(0, segment_meta);
 
                 status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
                 EXPECT_TRUE(status.ok());
@@ -5781,7 +5781,7 @@ TEST_P(TestDelete, test_delete_and_delete) {
                 }
             }
             //            {
-            //                BlockMeta block_meta(1, segment_meta, *txn->kv_instance());
+            //                BlockMeta block_meta(1, segment_meta);
             //
             //                status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             //                EXPECT_TRUE(status.ok());

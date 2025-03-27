@@ -171,7 +171,7 @@ TEST_P(TestImport, test_import1) {
             SizeT row_count = state.block_offset_end();
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -184,7 +184,7 @@ TEST_P(TestImport, test_import1) {
             }
             {
                 SizeT column_idx = 1;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -203,13 +203,13 @@ TEST_P(TestImport, test_import1) {
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
             for (auto block_id : *block_ids) {
-                BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(block_id, segment_meta);
                 check_block(block_meta);
             }
         };
 
         for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta);
             check_segment(segment_meta);
         }
     }
@@ -299,7 +299,7 @@ TEST_P(TestImport, test_import_with_index) {
         EXPECT_TRUE(status.ok());
 
         auto check_segment = [&](SegmentID segment_id) {
-            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
             {
                 Vector<ChunkID> *chunk_ids = nullptr;
@@ -308,7 +308,7 @@ TEST_P(TestImport, test_import_with_index) {
                 EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
             }
             ChunkID chunk_id = 0;
-            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             {
                 ChunkIndexMetaInfo *chunk_info = nullptr;
                 Status status = chunk_index_meta.GetChunkInfo(chunk_info);
@@ -454,19 +454,19 @@ TEST_P(TestImport, test_insert_and_import) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1, 2}));
 
         {
-            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(0, *table_meta);
             auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         }
         {
-            SegmentMeta segment_meta(1, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(1, *table_meta);
             auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
         }
         {
-            SegmentMeta segment_meta(2, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(2, *table_meta);
             auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
@@ -533,7 +533,7 @@ TEST_P(TestImport, test_import_drop_db) {
         SizeT row_count = state.block_offset_end();
         {
             SizeT column_idx = 0;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -546,7 +546,7 @@ TEST_P(TestImport, test_import_drop_db) {
         }
         {
             SizeT column_idx = 1;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -567,7 +567,7 @@ TEST_P(TestImport, test_import_drop_db) {
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
         for (auto block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             check_block(block_meta, begin_ts);
         }
     };
@@ -577,7 +577,7 @@ TEST_P(TestImport, test_import_drop_db) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
         for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, table_meta);
             check_segment(segment_meta, txn);
         }
     };
@@ -587,7 +587,7 @@ TEST_P(TestImport, test_import_drop_db) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
         SegmentID segment_id = 0;
-        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, table_meta);
         check_segment(segment_meta, txn);
     };
 
@@ -1071,7 +1071,7 @@ TEST_P(TestImport, test_import_drop_table) {
         SizeT row_count = state.block_offset_end();
         {
             SizeT column_idx = 0;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -1084,7 +1084,7 @@ TEST_P(TestImport, test_import_drop_table) {
         }
         {
             SizeT column_idx = 1;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -1105,7 +1105,7 @@ TEST_P(TestImport, test_import_drop_table) {
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
         for (auto block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             check_block(block_meta, begin_ts);
         }
     };
@@ -1115,7 +1115,7 @@ TEST_P(TestImport, test_import_drop_table) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
         for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, table_meta);
             check_segment(segment_meta, txn);
         }
     };
@@ -1125,7 +1125,7 @@ TEST_P(TestImport, test_import_drop_table) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
         SegmentID segment_id = 0;
-        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, table_meta);
         check_segment(segment_meta, txn);
     };
 
@@ -1665,7 +1665,7 @@ TEST_P(TestImport, test_import_add_columns) {
         SizeT row_count = state.block_offset_end();
         {
             SizeT column_idx = 0;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -1678,7 +1678,7 @@ TEST_P(TestImport, test_import_add_columns) {
         }
         {
             SizeT column_idx = 1;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -1699,7 +1699,7 @@ TEST_P(TestImport, test_import_add_columns) {
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
         for (auto block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             check_block(block_meta, begin_ts);
         }
     };
@@ -1709,7 +1709,7 @@ TEST_P(TestImport, test_import_add_columns) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
         for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, table_meta);
             check_segment(segment_meta, txn);
         }
     };
@@ -1719,7 +1719,7 @@ TEST_P(TestImport, test_import_add_columns) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
         SegmentID segment_id = 0;
-        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, table_meta);
         check_segment(segment_meta, txn);
     };
 
@@ -2324,7 +2324,7 @@ TEST_P(TestImport, test_import_drop_columns) {
         SizeT row_count = state.block_offset_end();
         {
             SizeT column_idx = 0;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -2344,7 +2344,7 @@ TEST_P(TestImport, test_import_drop_columns) {
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
         for (auto block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             check_block(block_meta, begin_ts);
         }
     };
@@ -2354,7 +2354,7 @@ TEST_P(TestImport, test_import_drop_columns) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
         for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, table_meta);
             check_segment(segment_meta, txn);
         }
     };
@@ -2364,7 +2364,7 @@ TEST_P(TestImport, test_import_drop_columns) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
         SegmentID segment_id = 0;
-        SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, table_meta);
         check_segment(segment_meta, txn);
     };
 
@@ -2954,7 +2954,7 @@ TEST_P(TestImport, test_import) {
             SizeT row_count = state.block_offset_end();
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -2967,7 +2967,7 @@ TEST_P(TestImport, test_import) {
             }
             {
                 SizeT column_idx = 1;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -2986,7 +2986,7 @@ TEST_P(TestImport, test_import) {
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
             for (auto block_id : *block_ids) {
-                BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(block_id, segment_meta);
                 check_block(block_meta);
             }
         };
@@ -2997,7 +2997,7 @@ TEST_P(TestImport, test_import) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0, 1}));
 
             for (SegmentID segment_id : *segment_ids) {
-                SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+                SegmentMeta segment_meta(segment_id, table_meta);
                 check_segment(segment_meta);
             }
         };
@@ -3067,7 +3067,7 @@ TEST_P(TestImport, test_import_append_table) {
         SizeT row_count = state.block_offset_end();
         {
             SizeT column_idx = 0;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -3080,7 +3080,7 @@ TEST_P(TestImport, test_import_append_table) {
         }
         {
             SizeT column_idx = 1;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -3101,7 +3101,7 @@ TEST_P(TestImport, test_import_append_table) {
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
         for (auto block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             check_block(block_meta, begin_ts);
         }
     };
@@ -3112,7 +3112,7 @@ TEST_P(TestImport, test_import_append_table) {
         EXPECT_EQ(*segment_ids_ptr, segment_ids);
 
         for (auto segment_id : *segment_ids_ptr) {
-            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, table_meta);
             check_segment(segment_meta, txn);
         }
     };
@@ -3704,7 +3704,7 @@ TEST_P(TestImport, test_import_import_table) {
         SizeT row_count = state.block_offset_end();
         {
             SizeT column_idx = 0;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -3717,7 +3717,7 @@ TEST_P(TestImport, test_import_import_table) {
         }
         {
             SizeT column_idx = 1;
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -3738,7 +3738,7 @@ TEST_P(TestImport, test_import_import_table) {
         //        EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
         for (auto block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             check_block(block_meta, begin_ts);
         }
     };
@@ -3751,7 +3751,7 @@ TEST_P(TestImport, test_import_import_table) {
         EXPECT_EQ(*seg_ids, segment_ids);
 
         for (auto segment_id : segment_ids) {
-            SegmentMeta segment_meta(segment_id, table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, table_meta);
             check_segment(segment_meta, txn);
         }
     };

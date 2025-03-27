@@ -92,7 +92,7 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
     Vector<String> paths;
     for (SizeT i = 0; i < column_defs_ptr->size(); i++) {
         ColumnID column_id = (*column_defs_ptr)[i]->id();
-        ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+        ColumnMeta column_meta(column_id, block_meta);
         SizeT chunk_offset = 0;
         status = column_meta.GetChunkOffset(chunk_offset);
         if (!status.ok()) {
@@ -226,7 +226,7 @@ WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts)
 
     // SizeT row_count = 0;
     for (BlockID block_id : *block_ids_ptr) {
-        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        BlockMeta block_meta(block_id, segment_meta);
         block_infos_.emplace_back(block_meta);
 
         // SizeT block_row_cnt = 0;

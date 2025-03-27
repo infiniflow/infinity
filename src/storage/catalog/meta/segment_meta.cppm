@@ -28,7 +28,7 @@ class TableMeeta;
 
 export class SegmentMeta {
 public:
-    SegmentMeta(SegmentID segment_id, TableMeeta &table_meta, KVInstance &kv_instance);
+    SegmentMeta(SegmentID segment_id, TableMeeta &table_meta);
 
     TxnTimeStamp begin_ts() const { return begin_ts_; }
 

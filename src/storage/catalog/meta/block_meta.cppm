@@ -29,7 +29,7 @@ class BufferObj;
 
 export class BlockMeta {
 public:
-    BlockMeta(BlockID block_id, SegmentMeta &segment_meta, KVInstance &kv_instance);
+    BlockMeta(BlockID block_id, SegmentMeta &segment_meta);
 
     KVInstance &kv_instance() const { return kv_instance_; }
 

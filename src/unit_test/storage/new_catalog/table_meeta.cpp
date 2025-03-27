@@ -88,7 +88,7 @@ TEST_P(TableMeetaTest, table_meeta) {
         EXPECT_TRUE(segment_status.ok());
         EXPECT_EQ(segment_id, 0);
         {
-            SegmentMeta segment_meta(0, table_meta, *kv_instance);
+            SegmentMeta segment_meta(0, table_meta);
             segment_meta.Init();
             // segment_meta.SetRowCnt(1048);
             {

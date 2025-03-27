@@ -167,7 +167,7 @@ TEST_P(NewCheckpointTest, test_checkpoint0) {
             EXPECT_EQ(row_count, block_row_cnt);
 
             auto check_column = [&](ColumnID column_id, const Value &v) {
-                ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_id, block_meta);
                 ColumnVector col1;
                 status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col1);
                 EXPECT_TRUE(status.ok());
@@ -188,7 +188,7 @@ TEST_P(NewCheckpointTest, test_checkpoint0) {
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0, 1}));
 
             for (BlockID block_id : *block_ids_ptr) {
-                BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+                BlockMeta block_meta(block_id, segment_meta);
                 check_block(block_meta);
             }
         };
@@ -200,7 +200,7 @@ TEST_P(NewCheckpointTest, test_checkpoint0) {
 
             EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
             SegmentID segment_id = (*segment_ids_ptr)[0];
-            SegmentMeta segment_meta(segment_id, *table_meta, table_meta->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta);
             check_segment(segment_meta);
         }
     };

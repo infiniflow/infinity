@@ -37,7 +37,7 @@ export struct SegmentIndexFtInfo {
 
 export class SegmentIndexMeta {
 public:
-    SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta, KVInstance &kv_instance);
+    SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta);
 
     SegmentID segment_id() const { return segment_id_; }
 

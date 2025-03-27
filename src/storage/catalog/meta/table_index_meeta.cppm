@@ -28,7 +28,7 @@ class IndexBase;
 
 export class TableIndexMeeta {
 public:
-    TableIndexMeeta(String index_id_str, TableMeeta &table_meta, KVInstance &kv_instance);
+    TableIndexMeeta(String index_id_str, TableMeeta &table_meta);
 
     KVInstance &kv_instance() const { return kv_instance_; }
 

@@ -143,7 +143,7 @@ TEST_P(ReplayImportTest, test_import0) {
             SizeT row_count = state.block_offset_end();
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -156,7 +156,7 @@ TEST_P(ReplayImportTest, test_import0) {
             }
             {
                 SizeT column_idx = 1;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -175,13 +175,13 @@ TEST_P(ReplayImportTest, test_import0) {
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
             for (auto block_id : *block_ids) {
-                BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(block_id, segment_meta);
                 check_block(block_meta);
             }
         };
 
         for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta);
             check_segment(segment_meta);
         }
     }
@@ -271,7 +271,7 @@ TEST_P(ReplayImportTest, test_import_with_index) {
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
 
         for (ChunkID chunk_id : *chunk_ids_ptr) {
-            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
+            ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
             check_chunk_index(chunk_index_meta);
         }
     };
@@ -292,7 +292,7 @@ TEST_P(ReplayImportTest, test_import_with_index) {
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0, 1}));
 
         for (SegmentID segment_id : *segment_ids_ptr) {
-            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, *txn->kv_instance());
+            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
             check_segment_index(segment_index_meta);
         }
 

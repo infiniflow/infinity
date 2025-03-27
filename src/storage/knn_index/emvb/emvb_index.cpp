@@ -239,8 +239,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
         BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
 
-        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-        ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+        BlockMeta block_meta(block_id, segment_meta);
+        ColumnMeta column_meta(column_id, block_meta);
         ColumnVector column_vector;
         u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
         Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vector);
@@ -257,8 +257,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
                     block_id = new_block_id;
                     u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
 
-                    BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-                    ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+                    BlockMeta block_meta(block_id, segment_meta);
+                    ColumnMeta column_meta(column_id, block_meta);
                     Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vector);
                     if (!status.ok()) {
                         UnrecoverableError("EMVBIndex::BuildEMVBIndex: GetColumnVector failed!");
@@ -317,8 +317,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
                 const SegmentOffset new_segment_offset = start_segment_offset + sample_row;
                 const BlockID block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY;
                 const BlockOffset block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
-                BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-                ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+                BlockMeta block_meta(block_id, segment_meta);
+                ColumnMeta column_meta(column_id, block_meta);
                 ColumnVector column_vector;
                 u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
                 Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vector);
@@ -354,8 +354,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
         BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
 
-        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-        ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+        BlockMeta block_meta(block_id, segment_meta);
+        ColumnMeta column_meta(column_id, block_meta);
 
         u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
         ColumnVector column_vector;
@@ -371,8 +371,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid, const u32 row_count, Segm
                 if (const BlockID new_block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY; new_block_id != block_id) {
                     block_id = new_block_id;
 
-                    BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
-                    ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+                    BlockMeta block_meta(block_id, segment_meta);
+                    ColumnMeta column_meta(column_id, block_meta);
 
                     u32 block_row_count = std::min(DEFAULT_BLOCK_CAPACITY, i64(start_segment_offset + row_count - block_id * DEFAULT_BLOCK_CAPACITY));
                     Status status = NewCatalog::GetColumnVector(column_meta, block_row_count, ColumnVectorTipe::kReadOnly, column_vector);

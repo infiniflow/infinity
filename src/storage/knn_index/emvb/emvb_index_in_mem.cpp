@@ -127,7 +127,7 @@ void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u
                 MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
 
             TableMeeta table_meta(db_id_str_, table_id_str_, kv_instance, begin_ts);
-            SegmentMeta segment_meta(segment_id_, table_meta, table_meta.kv_instance());
+            SegmentMeta segment_meta(segment_id_, table_meta);
             emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_meta, column_def_);
             if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {
                 UnrecoverableError("EMVBIndexInMem Insert doc num or embedding num not consistent!");

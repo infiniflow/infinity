@@ -106,7 +106,7 @@ struct NewTxnCompactState {
         column_vectors_.resize(column_cnt_);
 
         for (SizeT i = 0; i < column_cnt_; ++i) {
-            ColumnMeta column_meta(i, *block_meta_, block_meta_->kv_instance());
+            ColumnMeta column_meta(i, *block_meta_);
             status = NewCatalog::GetColumnVector(column_meta, 0, ColumnVectorTipe::kReadWrite, column_vectors_[i]);
             if (!status.ok()) {
                 return status;
@@ -125,7 +125,7 @@ struct NewTxnCompactState {
             segment_row_cnt_ += cur_block_row_cnt_;
         }
         for (ColumnID i = 0; i < column_cnt_; ++i) {
-            ColumnMeta column_meta(i, *block_meta_, block_meta_->kv_instance());
+            ColumnMeta column_meta(i, *block_meta_);
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
 
@@ -245,7 +245,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         for (SizeT i = 0; i < input_block->column_count(); ++i) {
             SharedPtr<ColumnVector> col = input_block->column_vectors[i];
 
-            ColumnMeta column_meta(i, *block_meta, block_meta->kv_instance());
+            ColumnMeta column_meta(i, *block_meta);
 
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
@@ -308,7 +308,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
     for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
         const String &index_id_str = (*index_id_strs_ptr)[i];
         const String &index_name = (*index_names_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+        TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
         status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *segment_meta, segment_row_cnt);
         if (!status.ok()) {
@@ -502,13 +502,13 @@ Status NewTxn::PrintVersion(const String &db_name, const String &table_name, con
     txn_table_store->GetAccessState(row_ids, access_state);
     for (const auto &[segment_id, block_map] : access_state.rows_) {
         if (!segment_meta || segment_id != segment_meta->segment_id()) {
-            segment_meta.emplace(segment_id, table_meta, *kv_instance_);
+            segment_meta.emplace(segment_id, table_meta);
             block_meta.reset();
         }
         LOG_INFO(fmt::format("Segment {} version: ", segment_id));
         for (const auto &[block_id, block_offsets] : block_map) {
             if (!block_meta || block_id != block_meta->block_id()) {
-                block_meta.emplace(block_id, segment_meta.value(), *kv_instance_);
+                block_meta.emplace(block_id, segment_meta.value());
             }
             LOG_INFO(fmt::format("Block {} version: ", block_id));
             Status status = this->PrintVersionInBlock(*block_meta, block_offsets, ignore_invisible);
@@ -555,7 +555,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     NewTxnCompactState compact_state(table_meta, fake_commit_ts);
 
     for (SegmentID segment_id : segment_ids) {
-        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        SegmentMeta segment_meta(segment_id, table_meta);
 
         Vector<BlockID> *block_ids_ptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
@@ -564,7 +564,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         }
 
         for (BlockID block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             status = this->CompactBlock(block_meta, compact_state);
             if (!status.ok()) {
                 return status;
@@ -618,7 +618,7 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
         const String &index_id_str = (*index_id_strs_ptr)[i];
         const String &index_name = (*index_name_ptr)[i];
-        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+        TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
         status =
             this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *compact_state.new_segment_meta_, compact_state.segment_row_cnt_);
@@ -797,7 +797,7 @@ Status NewTxn::AppendInBlock(BlockMeta &block_meta, SizeT block_offset, SizeT ap
         // append in column file
         for (SizeT column_idx = 0; column_idx < input_block->column_count(); ++column_idx) {
             const ColumnVector &column_vector = *input_block->column_vectors[column_idx];
-            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             Status status = this->AppendInColumn(column_meta, block_offset, append_rows, column_vector, input_offset);
             if (!status.ok()) {
                 return status;
@@ -944,7 +944,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
     Vector<ColumnVector> column_vectors;
     column_vectors.resize(column_cnt);
     for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
-        ColumnMeta column_meta(column_id, block_meta, block_meta.kv_instance());
+        ColumnMeta column_meta(column_id, block_meta);
 
         status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vectors[column_id]);
         if (!status.ok()) {
@@ -1034,7 +1034,7 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<Col
     }
 
     for (SegmentID segment_id : *segment_ids_ptr) {
-        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        SegmentMeta segment_meta(segment_id, table_meta);
         status = this->AddColumnsDataInSegment(segment_meta, column_defs, default_values);
         if (!status.ok()) {
             return status;
@@ -1051,7 +1051,7 @@ NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPt
     }
 
     for (BlockID block_id : *block_ids_ptr) {
-        BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+        BlockMeta block_meta(block_id, segment_meta);
         status = this->AddColumnsDataInBlock(block_meta, column_defs, default_values);
         if (!status.ok()) {
             return status;
@@ -1138,7 +1138,7 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
             return status;
         }
         for (BlockID block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             status = drop_columns_in_block(block_meta);
             if (!status.ok()) {
                 return status;
@@ -1148,7 +1148,7 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
     };
 
     for (SegmentID segment_id : *segment_ids_ptr) {
-        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        SegmentMeta segment_meta(segment_id, table_meta);
         status = drop_columns_in_segment(segment_meta);
         if (!status.ok()) {
             return status;
@@ -1168,13 +1168,13 @@ Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOptio
 
     Vector<BlockID> *block_ids_ptr = nullptr;
     for (SegmentID segment_id : *segment_ids_ptr) {
-        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        SegmentMeta segment_meta(segment_id, table_meta);
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         if (!status.ok()) {
             return status;
         }
         for (BlockID block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             SharedPtr<BlockLock> block_lock;
             status = block_meta.GetBlockLock(block_lock);
@@ -1245,7 +1245,7 @@ Status NewTxn::CommitImport(WalCmdImport *import_cmd) {
     }
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get(), begin_ts);
-    SegmentMeta segment_meta(segment_info.segment_id_, table_meta, table_meta.kv_instance());
+    SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
     if (!status.ok()) {
@@ -1326,7 +1326,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
             return status;
         }
     } else {
-        segment_meta.emplace(unsealed_segment_id, table_meta, *kv_instance);
+        segment_meta.emplace(unsealed_segment_id, table_meta);
     }
 
     // BlockID next_block_id = 0;
@@ -1347,7 +1347,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
     //     }
     // } else {
     //     BlockID block_id = next_block_id - 1;
-    //     block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
+    //     block_meta.emplace(block_id, segment_meta.value() 
     // }
 
     Vector<BlockID> *block_ids_ptr = nullptr;
@@ -1363,7 +1363,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
         }
     } else {
         BlockID block_id = block_ids_ptr->back();
-        block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
+        block_meta.emplace(block_id, segment_meta.value());
     }
 
     while (true) {
@@ -1453,12 +1453,12 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
         const DataBlock *data_block = append_state->blocks_[range.data_block_idx_].get();
         SegmentID segment_id = range.segment_id_;
         if (!segment_meta || segment_meta->segment_id() != segment_id) {
-            segment_meta.emplace(segment_id, table_meta, *kv_instance);
+            segment_meta.emplace(segment_id, table_meta);
             block_meta.reset();
         }
         BlockID block_id = range.block_id_;
         if (!block_meta || block_meta->block_id() != block_id) {
-            block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
+            block_meta.emplace(block_id, segment_meta.value());
         }
         status = this->AppendInBlock(*block_meta, range.start_offset_, range.row_count_, data_block, range.data_block_offset_);
         if (!status.ok()) {
@@ -1475,7 +1475,7 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
         }
         for (SizeT i = 0; i < index_id_strs->size(); ++i) {
             const String &index_id_str = (*index_id_strs)[i];
-            TableIndexMeeta table_index_meta(index_id_str, table_meta, *kv_instance);
+            TableIndexMeeta table_index_meta(index_id_str, table_meta);
             status = this->AppendIndex(table_index_meta, append_state->append_ranges_);
             if (!status.ok()) {
                 return status;
@@ -1505,13 +1505,13 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *k
     DeleteState &undo_delete_state = txn_table_store->undo_delete_state();
     for (const auto &[segment_id, block_map] : delete_state.rows_) {
         if (!segment_meta || segment_id != segment_meta->segment_id()) {
-            segment_meta.emplace(segment_id, table_meta, *kv_instance);
+            segment_meta.emplace(segment_id, table_meta);
             block_meta.reset();
         }
         auto &undo_segment_map = undo_delete_state.rows_[segment_id];
         for (const auto &[block_id, block_offsets] : block_map) {
             if (!block_meta || block_id != block_meta->block_id()) {
-                block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
+                block_meta.emplace(block_id, segment_meta.value());
             }
             auto &undo_block_offsets = undo_segment_map[block_id];
             Status status = this->DeleteInBlock(*block_meta, block_offsets, undo_block_offsets);
@@ -1539,13 +1539,13 @@ Status NewTxn::RollbackDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_ins
 
     for (const auto &[segment_id, block_map] : undo_delete_state.rows_) {
         if (!segment_meta || segment_id != segment_meta->segment_id()) {
-            segment_meta.emplace(segment_id, table_meta, *kv_instance);
+            segment_meta.emplace(segment_id, table_meta);
             block_meta.reset();
         }
         auto &undo_block_map = undo_delete_state.rows_[segment_id];
         for (const auto &[block_id, block_offsets] : undo_block_map) {
             if (!block_meta || block_id != block_meta->block_id()) {
-                block_meta.emplace(block_id, segment_meta.value(), *kv_instance);
+                block_meta.emplace(block_id, segment_meta.value());
             }
             Status status = this->RollbackDeleteInBlock(*block_meta, block_offsets);
             if (!status.ok()) {
@@ -1574,7 +1574,7 @@ Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
     Vector<SegmentID> new_segment_ids{segment_info.segment_id_};
 
     TableMeeta table_meta(db_id_str, table_id_str, *kv_instance_.get(), begin_ts);
-    SegmentMeta segment_meta(segment_info.segment_id_, table_meta, table_meta.kv_instance());
+    SegmentMeta segment_meta(segment_info.segment_id_, table_meta);
 
     status = table_meta.CommitSegment(segment_info.segment_id_, commit_ts);
     if (!status.ok()) {
@@ -1606,7 +1606,7 @@ Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
             return status;
         }
         for (const String &index_id_str : *index_id_strs_ptr) {
-            TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+            TableIndexMeeta table_index_meta(index_id_str, table_meta);
             Vector<SegmentID> *segment_ids_ptr = nullptr;
             status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
             if (!status.ok()) {
@@ -1637,13 +1637,13 @@ Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp ch
     }
 
     for (SegmentID segment_id : *segment_ids_ptr) {
-        SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
+        SegmentMeta segment_meta(segment_id, table_meta);
         auto [block_ids, status] = segment_meta.GetBlockIDs1();
         if (!status.ok()) {
             return status;
         }
         for (BlockID block_id : *block_ids) {
-            BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
 
             SharedPtr<BlockLock> block_lock;
             status = block_meta.GetBlockLock(block_lock);
@@ -1667,7 +1667,7 @@ Status NewTxn::CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &s
     auto *pm = InfinityContext::instance().persistence_manager();
 
     for (WalBlockInfo &block_info : segment_info.block_infos_) {
-        BlockMeta block_meta(block_info.block_id_, segment_meta, segment_meta.kv_instance());
+        BlockMeta block_meta(block_info.block_id_, segment_meta);
         SharedPtr<String> block_dir_ptr = block_meta.GetBlockDir();
 
         auto [version_buffer, status] = block_meta.GetVersionBuffer();
@@ -1726,7 +1726,7 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         return status;
     }
     for (const auto &column_def : *column_defs) {
-        ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+        ColumnMeta column_meta(column_def->id(), block_meta);
         BufferObj *buffer_obj = nullptr;
         BufferObj *outline_buffer_obj = nullptr;
 
@@ -1761,7 +1761,7 @@ Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_m
             return status;
         }
         for (const auto &column_def : *column_defs) {
-            ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_def->id(), block_meta);
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
 

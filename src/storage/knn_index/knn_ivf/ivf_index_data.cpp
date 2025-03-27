@@ -106,14 +106,14 @@ private:
         BlockID block_id = offset / DEFAULT_BLOCK_CAPACITY;
         if (block_id != last_block_id_) {
             last_block_id_ = block_id;
-            BlockMeta block_meta(block_id, segment_meta_, segment_meta_.kv_instance());
+            BlockMeta block_meta(block_id, segment_meta_);
             // auto [row_cnt, status] = block_meta.GetRowCnt();
             auto [row_cnt, status] = block_meta.GetRowCnt1();
             if (!status.ok()) {
                 UnrecoverableError("Get row count failed");
             }
 
-            ColumnMeta column_meta(column_id_, block_meta, block_meta.kv_instance());
+            ColumnMeta column_meta(column_id_, block_meta);
             status = NewCatalog::GetColumnVector(column_meta, row_cnt, ColumnVectorTipe::kReadOnly, cur_column_vector_);
             if (!status.ok()) {
                 UnrecoverableError("Get column vector failed");

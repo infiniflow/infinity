@@ -136,12 +136,12 @@ TEST_P(ReplayCompactTest, test_compact0) {
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
-        SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
         auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(block_status.ok());
 
         auto check_block = [&](BlockID block_id, const Value &v1, const Value &v2) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
             Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -265,7 +265,7 @@ TEST_P(ReplayCompactTest, test_compact_with_index) {
             segment_id = (*segment_ids_ptr)[0];
         }
 
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, *txn->kv_instance());
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
         ChunkID chunk_id = 0;
         {
             Vector<ChunkID> *chunk_ids_ptr = nullptr;
@@ -274,7 +274,7 @@ TEST_P(ReplayCompactTest, test_compact_with_index) {
             EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({0}));
             chunk_id = (*chunk_ids_ptr)[0];
         }
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
             Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);

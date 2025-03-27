@@ -165,14 +165,14 @@ TEST_P(TestCompact, test_compact) {
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
-        SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
 
         auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3}));
 
         {
-            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(0, segment_meta);
             NewTxnGetVisibleRangeState state;
             Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -190,7 +190,7 @@ TEST_P(TestCompact, test_compact) {
 
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
@@ -207,7 +207,7 @@ TEST_P(TestCompact, test_compact) {
             }
         }
         for (BlockID block_id = 1; block_id < 4; ++block_id) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
             Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -229,7 +229,7 @@ TEST_P(TestCompact, test_compact) {
 
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
@@ -352,14 +352,14 @@ TEST_P(TestCompact, test_compact_with_index) {
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
 
-        SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
 
         auto [block_ids, block_status] = segment_meta.GetBlockIDs1();
         EXPECT_TRUE(block_status.ok());
         EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1, 2, 3}));
 
         {
-            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(0, segment_meta);
             NewTxnGetVisibleRangeState state;
             Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -377,7 +377,7 @@ TEST_P(TestCompact, test_compact_with_index) {
 
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
@@ -394,7 +394,7 @@ TEST_P(TestCompact, test_compact_with_index) {
             }
         }
         for (BlockID block_id = 1; block_id < 4; ++block_id) {
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
             Status status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -416,7 +416,7 @@ TEST_P(TestCompact, test_compact_with_index) {
 
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 Status status = NewCatalog::GetColumnVector(column_meta, state.block_offset_end(), ColumnVectorTipe::kReadOnly, col);
@@ -450,8 +450,8 @@ TEST_P(TestCompact, test_compact_with_index) {
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({2}));
             segment_id = (*segment_ids)[0];
         }
-        
-        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, table_index_meta->kv_instance());
+
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
         {
             Vector<ChunkID> *chunk_ids = nullptr;
@@ -460,7 +460,7 @@ TEST_P(TestCompact, test_compact_with_index) {
             EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
         }
         ChunkID chunk_id = 0;
-        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *txn->kv_instance());
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
         {
             ChunkIndexMetaInfo *chunk_info = nullptr;
             Status status = chunk_index_meta.GetChunkInfo(chunk_info);

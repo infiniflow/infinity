@@ -72,7 +72,7 @@ KVInstance::~KVInstance() {
 }
 
 Status KVInstance::Put(const String &key, const String &value) {
-//    LOG_INFO(fmt::format("Put key: {}, value: {}", key, value));
+    //    LOG_INFO(fmt::format("Put key: {}, value: {}", key, value));
     rocksdb::Status s = transaction_->Put(key, value);
     if (!s.ok()) {
         LOG_DEBUG(fmt::format("Put key: {}, value: {}", key, value));

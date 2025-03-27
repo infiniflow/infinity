@@ -126,7 +126,7 @@ TEST_P(TestAppend, test_append0) {
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
         std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
@@ -138,7 +138,7 @@ TEST_P(TestAppend, test_append0) {
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
         BlockID block_id = (*block_ids_ptr)[0];
-        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+        BlockMeta block_meta(block_id, segment_meta);
         SizeT block_row_cnt = 0;
         std::tie(block_row_cnt, status) = block_meta.GetRowCnt1();
         EXPECT_EQ(block_row_cnt, 8);
@@ -251,14 +251,14 @@ TEST_P(TestAppend, test_append1) {
         auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
         EXPECT_TRUE(seg_status.ok());
         EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
-        SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
-        BlockMeta block_meta((*block_ids_ptr)[0], segment_meta, *txn->kv_instance());
+        BlockMeta block_meta((*block_ids_ptr)[0], segment_meta);
 
         NewTxnGetVisibleRangeState state;
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -279,7 +279,7 @@ TEST_P(TestAppend, test_append1) {
 
         {
             SizeT column_idx = 0;
-            ColumnMeta column_meta(column_idx, block_meta, *txn->kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
 
             status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -293,7 +293,7 @@ TEST_P(TestAppend, test_append1) {
 
         {
             SizeT column_idx = 1;
-            ColumnMeta column_meta(column_idx, block_meta, *txn->kv_instance());
+            ColumnMeta column_meta(column_idx, block_meta);
             ColumnVector col;
             status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
 
@@ -438,7 +438,7 @@ TEST_P(TestAppend, test_append2) {
         EXPECT_EQ(segment_ids->size(), 1);
         SegmentID segment_id = segment_ids->at(0);
         EXPECT_EQ(segment_id, 0);
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
@@ -451,7 +451,7 @@ TEST_P(TestAppend, test_append2) {
         for (SizeT idx = 0; idx < block_count; ++idx) {
             BlockID block_id = block_ids_ptr->at(idx);
             EXPECT_EQ(block_id, idx);
-            BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(block_id, segment_meta);
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
             EXPECT_TRUE(status.ok());
@@ -473,7 +473,7 @@ TEST_P(TestAppend, test_append2) {
 
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, *txn->kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
 
                 status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -494,7 +494,7 @@ TEST_P(TestAppend, test_append2) {
 
             {
                 SizeT column_idx = 1;
-                ColumnMeta column_meta(column_idx, block_meta, *txn->kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 ColumnVector col;
                 status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
                 EXPECT_TRUE(status.ok());
@@ -2933,14 +2933,14 @@ TEST_P(TestAppend, test_append_append) {
             auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
-            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(0, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
-            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3027,14 +3027,14 @@ TEST_P(TestAppend, test_append_append) {
             auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
-            SegmentMeta segment_meta((*segment_ids)[0], *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta((*segment_ids)[0], *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
-            BlockMeta block_meta((*block_ids_ptr)[0], segment_meta, *txn->kv_instance());
+            BlockMeta block_meta((*block_ids_ptr)[0], segment_meta);
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3121,14 +3121,14 @@ TEST_P(TestAppend, test_append_append) {
             auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
-            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(0, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
-            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3214,14 +3214,14 @@ TEST_P(TestAppend, test_append_append) {
             auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
-            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(0, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
-            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3309,14 +3309,14 @@ TEST_P(TestAppend, test_append_append) {
             auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
-            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(0, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
-            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3402,14 +3402,14 @@ TEST_P(TestAppend, test_append_append) {
             auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
-            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(0, *table_meta);
 
             Vector<BlockID> *block_ids_ptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
-            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3496,14 +3496,14 @@ TEST_P(TestAppend, test_append_append) {
             auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
             EXPECT_TRUE(seg_status.ok());
             EXPECT_EQ(*segment_ids, Vector<SegmentID>{0});
-            SegmentMeta segment_meta(0, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(0, *table_meta);
 
             Vector<BlockID> *block_ids_ptr = nullptr;
             std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(*block_ids_ptr, Vector<BlockID>{0});
-            BlockMeta block_meta(0, segment_meta, *txn->kv_instance());
+            BlockMeta block_meta(0, segment_meta);
 
             NewTxnGetVisibleRangeState state;
             status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3642,7 +3642,7 @@ TEST_P(TestAppend, test_append_append_concurrent) {
             {
                 SegmentID segment_id = segment_ids->at(0);
                 EXPECT_EQ(segment_id, 0);
-                SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+                SegmentMeta segment_meta(segment_id, *table_meta);
 
                 Vector<BlockID> *block_ids_ptr = nullptr;
                 std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
@@ -3652,7 +3652,7 @@ TEST_P(TestAppend, test_append_append_concurrent) {
                 for (SizeT idx = 0; idx < block_ids_ptr->size(); ++idx) {
                     BlockID block_id = block_ids_ptr->at(idx);
                     EXPECT_EQ(block_id, idx);
-                    BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                    BlockMeta block_meta(block_id, segment_meta);
 
                     NewTxnGetVisibleRangeState state;
                     status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -3671,7 +3671,7 @@ TEST_P(TestAppend, test_append_append_concurrent) {
 
                         {
                             SizeT column_idx = 0;
-                            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                            ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
                             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);
@@ -3686,7 +3686,7 @@ TEST_P(TestAppend, test_append_append_concurrent) {
                         }
                         {
                             SizeT column_idx = 1;
-                            ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                            ColumnMeta column_meta(column_idx, block_meta);
                             ColumnVector col;
 
                             Status status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, col);

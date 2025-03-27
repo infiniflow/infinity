@@ -173,12 +173,12 @@ TEST_P(TestAlter, add_column0) {
             SizeT row_count = state.block_offset_end();
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 check_column(column_meta, Value::MakeInt(1), row_count);
             }
             {
                 SizeT column_idx = 1;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 check_column(column_meta, Value::MakeVarchar(""), row_count);
             }
         };
@@ -189,7 +189,7 @@ TEST_P(TestAlter, add_column0) {
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
             for (auto block_id : *block_ids) {
-                BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(block_id, segment_meta);
                 check_block(block_meta);
             }
         };
@@ -199,7 +199,7 @@ TEST_P(TestAlter, add_column0) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
         for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta);
             check_segment(segment_meta);
         }
     }
@@ -301,7 +301,7 @@ TEST_P(TestAlter, drop_column0) {
             SizeT row_count = state.block_offset_end();
             {
                 SizeT column_idx = 0;
-                ColumnMeta column_meta(column_idx, block_meta, block_meta.kv_instance());
+                ColumnMeta column_meta(column_idx, block_meta);
                 check_column(column_meta, Value::MakeInt(1), row_count);
             }
         };
@@ -312,7 +312,7 @@ TEST_P(TestAlter, drop_column0) {
             EXPECT_EQ(*block_ids, Vector<BlockID>({0, 1}));
 
             for (auto block_id : *block_ids) {
-                BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+                BlockMeta block_meta(block_id, segment_meta);
                 check_block(block_meta);
             }
         };
@@ -322,7 +322,7 @@ TEST_P(TestAlter, drop_column0) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
 
         for (auto segment_id : *segment_ids) {
-            SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+            SegmentMeta segment_meta(segment_id, *table_meta);
             check_segment(segment_meta);
         }
     }

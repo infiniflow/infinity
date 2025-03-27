@@ -133,7 +133,7 @@ TEST_P(ReplayAppendTest, test_append0) {
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
         std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
@@ -145,7 +145,7 @@ TEST_P(ReplayAppendTest, test_append0) {
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
 
         BlockID block_id = (*block_ids_ptr)[0];
-        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+        BlockMeta block_meta(block_id, segment_meta);
 
         NewTxnGetVisibleRangeState state;
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -238,7 +238,7 @@ TEST_P(ReplayAppendTest, test_replay_append_delete) {
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
         SegmentID segment_id = (*segment_ids_ptr)[0];
 
-        SegmentMeta segment_meta(segment_id, *table_meta, *txn->kv_instance());
+        SegmentMeta segment_meta(segment_id, *table_meta);
 
         SizeT segment_row_cnt = 0;
         std::tie(segment_row_cnt, status) = segment_meta.GetRowCnt1();
@@ -250,7 +250,7 @@ TEST_P(ReplayAppendTest, test_replay_append_delete) {
         EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
         BlockID block_id = (*block_ids_ptr)[0];
 
-        BlockMeta block_meta(block_id, segment_meta, *txn->kv_instance());
+        BlockMeta block_meta(block_id, segment_meta);
 
         NewTxnGetVisibleRangeState state;
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -340,12 +340,13 @@ TEST_P(ReplayAppendTest, test_replay_append_with_index0) {
 
     RestartTxnMgr();
 
-    auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta, const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {
+    auto check_segment_index = [&](SegmentIndexMeta &segment_index_meta,
+                                   const std::function<Pair<RowID, u32>(const SharedPtr<MemIndex> &)> &check_mem_index) {
         Vector<ChunkID> *chunk_ids_ptr = nullptr;
         Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(*chunk_ids_ptr, Vector<ChunkID>({}));
-        
+
         SharedPtr<MemIndex> mem_index;
         status = segment_index_meta.GetMemIndex(mem_index);
         EXPECT_TRUE(status.ok());
@@ -371,7 +372,7 @@ TEST_P(ReplayAppendTest, test_replay_append_with_index0) {
         EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({0}));
 
         for (SegmentID segment_id : *segment_ids_ptr) {
-            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, *txn->kv_instance());
+            SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
             check_segment_index(segment_index_meta, check_mem_index);
         }
 

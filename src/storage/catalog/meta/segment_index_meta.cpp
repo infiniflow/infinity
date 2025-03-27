@@ -41,8 +41,8 @@ void SegmentIndexFtInfo::FromJson(const nlohmann::json &json) {
     ft_column_len_cnt_ = json["ft_column_len_cnt"].get<u32>();
 }
 
-SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta, KVInstance &kv_instance)
-    : kv_instance_(kv_instance), table_index_meta_(table_index_meta), segment_id_(segment_id) {}
+SegmentIndexMeta::SegmentIndexMeta(SegmentID segment_id, TableIndexMeeta &table_index_meta)
+    : kv_instance_(table_index_meta.kv_instance()), table_index_meta_(table_index_meta), segment_id_(segment_id) {}
 
 Status SegmentIndexMeta::SetChunkIDs(const Vector<ChunkID> &chunk_ids) {
     chunk_ids_ = chunk_ids;
