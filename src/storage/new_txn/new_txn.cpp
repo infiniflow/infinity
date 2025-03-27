@@ -2109,13 +2109,19 @@ Status NewTxn::GetBlockColumnFilePaths(const String &db_name,
 }
 
 Status NewTxn::GetColumnFilePaths(const String &db_name, const String &table_name, ColumnID column_id, Vector<String> &file_paths) {
-    //
+    // TODO
     return Status::OK();
 }
 
-Status NewTxn::GetIndexFilePaths(const String &db_name, const String &table_name, const String &index_name, Vector<String> &file_paths) {
-    //
-    return Status::OK();
+Status NewTxn::GetTableIndexFilePaths(const String &db_name, const String &table_name, const String &index_name, Vector<String> &file_paths) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    return NewCatalog::GetTableIndexFilePaths(*table_index_meta, file_paths);
 }
 
 Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
@@ -2123,8 +2129,15 @@ Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
                                         const String &index_name,
                                         SegmentID segment_id,
                                         Vector<String> &file_paths) {
-    //
-    return Status::OK();
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, *kv_instance_);
+    return NewCatalog::GetSegmentIndexFilepaths(segment_index_meta, file_paths);
 }
 
 Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
@@ -2133,8 +2146,16 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
                                       SegmentID segment_id,
                                       ChunkID chunk_id,
                                       Vector<String> &file_paths) {
-    //
-    return Status::OK();
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta, *kv_instance_);
+    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, *kv_instance_);
+    return NewCatalog::GetChunkIndexFilePaths(chunk_index_meta, file_paths);
 }
 
 } // namespace infinity

@@ -310,6 +310,11 @@ Status ChunkIndexMeta::LoadSet() {
 }
 
 Status ChunkIndexMeta::UninitSet() {
+    Status status = this->GetIndexBuffer(index_buffer_);
+    if (!status.ok()) {
+        return status;
+    }
+    index_buffer_->PickForCleanup();
     {
         String chunk_info_key = GetChunkIndexTag("chunk_info");
         Status status = kv_instance_.Delete(chunk_info_key);
@@ -317,12 +322,6 @@ Status ChunkIndexMeta::UninitSet() {
             return status;
         }
     }
-    Status status = this->GetIndexBuffer(index_buffer_);
-    if (!status.ok()) {
-        return status;
-    }
-    index_buffer_->PickForCleanup();
-
     return Status::OK();
 }
 

@@ -262,6 +262,12 @@ public:
     static Status GetBlockFilePaths(BlockMeta &block_meta, Vector<String> &file_paths);
 
     static Status GetBlockColumnFilePaths(ColumnMeta &column_meta, Vector<String> &file_paths);
+
+    static Status GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vector<String> &file_paths);
+
+    static Status GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, Vector<String> &file_paths);
+
+    static Status GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, Vector<String> &file_paths);
 };
 
 } // namespace infinity

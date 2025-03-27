@@ -869,6 +869,18 @@ Status NewCatalog::GetTableFilePaths(TxnTimeStamp begin_ts, TableMeeta &table_me
             return status;
         }
     }
+    Vector<String> *index_id_strs_ptr = nullptr;
+    status = table_meta.GetIndexIDs(index_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &index_id_str : *index_id_strs_ptr) {
+        TableIndexMeeta table_index_meta(index_id_str, table_meta, table_meta.kv_instance());
+        status = GetTableIndexFilePaths(table_index_meta, file_paths);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 
@@ -912,6 +924,49 @@ Status NewCatalog::GetBlockColumnFilePaths(ColumnMeta &column_meta, Vector<Strin
     Status status;
     Vector<String> paths;
     status = column_meta.FilePaths(paths);
+    if (!status.ok()) {
+        return status;
+    }
+    file_paths.insert(file_paths.end(), std::make_move_iterator(paths.begin()), std::make_move_iterator(paths.end()));
+    return Status::OK();
+}
+
+Status NewCatalog::GetTableIndexFilePaths(TableIndexMeeta &table_index_meta, Vector<String> &file_paths) {
+    Status status;
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta, table_index_meta.kv_instance());
+        status = GetSegmentIndexFilepaths(segment_index_meta, file_paths);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, Vector<String> &file_paths) {
+    Vector<ChunkID> *chunk_ids_ptr = nullptr;
+    Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (ChunkID chunk_id : *chunk_ids_ptr) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta, segment_index_meta.kv_instance());
+        status = GetChunkIndexFilePaths(chunk_index_meta, file_paths);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, Vector<String> &file_paths) {
+    Vector<String> paths;
+    Status status = chunk_index_meta.FilePaths(paths);
     if (!status.ok()) {
         return status;
     }
