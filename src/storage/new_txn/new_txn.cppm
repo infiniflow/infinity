@@ -491,6 +491,7 @@ private:
     Status CommitSegmentVersion(WalSegmentInfo &segment_info, SegmentMeta &segment_meta);
     Status FlushVersionFile(BlockMeta &block_meta, TxnTimeStamp save_ts);
     Status FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts);
+    Status TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap = nullptr);
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 

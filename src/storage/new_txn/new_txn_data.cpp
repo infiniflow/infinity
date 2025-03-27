@@ -1207,6 +1207,14 @@ Status NewTxn::CheckpointTableData(TableMeeta &table_meta, const CheckpointOptio
                 if (!status.ok()) {
                     return status;
                 }
+                bool to_mmap = false;
+                status = TryToMmap(block_meta, option.checkpoint_ts_, &to_mmap);
+                if (!status.ok()) {
+                    return status;
+                }
+                if (to_mmap) {
+                    LOG_INFO(fmt::format("Block {} to mmap, checkpoint ts: {}", block_meta.block_id(), option.checkpoint_ts_));
+                }
             }
         }
     }
@@ -1621,16 +1629,15 @@ Status NewTxn::CommitCompact(WalCmdCompact *compact_cmd) {
 Status NewTxn::CommitCheckpointTableData(TableMeeta &table_meta, TxnTimeStamp checkpoint_ts) {
     Status status;
 
-    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(checkpoint_ts);
     if (!status.ok()) {
         return status;
     }
 
-    SharedPtr<Vector<BlockID>> block_ids;
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta, table_meta.kv_instance());
-        auto [block_ids, status] = segment_meta.GetBlockIDs();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(checkpoint_ts);
         if (!status.ok()) {
             return status;
         }
@@ -1729,6 +1736,42 @@ Status NewTxn::FlushColumnFiles(BlockMeta &block_meta, TxnTimeStamp save_ts) {
         buffer_obj->Save();
         if (outline_buffer_obj) {
             outline_buffer_obj->Save();
+        }
+    }
+    return Status::OK();
+}
+
+Status NewTxn::TryToMmap(BlockMeta &block_meta, TxnTimeStamp save_ts, bool *to_mmap_ptr) {
+    Status status;
+
+    SizeT row_cnt;
+    std::tie(row_cnt, status) = block_meta.GetRowCnt1(save_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    bool to_mmap = row_cnt >= block_meta.block_capacity();
+    if (to_mmap_ptr) {
+        *to_mmap_ptr = to_mmap;
+    }
+    if (to_mmap) {
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs;
+        std::tie(column_defs, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        for (const auto &column_def : *column_defs) {
+            ColumnMeta column_meta(column_def->id(), block_meta, block_meta.kv_instance());
+            BufferObj *buffer_obj = nullptr;
+            BufferObj *outline_buffer_obj = nullptr;
+
+            Status status = column_meta.GetColumnBuffer(buffer_obj, outline_buffer_obj);
+            if (!status.ok()) {
+                return status;
+            }
+            buffer_obj->ToMmap();
+            if (outline_buffer_obj) {
+                outline_buffer_obj->ToMmap();
+            }
         }
     }
     return Status::OK();

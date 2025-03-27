@@ -965,7 +965,7 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
                                 BufferObj *buffer_obj) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
-    auto [block_ids, status] = segment_meta.GetBlockIDs();
+    auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
