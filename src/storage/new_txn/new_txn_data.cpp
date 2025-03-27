@@ -993,9 +993,10 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
 }
 
 Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<ColumnDef>> &column_defs) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     Status status;
-    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1045,12 +1046,13 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<Col
 
 Status
 NewTxn::AddColumnsDataInSegment(SegmentMeta &segment_meta, const Vector<SharedPtr<ColumnDef>> &column_defs, const Vector<Value> &default_values) {
-    auto [block_ids, status] = segment_meta.GetBlockIDs();
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
 
-    for (BlockID block_id : *block_ids) {
+    for (BlockID block_id : *block_ids_ptr) {
         BlockMeta block_meta(block_id, segment_meta, segment_meta.kv_instance());
         status = this->AddColumnsDataInBlock(block_meta, column_defs, default_values);
         if (!status.ok()) {
@@ -1095,9 +1097,11 @@ Status NewTxn::AddColumnsDataInBlock(BlockMeta &block_meta, const Vector<SharedP
 }
 
 Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &column_ids) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+
     Status status;
-    SharedPtr<Vector<SegmentID>> segment_ids_ptr;
-    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs();
+    Vector<SegmentID> *segment_ids_ptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1(begin_ts);
     if (!status.ok()) {
         return status;
     }
@@ -1135,7 +1139,7 @@ Status NewTxn::DropColumnsData(TableMeeta &table_meta, const Vector<ColumnID> &c
     };
 
     auto drop_columns_in_segment = [&](SegmentMeta &segment_meta) {
-        auto [block_ids, status] = segment_meta.GetBlockIDs();
+        auto [block_ids, status] = segment_meta.GetBlockIDs1(begin_ts);
         if (!status.ok()) {
             return status;
         }
