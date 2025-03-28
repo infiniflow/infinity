@@ -317,7 +317,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         }
     }
 
-    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
     if (!status.ok()) {
         return status;
     }
@@ -375,7 +375,7 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         return status;
     }
 
-    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
     if (!status.ok()) {
         return status;
     }
@@ -460,7 +460,7 @@ Status NewTxn::Delete(const String &db_name, const String &table_name, const Vec
         return status;
     }
 
-    status = new_catalog_->IncreaseTableWriteCount(table_key);
+    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
     if (!status.ok()) {
         return status;
     }

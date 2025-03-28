@@ -295,7 +295,7 @@ Status NewCatalog::MutateTable(const String &table_key, TransactionID txn_id) {
     return Status::OK();
 }
 
-Status NewCatalog::IncreaseTableWriteCount(const String &table_key) {
+Status NewCatalog::IncreaseTableWriteCount(NewTxn *txn_ptr, const String &table_key) {
     std::lock_guard lock(mtx_);
     auto iter = table_memory_context_map_.find(table_key);
     if (iter == table_memory_context_map_.end()) {
@@ -308,10 +308,15 @@ Status NewCatalog::IncreaseTableWriteCount(const String &table_key) {
     }
 
     ++table_memory_context->write_txn_num_;
+    txn_ptr->IncreaseTableReferenceCount(table_key);
     return Status::OK();
 }
 
-Status NewCatalog::DecreaseTableWriteCount(const String &table_key) {
+Status NewCatalog::DecreaseTableWriteCount(NewTxn *txn_ptr, const String &table_key) {
+    if (txn_ptr->GetTableReferenceCount(table_key) == 0) {
+        // Table isn't locked
+        return Status::OK();
+    }
     std::lock_guard lock(mtx_);
 
     auto iter = table_memory_context_map_.find(table_key);
@@ -327,6 +332,7 @@ Status NewCatalog::DecreaseTableWriteCount(const String &table_key) {
     SizeT &write_txn_num = iter->second->write_txn_num_;
     if (write_txn_num > 0) {
         --write_txn_num;
+        txn_ptr->DecreaseTableReferenceCount(table_key);
     }
 
     if (write_txn_num == 0) {

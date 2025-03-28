@@ -135,8 +135,8 @@ public:
     Status ImmutateTable(const String &table_key, TransactionID txn_id);
     Status MutateTable(const String &table_key, TransactionID txn_id);
 
-    Status IncreaseTableWriteCount(const String &table_key);
-    Status DecreaseTableWriteCount(const String &table_key);
+    Status IncreaseTableWriteCount(NewTxn* txn_ptr, const String &table_key);
+    Status DecreaseTableWriteCount(NewTxn* txn_ptr, const String &table_key);
     SizeT GetTableWriteCount() const;
 
 private:
