@@ -588,6 +588,9 @@ Status NewTxnTableStore1::Append(const SharedPtr<DataBlock> &input_block) {
 }
 
 Status NewTxnTableStore1::Delete(const Vector<RowID> &row_ids) {
+    if (!delete_state_) {
+        delete_state_ = MakeUnique<DeleteState>();
+    }
     HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = delete_state_->rows_;
     for (auto row_id : row_ids) {
         BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
@@ -617,6 +620,13 @@ void NewTxnTableStore1::GetAccessState(const Vector<RowID> &row_ids, AccessState
             UnrecoverableError(error_message);
         }
     }
+}
+
+DeleteState &NewTxnTableStore1::undo_delete_state() { 
+    if (!undo_delete_state_) {
+        undo_delete_state_ = MakeUnique<DeleteState>();
+    }
+    return *undo_delete_state_;
 }
 
 NewTxnStore::NewTxnStore(NewTxn *txn) : txn_(txn) {}

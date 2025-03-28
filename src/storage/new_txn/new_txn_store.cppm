@@ -241,7 +241,7 @@ public:
     AppendState *append_state() const { return append_state_.get(); }
 
     const DeleteState &delete_state() const { return *delete_state_; }
-    DeleteState &undo_delete_state() { return *undo_delete_state_; }
+    DeleteState &undo_delete_state();
 
 private:
     UniquePtr<AppendState> append_state_{};

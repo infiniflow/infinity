@@ -4246,7 +4246,7 @@ TEST_P(TestIndex, drop_index_and_rename_table) {
 
         // drop index
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
@@ -4303,7 +4303,7 @@ TEST_P(TestIndex, drop_index_and_rename_table) {
 
         // drop index
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
-        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         // rename
@@ -4366,7 +4366,7 @@ TEST_P(TestIndex, drop_index_and_rename_table) {
         // rename
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
 
-        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
@@ -4425,7 +4425,7 @@ TEST_P(TestIndex, drop_index_and_rename_table) {
         // rename
         auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
 
-        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
@@ -4488,7 +4488,7 @@ TEST_P(TestIndex, drop_index_and_rename_table) {
         status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
-        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());
@@ -4547,7 +4547,7 @@ TEST_P(TestIndex, drop_index_and_rename_table) {
         status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
-        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
@@ -4608,7 +4608,7 @@ TEST_P(TestIndex, drop_index_and_rename_table) {
         status = txn4->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
-        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
@@ -4671,7 +4671,7 @@ TEST_P(TestIndex, drop_index_and_rename_table) {
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = txn6->DropIndexByName(*db_name, *new_table_name, *index_name1, ConflictType::kError);
+        status = txn6->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn6);
         EXPECT_TRUE(status.ok());

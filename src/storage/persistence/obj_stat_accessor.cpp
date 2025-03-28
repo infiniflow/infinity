@@ -25,6 +25,7 @@ import third_party;
 import obj_status;
 
 import kv_store;
+import storage;
 import kv_code;
 import status;
 import infinity_context;
@@ -32,7 +33,11 @@ import infinity_context;
 namespace infinity {
 
 void ObjectStatAccessorBase::AddObjStatToKVStore(const String &key, const ObjStat &obj_stat) {
-    KVStore *kv_store = InfinityContext::instance().storage()->kv_store();
+    Storage *storage = InfinityContext::instance().storage();
+    if (!storage) {
+        return;
+    }
+    KVStore *kv_store = storage->kv_store();
     if (!kv_store) {
         return;
     }
@@ -43,7 +48,11 @@ void ObjectStatAccessorBase::AddObjStatToKVStore(const String &key, const ObjSta
 }
 
 void ObjectStatAccessorBase::RemoveObjStatFromKVStore(const String &key) {
-    KVStore *kv_store = InfinityContext::instance().storage()->kv_store();
+    Storage *storage = InfinityContext::instance().storage();
+    if (!storage) {
+        return;
+    }
+    KVStore *kv_store = storage->kv_store();
     if (!kv_store) {
         return;
     }
