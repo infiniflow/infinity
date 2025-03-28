@@ -20,6 +20,7 @@ module;
 module new_txn;
 
 import new_txn_manager;
+import kv_store;
 import new_catalog;
 import chunk_index_meta;
 import segment_index_meta;

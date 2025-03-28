@@ -49,6 +49,7 @@ import table_meeta;
 import segment_meta;
 import new_txn;
 import buffer_obj;
+import kv_store;
 
 namespace infinity {
 

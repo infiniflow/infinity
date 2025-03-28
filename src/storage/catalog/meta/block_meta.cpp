@@ -117,13 +117,13 @@ Status BlockMeta::LoadSet(TxnTimeStamp checkpoint_ts) {
 }
 
 Status BlockMeta::UninitSet() {
-    {
-        String block_row_cnt_key = GetBlockTag("row_cnt");
-        Status status = kv_instance_.Delete(block_row_cnt_key);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // {
+    //     String block_row_cnt_key = GetBlockTag("row_cnt");
+    //     Status status = kv_instance_.Delete(block_row_cnt_key);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     {
         String block_lock_key = GetBlockTag("lock");

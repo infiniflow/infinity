@@ -226,15 +226,15 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
         return status;
     }
 
-    {
-        // Create segment ids
-        String table_segment_ids_key = GetTableTag("segment_ids");
-        String table_segment_ids_str = nlohmann::json::array().dump();
-        Status status = kv_instance_.Put(table_segment_ids_key, table_segment_ids_str);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // {
+    //     // Create segment ids
+    //     String table_segment_ids_key = GetTableTag("segment_ids");
+    //     String table_segment_ids_str = nlohmann::json::array().dump();
+    //     Status status = kv_instance_.Put(table_segment_ids_key, table_segment_ids_str);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
 
     for (const auto &column : table_def->columns()) {
         String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column->name());
@@ -271,10 +271,21 @@ Status TableMeeta::UninitSet() {
         return status;
     }
 
-    String segment_ids_key = GetTableTag("segment_ids");
-    status = kv_instance_.Delete(segment_ids_key);
-    if (!status.ok()) {
-        return status;
+    // String segment_ids_key = GetTableTag("segment_ids");
+    // status = kv_instance_.Delete(segment_ids_key);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    {
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = GetSegmentIDs1();
+        if (!status.ok()) {
+            return status;
+        }
+        status = RemoveSegmentIDs1(*segment_ids_ptr);
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     String unsealed_seg_id_key = GetTableTag("unsealed_segment_id");

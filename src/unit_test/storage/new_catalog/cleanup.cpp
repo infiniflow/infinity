@@ -71,6 +71,22 @@ using namespace infinity;
 
 class TestCleanup : public BaseTestParamStr {
 protected:
+    void SetUp() override {
+        BaseTestParamStr::SetUp();
+
+        new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    }
+
+    void TearDown() override {
+        new_txn_mgr->PrintAllKeyValue();
+
+        SizeT kv_num = new_txn_mgr->KeyValueNum();
+        EXPECT_EQ(kv_num, 4);
+
+        new_txn_mgr = nullptr;
+        BaseTestParamStr::TearDown();
+    }
+
     void CheckFilePaths() {
         for (auto &file_path : file_paths_) {
             file_path = String(this->GetFullDataDir()) + "/" + file_path;
@@ -87,14 +103,82 @@ protected:
     }
 
 protected:
+    NewTxnManager *new_txn_mgr;
     Vector<String> file_paths_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TestCleanup, ::testing::Values(BaseTestParamStr::VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestCleanup, test_cleanup_table) {
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+TEST_P(TestCleanup, test_cleanup_db) {
+    SharedPtr<String> db_name = std::make_shared<String>("db1");
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto table_name = std::make_shared<std::string>("tb1");
+    auto table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
 
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+        Status status = txn->CreateDatabase(*db_name, ConflictType::kIgnore, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    SizeT block_row_cnt = 8192;
+    auto make_input_block = [&](const Value &v1, const Value &v2) {
+        auto input_block = MakeShared<DataBlock>();
+        auto make_column = [&](const Value &v) {
+            auto col = ColumnVector::Make(MakeShared<DataType>(v.type()));
+            col->Initialize();
+            for (SizeT i = 0; i < block_row_cnt; ++i) {
+                col->AppendValue(v);
+            }
+            return col;
+        };
+        {
+            auto col1 = make_column(v1);
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = make_column(v2);
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        Status status = txn->Import(*db_name, *table_name, {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnoprstuvwxyz"))});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+
+        Status status = txn->GetDBFilePaths(*db_name, file_paths_);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        EXPECT_TRUE(status.ok());
+    }
+
+    this->CheckFilePaths();
+}
+
+TEST_P(TestCleanup, test_cleanup_table) {
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -168,8 +252,6 @@ TEST_P(TestCleanup, test_cleanup_table) {
 }
 
 TEST_P(TestCleanup, test_cleanup_index) {
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -277,8 +359,6 @@ TEST_P(TestCleanup, test_cleanup_index) {
 }
 
 TEST_P(TestCleanup, test_cleanup_compact) {
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -375,8 +455,6 @@ TEST_P(TestCleanup, test_cleanup_compact) {
 }
 
 TEST_P(TestCleanup, test_cleanup_optimize) {
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -492,8 +570,6 @@ TEST_P(TestCleanup, test_cleanup_optimize) {
 TEST_P(TestCleanup, test_cleanup_drop_column) {
     using namespace infinity;
 
-    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
-
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
@@ -563,6 +639,24 @@ TEST_P(TestCleanup, test_cleanup_drop_column) {
         EXPECT_TRUE(status.ok());
     }
 
+    {
+        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        EXPECT_TRUE(status.ok());
+    }
+    this->CheckFilePaths();
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
+
+        Status status = txn->GetTableFilePaths(*db_name, *table_name, file_paths_);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
     {
         Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
         EXPECT_TRUE(status.ok());

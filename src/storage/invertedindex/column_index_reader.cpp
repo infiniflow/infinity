@@ -49,6 +49,7 @@ import chunk_index_meta;
 import new_txn;
 import status;
 import mem_index;
+import kv_store;
 
 namespace infinity {
 void ColumnIndexReader::Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment, Txn *txn) {

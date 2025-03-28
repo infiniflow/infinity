@@ -276,6 +276,18 @@ String KVStore::ToString() const {
     return ss.str();
 }
 
+SizeT KVStore::KeyValueNum() const {
+    SizeT cnt = 0;
+    rocksdb::ReadOptions read_option;
+    auto iter = transaction_db_->NewIterator(read_option);
+    iter->SeekToFirst();
+    for (; iter->Valid(); iter->Next()) {
+        ++cnt;
+    }
+    delete iter;
+    return cnt;
+}
+
 Status KVStore::Destroy(const String &db_path) {
     rocksdb::Options options;
     options.create_if_missing = true;

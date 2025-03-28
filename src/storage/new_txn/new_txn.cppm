@@ -32,7 +32,6 @@ import internal_types;
 import value;
 import snapshot_info;
 import txn_context;
-import kv_store;
 import column_def;
 import extra_command;
 import column_vector;
@@ -40,6 +39,7 @@ import buffer_handle;
 
 namespace infinity {
 
+class KVInstance;
 class NewCatalog;
 class NewTxnManager;
 struct Catalog;

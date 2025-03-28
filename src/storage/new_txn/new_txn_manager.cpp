@@ -464,6 +464,8 @@ void NewTxnManager::PrintAllKeyValue() const {
     std::cout << String(" -------------- ") << std::endl;
 }
 
+SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
+
 Status NewTxnManager::Cleanup(TxnTimeStamp ts) {
     if (ts == UNCOMMIT_TS) {
         ts = this->GetCleanupScanTS();

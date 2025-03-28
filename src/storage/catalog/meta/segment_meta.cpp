@@ -24,6 +24,7 @@ import third_party;
 import default_values;
 import table_meeta;
 import logger;
+import infinity_exception;
 
 import block_meta;
 
@@ -103,12 +104,38 @@ Status SegmentMeta::InitSet() {
 }
 
 Status SegmentMeta::UninitSet() {
+    // {
+    //     String block_ids_key = GetSegmentTag("block_ids");
+    //     Status status = kv_instance_.Delete(block_ids_key);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
     {
-        String block_ids_key = GetSegmentTag("block_ids");
-        Status status = kv_instance_.Delete(block_ids_key);
-        if (!status.ok()) {
-            return status;
+        String block_id_prefix = KeyEncode::CatalogTableSegmentBlockKeyPrefix(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_);
+        auto iter = kv_instance_.GetIterator();
+        iter->Seek(block_id_prefix);
+        Vector<String> delete_keys;
+        while (iter->Valid() && iter->Key().starts_with(block_id_prefix)) {
+            TxnTimeStamp commit_ts = std::stoull(iter->Value().ToString());
+            if (commit_ts > begin_ts_) {
+                BlockID block_id = std::stoull(iter->Key().ToString().substr(block_id_prefix.size()));
+                UnrecoverableError(fmt::format("Block id: {}.{} is not allowed to be removed. commit_ts: {}, begin_ts: {}",
+                                               segment_id_,
+                                               block_id,
+                                               commit_ts,
+                                               begin_ts_));
+            }
+            delete_keys.push_back(iter->Key().ToString());
+            iter->Next();
         }
+        for (const String &key : delete_keys) {
+            Status status = kv_instance_.Delete(key);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        block_ids1_.reset();
     }
     {
         String next_block_id_key = GetSegmentTag(String(LATEST_BLOCK_ID));
@@ -117,13 +144,13 @@ Status SegmentMeta::UninitSet() {
             return status;
         }
     }
-    {
-        String row_cnt_key = GetSegmentTag("row_cnt");
-        Status status = kv_instance_.Delete(row_cnt_key);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // {
+    //     String row_cnt_key = GetSegmentTag("row_cnt");
+    //     Status status = kv_instance_.Delete(row_cnt_key);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
     return Status::OK();
 }
 
@@ -204,14 +231,14 @@ Status SegmentMeta::Init() {
             }
         }
     }
-    {
-        String block_ids_key = GetSegmentTag("block_ids");
-        String block_ids_str = nlohmann::json::array().dump();
-        Status status = kv_instance_.Put(block_ids_key, block_ids_str);
-        if (!status.ok()) {
-            return status;
-        }
-    }
+    // {
+    //     String block_ids_key = GetSegmentTag("block_ids");
+    //     String block_ids_str = nlohmann::json::array().dump();
+    //     Status status = kv_instance_.Put(block_ids_key, block_ids_str);
+    //     if (!status.ok()) {
+    //         return status;
+    //     }
+    // }
     {
 
         String row_cnt_key = GetSegmentTag("row_cnt");

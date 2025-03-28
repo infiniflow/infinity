@@ -22,7 +22,6 @@ import txn_state;
 import default_values;
 import txn_context;
 import txn_manager;
-import kv_store;
 import status;
 
 namespace infinity {
@@ -31,6 +30,7 @@ class BGTaskProcessor;
 class WalManager;
 class CatalogDeltaEntry;
 class NewTxn;
+class KVStore;
 
 export class NewTxnManager {
 public:
@@ -114,6 +114,8 @@ public:
     TxnTimeStamp max_committed_ts() { return max_committed_ts_; }
 
     void PrintAllKeyValue() const;
+
+    SizeT KeyValueNum() const;
 
     KVStore *kv_store() const { return kv_store_; }
 

@@ -28,7 +28,6 @@ import log_file;
 import memindex_tracer;
 import persistence_manager;
 import virtual_store;
-import kv_store;
 import status;
 
 export module storage;
@@ -39,6 +38,8 @@ class CleanupInfoTracer;
 class ResultCacheManager;
 class NewCatalog;
 class NewTxnManager;
+class KVStore;
+class KVInstance;
 
 export enum class ReaderInitPhase {
     kInvalid,
