@@ -20,13 +20,13 @@ import stl;
 import serialize;
 import third_party;
 import obj_status;
-import obj_stat_accessor;
 import status;
 
 // A view means a logical plan
 namespace infinity {
 
 class KVInstance;
+class ObjectStatAccessorBase;
 
 export struct ObjAddr {
     String obj_key_{};

@@ -42,6 +42,17 @@ void ObjectStatAccessorBase::AddObjStatToKVStore(const String &key, const ObjSta
     }
 }
 
+void ObjectStatAccessorBase::RemoveObjStatFromKVStore(const String &key) {
+    KVStore *kv_store = InfinityContext::instance().storage()->kv_store();
+    if (!kv_store) {
+        return;
+    }
+    Status status = kv_store->Delete(KeyEncode::PMObjectStatKey(key));
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
 // ObjectStatMap
 
 ObjectStatMap::~ObjectStatMap() {
@@ -237,6 +248,8 @@ Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const String &key)
     }
     ObjStat obj_stat = std::move(iter->second);
     obj_map_.erase(iter);
+
+    this->RemoveObjStatFromKVStore(key);
     return obj_stat;
 }
 
@@ -348,6 +361,8 @@ Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Invalidate(const String &key
         return None;
     }
     disk_used_ -= obj_stat->obj_size_;
+
+    this->RemoveObjStatFromKVStore(key);
     return obj_stat;
 }
 

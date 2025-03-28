@@ -283,6 +283,9 @@ TxnIndexStore *TxnTableStore::GetIndexStore(TableIndexEntry *table_index_entry, 
 }
 
 Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_ids) {
+    if (!delete_state_) {
+        delete_state_ = MakeUnique<DeleteState>();
+    }
     HashMap<SegmentID, HashMap<BlockID, Vector<BlockOffset>>> &row_hash_table = delete_state_->rows_;
     for (auto row_id : row_ids) {
         BlockID block_id = row_id.segment_offset_ / DEFAULT_BLOCK_CAPACITY;
@@ -358,6 +361,9 @@ bool TxnTableStore::CheckConflict(Catalog *catalog, Txn *txn) const {
         if (!status.ok() || table_index_entry1 != index_store->table_index_entry_) {
             return true;
         }
+    }
+    if (!delete_state_) {
+        return false;
     }
     for (const auto &[segment_id, block_map] : delete_state_->rows_) {
         if (auto *segment_entry = table_entry_->GetSegmentEntry(segment_id); segment_entry != nullptr) {
@@ -478,7 +484,9 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
         Catalog::CommitCompact(table_entry_, txn_id, commit_ts, compact_state_);
     }
 
-    Catalog::Delete(table_entry_, txn_id, this, commit_ts, *delete_state_);
+    if (delete_state_) {
+        Catalog::Delete(table_entry_, txn_id, this, commit_ts, *delete_state_);
+    }
 
     for (auto *sealed_segment : set_sealed_segments_) {
         if (!sealed_segment->SetSealed()) {
@@ -518,8 +526,10 @@ void TxnTableStore::MaintainCompactionAlg() {
     for (auto *sealed_segment : set_sealed_segments_) {
         table_entry_->AddSegmentToCompactionAlg(sealed_segment);
     }
-    for (const auto &[segment_id, delete_map] : delete_state_->rows_) {
-        table_entry_->AddDeleteToCompactionAlg(segment_id);
+    if (delete_state_) {
+        for (const auto &[segment_id, delete_map] : delete_state_->rows_) {
+            table_entry_->AddDeleteToCompactionAlg(segment_id);
+        }
     }
 
     has_update_ = true;

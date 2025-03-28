@@ -25,7 +25,7 @@ import infinity_exception;
 import virtual_store;
 import logger;
 import global_resource_usage;
-
+import obj_stat_accessor;
 import kv_store;
 import kv_code;
 import infinity_context;
@@ -518,9 +518,9 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr,
         drop_from_remote_keys.emplace_back(object_addr.obj_key_);
         objects_->Invalidate(object_addr.obj_key_);
         LOG_TRACE(fmt::format("Deleted object {}", object_addr.obj_key_));
+    } else {
+        objects_->PutNoCount(object_addr.obj_key_, *obj_stat);
     }
-
-    objects_->PutNoCount(object_addr.obj_key_, *obj_stat);
 }
 
 ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {

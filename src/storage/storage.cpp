@@ -297,6 +297,11 @@ Status Storage::AdminToWriter() {
         wal_mgr_->ReplayWalEntries(replay_entries);
     }
 
+    if (bg_processor_ != nullptr) {
+        UnrecoverableError("Background processor was initialized before.");
+    }
+    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
+
     if (system_start_ts == 0) {
         CreateDefaultDB();
     }
@@ -312,10 +317,6 @@ Status Storage::AdminToWriter() {
     BuiltinFunctions builtin_functions(catalog_);
     builtin_functions.Init();
     // Catalog finish init here.
-    if (bg_processor_ != nullptr) {
-        UnrecoverableError("Background processor was initialized before.");
-    }
-    bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), catalog_.get());
 
     cleanup_info_tracer_ = MakeUnique<CleanupInfoTracer>();
 
@@ -882,8 +883,9 @@ void Storage::CreateDefaultDB() {
         if (!status.ok()) {
             UnrecoverableError("Can't commit txn for 'default_db'");
         }
-        return;
+        // return;
     }
+    // be compactible with old txn manager
 
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
     new_txn->SetReaderAllowed(true);

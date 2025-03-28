@@ -105,6 +105,8 @@ public:
 
 protected:
     void AddObjStatToKVStore(const String &key, const ObjStat &obj_stat);
+
+    void RemoveObjStatFromKVStore(const String &key);
 };
 
 export class ObjectStatAccessor_LocalStorage : public ObjectStatAccessorBase {
