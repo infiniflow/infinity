@@ -2889,11 +2889,11 @@ TEST_P(TestLockTable, lock_table_and_delete) {
     }
 
     {
-        // lock table and import
+        // lock table and delete
         //                              t1            lock table    commit (success)
         //                              |--------------|---------------|
         //       |----------|-------------------|
-        //       t2     append     commit (success)
+        //       t2     delete     commit (success)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -2911,18 +2911,30 @@ TEST_P(TestLockTable, lock_table_and_delete) {
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, table_name, input_block1);
         EXPECT_TRUE(status.ok());
-
-        // lock table txn
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
-
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        // lock table
-        status = txn4->LockTable(*db_name, table_name);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, table_name, row_ids);
         EXPECT_TRUE(status.ok());
+
+        // lock table txn
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
+
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
+
+        // lock table
+        status = txn7->LockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        check_data();
 
         // unlock table
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("unlock table"), TransactionType::kNormal);
@@ -2943,11 +2955,11 @@ TEST_P(TestLockTable, lock_table_and_delete) {
     }
 
     {
-        // lock table and import
-        //                        t1            lock table    commit (success)
-        //                        |--------------|---------------|
+        // lock table and delete
+        //                        t1            lock table (fail) rollback (success)
+        //                        |--------------|------------------|
         //       |----------|------------------------|
-        //       t2     append             commit (success)
+        //       t2     delete             commit (success)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -2965,17 +2977,30 @@ TEST_P(TestLockTable, lock_table_and_delete) {
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
         status = txn3->Append(*db_name, table_name, input_block1);
         EXPECT_TRUE(status.ok());
-
-        // lock table txn
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
-        // lock table
-        status = txn4->LockTable(*db_name, table_name);
-        EXPECT_FALSE(status.ok());
-
         status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->RollBackTxn(txn4);
+
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, table_name, row_ids);
         EXPECT_TRUE(status.ok());
+
+        // lock table txn
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
+        // lock table
+        status = txn7->LockTable(*db_name, table_name);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+
+        check_data();
 
         // unlock table
         //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("unlock table"), TransactionType::kNormal);
@@ -2996,11 +3021,11 @@ TEST_P(TestLockTable, lock_table_and_delete) {
     }
 
     {
-        // lock table and import
+        // lock table and delete
         //             t1            lock table    commit (success)
         //             |--------------|---------------|
         //       |------------------------|------------------------|
-        //       t2                    append             commit (success)
+        //       t2                    delete (fail)          rollback (success)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -3016,21 +3041,32 @@ TEST_P(TestLockTable, lock_table_and_delete) {
         EXPECT_TRUE(status.ok());
 
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-
-        // lock table txn
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
-        // lock table
-        status = txn4->LockTable(*db_name, table_name);
+        status = txn3->Append(*db_name, table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        status = txn3->Append(*db_name, table_name, input_block1);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        // lock table txn
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
+        // lock table
+        status = txn7->LockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
+
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, table_name, row_ids);
         EXPECT_FALSE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->RollBackTxn(txn3);
+        status = new_txn_mgr->RollBackTxn(txn4);
         EXPECT_TRUE(status.ok());
+
+        //        check_data();
 
         // unlock table
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("unlock table"), TransactionType::kNormal);
@@ -3055,7 +3091,7 @@ TEST_P(TestLockTable, lock_table_and_delete) {
         //                     t1            lock table           commit (success)
         //                     |--------------|----------------------------|
         //                                        |--------------------------------|-------------------|
-        //                                      t2                              append             commit (success)
+        //                                      t2                              delete             commit (success)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -3070,15 +3106,21 @@ TEST_P(TestLockTable, lock_table_and_delete) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        // lock table txn
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
-        // lock table
-        status = txn4->LockTable(*db_name, table_name);
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, table_name, input_block1);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+        // lock table txn
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
+        // lock table
+        status = txn7->LockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn4);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
         // unlock table
@@ -3088,11 +3130,16 @@ TEST_P(TestLockTable, lock_table_and_delete) {
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        status = txn3->Append(*db_name, table_name, input_block1);
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        check_data();
 
         // drop database
         auto *txn11 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -3110,7 +3157,7 @@ TEST_P(TestLockTable, lock_table_and_delete) {
         // t1            lock table           commit (success)
         // |--------------|----------------------------|
         //                                                   |--------------------------------|-------------------|
-        //                                                  t2                              append             commit (success)
+        //                                                  t2                              delete             commit (success)
         auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
         Status status = txn1->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
         EXPECT_TRUE(status.ok());
@@ -3125,12 +3172,18 @@ TEST_P(TestLockTable, lock_table_and_delete) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        // lock table txn
-        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
-        // lock table
-        status = txn4->LockTable(*db_name, table_name);
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, table_name, input_block1);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn4);
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        // lock table txn
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("lock table"), TransactionType::kNormal);
+        // lock table
+        status = txn7->LockTable(*db_name, table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn7);
         EXPECT_TRUE(status.ok());
 
         // unlock table
@@ -3140,12 +3193,17 @@ TEST_P(TestLockTable, lock_table_and_delete) {
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
-        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-        status = txn3->Append(*db_name, table_name, input_block1);
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        for (SizeT row_id = 1; row_id < 8192; row_id += 2) {
+            row_ids.push_back(RowID(0, row_id));
+        }
+        status = txn4->Delete(*db_name, table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        check_data();
 
         // drop database
         auto *txn11 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
