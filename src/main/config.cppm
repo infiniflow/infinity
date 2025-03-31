@@ -95,6 +95,7 @@ public:
     LogLevel GetLogLevel();
 
     // Storage
+    bool UseNewCatalog();
     String DataDir();
     String CatalogDir();
     String SnapshotDir();

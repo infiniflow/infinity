@@ -76,7 +76,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          NewCheckpointTest,
-                         ::testing::Values(NewCheckpointTest::NULL_CONFIG_PATH, NewCheckpointTest::VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(NewCheckpointTest::NEW_CONFIG_PATH, NewCheckpointTest::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(NewCheckpointTest, test_checkpoint0) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");

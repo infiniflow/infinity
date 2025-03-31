@@ -107,7 +107,7 @@ protected:
     Vector<String> file_paths_;
 };
 
-INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TestCleanup, ::testing::Values(BaseTestParamStr::VFS_OFF_CONFIG_PATH));
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams, TestCleanup, ::testing::Values(BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TestCleanup, test_cleanup_db) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");

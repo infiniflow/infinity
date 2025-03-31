@@ -84,7 +84,7 @@ class NewTxnReplayTest : public NewReplayTest {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          NewTxnReplayTest,
-                         ::testing::Values(NewTxnReplayTest::NULL_CONFIG_PATH, NewTxnReplayTest::VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(NewTxnReplayTest::NEW_CONFIG_PATH, NewTxnReplayTest::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(NewTxnReplayTest, test_replay_create_db) {
     using namespace infinity;

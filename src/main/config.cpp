@@ -1530,6 +1530,22 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     }
 
                     switch (option_index) {
+                        case GlobalOptionIndex::kUseNewCatalog: {
+                            // Use new catalog
+                            bool use_new_catalog = false;
+                            if (elem.second.is_boolean()) {
+                                use_new_catalog = elem.second.value_or(use_new_catalog);
+                            } else {
+                                return Status::InvalidConfig("'use_new_catalog' field isn't boolean.");
+                            }
+                            UniquePtr<BooleanOption> use_new_catalog_option =
+                                MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
+                            Status status = global_options_.AddOption(std::move(use_new_catalog_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
                         case GlobalOptionIndex::kDataDir: {
                             // Data Dir
                             String data_dir = "/var/infinity/data";
@@ -1896,6 +1912,16 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'storage' field", var_name));
                         }
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kUseNewCatalog) == nullptr) {
+                    // Use new catalog
+                    bool use_new_catalog = false;
+                    UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
+                    Status status = global_options_.AddOption(std::move(use_new_catalog_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
                     }
                 }
 
@@ -2694,6 +2720,11 @@ LogLevel Config::GetLogLevel() {
 }
 
 // Storage
+bool Config::UseNewCatalog() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetBoolValue(GlobalOptionIndex::kUseNewCatalog);
+}
+
 String Config::DataDir() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetStringValue(GlobalOptionIndex::kDataDir);

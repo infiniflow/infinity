@@ -58,7 +58,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ReplayAppendTest,
-                         ::testing::Values(ReplayAppendTest::NULL_CONFIG_PATH, ReplayAppendTest::VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(ReplayAppendTest::NEW_CONFIG_PATH, ReplayAppendTest::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(ReplayAppendTest, test_append0) {
     using namespace infinity;

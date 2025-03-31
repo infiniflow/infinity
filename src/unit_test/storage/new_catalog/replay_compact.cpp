@@ -57,7 +57,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ReplayCompactTest,
-                         ::testing::Values(ReplayCompactTest::NULL_CONFIG_PATH, ReplayCompactTest::VFS_OFF_CONFIG_PATH));
+                         ::testing::Values(ReplayCompactTest::NEW_CONFIG_PATH, ReplayCompactTest::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(ReplayCompactTest, test_compact0) {
     using namespace infinity;
