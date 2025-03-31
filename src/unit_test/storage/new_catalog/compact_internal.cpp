@@ -69,13 +69,13 @@ import constant_expr;
 
 using namespace infinity;
 
-class TestCompact : public BaseTestParamStr {};
+class TestCompactInternal : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestCompact,
+                         TestCompactInternal,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestCompact, test_compact) {
+TEST_P(TestCompactInternal, test_compact) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -249,7 +249,7 @@ TEST_P(TestCompact, test_compact) {
     }
 }
 
-TEST_P(TestCompact, test_compact_with_index) {
+TEST_P(TestCompactInternal, test_compact_with_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

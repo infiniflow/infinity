@@ -67,10 +67,12 @@ struct NewTxnCompactState {
         if (!status.ok()) {
             UnrecoverableError("Failed to get column defs");
         }
-        column_cnt_ = column_defs_ptr->size();
+        column_defs_ptr_ = column_defs_ptr;
     }
 
-    SizeT column_cnt() const { return column_cnt_; }
+    // SizeT column_cnt() const { return column_cnt_; }
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr() const { return column_defs_ptr_; }
 
     Status NextBlock() {
         Status status;
@@ -104,10 +106,11 @@ struct NewTxnCompactState {
         cur_block_row_cnt_ = 0;
 
         column_vectors_.clear();
-        column_vectors_.resize(column_cnt_);
+        column_vectors_.resize(column_defs_ptr_->size());
 
-        for (SizeT i = 0; i < column_cnt_; ++i) {
-            ColumnMeta column_meta(i, *block_meta_);
+        for (SizeT i = 0; i < column_defs_ptr_->size(); ++i) {
+            ColumnID column_id = (*column_defs_ptr_)[i]->id();
+            ColumnMeta column_meta(column_id, *block_meta_);
             status = NewCatalog::GetColumnVector(column_meta, 0, ColumnVectorTipe::kReadWrite, column_vectors_[i]);
             if (!status.ok()) {
                 return status;
@@ -125,8 +128,9 @@ struct NewTxnCompactState {
             block_row_cnts_.push_back(cur_block_row_cnt_);
             segment_row_cnt_ += cur_block_row_cnt_;
         }
-        for (ColumnID i = 0; i < column_cnt_; ++i) {
-            ColumnMeta column_meta(i, *block_meta_);
+        for (ColumnID i = 0; i < column_defs_ptr_->size(); ++i) {
+            ColumnID column_id = (*column_defs_ptr_)[i]->id();
+            ColumnMeta column_meta(column_id, *block_meta_);
             BufferObj *buffer_obj = nullptr;
             BufferObj *outline_buffer_obj = nullptr;
 
@@ -161,7 +165,7 @@ struct NewTxnCompactState {
     SizeT segment_row_cnt_ = 0;
     BlockOffset cur_block_row_cnt_ = 0;
     Vector<ColumnVector> column_vectors_;
-    SizeT column_cnt_ = 0;
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr_;
 };
 
 Status NewTxn::Import(const String &db_name, const String &table_name, const Vector<SharedPtr<DataBlock>> &input_blocks) {
@@ -941,13 +945,13 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
 
     SizeT block_row_cnt = range_state.block_offset_end();
 
-    SizeT column_cnt = compact_state.column_cnt();
-    Vector<ColumnVector> column_vectors;
-    column_vectors.resize(column_cnt);
-    for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs = compact_state.column_defs_ptr();
+    Vector<ColumnVector> column_vectors(column_defs->size());
+    for (SizeT i = 0; i < column_defs->size(); ++i) {
+        ColumnID column_id = (*column_defs)[i]->id();
         ColumnMeta column_meta(column_id, block_meta);
 
-        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vectors[column_id]);
+        status = NewCatalog::GetColumnVector(column_meta, block_row_cnt, ColumnVectorTipe::kReadOnly, column_vectors[i]);
         if (!status.ok()) {
             return status;
         }
@@ -983,7 +987,7 @@ Status NewTxn::CompactBlock(BlockMeta &block_meta, NewTxnCompactState &compact_s
             }
         }
 
-        for (SizeT column_id = 0; column_id < column_cnt; ++column_id) {
+        for (SizeT column_id = 0; column_id < column_defs->size(); ++column_id) {
             compact_state.column_vectors_[column_id].AppendWith(column_vectors[column_id], range.first, append_size);
         }
         compact_state.cur_block_row_cnt_ += append_size;
@@ -1008,7 +1012,7 @@ Status NewTxn::AddColumnsData(TableMeeta &table_meta, const Vector<SharedPtr<Col
     Vector<Value> default_values;
     ExpressionBinder tmp_binder(nullptr);
     for (const auto &column_def : column_defs) {
-        if (!column_def->default_value()) {
+        if (!column_def->default_value() || column_def->default_value()->literal_type_ == LiteralType::kNull) {
             return Status::NotSupport(fmt::format("Column {} has no default value", column_def->name()));
         }
         SharedPtr<ConstantExpr> default_expr = column_def->default_value();
@@ -1348,7 +1352,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
     //     }
     // } else {
     //     BlockID block_id = next_block_id - 1;
-    //     block_meta.emplace(block_id, segment_meta.value() 
+    //     block_meta.emplace(block_id, segment_meta.value()
     // }
 
     Vector<BlockID> *block_ids_ptr = nullptr;

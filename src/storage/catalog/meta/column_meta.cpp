@@ -60,7 +60,13 @@ Status ColumnMeta::InitSet() {
         if (!status.ok()) {
             return status;
         }
-        col_def = (*column_defs_ptr)[column_idx_];
+        auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [&](const SharedPtr<ColumnDef> &column_def) {
+            return column_def->id() == i64(column_idx_);
+        });
+        if (iter == column_defs_ptr->end()) {
+            return Status::ColumnNotExist(fmt::format("Column {} not found in table meta", column_idx_));
+        }
+        col_def = *iter;
     }
 
     SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
@@ -165,7 +171,13 @@ Status ColumnMeta::FilePaths(Vector<String> &paths) {
         if (!status.ok()) {
             return status;
         }
-        ColumnDef *col_def = (*column_defs_ptr)[column_idx_].get();
+        auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [this](const SharedPtr<ColumnDef> &col_def) {
+            return col_def->id() == i64(column_idx_);
+        });
+        if (iter == column_defs_ptr->end()) {
+            return Status::ColumnNotExist(fmt::format("Column index {} not found in column defs", column_idx_));
+        }
+        ColumnDef *col_def = (*iter).get();
 
         VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
         if (buffer_type == VectorBufferType::kVarBuffer) {
@@ -228,7 +240,13 @@ Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
         if (!status.ok()) {
             return status;
         }
-        col_def = (*column_defs_ptr)[column_idx_].get();
+        auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [this](const SharedPtr<ColumnDef> &col_def) {
+            return col_def->id() == i64(column_idx_);
+        });
+        if (iter == column_defs_ptr->end()) {
+            return Status::ColumnNotExist(fmt::format("Column index {} not found in column defs", column_idx_));
+        }
+        col_def = (*iter).get();
     }
 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();

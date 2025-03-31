@@ -856,7 +856,13 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, con
         if (!status.ok()) {
             return status;
         }
-        col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
+        auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [&](const SharedPtr<ColumnDef> &column_def) {
+            return ColumnID(column_def->id()) == column_meta.column_idx();
+        });
+        if (iter == column_defs_ptr->end()) {
+            UnrecoverableError(fmt::format("Column {} not found in table meta", column_meta.column_idx()));
+        }
+        col_def = iter->get();
     }
 
     BufferObj *buffer_obj = nullptr;
