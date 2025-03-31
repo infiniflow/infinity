@@ -186,7 +186,9 @@ private:
 public:
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);
 
-    static Status MemIndexRecover(NewTxn *txn, TxnTimeStamp system_start_ts);
+    static Status MemIndexRecover(NewTxn *txn);
+
+    static Status MemIndexCommit(KVInstance *kv_instance, TxnTimeStamp begin_ts);
 
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,

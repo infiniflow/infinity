@@ -466,6 +466,8 @@ private:
 public:
     Status RecoverMemIndex(TableIndexMeeta &table_index_meta);
 
+    static Status CommitMemIndex(TableIndexMeeta &table_index_meta);
+
 private:
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);
     Status CommitDropDB(const WalCmdDropDatabase *drop_db_cmd);

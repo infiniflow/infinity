@@ -337,7 +337,7 @@ Status Storage::AdminToWriter() {
     // recover index after start compact process
     catalog_->StartMemoryIndexCommit();
     catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
-    this->RecoverMemIndex(system_start_ts);
+    this->RecoverMemIndex();
 
     if (new_txn_mgr_) {
         auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
@@ -408,6 +408,7 @@ Status Storage::UnInitFromReader() {
         }
 
         catalog_.reset();
+        new_catalog_.reset();
         kv_store_->Uninit();
         kv_store_.reset();
 
@@ -536,6 +537,7 @@ Status Storage::WriterToAdmin() {
     }
 
     catalog_.reset();
+    new_catalog_.reset();
     kv_store_->Uninit();
     kv_store_.reset();
 
@@ -622,6 +624,7 @@ Status Storage::UnInitFromWriter() {
     }
 
     catalog_.reset();
+    new_catalog_.reset();
 
     memory_index_tracer_.reset();
 
@@ -851,10 +854,10 @@ void Storage::AttachCatalog(TxnTimeStamp checkpoint_ts) {
     }
 }
 
-void Storage::RecoverMemIndex(TxnTimeStamp system_start_ts) {
+void Storage::RecoverMemIndex() {
     NewTxn *txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("recover mem index"), TransactionType::kNormal);
     txn->SetReplay(true);
-    Status status = NewCatalog::MemIndexRecover(txn, system_start_ts);
+    Status status = NewCatalog::MemIndexRecover(txn);
     if (!status.ok()) {
         UnrecoverableError("Failed to recover mem index in new catalog");
     }

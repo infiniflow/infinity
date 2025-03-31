@@ -1292,6 +1292,41 @@ Status NewTxn::RecoverMemIndex(TableIndexMeeta &table_index_meta) {
     return Status::OK();
 }
 
+Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
+    Status status;
+
+    SharedPtr<IndexBase> index_base;
+    std::tie(index_base, status) = table_index_meta.GetIndexBase();
+    if (!status.ok()) {
+        return status;
+    }
+
+    if (index_base->index_type_ != IndexType::kFullText) {
+        return Status::OK();
+    }
+
+    Vector<SegmentID> *index_segment_ids_ptr = nullptr;
+    status = table_index_meta.GetSegmentIDs(index_segment_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : *index_segment_ids_ptr) {
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+
+        SharedPtr<MemIndex> mem_index;
+        Status status = segment_index_meta.GetMemIndex(mem_index);
+        if (!status.ok()) {
+            return status;
+        }
+
+        SharedPtr<MemoryIndexer> memory_indexer = mem_index->memory_indexer_;
+
+        memory_indexer->Commit();
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;

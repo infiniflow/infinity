@@ -235,8 +235,9 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
     return Status::OK();
 }
 
-Status NewCatalog::MemIndexRecover(NewTxn *txn, TxnTimeStamp system_start_ts) {
+Status NewCatalog::MemIndexRecover(NewTxn *txn) {
     Status status;
+    TxnTimeStamp begin_ts = txn->BeginTS();
     KVInstance *kv_instance = txn->kv_instance();
 
     Vector<String> *db_id_strs_ptr;
@@ -267,7 +268,7 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn, TxnTimeStamp system_start_ts) {
             return status;
         }
         for (const String &table_id_str : *table_id_strs_ptr) {
-            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, system_start_ts);
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts);
             status = IndexRecoverTable(table_meta);
             if (!status.ok()) {
                 return status;
@@ -278,6 +279,55 @@ Status NewCatalog::MemIndexRecover(NewTxn *txn, TxnTimeStamp system_start_ts) {
     for (const String &db_id_str : *db_id_strs_ptr) {
         DBMeeta db_meta(db_id_str, *kv_instance);
         status = IndexRecoverDB(db_meta);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::MemIndexCommit(KVInstance *kv_instance, TxnTimeStamp begin_ts) {
+    Status status;
+
+    Vector<String> *db_id_strs_ptr;
+    CatalogMeta catalog_meta(*kv_instance);
+    status = catalog_meta.GetDBIDs(db_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    auto IndexCommitTable = [&](TableMeeta &table_meta) {
+        Vector<String> *index_id_strs_ptr = nullptr;
+        status = table_meta.GetIndexIDs(index_id_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (const String &index_id_str : *index_id_strs_ptr) {
+            TableIndexMeeta table_index_meta(index_id_str, table_meta);
+            status = NewTxn::CommitMemIndex(table_index_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    };
+    auto IndexCommitDB = [&](DBMeeta &db_meta) {
+        Vector<String> *table_id_strs_ptr = nullptr;
+        status = db_meta.GetTableIDs(table_id_strs_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (const String &table_id_str : *table_id_strs_ptr) {
+            TableMeeta table_meta(db_meta.db_id_str(), table_id_str, *kv_instance, begin_ts);
+            status = IndexCommitTable(table_meta);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+        return Status::OK();
+    };
+    for (const String &db_id_str : *db_id_strs_ptr) {
+        DBMeeta db_meta(db_id_str, *kv_instance);
+        status = IndexCommitDB(db_meta);
         if (!status.ok()) {
             return status;
         }
