@@ -76,8 +76,6 @@ TEST_P(TableMeetaTest, table_meeta) {
     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("get table"), TransactionType::kNormal);
     auto [table_info, get_status] = txn2->GetTableInfo(*db_name, *table_name);
     EXPECT_TRUE(get_status.ok());
-    get_status = new_txn_mgr->CommitTxn(txn2);
-    EXPECT_TRUE(get_status.ok());
 
     UniquePtr<KVInstance> kv_instance = infinity::InfinityContext::instance().storage()->KVInstance();
     TableMeeta table_meta(table_info->db_id_, table_info->table_id_, *kv_instance, txn2->BeginTS());
@@ -173,6 +171,9 @@ TEST_P(TableMeetaTest, table_meeta) {
 
     kv_instance->Commit();
     kv_instance.reset();
+
+    get_status = new_txn_mgr->CommitTxn(txn2);
+    EXPECT_TRUE(get_status.ok());
 
     {
         auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);

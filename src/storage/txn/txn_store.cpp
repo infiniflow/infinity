@@ -535,6 +535,20 @@ void TxnTableStore::MaintainCompactionAlg() {
     has_update_ = true;
 }
 
+DeleteState &TxnTableStore::GetDeleteStateRef() {
+    if (!delete_state_) {
+        delete_state_ = MakeUnique<DeleteState>();
+    }
+    return *delete_state_;
+}
+
+DeleteState *TxnTableStore::GetDeleteStatePtr() {
+    if (!delete_state_) {
+        delete_state_ = MakeUnique<DeleteState>();
+    }
+    return delete_state_.get();
+}
+
 void TxnTableStore::SetAppendState(UniquePtr<AppendState> append_state) { append_state_ = std::move(append_state); }
 
 void TxnTableStore::AddSegmentStore(SegmentEntry *segment_entry) {

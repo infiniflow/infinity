@@ -25,7 +25,7 @@ import extra_ddl_info;
 
 using namespace infinity;
 
-class NewTxnManagerTest : public BaseTestNoParam {
+class NewTxnManagerTest : public NewBaseTestNoParam {
 public:
 };
 

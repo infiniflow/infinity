@@ -385,6 +385,18 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Use new catalog
+        bool use_new_catalog = false;
+        if (default_config != nullptr) {
+            use_new_catalog = default_config->default_use_new_catalog_;
+        }
+        UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
+        status = global_options_.AddOption(std::move(use_new_catalog_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Data Dir
         String data_dir = "/var/infinity/data";
         if (default_config != nullptr) {

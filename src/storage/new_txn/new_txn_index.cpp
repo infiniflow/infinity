@@ -1320,8 +1320,9 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
         }
 
         SharedPtr<MemoryIndexer> memory_indexer = mem_index->memory_indexer_;
-
-        memory_indexer->Commit();
+        if (memory_indexer) {
+            memory_indexer->Commit();
+        }
     }
 
     return Status::OK();

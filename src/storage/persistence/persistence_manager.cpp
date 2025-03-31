@@ -29,6 +29,7 @@ import obj_stat_accessor;
 import kv_store;
 import kv_code;
 import infinity_context;
+import storage;
 
 namespace fs = std::filesystem;
 
@@ -564,7 +565,11 @@ void PersistenceManager::SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj
 }
 
 void PersistenceManager::AddObjAddrToKVStore(const String &path, const ObjAddr &obj_addr) {
-    KVStore *kv_store = InfinityContext::instance().storage()->kv_store();
+    Storage *storage = InfinityContext::instance().storage();
+    if (!storage) {
+        return;
+    }
+    KVStore *kv_store = storage->kv_store();
     if (!kv_store) {
         return;
     }

@@ -167,9 +167,9 @@ public: // Setter, Getter
 
     inline bool HasUpdate() const { return has_update_; }
 
-    DeleteState &GetDeleteStateRef() { return *delete_state_; }
+    DeleteState &GetDeleteStateRef();
 
-    inline DeleteState *GetDeleteStatePtr() { return delete_state_.get(); }
+    DeleteState *GetDeleteStatePtr();
 
     inline const Vector<SharedPtr<DataBlock>> &GetBlocks() const { return blocks_; }
 

@@ -141,8 +141,13 @@ void WalManager::Stop() {
 
     LOG_TRACE("WalManager::Stop begin to stop txn manager.");
     // Notify txn manager to stop.
-    TxnManager *txn_mgr = storage_->txn_manager();
-    txn_mgr->Stop();
+    if (TxnManager *txn_mgr = storage_->txn_manager(); txn_mgr) {
+        txn_mgr->Stop();
+    } else if (NewTxnManager *new_txn_mgr = storage_->new_txn_manager(); new_txn_mgr) {
+        new_txn_mgr->Stop();
+    } else {
+        UnrecoverableError("WAL manager stop failed: txn manager is nullptr");
+    }
 
     // pop all the entries in the queue. and notify the condition variable.
     wait_flush_.Enqueue(nullptr);

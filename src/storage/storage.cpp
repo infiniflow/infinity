@@ -266,21 +266,13 @@ Status Storage::AdminToWriter() {
 
     // TxnTimeStamp system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
     TxnTimeStamp system_start_ts = 0;
-    TxnTimeStamp max_checkpoint_ts = 0;
-    {
-        Vector<SharedPtr<WalEntry>> replay_entries;
-        std::tie(system_start_ts, max_checkpoint_ts) = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
-        // Init database, need to create default_db
-        LOG_INFO(fmt::format("Init a new catalog"));
-        catalog_ = Catalog::NewCatalog();
-        this->AttachCatalog(max_checkpoint_ts);
-
-        // TODO: new txn manager
-        new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
-        new_txn_mgr_->Start();
-
-        // start WalManager after TxnManager since it depends on TxnManager.
-        wal_mgr_->Start();
+    if (!config_ptr_->UseNewCatalog()) {
+        system_start_ts = wal_mgr_->ReplayWalFile(StorageMode::kWritable);
+        if (system_start_ts == 0) {
+            // Init database, need to create default_db
+            LOG_INFO(fmt::format("Init a new catalog"));
+            catalog_ = Catalog::NewCatalog();
+        }
 
         // Construct txn manager
         if (txn_mgr_ != nullptr) {
@@ -289,13 +281,33 @@ Status Storage::AdminToWriter() {
         txn_mgr_ = MakeUnique<TxnManager>(buffer_mgr_.get(), wal_mgr_.get(), system_start_ts);
         txn_mgr_->Start();
 
-        if (memory_index_tracer_ != nullptr) {
-            UnrecoverableError("Memory index tracer was initialized before.");
+        wal_mgr_->Start();
+    } else {
+        TxnTimeStamp max_checkpoint_ts = 0;
+
+        Vector<SharedPtr<WalEntry>> replay_entries;
+        std::tie(system_start_ts, max_checkpoint_ts) = wal_mgr_->GetReplayEntries(StorageMode::kWritable, replay_entries);
+        // Init database, need to create default_db
+        LOG_INFO(fmt::format("Init a new catalog"));
+        catalog_ = Catalog::NewCatalog();
+        this->AttachCatalog(max_checkpoint_ts);
+
+        if (new_txn_mgr_) {
+            UnrecoverableError("New transaction manager was initialized before.");
         }
-        memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), catalog_.get(), txn_mgr_.get());
+        new_txn_mgr_ = MakeUnique<NewTxnManager>(buffer_mgr_.get(), wal_mgr_.get(), kv_store_.get(), system_start_ts);
+        new_txn_mgr_->Start();
+
+        // start WalManager after TxnManager since it depends on TxnManager.
+        wal_mgr_->Start();
 
         wal_mgr_->ReplayWalEntries(replay_entries);
     }
+
+    if (memory_index_tracer_ != nullptr) {
+        UnrecoverableError("Memory index tracer was initialized before.");
+    }
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota(), catalog_.get(), txn_mgr_.get());
 
     if (bg_processor_ != nullptr) {
         UnrecoverableError("Background processor was initialized before.");
@@ -337,9 +349,10 @@ Status Storage::AdminToWriter() {
     // recover index after start compact process
     catalog_->StartMemoryIndexCommit();
     catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
-    this->RecoverMemIndex();
 
     if (new_txn_mgr_) {
+        this->RecoverMemIndex();
+
         auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
 
         CheckpointOption option;
@@ -886,9 +899,8 @@ void Storage::CreateDefaultDB() {
         if (!status.ok()) {
             UnrecoverableError("Can't commit txn for 'default_db'");
         }
-        // return;
+        return;
     }
-    // be compactible with old txn manager
 
     Txn *new_txn = txn_mgr_->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
     new_txn->SetReaderAllowed(true);

@@ -182,6 +182,28 @@ public:
     }
 };
 
+export class NewBaseTestNoParam : public BaseTestWithParam<void> {
+public:
+    void SetUp() override {
+        CleanupDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+    }
+};
+
 export class BaseTestParamStr : public BaseTestWithParam<std::string> {
 public:
     void SetUp() override {
