@@ -109,6 +109,9 @@ HnswLSGBuilder::HnswLSGBuilder(const IndexHnsw *index_hnsw, SharedPtr<ColumnDef>
         case MetricType::kMetricInnerProduct:
             distance_type = KnnDistanceType::kInnerProduct;
             break;
+        case MetricType::kMetricCosine:
+            distance_type = KnnDistanceType::kCosine;
+            break;
         default:
             UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
     }
@@ -203,6 +206,7 @@ UniquePtr<float[]> HnswLSGBuilder::GetLSAvg(Iter iter, SizeT row_count, const Ro
         case MetricType::kMetricL2:
             return GetAvgByIVF<Iter, DataType, CompareMax, DistanceDataType>(std::move(iter), row_count);
         case MetricType::kMetricInnerProduct:
+        case MetricType::kMetricCosine:
             return GetAvgByIVF<Iter, DataType, CompareMin, DistanceDataType>(std::move(iter), row_count);
         default:
             UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
@@ -212,6 +216,7 @@ UniquePtr<float[]> HnswLSGBuilder::GetLSAvg(Iter iter, SizeT row_count, const Ro
         case MetricType::kMetricL2:
             return GetAvgBF<Iter, DataType, CompareMax, DistanceDataType>(std::move(iter), row_count);
         case MetricType::kMetricInnerProduct:
+        case MetricType::kMetricCosine:
             return GetAvgBF<Iter, DataType, CompareMin, DistanceDataType>(std::move(iter), row_count);
         default:
             UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
@@ -353,6 +358,9 @@ UniquePtr<float[]> HnswLSGBuilder::GetAvgBF(Iter iter, SizeT row_count) {
             break;
         case MetricType::kMetricInnerProduct:
             dist_type = KnnDistanceType::kInnerProduct;
+            break;
+        case MetricType::kMetricCosine:
+            dist_type = KnnDistanceType::kCosine;
             break;
         default:
             UnrecoverableError(fmt::format("Invalid metric type: {}", MetricTypeToString(index_hnsw_->metric_type_)));
