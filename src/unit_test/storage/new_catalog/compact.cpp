@@ -468,7 +468,7 @@ TEST_P(TestCompact, compact_and_drop_table) {
 
 TEST_P(TestCompact, compact_and_add_columns) {
     auto CheckTable = [&] {
-        Vector<ColumnID> column_ids = {0, 1, 2};
+        Vector<ColumnID> column_idxes = {0, 1, 2};
 
         auto check_column = [&](ColumnMeta &column_meta) {
             BufferObj *column_buffer = nullptr;
@@ -486,7 +486,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_cnt, 8192);
 
-            for (auto column_id : column_ids) {
+            for (auto column_id : column_idxes) {
                 ColumnMeta column_meta(column_id, block_meta);
                 check_column(column_meta);
             }
@@ -676,18 +676,15 @@ TEST_P(TestCompact, compact_and_add_columns) {
 
 TEST_P(TestCompact, compact_and_drop_columns) {
     auto CheckTable = [&] {
-        Vector<ColumnID> column_ids = {0, 1};
+        Vector<ColumnID> column_idxes = {0};
 
         auto check_column = [&](ColumnMeta &column_meta) {
             BufferObj *column_buffer = nullptr;
             BufferObj *outline_buffer = nullptr;
             Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
-            if (column_meta.column_idx() == 0) {
-                EXPECT_FALSE(status.ok());
-            } else {
-                EXPECT_TRUE(status.ok());
-                EXPECT_NE(column_buffer, nullptr);
-            }
+            EXPECT_TRUE(status.ok());
+            EXPECT_NE(column_buffer, nullptr);
+            EXPECT_NE(outline_buffer, nullptr);
         };
 
         auto check_block = [&](BlockMeta &block_meta) {
@@ -695,7 +692,7 @@ TEST_P(TestCompact, compact_and_drop_columns) {
             EXPECT_TRUE(status.ok());
             EXPECT_EQ(row_cnt, 8192);
 
-            for (auto column_id : column_ids) {
+            for (auto column_id : column_idxes) {
                 ColumnMeta column_meta(column_id, block_meta);
                 check_column(column_meta);
             }

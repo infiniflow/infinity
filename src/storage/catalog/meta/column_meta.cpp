@@ -60,19 +60,14 @@ Status ColumnMeta::InitSet() {
         if (!status.ok()) {
             return status;
         }
-        auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [&](const SharedPtr<ColumnDef> &column_def) {
-            return column_def->id() == i64(column_idx_);
-        });
-        if (iter == column_defs_ptr->end()) {
-            return Status::ColumnNotExist(fmt::format("Column {} not found in table meta", column_idx_));
-        }
-        col_def = *iter;
+        col_def = (*column_defs_ptr)[column_idx_];
     }
+    ColumnID column_id = col_def->id();
 
     SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     {
-        auto filename = MakeShared<String>(fmt::format("{}.col", column_idx_));
+        auto filename = MakeShared<String>(fmt::format("{}.col", column_id));
         SizeT total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
         auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
@@ -88,7 +83,7 @@ Status ColumnMeta::InitSet() {
     }
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_idx_));
+        auto filename = MakeShared<String>(fmt::format("col_{}_out_0", column_id));
         auto outline_file_worker = MakeUnique<VarFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                              MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                              block_dir_ptr,
@@ -163,25 +158,20 @@ Status ColumnMeta::GetColumnBuffer(BufferObj *&column_buffer, BufferObj *&outlin
 }
 
 Status ColumnMeta::FilePaths(Vector<String> &paths) {
-    String col_filename = std::to_string(column_idx_) + ".col";
+    auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        return status;
+    }
+    ColumnDef *col_def = (*column_defs_ptr)[column_idx_].get();
+    ColumnID column_id = col_def->id();
+
+    String col_filename = std::to_string(column_id) + ".col";
     paths.push_back(*block_meta_.GetBlockDir() + "/" + col_filename);
 
     {
-        auto [column_defs_ptr, status] = block_meta_.segment_meta().table_meta().GetColumnDefs();
-        if (!status.ok()) {
-            return status;
-        }
-        auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [this](const SharedPtr<ColumnDef> &col_def) {
-            return col_def->id() == i64(column_idx_);
-        });
-        if (iter == column_defs_ptr->end()) {
-            return Status::ColumnNotExist(fmt::format("Column index {} not found in column defs", column_idx_));
-        }
-        ColumnDef *col_def = (*iter).get();
-
         VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
         if (buffer_type == VectorBufferType::kVarBuffer) {
-            String outline_filename = fmt::format("col_{}_out_0", column_idx_);
+            String outline_filename = fmt::format("col_{}_out_0", column_id);
             paths.push_back(*block_meta_.GetBlockDir() + "/" + outline_filename);
         }
     }
@@ -240,18 +230,13 @@ Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
         if (!status.ok()) {
             return status;
         }
-        auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [this](const SharedPtr<ColumnDef> &col_def) {
-            return col_def->id() == i64(column_idx_);
-        });
-        if (iter == column_defs_ptr->end()) {
-            return Status::ColumnNotExist(fmt::format("Column index {} not found in column defs", column_idx_));
-        }
-        col_def = (*iter).get();
+        col_def = (*column_defs_ptr)[column_idx_].get();
     }
+    ColumnID column_id = col_def->id();
 
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     {
-        String col_filename = std::to_string(column_idx_) + ".col";
+        String col_filename = std::to_string(column_id) + ".col";
         String col_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + col_filename;
         column_buffer_ = buffer_mgr->GetBufferObject(col_filepath);
         if (column_buffer_ == nullptr) {
@@ -261,7 +246,7 @@ Status ColumnMeta::LoadColumnBuffer(const ColumnDef *col_def) {
     VectorBufferType buffer_type = ColumnVector::GetVectorBufferType(*col_def->type());
     [[maybe_unused]] SizeT chunk_offset = 0;
     if (buffer_type == VectorBufferType::kVarBuffer) {
-        String outline_filename = fmt::format("col_{}_out_0", column_idx_);
+        String outline_filename = fmt::format("col_{}_out_0", column_id);
         String outline_filepath = InfinityContext::instance().config()->DataDir() + "/" + *block_dir_ptr + "/" + outline_filename;
         BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
         outline_buffer_ = buffer_mgr->GetBufferObject(outline_filepath);

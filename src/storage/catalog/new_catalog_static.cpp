@@ -617,8 +617,8 @@ Status NewCatalog::AddNewBlock1(SegmentMeta &segment_meta, TxnTimeStamp commit_t
             return status;
         }
     }
-    for (const auto &column_def : *column_defs_ptr) {
-        ColumnMeta column_meta(column_def->id(), *block_meta);
+    for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+        ColumnMeta column_meta(column_idx, *block_meta);
         status = column_meta.InitSet();
         if (!status.ok()) {
             return status;
@@ -856,13 +856,7 @@ Status NewCatalog::GetColumnVector(ColumnMeta &column_meta, SizeT row_count, con
         if (!status.ok()) {
             return status;
         }
-        auto iter = std::find_if(column_defs_ptr->begin(), column_defs_ptr->end(), [&](const SharedPtr<ColumnDef> &column_def) {
-            return ColumnID(column_def->id()) == column_meta.column_idx();
-        });
-        if (iter == column_defs_ptr->end()) {
-            UnrecoverableError(fmt::format("Column {} not found in table meta", column_meta.column_idx()));
-        }
-        col_def = iter->get();
+        col_def = (*column_defs_ptr)[column_meta.column_idx()].get();
     }
 
     BufferObj *buffer_obj = nullptr;

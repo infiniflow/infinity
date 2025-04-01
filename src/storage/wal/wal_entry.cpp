@@ -90,15 +90,14 @@ WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_i
     }
     outline_infos_.resize(column_defs_ptr->size());
     Vector<String> paths;
-    for (SizeT i = 0; i < column_defs_ptr->size(); i++) {
-        ColumnID column_id = (*column_defs_ptr)[i]->id();
-        ColumnMeta column_meta(column_id, block_meta);
+    for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+        ColumnMeta column_meta(column_idx, block_meta);
         SizeT chunk_offset = 0;
         status = column_meta.GetChunkOffset(chunk_offset);
         if (!status.ok()) {
             UnrecoverableError(status.message());
         }
-        outline_infos_[i] = {1, chunk_offset};
+        outline_infos_[column_idx] = {1, chunk_offset};
 
         Status status = column_meta.FilePaths(paths);
         if (!status.ok()) {
