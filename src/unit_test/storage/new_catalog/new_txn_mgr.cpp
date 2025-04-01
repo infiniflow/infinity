@@ -172,3 +172,89 @@ TEST_F(NewTxnManagerTest, test_parallel_ts) {
 
     EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
 }
+
+TEST_F(NewTxnManagerTest, test_check_txns) {
+    NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    Status status;
+    Vector<NewTxn *> check_txns;
+
+    auto get_check_txns = [&](NewTxn *txn) {
+        TxnTimeStamp fake_commit_ts = new_txn_mgr->CurrentTS() + 1;
+        return new_txn_mgr->GetCheckTxns(txn->BeginTS(), fake_commit_ts);
+    };
+
+    auto check_empty = [&] {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check empty"), TransactionType::kNormal);
+        check_txns = get_check_txns(txn);
+        EXPECT_EQ(check_txns, Vector<NewTxn *>({}));
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn1"), TransactionType::kNormal);
+        status = txn1->Dummy();
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn2"), TransactionType::kNormal);
+        status = txn2->Dummy();
+        EXPECT_TRUE(status.ok());
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn3"), TransactionType::kNormal);
+        status = txn3->Dummy();
+        EXPECT_TRUE(status.ok());
+
+        check_txns = get_check_txns(txn1);
+        EXPECT_EQ(check_txns, Vector<NewTxn *>({}));
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        check_txns = get_check_txns(txn2);
+        EXPECT_EQ(check_txns, Vector<NewTxn *>({txn1}));
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        check_txns = get_check_txns(txn3);
+        EXPECT_EQ(check_txns, Vector<NewTxn *>({txn1, txn2}));
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        check_empty();
+    }
+
+    {
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn1"), TransactionType::kNormal);
+        status = txn1->Dummy();
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn2"), TransactionType::kNormal);
+        status = txn2->Dummy();
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("txn3"), TransactionType::kNormal);
+        status = txn3->Dummy();
+        EXPECT_TRUE(status.ok());
+
+        check_txns = get_check_txns(txn1);
+        EXPECT_EQ(check_txns, Vector<NewTxn *>({txn2}));
+
+        check_txns = get_check_txns(txn3);
+        EXPECT_EQ(check_txns, Vector<NewTxn *>({}));
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        check_txns = get_check_txns(txn1);
+        EXPECT_EQ(check_txns, Vector<NewTxn *>({txn2, txn3}));
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        check_empty();
+    }
+}

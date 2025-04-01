@@ -140,9 +140,7 @@ public:
 
     Status PostReadTxnCommit();
 
-    bool CheckConflict();
-
-    Optional<String> CheckConflict(NewTxn *txn);
+    bool CheckConflict1(NewTxn *check_txn, String &conflict_reason);
 
     Status PrepareCommit();
 
@@ -155,8 +153,6 @@ public:
     Status PostRollback(TxnTimeStamp abort_ts);
 
     Status Rollback();
-
-    SharedPtr<AddDeltaEntryTask> MakeAddDeltaEntryTask();
 
     // Database OPs
     Status CreateDatabase(const String &db_name, ConflictType conflict_type, const SharedPtr<String> &comment);
@@ -281,7 +277,7 @@ public:
 
     // Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
 
-    Status Checkpoint(CheckpointOption &option);
+    Status Checkpoint();
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
@@ -533,6 +529,8 @@ public:
     void IncreaseTableReferenceCount(const String &table_key);
     void DecreaseTableReferenceCount(const String &table_key);
     SizeT GetTableReferenceCount(const String &table_key);
+
+    Status Dummy();
 
 private:
     // Reference to external class

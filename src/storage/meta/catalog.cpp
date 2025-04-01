@@ -1319,7 +1319,7 @@ void Catalog::MemIndexCommit() {
             }
         }
     } else {
-        TxnTimeStamp begin_ts = new_txn_mgr->max_committed_ts();
+        TxnTimeStamp begin_ts = new_txn_mgr->CurrentTS();
 
         KVStore *kv_store = new_txn_mgr->kv_store();
         UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();

@@ -754,12 +754,10 @@ Status NewTxn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented NewTxn Operation: GetViews"};
 }
 
-Status NewTxn::Checkpoint(CheckpointOption &option) {
-    if (option.checkpoint_ts_ == 0) {
-        option.checkpoint_ts_ = txn_mgr_->max_committed_ts();
-    }
-
+Status NewTxn::Checkpoint() {
     Status status;
+    TxnTimeStamp checkpoint_ts = txn_context_ptr_->begin_ts_;
+    CheckpointOption option{checkpoint_ts};
 
     Vector<String> *db_id_strs_ptr;
     CatalogMeta catalog_meta(*kv_instance_);
@@ -918,7 +916,7 @@ Status NewTxn::Commit() {
     if (this->IsReplay()) {
         commit_ts = txn_mgr_->GetReplayWriteCommitTS(this);
     } else {
-        commit_ts = txn_mgr_->GetWriteCommitTS(this);
+        commit_ts = txn_mgr_->GetWriteCommitTS(shared_from_this());
     }
     LOG_TRACE(fmt::format("NewTxn: {} is committing, begin_ts:{} committing ts: {}", txn_context_ptr_->txn_id_, BeginTS(), commit_ts));
 
@@ -1009,6 +1007,9 @@ Status NewTxn::PrepareCommit() {
     for (auto &command : wal_entry_->cmds_) {
         WalCommandType command_type = command->GetType();
         switch (command_type) {
+            case WalCommandType::DUMMY: {
+                break;
+            }
             case WalCommandType::CREATE_DATABASE: {
                 auto *create_db_cmd = static_cast<WalCmdCreateDatabase *>(command.get());
                 Status status = CommitCreateDB(create_db_cmd);
@@ -1499,12 +1500,9 @@ Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
     return kv_instance_->Put(id_name.data(), id_str);
 }
 
-bool NewTxn::CheckConflict() { return txn_store_.CheckConflict(catalog_); }
-
-Optional<String> NewTxn::CheckConflict(NewTxn *other_txn) {
-    LOG_TRACE(fmt::format("NewTxn {} check conflict with {}.", txn_context_ptr_->txn_id_, other_txn->txn_context_ptr_->txn_id_));
-
-    return txn_store_.CheckConflict(other_txn->txn_store_);
+bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
+    //
+    return false;
 }
 
 void NewTxn::CommitBottom() {
@@ -1814,14 +1812,6 @@ Status NewTxn::Rollback() {
     LOG_TRACE(fmt::format("NewTxn: {} is dropped.", txn_context_ptr_->txn_id_));
 
     return status;
-}
-
-SharedPtr<AddDeltaEntryTask> NewTxn::MakeAddDeltaEntryTask() {
-    if (!txn_delta_ops_entry_->operations().empty()) {
-        LOG_TRACE(txn_delta_ops_entry_->ToStringSimple());
-        return MakeShared<AddDeltaEntryTask>(std::move(txn_delta_ops_entry_));
-    }
-    return nullptr;
 }
 
 void NewTxn::AddWalCmd(const SharedPtr<WalCmd> &cmd) {
@@ -2210,6 +2200,11 @@ SizeT NewTxn::GetTableReferenceCount(const String &table_key) {
         return 0;
     }
     return table_reference_count_[table_key];
+}
+
+Status NewTxn::Dummy() {
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdDummy>());
+    return Status::OK();
 }
 
 } // namespace infinity

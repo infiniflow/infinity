@@ -54,11 +54,13 @@ public:
 
     TxnTimeStamp GetReadCommitTS(NewTxn *txn);
 
-    TxnTimeStamp GetWriteCommitTS(NewTxn *txn);
+    TxnTimeStamp GetWriteCommitTS(SharedPtr<NewTxn> txn);
 
     TxnTimeStamp GetReplayWriteCommitTS(NewTxn *txn);
 
-    Optional<String> CheckTxnConflict(NewTxn *txn);
+    // Optional<String> CheckTxnConflict(NewTxn *txn);
+
+    bool CheckConflict1(NewTxn *txn, String &conflict_reason);
 
     void SendToWAL(NewTxn *txn);
 
@@ -86,7 +88,7 @@ public:
 
     TxnTimeStamp GetNewTimeStamp();
 
-    TxnTimeStamp GetCleanupScanTS();
+    TxnTimeStamp GetCleanupScanTS1();
 
     void IncreaseCommittedTxnCount() { ++total_committed_txn_count_; }
 
@@ -111,15 +113,15 @@ public:
     // Only used by follower and learner when received the replicated log from leader
     void SetStartTS(TxnTimeStamp new_start_ts) { current_ts_ = new_start_ts; }
 
-    TxnTimeStamp max_committed_ts() { return max_committed_ts_; }
-
     void PrintAllKeyValue() const;
 
     SizeT KeyValueNum() const;
 
     KVStore *kv_store() const { return kv_store_; }
 
-    Status Cleanup(TxnTimeStamp ts = UNCOMMIT_TS);
+    Status Cleanup();
+
+    Vector<NewTxn *> GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 private:
     mutable std::mutex locker_{};
@@ -131,15 +133,13 @@ private:
     WalManager *wal_mgr_;
     KVStore *kv_store_;
 
-    Deque<WeakPtr<NewTxn>> beginned_txns_;        // sorted by begin ts
-    Map<TxnTimeStamp, NewTxn *> committing_txns_; // the txns in committing stage
-    Set<TxnTimeStamp> checking_ts_{};             // the begin ts of txn that is used to check conflict
+    Set<Pair<TxnTimeStamp, TransactionID>> begin_txns_;
+    Deque<SharedPtr<NewTxn>> check_txns_; //
 
     Map<TxnTimeStamp, NewTxn *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> current_ts_{}; // The next txn ts
     TxnTimeStamp prepare_commit_ts_{};
-    Atomic<TxnTimeStamp> max_committed_ts_{};
     Atomic<TxnTimeStamp> ckp_begin_ts_ =
         UNCOMMIT_TS; // current ckp begin ts, UNCOMMIT_TS if no ckp is happening, UNCOMMIT_TS is a maximum u64 integer
 

@@ -355,8 +355,7 @@ Status Storage::AdminToWriter() {
 
         auto *new_txn = new_txn_mgr_->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
 
-        CheckpointOption option;
-        Status status = new_txn->Checkpoint(option);
+        Status status = new_txn->Checkpoint();
         if (!status.ok()) {
             UnrecoverableError("Failed to checkpoint");
         }

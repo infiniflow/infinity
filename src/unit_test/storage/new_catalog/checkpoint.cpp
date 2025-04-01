@@ -135,8 +135,7 @@ TEST_P(NewCheckpointTest, test_checkpoint0) {
 
     auto checkpoint = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
-        CheckpointOption option;
-        Status status = txn->Checkpoint(option);
+        Status status = txn->Checkpoint();
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

@@ -41,8 +41,7 @@ import new_catalog;
 namespace infinity {
 
 NewTxnManager::NewTxnManager(BufferManager *buffer_mgr, WalManager *wal_mgr, KVStore *kv_store, TxnTimeStamp start_ts)
-    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), kv_store_(kv_store), current_ts_(start_ts), prepare_commit_ts_(start_ts),
-      max_committed_ts_(start_ts), is_running_(false) {
+    : buffer_mgr_(buffer_mgr), wal_mgr_(wal_mgr), kv_store_(kv_store), current_ts_(start_ts), prepare_commit_ts_(start_ts), is_running_(false) {
 #ifdef INFINITY_DEBUG
     GlobalResourceUsage::IncrObjectCount("NewTxnManager");
 #endif
@@ -109,7 +108,7 @@ NewTxn *NewTxnManager::BeginTxn(UniquePtr<String> txn_text, TransactionType txn_
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
-    beginned_txns_.emplace_back(new_txn);
+    begin_txns_.emplace(begin_ts, new_txn_id);
 
     // LOG_INFO(fmt::format("NewTxn: {} is Begin. begin ts: {}", new_txn_id, begin_ts));
     return new_txn.get();
@@ -154,12 +153,12 @@ TxnTimeStamp NewTxnManager::GetReadCommitTS(NewTxn *txn) {
 }
 
 // Prepare to commit WriteTxn
-TxnTimeStamp NewTxnManager::GetWriteCommitTS(NewTxn *txn) {
+TxnTimeStamp NewTxnManager::GetWriteCommitTS(SharedPtr<NewTxn> txn) {
     std::lock_guard guard(locker_);
     prepare_commit_ts_ += 2;
     TxnTimeStamp commit_ts = prepare_commit_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
-    committing_txns_.emplace(commit_ts, txn);
+    check_txns_.emplace_back(txn);
     txn->SetTxnWrite();
     return commit_ts;
 }
@@ -168,48 +167,21 @@ TxnTimeStamp NewTxnManager::GetReplayWriteCommitTS(NewTxn *txn) {
     std::lock_guard guard(locker_);
     prepare_commit_ts_ += 2;
     TxnTimeStamp commit_ts = prepare_commit_ts_;
-    committing_txns_.emplace(commit_ts, txn);
     txn->SetTxnWrite();
     return commit_ts;
 }
 
-Optional<String> NewTxnManager::CheckTxnConflict(NewTxn *txn) {
+bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason) {
+    TxnTimeStamp begin_ts = txn->BeginTS();
     TxnTimeStamp commit_ts = txn->CommitTS();
-    Vector<SharedPtr<NewTxn>> candidate_txns;
-    TxnTimeStamp min_checking_ts = UNCOMMIT_TS;
-    {
-        std::lock_guard guard(locker_);
-        // LOG_INFO(fmt::format("NewTxn {}(commit_ts:{}) check conflict", txn->TxnID(), txn->CommitTS()));
-        for (auto &[committing_ts, committing_txn] : committing_txns_) {
-            if (commit_ts > committing_ts) {
-                candidate_txns.push_back(committing_txn->shared_from_this());
-                min_checking_ts = std::min(min_checking_ts, committing_txn->BeginTS());
-            }
-        }
-        if (min_checking_ts != UNCOMMIT_TS) {
-            checking_ts_.insert(min_checking_ts);
+
+    [[maybe_unused]] Vector<NewTxn *> check_txns = GetCheckTxns(begin_ts, commit_ts);
+    for (NewTxn *check_txn : check_txns) {
+        if (txn->CheckConflict1(check_txn, conflict_reason)) {
+            return true;
         }
     }
-    DeferFn defer_fn([&] {
-        if (min_checking_ts != UNCOMMIT_TS) {
-            std::lock_guard guard(locker_);
-            checking_ts_.erase(min_checking_ts);
-        }
-    });
-    if (txn->CheckConflict()) {
-        return "Conflict in txn->CheckConflict()";
-    }
-    for (const auto &candidate_txn : candidate_txns) {
-        // LOG_INFO(fmt::format("NewTxn {}(commit_ts: {}) check conflict with txn {}(commit_ts: {})",
-        //                      txn->TxnID(),
-        //                      txn->CommitTS(),
-        //                      candidate_txn->TxnID(),
-        //                      candidate_txn->CommitTS()));
-        if (const auto conflict_reason = txn->CheckConflict(candidate_txn.get()); conflict_reason) {
-            return fmt::format("Conflict with candidate_txn {}: {}", candidate_txn->TxnID(), *conflict_reason);
-        }
-    }
-    return None;
+    return false;
 }
 
 void NewTxnManager::SendToWAL(NewTxn *txn) {
@@ -351,34 +323,10 @@ Vector<SharedPtr<TxnContext>> NewTxnManager::GetTxnContextHistories() const {
 
 TxnTimeStamp NewTxnManager::GetNewTimeStamp() { return current_ts_ + 1; }
 
-TxnTimeStamp NewTxnManager::GetCleanupScanTS() {
-    TxnTimeStamp least_ts = UNCOMMIT_TS;
-    TxnTimeStamp last_checkpoint_ts = UNCOMMIT_TS;
-    {
-        std::unique_lock w_lock(locker_);
-        TxnTimeStamp first_uncommitted_begin_ts = current_ts_;
-        // Get earliest txn of the ongoing transactions
-        while (!beginned_txns_.empty()) {
-            auto first_txn = beginned_txns_.front().lock();
-            if (first_txn.get() != nullptr) {
-                first_uncommitted_begin_ts = first_txn->BeginTS();
-                break;
-            }
-            beginned_txns_.pop_front();
-        }
+TxnTimeStamp NewTxnManager::GetCleanupScanTS1() {
+    std::lock_guard guard(locker_);
 
-        // Get the earlier txn ts between current ongoing txn and last checkpoint ts
-        last_checkpoint_ts = wal_mgr_->LastCheckpointTS();
-        least_ts = std::min(first_uncommitted_begin_ts, last_checkpoint_ts);
-
-        // Get the earlier txn ts between current least txn and checking conflict TS
-        if (!checking_ts_.empty()) {
-            least_ts = std::min(least_ts, *checking_ts_.begin());
-        }
-    }
-
-    LOG_INFO(fmt::format("Cleanup scan ts: {}, checkpoint ts: {}", least_ts, last_checkpoint_ts));
-    return least_ts;
+    return begin_txns_.empty() ? current_ts_ + 1 : begin_txns_.begin()->first;
 }
 
 void NewTxnManager::CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id) {
@@ -391,6 +339,7 @@ void NewTxnManager::CommitBottom(TxnTimeStamp commit_ts, TransactionID txn_id) {
 
 void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {
     bool is_write_transaction = txn->IsWriteTransaction();
+    TxnTimeStamp begin_ts = txn->BeginTS();
     TransactionID txn_id = txn->TxnID();
     if (is_write_transaction) {
         // For write txn, we need to update the state: committing->committed, rollbacking->rollbacked
@@ -409,32 +358,18 @@ void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {
                 UnrecoverableError(error_message);
             }
         }
-        SharedPtr<AddDeltaEntryTask> add_delta_entry_task = txn->MakeAddDeltaEntryTask();
         {
-            // cleanup the txn from committing_txn and txm_map
-            auto commit_ts = txn->CommitTS();
             std::lock_guard guard(locker_);
-            SizeT remove_n = committing_txns_.erase(commit_ts);
-            if (remove_n == 0) {
-                UnrecoverableError("NewTxn not found in committing_txns_");
-            }
             SharedPtr<NewTxn> txn_ptr = txn_map_[txn_id];
             if (txn_context_histories_.size() >= DEFAULT_TXN_HISTORY_SIZE) {
                 txn_context_histories_.pop_front();
             }
             txn_context_histories_.push_back(txn_ptr->txn_context());
-            remove_n = txn_map_.erase(txn_id);
+            SizeT remove_n = txn_map_.erase(txn_id);
             if (remove_n == 0) {
                 String error_message = fmt::format("NewTxn: {} not found in txn map", txn_id);
                 UnrecoverableError(error_message);
             }
-            if (committing_txns_.empty() || committing_txns_.begin()->first > commit_ts) {
-                max_committed_ts_ = commit_ts;
-            }
-        }
-        if (commit && add_delta_entry_task) {
-            // Submit delta entry must be after max_committed_ts_ is updated
-            InfinityContext::instance().storage()->bg_processor()->Submit(std::move(add_delta_entry_task));
         }
     } else {
         // For read-only NewTxn only remove txn from txn_map
@@ -445,6 +380,21 @@ void NewTxnManager::CleanupTxn(NewTxn *txn, bool commit) {
         //            }
         //            txn_contexts_.push_back(txn_ptr);
         txn_map_.erase(txn_id);
+    }
+    {
+        std::lock_guard guard(locker_);
+
+        SizeT remove_n = begin_txns_.erase({begin_ts, txn_id});
+        if (remove_n == 0) {
+            String error_message = fmt::format("NewTxn: {} not found in begin_txns_", txn_id);
+            UnrecoverableError(error_message);
+        }
+
+        TxnTimeStamp first_begin_ts = begin_txns_.empty() ? UNCOMMIT_TS : begin_txns_.begin()->first;
+
+        while (!check_txns_.empty() && check_txns_.front()->CommitTS() < first_begin_ts) {
+            check_txns_.pop_front();
+        }
     }
 }
 
@@ -466,16 +416,14 @@ void NewTxnManager::PrintAllKeyValue() const {
 
 SizeT NewTxnManager::KeyValueNum() const { return kv_store_->KeyValueNum(); }
 
-Status NewTxnManager::Cleanup(TxnTimeStamp ts) {
-    if (ts == UNCOMMIT_TS) {
-        ts = this->GetCleanupScanTS();
-    }
+Status NewTxnManager::Cleanup() {
+    TxnTimeStamp cleanup_ts = this->GetCleanupScanTS1();
 
     UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
 
     Status status;
 
-    status = NewTxn::Cleanup(ts, kv_instance.get());
+    status = NewTxn::Cleanup(cleanup_ts, kv_instance.get());
     if (!status.ok()) {
         return status;
     }
@@ -485,6 +433,25 @@ Status NewTxnManager::Cleanup(TxnTimeStamp ts) {
         return status;
     }
     return Status::OK();
+}
+
+Vector<NewTxn *> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    Vector<NewTxn *> res;
+    {
+        std::lock_guard guard(locker_);
+        for (SizeT i = 0; i < check_txns_.size(); ++i) {
+            NewTxn *check_txn = check_txns_[i].get();
+            TxnTimeStamp check_commit_ts = check_txn->CommitTS();
+            if (check_commit_ts < begin_ts) {
+                continue;
+            }
+            if (check_commit_ts >= commit_ts) {
+                break;
+            }
+            res.push_back(check_txn);
+        }
+    }
+    return res;
 }
 
 } // namespace infinity

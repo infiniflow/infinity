@@ -171,7 +171,7 @@ TEST_P(TestCleanup, test_cleanup_db) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
 
@@ -224,8 +224,7 @@ TEST_P(TestCleanup, test_cleanup_table) {
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
-        CheckpointOption option;
-        Status status = txn->Checkpoint(option);
+        Status status = txn->Checkpoint();
         EXPECT_TRUE(status.ok());
 
         status = txn->GetTableFilePaths(*db_name, *table_name, file_paths_);
@@ -244,7 +243,7 @@ TEST_P(TestCleanup, test_cleanup_table) {
     }
 
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
 
@@ -314,8 +313,7 @@ TEST_P(TestCleanup, test_cleanup_index) {
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
-        CheckpointOption option;
-        Status status = txn->Checkpoint(option);
+        Status status = txn->Checkpoint();
         EXPECT_TRUE(status.ok());
 
         status = txn->GetTableIndexFilePaths(*db_name, *table_name, *index_name1, file_paths_);
@@ -334,7 +332,7 @@ TEST_P(TestCleanup, test_cleanup_index) {
     }
 
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -352,7 +350,7 @@ TEST_P(TestCleanup, test_cleanup_index) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -430,7 +428,7 @@ TEST_P(TestCleanup, test_cleanup_compact) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -448,7 +446,7 @@ TEST_P(TestCleanup, test_cleanup_compact) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -543,7 +541,7 @@ TEST_P(TestCleanup, test_cleanup_optimize) {
     merge_index(segment_id, *index_name2);
 
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -561,7 +559,7 @@ TEST_P(TestCleanup, test_cleanup_optimize) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -618,8 +616,7 @@ TEST_P(TestCleanup, test_cleanup_drop_column) {
 
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
-        CheckpointOption option;
-        Status status = txn->Checkpoint(option);
+        Status status = txn->Checkpoint();
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -640,7 +637,7 @@ TEST_P(TestCleanup, test_cleanup_drop_column) {
     }
 
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();
@@ -658,7 +655,7 @@ TEST_P(TestCleanup, test_cleanup_drop_column) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
     this->CheckFilePaths();

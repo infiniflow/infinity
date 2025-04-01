@@ -84,6 +84,7 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     OPTIMIZE = 101,
     DUMP_INDEX = 102,
+    DUMMY = 103,
 };
 
 export struct WalBlockInfo {
@@ -214,6 +215,17 @@ export struct WalCmd {
     static SharedPtr<WalCmd> ReadAdv(const char *&ptr, i32 max_bytes);
 
     static String WalCommandTypeToString(WalCommandType type);
+};
+
+export struct WalCmdDummy final : public WalCmd {
+    WalCmdDummy() = default;
+
+    WalCommandType GetType() const final { return WalCommandType::DUMMY; }
+    bool operator==(const WalCmd &other) const final { return typeid(*this) == typeid(other); }
+    [[nodiscard]] i32 GetSizeInBytes() const final { return 0; }
+    void WriteAdv(char *&buf) const final {}
+    String ToString() const final { return "Dummy"; }
+    String CompactInfo() const final { return "Dummy"; }
 };
 
 export struct WalCmdCreateDatabase final : public WalCmd {

@@ -163,7 +163,7 @@ TEST_P(TestColumn, test_add_columns) {
         EXPECT_TRUE(status.ok());
     }
     {
-        Status status = new_txn_mgr->Cleanup(new_txn_mgr->max_committed_ts() + 1);
+        Status status = new_txn_mgr->Cleanup();
         EXPECT_TRUE(status.ok());
     }
     NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
