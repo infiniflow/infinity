@@ -3771,22 +3771,11 @@ TEST_P(TestAppend, test_append_and_create_index) {
         input_block1->Finalize();
     }
 
-    auto check_table = [&]() {
-        // Check the appended data.
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+    auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        Status status;
+        Vector<BlockID> *block_ids_ptr = nullptr;
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_TRUE(status.ok());
-
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
-        SegmentMeta segment_meta(0, *table_meta);
-
-        Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
         EXPECT_TRUE(status.ok());
@@ -3810,6 +3799,22 @@ TEST_P(TestAppend, test_append_and_create_index) {
 
         SizeT row_count = state.block_offset_end();
         EXPECT_EQ(row_count, 4096);
+    };
+    auto check_table = [&]() {
+        // Check the appended data.
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        SegmentMeta segment_meta(0, *table_meta);
+
+        check_segment(segment_meta, txn);
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
@@ -3829,6 +3834,47 @@ TEST_P(TestAppend, test_append_and_create_index) {
         status = table_index_meta.GetSegmentIDs(index_segment_ids_ptr);
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_segment_ids_ptr->size(), 1);
+    };
+    auto check_no_index = [&] {
+        // Check the appended data.
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        SegmentMeta segment_meta(0, *table_meta);
+
+        check_segment(segment_meta, txn);
+
+        Vector<String> *index_id_strs_ptr = nullptr;
+        Vector<String> *index_names_ptr = nullptr;
+        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(index_id_strs_ptr->size(), 0);
+    };
+    auto check_no_data = [&] {
+        // Check the appended data.
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({}));
+
+        Vector<String> *index_id_strs_ptr = nullptr;
+        Vector<String> *index_names_ptr = nullptr;
+        status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_names_ptr, Vector<String>({"idx1"}));
     };
 
     //    t1      append      commit (success)
@@ -3908,9 +3954,9 @@ TEST_P(TestAppend, test_append_and_create_index) {
         status = txn7->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn7);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        check_table();
+        check_no_index();
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -3955,9 +4001,9 @@ TEST_P(TestAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn7);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        check_table();
+        check_no_index();
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -4001,9 +4047,9 @@ TEST_P(TestAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        check_table();
+        check_no_data();
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -4049,9 +4095,9 @@ TEST_P(TestAppend, test_append_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        check_table();
+        check_no_data();
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -4095,9 +4141,9 @@ TEST_P(TestAppend, test_append_and_create_index) {
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        check_table();
+        check_no_data();
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -4142,9 +4188,9 @@ TEST_P(TestAppend, test_append_and_create_index) {
         status = txn4->Append(*db_name, *table_name, input_block1);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
-        check_table();
+        check_no_data();
 
         // drop database
         auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);

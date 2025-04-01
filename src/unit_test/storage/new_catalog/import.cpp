@@ -4660,6 +4660,33 @@ TEST_P(TestImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
         EXPECT_EQ(index_segment_ids_ptr->size(), 1);
     };
+    auto check_no_index = [&](TableMeeta &table_meta, NewTxn *txn, const Vector<SegmentID> &segment_ids) {
+        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids_ptr, segment_ids);
+
+        for (auto segment_id : *segment_ids_ptr) {
+            SegmentMeta segment_meta(segment_id, table_meta);
+            check_segment(segment_meta, txn);
+        }
+
+        Vector<String> *index_id_strs_ptr = nullptr;
+        Vector<String> *index_names_ptr = nullptr;
+        Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_id_strs_ptr, Vector<String>({}));
+    };
+    auto check_no_data = [&](TableMeeta &table_meta, NewTxn *txn) {
+        auto [segment_ids_ptr, seg_status] = table_meta.GetSegmentIDs1();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids_ptr, Vector<SegmentID>({}));
+
+        Vector<String> *index_id_strs_ptr = nullptr;
+        Vector<String> *index_names_ptr = nullptr;
+        Status status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(*index_names_ptr, Vector<String>({"idx1"}));
+    };
 
     auto input_block1 = MakeShared<DataBlock>();
     {
@@ -4830,7 +4857,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -4838,7 +4865,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        check_table(*table_meta, txn5, {0});
+        check_no_index(*table_meta, txn5, {0});
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -4888,7 +4915,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -4896,7 +4923,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        check_table(*table_meta, txn5, {0});
+        check_no_data(*table_meta, txn5);
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -4949,7 +4976,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -4957,7 +4984,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        check_table(*table_meta, txn5, {0});
+        check_no_data(*table_meta, txn5);
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -5008,7 +5035,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -5016,7 +5043,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        check_table(*table_meta, txn5, {0});
+        check_no_data(*table_meta, txn5);
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 
@@ -5068,7 +5095,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         // Scan and check
         auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
@@ -5076,7 +5103,7 @@ TEST_P(TestImport, test_import_and_create_index) {
         Optional<TableMeeta> table_meta;
         status = txn5->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
         EXPECT_TRUE(status.ok());
-        check_table(*table_meta, txn5, {0});
+        check_no_data(*table_meta, txn5);
         status = new_txn_mgr->CommitTxn(txn5);
         EXPECT_TRUE(status.ok());
 

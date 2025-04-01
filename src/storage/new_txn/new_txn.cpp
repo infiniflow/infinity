@@ -925,17 +925,14 @@ Status NewTxn::Commit() {
     txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("NewTxn {} commit ts: {}", txn_context_ptr_->txn_id_, commit_ts));
 
-    // if (const auto conflict_reason = txn_mgr_->CheckTxnConflict(this); conflict_reason) {
-    //     LOG_ERROR(fmt::format("NewTxn: {} is rolled back. rollback ts: {}. NewTxn conflict reason: {}.",
-    //                           txn_context_ptr_->txn_id_,
-    //                           commit_ts,
-    //                           *conflict_reason));
-    //     wal_entry_ = nullptr;
-    //     txn_mgr_->SendToWAL(this);
-    //     return Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", *conflict_reason));
-    // }
-
     Status status = this->PrepareCommit();
+    if (status.ok()) {
+        String conflict_reason;
+        bool conflict = txn_mgr_->CheckConflict1(this, conflict_reason);
+        if (conflict) {
+            status = Status::TxnConflict(txn_context_ptr_->txn_id_, fmt::format("NewTxn conflict reason: {}.", conflict_reason));
+        }
+    }
     if (!status.ok()) {
         if (!this->IsReplay()) {
             // If prepare commit fail and not replay, rollback the transaction
@@ -1501,7 +1498,85 @@ Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
 }
 
 bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
-    //
+    auto check_with_append = [&](const String &db_name, const String &table_name) {
+        for (SharedPtr<WalCmd> &wal_cmd : check_txn->wal_entry_->cmds_) {
+            WalCommandType command_type = wal_cmd->GetType();
+            switch (command_type) {
+                case WalCommandType::CREATE_INDEX: {
+                    auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+                    if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
+                        conflict_reason = fmt::format("Create index {} on table {} in database {}.",
+                                                      *create_index_cmd->index_base_->index_name_,
+                                                      table_name,
+                                                      db_name);
+                        return true;
+                    }
+                }
+                default: {
+                    //
+                }
+            }
+        }
+        return false;
+    };
+    auto check_with_index = [&](const String &db_name, const String &table_name) {
+        for (SharedPtr<WalCmd> &wal_cmd : check_txn->wal_entry_->cmds_) {
+            WalCommandType command_type = wal_cmd->GetType();
+            switch (command_type) {
+                case WalCommandType::APPEND: {
+                    auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                    if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
+                        conflict_reason = fmt::format("Append on table {} in database {}.", table_name, db_name);
+                        return true;
+                    }
+                }
+                case WalCommandType::IMPORT: {
+                    auto *import_cmd = static_cast<WalCmdImport *>(wal_cmd.get());
+                    if (import_cmd->db_name_ == db_name && import_cmd->table_name_ == table_name) {
+                        conflict_reason = fmt::format("Import on table {} in database {}.", table_name, db_name);
+                        return true;
+                    }
+                }
+                default: {
+                    //
+                }
+            }
+        }
+        return false;
+    };
+    for (SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
+        WalCommandType command_type = wal_cmd->GetType();
+
+        switch (command_type) {
+            case WalCommandType::APPEND: {
+                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                bool conflict = check_with_append(append_cmd->db_name_, append_cmd->table_name_);
+                if (conflict) {
+                    return true;
+                }
+                break;
+            }
+            case WalCommandType::IMPORT: {
+                auto *import_cmd = static_cast<WalCmdImport *>(wal_cmd.get());
+                bool conflict = check_with_append(import_cmd->db_name_, import_cmd->table_name_);
+                if (conflict) {
+                    return true;
+                }
+                break;
+            }
+            case WalCommandType::CREATE_INDEX: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+                bool conflict = check_with_index(create_index_cmd->db_name_, create_index_cmd->table_name_);
+                if (conflict) {
+                    return true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+    }
     return false;
 }
 
@@ -1514,41 +1589,6 @@ void NewTxn::CommitBottom() {
     txn_mgr_->CommitBottom(commit_ts, txn_id);
 
     LOG_TRACE(fmt::format("NewTxn bottom: {} is started.", txn_context_ptr_->txn_id_));
-    // prepare to commit txn local data into table
-    //    TxnTimeStamp commit_ts = this->CommitTS();
-
-    //    for (auto &command : wal_entry_->cmds_) {
-    //        WalCommandType command_type = command->GetType();
-    //        switch (command_type) {
-    //            case WalCommandType::APPEND: {
-    //                auto *append_cmd = static_cast<WalCmdAppend *>(command.get());
-    //                Status status = CommitAppend(append_cmd);
-    //                if (!status.ok()) {
-    //                    UnrecoverableError(fmt::format("CommitAppend failed: {}", status.message()));
-    //                }
-    //                break;
-    //            }
-    //            default: {
-    //                break;
-    //            }
-    //        }
-    //    }
-
-    // Status status = kv_instance_->Commit();
-    // if (!status.ok()) {
-    //     UnrecoverableError("KV instance commit failed");
-    // }
-
-    //    txn_store_.PrepareCommit(txn_context_ptr_->txn_id_, commit_ts, buffer_mgr_);
-    //
-    //    txn_store_.CommitBottom(txn_context_ptr_->txn_id_, commit_ts);
-    //
-    //    txn_store_.AddDeltaOp(txn_delta_ops_entry_.get(), nullptr);
-
-    // Don't need to write empty CatalogDeltaEntry (read-only transactions).
-    //    if (!txn_delta_ops_entry_->operations().empty()) {
-    //        txn_delta_ops_entry_->SaveState(txn_context_ptr_->txn_id_, this->CommitTS(), txn_mgr_->NextSequence());
-    //    }
 
     // Notify the top half
     std::unique_lock<std::mutex> lk(commit_lock_);
