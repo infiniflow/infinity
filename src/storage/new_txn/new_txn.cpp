@@ -1540,6 +1540,13 @@ bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
                         return true;
                     }
                 }
+                case WalCommandType::COMPACT: {
+                    auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                    if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                        conflict_reason = fmt::format("Compact on table {} in database {}.", table_name, db_name);
+                        return true;
+                    }
+                }
                 default: {
                     //
                 }
@@ -1566,6 +1573,13 @@ bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
                     return true;
                 }
                 break;
+            }
+            case WalCommandType::COMPACT: {
+                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                bool conflict = check_with_append(compact_cmd->db_name_, compact_cmd->table_name_);
+                if (conflict) {
+                    return true;
+                }
             }
             case WalCommandType::CREATE_INDEX: {
                 auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
