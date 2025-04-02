@@ -450,13 +450,17 @@ void WalManager::NewFlush() {
                 break;
             }
 
-            WalEntry *entry = txn->GetWALEntry();
-            if (entry == nullptr) {
+            TxnState txn_state = txn->GetTxnState();
+            if (txn_state == TxnState::kRollbacking) {
                 // rollback txn
                 // need calls CommitBottom to update NewTxnManager::current_ts_ to NewTxnManager::prepare_commit_ts_
                 continue;
+            } else if (txn_state != TxnState::kCommitting) {
+                String error_message = fmt::format("NewTxnManager::Flush: txn state is {}, not committing", TxnState2Str(txn_state));
+                UnrecoverableError(error_message);
             }
             // Empty WalEntry (read-only transactions) shouldn't go into WalManager.
+            WalEntry *entry = txn->GetWALEntry();
 
             if (entry->cmds_.empty()) {
                 continue;

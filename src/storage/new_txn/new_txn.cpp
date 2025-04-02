@@ -934,17 +934,17 @@ Status NewTxn::Commit() {
         }
     }
     if (!status.ok()) {
+        this->SetTxnRollbacking(commit_ts);
+
         if (!this->IsReplay()) {
             // If prepare commit fail and not replay, rollback the transaction
 
-            SharedPtr<WalEntry> wal_entry = std::exchange(wal_entry_, nullptr);
             txn_mgr_->SendToWAL(this);
 
             // Wait until CommitTxnBottom is done.
             std::unique_lock<std::mutex> lk(commit_lock_);
             commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-            wal_entry_ = wal_entry;
             PostRollback(commit_ts);
         }
         return status;
