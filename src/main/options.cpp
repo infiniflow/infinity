@@ -99,6 +99,7 @@ GlobalOptions::GlobalOptions() {
 
     name2index_[String(RECORD_RUNNING_QUERY_OPTION_NAME)] = GlobalOptionIndex::kRecordRunningQuery;
     name2index_[String(USE_NEW_CATALOG_OPTION_NAME)] = GlobalOptionIndex::kUseNewCatalog;
+    name2index_[String(REPLAY_WAL_OPTION_NAME)] = GlobalOptionIndex::kReplayWal;
 }
 
 Status GlobalOptions::AddOption(UniquePtr<BaseOption> option) {

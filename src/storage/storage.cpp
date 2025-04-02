@@ -301,7 +301,9 @@ Status Storage::AdminToWriter() {
         // start WalManager after TxnManager since it depends on TxnManager.
         wal_mgr_->Start();
 
-        wal_mgr_->ReplayWalEntries(replay_entries);
+        if (config_ptr_->ReplayWal()) {
+            wal_mgr_->ReplayWalEntries(replay_entries);
+        }
     }
 
     if (memory_index_tracer_ != nullptr) {

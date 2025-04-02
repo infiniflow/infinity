@@ -61,6 +61,10 @@ public:
 
     static constexpr const char *NEW_VFS_OFF_CONFIG_PATH = "test/data/config/test_vfs_off_new.toml";
 
+    static constexpr const char *NEW_CONFIG_NOWAL_PATH = "test/data/config/test_new_nowal.toml";
+
+    static constexpr const char *NEW_VFS_OFF_CONFIG_NOWAL_PATH = "test/data/config/test_vfs_off_nowal.toml";
+
 protected:
     const char *GetHomeDir() { return "/var/infinity"; }
 

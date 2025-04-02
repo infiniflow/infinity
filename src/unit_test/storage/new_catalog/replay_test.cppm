@@ -38,6 +38,18 @@ protected:
         new_txn_mgr->PrintAllKeyValue();
     }
 
+    void UninitTxnMgr() {
+        new_txn_mgr->PrintAllKeyValue();
+        infinity::InfinityContext::instance().UnInit();
+        new_txn_mgr = nullptr;
+    }
+
+    void InitTxnMgr() {
+        InfinityContext::instance().InitPhase1(this->config_path);
+        InfinityContext::instance().InitPhase2();
+        new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
+    }
+
     void SetUp() override {
         BaseTestParamStr::SetUp();
         new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

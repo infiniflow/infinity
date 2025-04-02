@@ -174,7 +174,8 @@ export enum class GlobalOptionIndex : i8 {
     kSnapshotDir = 56,
     kCatalogDir = 57,
     kUseNewCatalog = 58,
-    kInvalid = 59,
+    kReplayWal = 59,
+    kInvalid = 60,
 };
 
 export struct GlobalOptions {

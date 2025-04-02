@@ -1558,6 +1558,21 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kReplayWal: {
+                            // Replay wal
+                            bool replay_wal = true;
+                            if (elem.second.is_boolean()) {
+                                replay_wal = elem.second.value_or(replay_wal);
+                            } else {
+                                return Status::InvalidConfig("'replay_wal' field isn't boolean.");
+                            }
+                            UniquePtr<BooleanOption> replay_wal_option = MakeUnique<BooleanOption>(REPLAY_WAL_OPTION_NAME, replay_wal);
+                            Status status = global_options_.AddOption(std::move(replay_wal_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
                         case GlobalOptionIndex::kDataDir: {
                             // Data Dir
                             String data_dir = "/var/infinity/data";
@@ -1932,6 +1947,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     bool use_new_catalog = false;
                     UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
                     Status status = global_options_.AddOption(std::move(use_new_catalog_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kReplayWal) == nullptr) {
+                    bool replay_wal = true;
+                    UniquePtr<BooleanOption> replay_wal_option = MakeUnique<BooleanOption>(REPLAY_WAL_OPTION_NAME, replay_wal);
+                    Status status = global_options_.AddOption(std::move(replay_wal_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2735,6 +2759,11 @@ LogLevel Config::GetLogLevel() {
 bool Config::UseNewCatalog() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetBoolValue(GlobalOptionIndex::kUseNewCatalog);
+}
+
+bool Config::ReplayWal() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetBoolValue(GlobalOptionIndex::kReplayWal);
 }
 
 String Config::DataDir() {

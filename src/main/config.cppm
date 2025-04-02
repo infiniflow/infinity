@@ -97,6 +97,7 @@ public:
 
     // Storage
     bool UseNewCatalog();
+    bool ReplayWal();
     String DataDir();
     String CatalogDir();
     String SnapshotDir();
