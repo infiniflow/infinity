@@ -4294,22 +4294,11 @@ TEST_P(TestAppend, test_append_and_drop_index) {
         input_block1->Finalize();
     }
 
-    auto check_index = [&]() {
-        // Check the appended data.
-        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+    auto check_segment = [&](SegmentMeta &segment_meta, NewTxn *txn) {
+        Status status;
+        Vector<BlockID> *block_ids_ptr = nullptr;
         TxnTimeStamp begin_ts = txn->BeginTS();
 
-        Optional<DBMeeta> db_meta;
-        Optional<TableMeeta> table_meta;
-        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
-        EXPECT_TRUE(status.ok());
-
-        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
-        EXPECT_TRUE(seg_status.ok());
-        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
-        SegmentMeta segment_meta(0, *table_meta);
-
-        Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
 
         EXPECT_TRUE(status.ok());
@@ -4333,6 +4322,23 @@ TEST_P(TestAppend, test_append_and_drop_index) {
 
         SizeT row_count = state.block_offset_end();
         EXPECT_EQ(row_count, 4096);
+    };
+
+    auto check_index = [&]() {
+        // Check the appended data.
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        auto [segment_ids, seg_status] = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(seg_status.ok());
+        EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        SegmentMeta segment_meta(0, *table_meta);
+
+        check_segment(segment_meta, txn);
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
@@ -4351,13 +4357,12 @@ TEST_P(TestAppend, test_append_and_drop_index) {
         Vector<SegmentID> *index_segment_ids_ptr = nullptr;
         status = table_index_meta.GetSegmentIDs(index_segment_ids_ptr);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(index_segment_ids_ptr->size(), 0);
+        EXPECT_EQ(*index_segment_ids_ptr, Vector<SegmentID>({0}));
     };
 
     auto check_table = [&]() {
         // Check the appended data.
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
-        TxnTimeStamp begin_ts = txn->BeginTS();
 
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
@@ -4369,49 +4374,14 @@ TEST_P(TestAppend, test_append_and_drop_index) {
         EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
         SegmentMeta segment_meta(0, *table_meta);
 
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
-        BlockMeta block_meta(0, segment_meta);
-
-        NewTxnGetVisibleRangeState state;
-        status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
-        EXPECT_TRUE(status.ok());
-        {
-            Pair<BlockOffset, BlockOffset> range;
-            BlockOffset offset = 0;
-            bool has_next = state.Next(offset, range);
-            EXPECT_TRUE(has_next);
-            EXPECT_EQ(range.first, 0);
-            EXPECT_EQ(range.second, static_cast<BlockOffset>(4096));
-            offset = range.second;
-            has_next = state.Next(offset, range);
-            EXPECT_FALSE(has_next);
-        }
-
-        SizeT row_count = state.block_offset_end();
-        EXPECT_EQ(row_count, 4096);
+        check_segment(segment_meta, txn);
 
         Vector<String> *index_id_strs_ptr = nullptr;
         Vector<String> *index_names_ptr = nullptr;
         status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
         EXPECT_TRUE(status.ok());
-        EXPECT_EQ(index_id_strs_ptr->size(), 1);
-        EXPECT_EQ(index_names_ptr->size(), 1);
-        EXPECT_EQ(index_names_ptr->at(0), "idx1");
-
-        TableIndexMeeta table_index_meta(index_id_strs_ptr->at(0), *table_meta);
-        auto [index_base, index_status] = table_index_meta.GetIndexBase();
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(*index_base->index_name_, String("idx1"));
-        EXPECT_EQ(index_base->index_type_, IndexType::kSecondary);
-
-        Vector<SegmentID> *index_segment_ids_ptr = nullptr;
-        status = table_index_meta.GetSegmentIDs(index_segment_ids_ptr);
-        EXPECT_TRUE(status.ok());
-        EXPECT_EQ(index_segment_ids_ptr->size(), 1);
+        EXPECT_EQ(*index_id_strs_ptr, Vector<String>({}));
+        EXPECT_EQ(*index_names_ptr, Vector<String>({}));
     };
 
     //    t1      append      commit (success)
