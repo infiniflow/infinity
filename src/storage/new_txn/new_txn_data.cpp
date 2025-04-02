@@ -58,17 +58,22 @@ import expression_evaluator;
 namespace infinity {
 
 struct NewTxnCompactState {
-    NewTxnCompactState(TableMeeta &table_meta, TxnTimeStamp commit_ts) : commit_ts_(commit_ts) {
-        Status status1 = NewCatalog::AddNewSegment1(table_meta, commit_ts, new_segment_meta_);
-        if (!status1.ok()) {
-            UnrecoverableError("Failed to add new segment");
-        }
-        auto [column_defs_ptr, status] = table_meta.GetColumnDefs();
+    NewTxnCompactState() = default;
+
+    static Status Make(TableMeeta &table_meta, TxnTimeStamp commit_ts, NewTxnCompactState &state) {
+        Status status = NewCatalog::AddNewSegment1(table_meta, commit_ts, state.new_segment_meta_);
         if (!status.ok()) {
-            UnrecoverableError("Failed to get column defs");
+            return status;
         }
-        column_cnt_ = column_defs_ptr->size();
-    }
+        SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+        std::tie(column_defs_ptr, status) = table_meta.GetColumnDefs();
+        if (!status.ok()) {
+            return status;
+        }
+        state.column_cnt_ = column_defs_ptr->size();
+        
+        return Status::OK();
+    };
 
     SizeT column_cnt() const { return column_cnt_; }
 
@@ -553,7 +558,11 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     // }
     // status = table_meta.SetNextSegmentID(new_segment_id + 1);
 
-    NewTxnCompactState compact_state(table_meta, fake_commit_ts);
+    NewTxnCompactState compact_state;
+    status = NewTxnCompactState::Make(table_meta, fake_commit_ts, compact_state);
+    if (!status.ok()) {
+        return status;
+    }
 
     for (SegmentID segment_id : segment_ids) {
         SegmentMeta segment_meta(segment_id, table_meta);
