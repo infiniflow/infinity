@@ -365,5 +365,72 @@ TEST_P(TestDumpMemIndex, dump_and_dropdb) {
         EXPECT_TRUE(status.ok());
     }
 
+    // dump index and drop db
+    //  t1            dump index                 commit (success)
+    //  |--------------|------------------------------|
+    //                         |------------------|----------|
+    //                        t2                drop db    commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+
+        append_a_block();
+
+        check_index(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+            return std::make_pair(begin_id, row_cnt);
+        });
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+    }
+
+    // dump index and drop db
+    //  t1            dump index                             commit (success)
+    //  |--------------|------------------------------------------|
+    //                         |------------------|----------|
+    //                        t2                drop db    commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        status = txn6->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
     RemoveDbDirs();
 }
