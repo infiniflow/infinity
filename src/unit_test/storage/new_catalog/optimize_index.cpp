@@ -92,6 +92,32 @@ protected:
         BaseTestParamStr::TearDown();
     }
 
+    auto MakeInputBlock(const Value &v1, const Value &v2) -> SharedPtr<DataBlock> {
+        u32 block_row_cnt = 8192;
+
+        auto input_block = MakeShared<DataBlock>();
+        auto append_to_col = [&](ColumnVector &col, const Value &v) {
+            for (u32 i = 0; i < block_row_cnt; ++i) {
+                col.AppendValue(v);
+            }
+        };
+        // Initialize input block
+        {
+            auto col1 = ColumnVector::Make(column_def1->type());
+            col1->Initialize();
+            append_to_col(*col1, v1);
+            input_block->InsertVector(col1, 0);
+        }
+        {
+            auto col2 = ColumnVector::Make(column_def2->type());
+            col2->Initialize();
+            append_to_col(*col2, v2);
+            input_block->InsertVector(col2, 1);
+        }
+        input_block->Finalize();
+        return input_block;
+    };
+
     void PrepareForOptimizeIndex() {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
@@ -114,34 +140,10 @@ protected:
             status = new_txn_mgr->CommitTxn(txn);
             EXPECT_TRUE(status.ok());
         }
-        u32 block_row_cnt = 8192;
-        auto make_input_block = [&](const Value &v1, const Value &v2) {
-            auto input_block = MakeShared<DataBlock>();
-            auto append_to_col = [&](ColumnVector &col, const Value &v) {
-                for (u32 i = 0; i < block_row_cnt; ++i) {
-                    col.AppendValue(v);
-                }
-            };
-            // Initialize input block
-            {
-                auto col1 = ColumnVector::Make(column_def1->type());
-                col1->Initialize();
-                append_to_col(*col1, v1);
-                input_block->InsertVector(col1, 0);
-            }
-            {
-                auto col2 = ColumnVector::Make(column_def2->type());
-                col2->Initialize();
-                append_to_col(*col2, v2);
-                input_block->InsertVector(col2, 1);
-            }
-            input_block->Finalize();
-            return input_block;
-        };
         for (int i = 0; i < 2; ++i) {
             {
-                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
-                SharedPtr<DataBlock> input_block = make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
+                SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
                 Status status = txn->Append(*db_name, *table_name, input_block);
                 EXPECT_TRUE(status.ok());
                 status = new_txn_mgr->CommitTxn(txn);
@@ -747,6 +749,166 @@ TEST_P(TestOptimizeIndex, optimize_index_and_optimize_index) {
         EXPECT_TRUE(status.ok());
 
         CheckTable();
+        DropDB();
+    }
+}
+
+TEST_P(TestOptimizeIndex, optimize_index_and_dump_index) {
+    auto PrepareForOptimizeAndDumpIndex = [&] {
+        PrepareForOptimizeIndex();
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            Status status = txn->Append(*db_name, *table_name, input_block);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    };
+
+    Status status;
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1        optimize index     commit (success)
+        //  |--------------|---------------|
+        //                                     |------------------|----------|
+        //                                    t2                dump index   commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1        optimize index    commit (success)
+        //  |--------------|---------------|
+        //                         |------------------|----------|
+        //                        t2         dump index(fail)  rollback
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1       optimize index     commit (success)
+        //  |--------------|---------------|
+        //         |------------------|-------------|
+        //        t2            dump index(fail)  rollback
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1        optimize index(fail)    rollback
+        //  |--------------|-------------------|
+        //         |-----|----------|
+        //        t2  dump index  commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //                  t1                optimize index(fail)  rollback
+        //                  |--------------------------|---------------|
+        //         |-----|----------|
+        //        t2  dump index  commit
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //                             t1                  optimize index      commit
+        //                             |--------------------------|---------------|
+        //         |-----|----------|
+        //        t2  dump index  commit
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("dump index"), TransactionType::kNormal);
+        status = txn2->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
         DropDB();
     }
 }
