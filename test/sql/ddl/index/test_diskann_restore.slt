@@ -1,0 +1,49 @@
+# name: test/sql/ddl/index/test_diskann.sql
+# description: Test create diskann index
+# group: [ddl, test_diskann]
+
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_diskann;
+
+statement ok
+CREATE TABLE sqllogic_test_diskann (col1 embedding(float,128));
+
+statement ok
+COPY sqllogic_test_diskann FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
+
+statement ok
+CREATE INDEX idx1 ON sqllogic_test_diskann (col1) USING DiskAnn WITH (R = 16, L = 50, num_pq_chunks = 4, num_parts = 10, metric = l2);
+
+statement ok
+CREATE SNAPSHOT sqllogic_test_diskann_backup ON TABLE sqllogic_test_diskann;
+
+statement ok
+DROP TABLE sqllogic_test_diskann;
+
+statement ok
+RESTORE TABLE SNAPSHOT sqllogic_test_diskann_backup;
+
+statement ok
+SELECT * FROM sqllogic_test_diskann LIMIT 1;
+
+statement ok
+SHOW TABLE sqllogic_test_diskann INDEX idx1;
+
+#drop and restore again
+statement ok
+DROP TABLE sqllogic_test_diskann;
+
+statement ok
+RESTORE TABLE SNAPSHOT sqllogic_test_diskann_backup;
+
+statement ok
+SHOW TABLE sqllogic_test_diskann INDEX idx1;
+
+statement ok
+DROP TABLE sqllogic_test_diskann;
+
+statement ok
+DROP SNAPSHOT sqllogic_test_diskann_backup;
+
+statement error
+DROP SNAPSHOT sqllogic_test_diskann_backup;
