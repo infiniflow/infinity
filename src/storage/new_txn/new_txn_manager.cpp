@@ -175,9 +175,9 @@ bool NewTxnManager::CheckConflict1(NewTxn *txn, String &conflict_reason) {
     TxnTimeStamp begin_ts = txn->BeginTS();
     TxnTimeStamp commit_ts = txn->CommitTS();
 
-    [[maybe_unused]] Vector<NewTxn *> check_txns = GetCheckTxns(begin_ts, commit_ts);
-    for (NewTxn *check_txn : check_txns) {
-        if (txn->CheckConflict1(check_txn, conflict_reason)) {
+    Vector<SharedPtr<NewTxn>> check_txns = GetCheckTxns(begin_ts, commit_ts);
+    for (SharedPtr<NewTxn> &check_txn : check_txns) {
+        if (txn->CheckConflict1(check_txn.get(), conflict_reason)) {
             return true;
         }
     }
@@ -260,6 +260,8 @@ Status NewTxnManager::CommitTxn(NewTxn *txn, TxnTimeStamp *commit_ts_ptr) {
             ckp_begin_ts_ = UNCOMMIT_TS;
         }
         this->CleanupTxn(txn, true);
+    } else {
+        this->CleanupTxn(txn, false);
     }
     return status;
 }
@@ -435,12 +437,12 @@ Status NewTxnManager::Cleanup() {
     return Status::OK();
 }
 
-Vector<NewTxn *> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
-    Vector<NewTxn *> res;
+Vector<SharedPtr<NewTxn>> NewTxnManager::GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
+    Vector<SharedPtr<NewTxn>> res;
     {
         std::lock_guard guard(locker_);
         for (SizeT i = 0; i < check_txns_.size(); ++i) {
-            NewTxn *check_txn = check_txns_[i].get();
+            SharedPtr<NewTxn> &check_txn = check_txns_[i];
             TxnTimeStamp check_commit_ts = check_txn->CommitTS();
             if (check_commit_ts < begin_ts) {
                 continue;

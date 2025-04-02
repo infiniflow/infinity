@@ -1498,8 +1498,11 @@ Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
 }
 
 bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
+    // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
+
     auto check_with_append = [&](const String &db_name, const String &table_name) {
-        for (SharedPtr<WalCmd> &wal_cmd : check_txn->wal_entry_->cmds_) {
+        const Vector<SharedPtr<WalCmd>> &wal_cmds = check_txn->wal_entry_->cmds_;
+        for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
             WalCommandType command_type = wal_cmd->GetType();
             switch (command_type) {
                 case WalCommandType::CREATE_INDEX: {
@@ -1852,17 +1855,6 @@ Status NewTxn::Rollback() {
     LOG_TRACE(fmt::format("NewTxn: {} is dropped.", txn_context_ptr_->txn_id_));
 
     return status;
-}
-
-void NewTxn::AddWalCmd(const SharedPtr<WalCmd> &cmd) {
-    std::lock_guard guard(txn_store_.mtx_);
-    auto state = this->GetTxnState();
-    if (state != TxnState::kStarted) {
-        auto begin_ts = BeginTS();
-        UnrecoverableError(fmt::format("Should add wal cmd in started state, begin_ts: {}", begin_ts));
-    }
-    wal_entry_->cmds_.push_back(cmd);
-    txn_context_ptr_->AddOperation(MakeShared<String>(cmd->ToString()));
 }
 
 // the max_commit_ts is determined by the max commit ts of flushed delta entry

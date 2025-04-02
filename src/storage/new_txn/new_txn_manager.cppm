@@ -121,7 +121,7 @@ public:
 
     Status Cleanup();
 
-    Vector<NewTxn *> GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+    Vector<SharedPtr<NewTxn>> GetCheckTxns(TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
 private:
     mutable std::mutex locker_{};

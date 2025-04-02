@@ -306,9 +306,6 @@ public:
 
     void SetTxnWrite();
 
-    // WAL and replay OPS
-    void AddWalCmd(const SharedPtr<WalCmd> &cmd);
-
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
     bool DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts);

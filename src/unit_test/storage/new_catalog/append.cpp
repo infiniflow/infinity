@@ -3612,14 +3612,16 @@ TEST_P(TestAppend, test_append_append_concurrent) {
         SizeT loop_count = 128;
         SizeT block_num = thread_count * loop_count / 2;
         for (SizeT i = 0; i < thread_count; ++i) {
-            worker_threads.emplace_back([&] {
+            worker_threads.emplace_back([&, i] {
                 for (SizeT j = 0; j < loop_count; ++j) {
                     Status status;
+                    int k = 0;
                     do {
-                        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+                        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append_{}_{}_{}", i, j, k)), TransactionType::kNormal);
                         status = txn3->Append(*db_name, *table_name, input_block1);
                         EXPECT_TRUE(status.ok());
                         status = new_txn_mgr->CommitTxn(txn3);
+                        ++k;
                     } while (!status.ok());
                 }
             });
