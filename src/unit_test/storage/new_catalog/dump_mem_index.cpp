@@ -430,6 +430,144 @@ TEST_P(TestDumpMemIndex, dump_and_dropdb) {
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
+
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kNormal);
+        auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
+        EXPECT_FALSE(db_status.ok());
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    // dump index and drop db
+    //  t1            dump index                             commit (success)
+    //  |--------------|------------------------------------------|
+    //         |------------------|----------|
+    //         t2                drop db    commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        status = txn6->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kNormal);
+        auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
+        EXPECT_FALSE(db_status.ok());
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    // dump index and drop db
+    //  t1                                  dump index                             commit (success)
+    //  |---------------------------------------|------------------------------------------|
+    //         |------------------|----------|
+    //         t2                drop db    commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        Status status = txn6->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kNormal);
+        auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
+        EXPECT_FALSE(db_status.ok());
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    // dump index and drop db
+    //                                 t1                    dump index                             commit (success)
+    //                                 |----------------------|------------------------------------------|
+    //         |------------------|----------|
+    //         t2                drop db    commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        Status status = txn6->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn7 = new_txn_mgr->BeginTxn(MakeUnique<String>("get db"), TransactionType::kNormal);
+        auto [db_info, db_status] = txn7->GetDatabaseInfo(*db_name);
+        EXPECT_FALSE(db_status.ok());
+        status = new_txn_mgr->RollBackTxn(txn7);
+        EXPECT_TRUE(status.ok());
+    }
+
+    // dump index and drop db
+    //                                            t1                    dump index                             commit (success)
+    //                                            |----------------------|------------------------------------------|
+    //         |------------------|----------|
+    //         t2                drop db    commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        // drop database
+        auto *txn6 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
+        Status status = txn6->DropDatabase(*db_name, ConflictType::kError);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn6);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
     }
 
     RemoveDbDirs();
