@@ -71,7 +71,7 @@ struct NewTxnCompactState {
             return status;
         }
         state.column_cnt_ = column_defs_ptr->size();
-        
+
         return Status::OK();
     };
 
@@ -316,7 +316,7 @@ Status NewTxn::Import(const String &db_name, const String &table_name, const Vec
         const String &index_name = (*index_names_ptr)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
-        status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *segment_meta, segment_row_cnt);
+        status = this->PopulateIndex(db_name, table_name, index_name, table_key, table_index_meta, *segment_meta, segment_row_cnt);
         if (!status.ok()) {
             return status;
         }
@@ -534,7 +534,8 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
-    status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt);
+    String table_key;
+    status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -630,8 +631,13 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         const String &index_name = (*index_name_ptr)[i];
         TableIndexMeeta table_index_meta(index_id_str, table_meta);
 
-        status =
-            this->PopulateIndex(db_name, table_name, index_name, table_index_meta, *compact_state.new_segment_meta_, compact_state.segment_row_cnt_);
+        status = this->PopulateIndex(db_name,
+                                     table_name,
+                                     index_name,
+                                     table_key,
+                                     table_index_meta,
+                                     *compact_state.new_segment_meta_,
+                                     compact_state.segment_row_cnt_);
         if (!status.ok()) {
             return status;
         }
@@ -1357,7 +1363,7 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
     //     }
     // } else {
     //     BlockID block_id = next_block_id - 1;
-    //     block_meta.emplace(block_id, segment_meta.value() 
+    //     block_meta.emplace(block_id, segment_meta.value()
     // }
 
     Vector<BlockID> *block_ids_ptr = nullptr;

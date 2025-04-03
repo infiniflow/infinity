@@ -67,26 +67,39 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
-    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta);
+    String table_key;
+    String index_key;
+    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return status;
     }
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
+    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     ChunkID new_chunk_id = 0;
-    {
-        Status status = this->DumpMemIndexInner(segment_index_meta, new_chunk_id);
+    status = this->DumpMemIndexInner(segment_index_meta, new_chunk_id);
+    if (!status.ok()) {
+        status = new_catalog_->DecreaseTableWriteCount(this, table_key);
         if (!status.ok()) {
-            return status;
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
         }
+        return status;
     }
-    {
-        ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
-        Status status = this->AddChunkWal(db_name, table_name, index_name, chunk_index_meta, {}, true);
+
+    ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
+    status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, true);
+    if (!status.ok()) {
+        status = new_catalog_->DecreaseTableWriteCount(this, table_key);
         if (!status.ok()) {
-            return status;
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
         }
+        return status;
     }
+
     return Status::OK();
 }
 
@@ -96,7 +109,9 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     Optional<TableIndexMeeta> table_index_meta_opt;
-    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta_opt, table_index_meta_opt);
+    String table_key;
+    String index_key;
+    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta_opt, table_index_meta_opt, &table_key, &index_key);
     if (!status.ok()) {
         return status;
     }
@@ -269,7 +284,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
         }
     }
 
-    status = this->AddChunkWal(db_name, table_name, index_name, *chunk_index_meta, deprecate_ids, true);
+    status = this->AddChunkWal(db_name, table_name, index_name, table_key, *chunk_index_meta, deprecate_ids, true);
     if (!status.ok()) {
         return status;
     }
@@ -520,6 +535,7 @@ NewTxn::AppendMemIndex(SegmentIndexMeta &segment_index_meta, RowID base_row_id, 
 Status NewTxn::PopulateIndex(const String &db_name,
                              const String &table_name,
                              const String &index_name,
+                             const String &table_key,
                              TableIndexMeeta &table_index_meta,
                              SegmentMeta &segment_meta,
                              SizeT segment_row_cnt,
@@ -604,7 +620,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
 
         create_index_cmd.segment_index_infos_.emplace_back(segment_meta.segment_id(), std::move(chunk_infos));
     } else {
-        Status status = this->AddChunkWal(db_name, table_name, index_name, chunk_index_meta, old_chunk_ids, false);
+        Status status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, old_chunk_ids, false);
         if (!status.ok()) {
             return status;
         }
@@ -618,8 +634,16 @@ Status NewTxn::ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd) {
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
-    status =
-        GetTableIndexMeta(dump_index_cmd->db_name_, dump_index_cmd->table_name_, dump_index_cmd->index_name_, db_meta, table_meta, table_index_meta);
+    String table_key;
+    String index_key;
+    status = GetTableIndexMeta(dump_index_cmd->db_name_,
+                               dump_index_cmd->table_name_,
+                               dump_index_cmd->index_name_,
+                               db_meta,
+                               table_meta,
+                               table_index_meta,
+                               &table_key,
+                               &index_key);
     if (!status.ok()) {
         return status;
     }
@@ -1155,6 +1179,7 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
 Status NewTxn::AddChunkWal(const String &db_name,
                            const String &table_name,
                            const String &index_name,
+                           const String &table_key,
                            ChunkIndexMeta &chunk_index_meta,
                            const Vector<ChunkID> &deprecate_ids,
                            bool clear_mem_index) {
@@ -1169,6 +1194,7 @@ Status NewTxn::AddChunkWal(const String &db_name,
         dump_cmd->table_id_str_ = segment_index_meta.table_index_meta().table_meta().table_id_str();
         dump_cmd->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
     }
+    dump_cmd->table_key_ = table_key;
 
     wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
     txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
@@ -1337,6 +1363,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
     const String &index_name = *create_index_cmd->index_base_->index_name_;
     const String &db_id_str = create_index_cmd->db_id_;
     const String &table_id_str = create_index_cmd->table_id_;
+    const String &table_key = create_index_cmd->table_key_;
 
     // Get latest index id and lock the id
     String index_id_str;
@@ -1377,7 +1404,8 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
             if (!status.ok()) {
                 return status;
             }
-            status = this->PopulateIndex(db_name, table_name, index_name, table_index_meta, segment_meta, segment_row_cnt, create_index_cmd);
+            status =
+                this->PopulateIndex(db_name, table_name, index_name, table_key, table_index_meta, segment_meta, segment_row_cnt, create_index_cmd);
             if (!status.ok()) {
                 return status;
             }

@@ -1235,13 +1235,14 @@ Status NewTxn::GetTableIndexMeta(const String &db_name,
                                  Optional<DBMeeta> &db_meta,
                                  Optional<TableMeeta> &table_meta,
                                  Optional<TableIndexMeeta> &table_index_meta,
+                                 String *table_key_ptr,
                                  String *index_key_ptr) {
     Status status;
     status = this->GetDBMeta(db_name, db_meta);
     if (!status.ok()) {
         return status;
     }
-    status = GetTableMeta(table_name, *db_meta, table_meta);
+    status = GetTableMeta(table_name, *db_meta, table_meta, table_key_ptr);
     if (!status.ok()) {
         return status;
     }
@@ -1715,11 +1716,11 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX: {
-                // auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
-                // Status status = PostCommitDumpIndex(cmd);
-                // if (!status.ok()) {
-                //     UnrecoverableError("Fail to dump index");
-                // }
+                auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError("Fail to unlock table");
+                }
                 break;
             }
             default: {
@@ -1800,7 +1801,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto *cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table when rollback append txn");
+                    UnrecoverableError("Fail to unlock table when rollback delete txn");
                 }
                 status = RollbackDelete(cmd, kv_instance_.get());
                 if (!status.ok()) {
@@ -1814,7 +1815,18 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 if (!status.ok()) {
                     if (status.code() != ErrorCode::kNotFound) {
                         // In some cases, the table may have been deleted, so the table cannot be unlocked
-                        UnrecoverableError("Fail to unlock table when rollback append txn");
+                        UnrecoverableError("Fail to unlock table when rollback import txn");
+                    }
+                }
+                break;
+            }
+            case WalCommandType::DUMP_INDEX: {
+                auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
+                if (!status.ok()) {
+                    if (status.code() != ErrorCode::kNotFound) {
+                        // In some cases, the table may have been deleted, so the table cannot be unlocked
+                        UnrecoverableError("Fail to unlock table when rollback dump mem index txn");
                     }
                 }
                 break;
@@ -2181,7 +2193,9 @@ Status NewTxn::GetTableIndexFilePaths(const String &db_name, const String &table
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
-    Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta);
+    String table_key;
+    String index_key;
+    Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return status;
     }
@@ -2196,7 +2210,9 @@ Status NewTxn::GetSegmentIndexFilepaths(const String &db_name,
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
-    Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta);
+    String table_key;
+    String index_key;
+    Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return status;
     }
@@ -2213,7 +2229,9 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Optional<TableIndexMeeta> table_index_meta;
-    Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta);
+    String table_key;
+    String index_key;
+    Status status = this->GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
     if (!status.ok()) {
         return status;
     }

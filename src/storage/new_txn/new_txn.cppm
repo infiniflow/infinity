@@ -364,7 +364,8 @@ public:
                              Optional<DBMeeta> &db_meta,
                              Optional<TableMeeta> &table_meta,
                              Optional<TableIndexMeeta> &table_index_meta,
-                             String *index_key = nullptr);
+                             String *table_key,
+                             String *index_key);
 
     Status
     GetTableIndexMeta(const String &index_name, TableMeeta &table_meta, Optional<TableIndexMeeta> &table_index_meta, String *index_key = nullptr);
@@ -403,6 +404,7 @@ private:
     Status PopulateIndex(const String &db_name,
                          const String &table_name,
                          const String &index_name,
+                         const String &table_key,
                          TableIndexMeeta &table_index_meta,
                          SegmentMeta &segment_meta,
                          SizeT segment_row_cnt,
@@ -444,6 +446,7 @@ private:
     Status AddChunkWal(const String &db_name,
                        const String &table_name,
                        const String &index_name,
+                       const String &table_key,
                        ChunkIndexMeta &chunk_index_meta,
                        const Vector<ChunkID> &deprecate_ids,
                        bool clear_mem_index);
