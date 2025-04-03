@@ -26,6 +26,8 @@ import global_resource_usage;
 
 namespace infinity {
 
+class NewTxn;
+
 export enum class SessionType {
     kLocal,
     kRemote,
@@ -43,6 +45,9 @@ public:
 
     [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
     inline void SetTxn(Txn *txn) { txn_ = txn; }
+
+    [[nodiscard]] inline NewTxn *GetNewTxn() const { return new_txn_; }
+    inline void SetNewTxn(NewTxn *new_txn) { new_txn_ = new_txn; }
 
     void IncreaseQueryCount() { ++query_count_; }
 
@@ -66,6 +71,7 @@ protected:
 
     // Txn is session level.
     Txn *txn_{};
+    NewTxn *new_txn_{};
 
     SessionType session_type_{SessionType::kRemote};
 
