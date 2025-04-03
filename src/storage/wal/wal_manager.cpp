@@ -64,6 +64,7 @@ import global_resource_usage;
 import txn_state;
 import meta_info;
 import wal_entry;
+import block_index;
 
 module wal_manager;
 

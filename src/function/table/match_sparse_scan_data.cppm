@@ -19,7 +19,6 @@ export module match_sparse_scan_function_data;
 import stl;
 import table_function;
 import global_block_id;
-import block_index;
 import merge_knn;
 import data_block;
 import match_sparse_expr;

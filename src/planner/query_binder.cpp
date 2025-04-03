@@ -81,6 +81,11 @@ import defer_op;
 import highlighter;
 import txn_store;
 
+import meta_info;
+import new_txn;
+import db_meeta;
+import table_meeta;
+
 namespace infinity {
 
 UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &statement) {
@@ -430,12 +435,33 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
     } else {
         db_name = from_table->db_name_;
     }
+    const String &table_name = from_table->table_name_;
 
-    Txn *txn = query_context->GetTxn();
-
-    auto [table_info, status] = txn->GetTableInfo(db_name, from_table->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
+    SharedPtr<TableInfo> table_info;
+    Txn *txn = nullptr;
+    Status status;
+    bool use_new_meta = query_context->global_config()->UseNewCatalog();
+    if (use_new_meta) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info = MakeShared<TableInfo>();
+        status = table_meta->GetTableInfo(*table_info);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info->db_name_ = MakeShared<String>(db_name);
+        table_info->table_name_ = MakeShared<String>(table_name);
+    } else {
+        txn = query_context->GetTxn();
+        std::tie(table_info, status) = txn->GetTableInfo(db_name, from_table->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
     }
 
     if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {
@@ -467,7 +493,12 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         }
     }
 
-    SharedPtr<BlockIndex> block_index = txn->GetBlockIndexFromTable(db_name, from_table->table_name_);
+    SharedPtr<BlockIndex> block_index;
+    if (use_new_meta) {
+        // block_index;
+    } else {
+        block_index = txn->GetBlockIndexFromTable(db_name, from_table->table_name_);
+    }
 
     u64 table_index = bind_context_ptr_->GenerateTableIndex();
     auto table_ref = MakeShared<BaseTableRef>(table_info, std::move(columns), block_index, alias, table_index, names_ptr, types_ptr);

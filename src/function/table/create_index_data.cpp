@@ -14,27 +14,22 @@
 
 module;
 
-import stl;
-import function_data;
-import table_function;
-import global_block_id;
+module create_index_data;
 
-export module table_scan_function_data;
+import block_index;
 
 namespace infinity {
 
-class BlockIndex;
+CreateIndexSharedData::CreateIndexSharedData(BlockIndex *block_index) { Init(block_index); }
 
-export class TableScanFunctionData : public TableFunctionData {
-public:
-    TableScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids, const Vector<SizeT> &column_ids);
-
-    const BlockIndex *block_index_{};
-    const SharedPtr<Vector<GlobalBlockID>> &global_block_ids_{};
-    const Vector<SizeT> &column_ids_{};
-
-    u64 current_block_ids_idx_{0};
-    SizeT current_read_offset_{0};
-};
+void CreateIndexSharedData::Init(BlockIndex *block_index) {
+    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+        auto [iter, insert_ok] = create_index_idxes_.emplace(segment_id, 0);
+        if (!insert_ok) {
+            String error_message = fmt::format("Duplicate segment id: %u", segment_id);
+            UnrecoverableError(error_message);
+        }
+    }
+}
 
 } // namespace infinity

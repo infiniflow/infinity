@@ -46,6 +46,7 @@ import internal_types;
 import join_reference;
 import data_type;
 import logger;
+import block_index;
 
 namespace infinity {
 

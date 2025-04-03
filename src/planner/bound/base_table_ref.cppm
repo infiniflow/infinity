@@ -20,7 +20,6 @@ import stl;
 import table_ref;
 import txn;
 import table_function;
-import block_index;
 import internal_types;
 import infinity_exception;
 import table_reference;
@@ -30,35 +29,27 @@ import status;
 
 namespace infinity {
 
+struct BlockIndex;
+struct IndexIndex;
+
 export class BaseTableRef : public TableRef {
 public:
-    explicit BaseTableRef(SharedPtr<TableInfo> table_info,
-                          Vector<SizeT> column_ids,
-                          SharedPtr<BlockIndex> block_index,
-                          const String &alias,
-                          u64 table_index,
-                          SharedPtr<Vector<String>> column_names,
-                          SharedPtr<Vector<SharedPtr<DataType>>> column_types)
-        : TableRef(TableRefType::kTable, alias), table_info_(std::move(table_info)), column_ids_(std::move(column_ids)),
-          block_index_(std::move(block_index)), column_names_(std::move(column_names)), column_types_(std::move(column_types)),
-          table_index_(table_index) {}
+    BaseTableRef(SharedPtr<TableInfo> table_info,
+                 Vector<SizeT> column_ids,
+                 SharedPtr<BlockIndex> block_index,
+                 const String &alias,
+                 u64 table_index,
+                 SharedPtr<Vector<String>> column_names,
+                 SharedPtr<Vector<SharedPtr<DataType>>> column_types);
 
     // only use some fields
-    explicit BaseTableRef(SharedPtr<TableInfo> table_info, SharedPtr<BlockIndex> block_index, SharedPtr<IndexIndex> index_index = nullptr)
-        : TableRef(TableRefType::kTable, ""), table_info_(std::move(table_info)), block_index_(block_index), index_index_(index_index) {}
+    BaseTableRef(SharedPtr<TableInfo> table_info, SharedPtr<BlockIndex> block_index);
 
-    static SharedPtr<BaseTableRef> FakeTableRef(Txn *txn, const String &db_name, const String &table_name) {
+    BaseTableRef(SharedPtr<TableInfo> table_info, SharedPtr<BlockIndex> block_index, SharedPtr<IndexIndex> index_index);
 
-        SharedPtr<TableInfo> table_info;
-        Status status;
-        std::tie(table_info, status) = txn->GetTableInfo(db_name, table_name);
-        if (!status.ok()) {
-            RecoverableError(status);
-            return nullptr;
-        }
-        SharedPtr<BlockIndex> block_index = txn->GetBlockIndexFromTable(db_name, table_name);
-        return MakeShared<BaseTableRef>(table_info, std::move(block_index));
-    }
+    ~BaseTableRef() override;
+
+    static SharedPtr<BaseTableRef> FakeTableRef(Txn *txn, const String &db_name, const String &table_name);
 
     void RetainColumnByIndices(const Vector<SizeT> &indices) {
         replace_field(column_ids_, indices);

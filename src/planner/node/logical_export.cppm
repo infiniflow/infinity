@@ -24,9 +24,10 @@ import data_type;
 import internal_types;
 import statement_common;
 import meta_info;
-import block_index;
 
 namespace infinity {
+
+struct BlockIndex;
 
 export class LogicalExport : public LogicalNode {
 public:
@@ -42,11 +43,9 @@ public:
                            SizeT limit,
                            SizeT row_limit,
                            Vector<u64> column_idx_array,
-                           SharedPtr<BlockIndex> block_index)
-        : LogicalNode(node_id, LogicalNodeType::kExport), table_info_(table_info), schema_name_(std::move(schema_name)),
-          table_name_(std::move(table_name)), file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type),
-          offset_(offset), limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)),
-          block_index_(std::move(block_index)) {}
+                           SharedPtr<BlockIndex> block_index);
+
+    ~LogicalExport() override;
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -58,7 +57,7 @@ public:
 
     inline String name() final { return "LogicalExport"; }
 
-    const SharedPtr<TableInfo>& table_info() const { return table_info_; }
+    const SharedPtr<TableInfo> &table_info() const { return table_info_; }
 
     SharedPtr<TableInfo> table_info() { return table_info_; }
 

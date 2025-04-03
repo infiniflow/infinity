@@ -28,6 +28,7 @@ import data_type;
 import logical_type;
 import embedding_info;
 import meta_info;
+import block_index;
 
 using namespace infinity;
 

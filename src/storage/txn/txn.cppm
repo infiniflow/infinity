@@ -33,7 +33,6 @@ import column_def;
 import value;
 import snapshot_info;
 import txn_context;
-import block_index;
 
 namespace infinity {
 
@@ -49,6 +48,7 @@ struct ScanParam {
     const Vector<ColumnID> &column_ids_{};
 };
 
+struct BlockIndex;
 class TxnManager;
 struct Catalog;
 struct TableEntry;
