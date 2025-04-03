@@ -262,6 +262,16 @@ public:
 
     Status Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block);
 
+    Status Append(const TableInfo &table_info, const SharedPtr<DataBlock> &input_block);
+
+private:
+    Status AppendInner(const String &db_name,
+                       const String &table_name,
+                       const String &table_key,
+                       TableMeeta &table_meta,
+                       const SharedPtr<DataBlock> &input_block);
+
+public:
     // Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);

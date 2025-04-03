@@ -347,6 +347,7 @@ Status TableMeeta::GetTableInfo(TableInfo &table_info) {
     std::sort(table_info.column_defs_.begin(), table_info.column_defs_.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) {
         return a->id_ < b->id_;
     });
+    table_info.column_count_ = table_info.column_defs_.size();
 
     table_info.db_id_ = db_id_str_;
     table_info.table_id_ = table_id_str_;

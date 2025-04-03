@@ -23,25 +23,39 @@ import query_result;
 
 using namespace infinity;
 
-class TestDDLRequest : public NewRequestTest {
+class TestAppendRequest : public NewRequestTest {
 protected:
+    void Prepare() {
+        String create_table_sql = "create table t1(c1 int, c2 varchar)";
+        {
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(create_table_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+    }
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestDDLRequest,
+                         TestAppendRequest,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestDDLRequest, test_create_table) {
-    String create_table_sql = "create table t1(c1 int, c2 varchar)";
+TEST_P(TestAppendRequest, test_append) {
+    Prepare();
+
     {
+        String append_req_sql = "insert into t1 values(1, 'abc')";
+
         UniquePtr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(create_table_sql);
+        QueryResult query_result = query_context->Query(append_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
-    { // create table with same name
+    {
+        String append_err_req_sql = "insert into t2 values(1, 'abc')";
+
         UniquePtr<QueryContext> query_context = MakeQueryContext();
-        QueryResult query_result = query_context->Query(create_table_sql);
+        QueryResult query_result = query_context->Query(append_err_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
     }

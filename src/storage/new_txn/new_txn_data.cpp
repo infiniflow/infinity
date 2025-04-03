@@ -369,13 +369,12 @@ Status NewTxn::ReplayImport(WalCmdImport *import_cmd) {
 }
 
 Status NewTxn::Append(const String &db_name, const String &table_name, const SharedPtr<DataBlock> &input_block) {
-    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     this->CheckTxn(db_name);
 
     Optional<DBMeeta> db_meta;
-    Optional<TableMeeta> table_meta_opt;
+    Optional<TableMeeta> table_meta;
     String table_key;
-    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
     if (!status.ok()) {
         return status;
     }
@@ -385,11 +384,24 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         return status;
     }
 
-    TableMeeta &table_meta = *table_meta_opt;
+    return AppendInner(db_name, table_name, table_key, *table_meta, input_block);
+}
 
+Status NewTxn::Append(const TableInfo &table_info, const SharedPtr<DataBlock> &input_block) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TableMeeta table_meta(table_info.db_id_, table_info.table_id_, *kv_instance_, begin_ts);
+    return AppendInner(*table_info.db_name_, *table_info.table_name_, table_info.table_key_, table_meta, input_block);
+}
+
+Status NewTxn::AppendInner(const String &db_name,
+                           const String &table_name,
+                           const String &table_key,
+                           TableMeeta &table_meta,
+                           const SharedPtr<DataBlock> &input_block) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     auto append_command = MakeShared<WalCmdAppend>(db_name, table_name, input_block);
     {
-        append_command->db_id_str_ = db_meta->db_id_str();
+        append_command->db_id_str_ = table_meta.db_id_str();
         append_command->table_id_str_ = table_meta.table_id_str();
         append_command->table_key_ = table_key;
     }
@@ -397,7 +409,7 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
     // Read col definition in new rocksdb transaction
     KVStore *kv_store = txn_mgr_->kv_store();
     UniquePtr<KVInstance> kv_instance_validation = kv_store->GetInstance();
-    TableMeeta table_meta_validation(db_meta->db_id_str(), table_meta.table_id_str(), *kv_instance_validation, begin_ts);
+    TableMeeta table_meta_validation(table_meta.db_id_str(), table_meta.table_id_str(), *kv_instance_validation, begin_ts);
     auto [column_defs_validation, column_defs_validation_status] = table_meta_validation.GetColumnDefs();
     if (!column_defs_validation_status.ok()) {
         return column_defs_validation_status;

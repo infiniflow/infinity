@@ -52,6 +52,7 @@ export struct TableInfo {
     Vector<SharedPtr<ColumnDef>> column_defs_{};
     String db_id_{};
     String table_id_{};
+    String table_key_{};
 
 public:
     u64 GetColumnIdByName(const String &column_name) const;
