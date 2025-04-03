@@ -49,7 +49,7 @@ bool PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *oper
 
     auto txn = query_context->GetTxn();
 
-    Status status = txn->DropTableCollectionByName(*schema_name_, *table_name_, conflict_type_);
+    Status status = txn->DropTable(*schema_name_, *table_name_, conflict_type_);
     if (ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager(); cache_mgr != nullptr) {
         cache_mgr->DropTable(*schema_name_, *table_name_);
     }

@@ -236,7 +236,7 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-            Status status = txn->DropTableCollectionByName("default_db", "tbl2", ConflictType::kIgnore);
+            Status status = txn->DropTable("default_db", "tbl2", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }
@@ -282,7 +282,7 @@ TEST_P(WalReplayTest, wal_replay_tables) {
         }
         {
             auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-            Status status = txn->DropTableCollectionByName("default_db", "tbl3", ConflictType::kIgnore);
+            Status status = txn->DropTable("default_db", "tbl3", ConflictType::kIgnore);
             EXPECT_TRUE(status.ok());
             txn_mgr->CommitTxn(txn);
         }

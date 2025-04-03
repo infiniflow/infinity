@@ -151,6 +151,8 @@ public:
     // check the invalid state, only used in tests.
     void CheckState() const;
 
+    void SetData(void *data);
+
 protected:
     mutable std::mutex w_locker_{};
 

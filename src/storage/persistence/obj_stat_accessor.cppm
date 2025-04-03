@@ -22,6 +22,8 @@ import third_party;
 
 namespace infinity {
 
+class KVInstance;
+
 struct LRUListEntry {
     LRUListEntry(String key, ObjStat obj_stat) : key_(std::move(key)), obj_stat_(std::move(obj_stat)) {}
 
@@ -97,7 +99,14 @@ public:
 
     virtual void Deserialize(const nlohmann::json &obj) = 0;
 
+    virtual void Deserialize(KVInstance *kv_instance) = 0;
+
     virtual HashMap<String, ObjStat> GetAllObjects() const = 0;
+
+protected:
+    void AddObjStatToKVStore(const String &key, const ObjStat &obj_stat);
+
+    void RemoveObjStatFromKVStore(const String &key);
 };
 
 export class ObjectStatAccessor_LocalStorage : public ObjectStatAccessorBase {
@@ -121,6 +130,8 @@ public:
     nlohmann::json Serialize() override;
 
     void Deserialize(const nlohmann::json &obj) override;
+
+    void Deserialize(KVInstance *kv_instance) override;
 
     HashMap<String, ObjStat> GetAllObjects() const override;
 
@@ -152,6 +163,8 @@ public:
     nlohmann::json Serialize() override;
 
     void Deserialize(const nlohmann::json &obj) override;
+
+    void Deserialize(KVInstance *kv_instance) override;
 
     HashMap<String, ObjStat> GetAllObjects() const override;
 

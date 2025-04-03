@@ -57,6 +57,14 @@ public:
 
     static constexpr const char *VFS_OFF_CONFIG_PATH = "test/data/config/test_vfs_off.toml";
 
+    static constexpr const char *NEW_CONFIG_PATH = "test/data/config/test_new.toml";
+
+    static constexpr const char *NEW_VFS_OFF_CONFIG_PATH = "test/data/config/test_vfs_off_new.toml";
+
+    static constexpr const char *NEW_CONFIG_NOWAL_PATH = "test/data/config/test_new_nowal.toml";
+
+    static constexpr const char *NEW_VFS_OFF_CONFIG_NOWAL_PATH = "test/data/config/test_vfs_off_nowal.toml";
+
 protected:
     const char *GetHomeDir() { return "/var/infinity"; }
 
@@ -68,12 +76,14 @@ protected:
 
     const char *GetFullTmpDir() { return "/var/infinity/tmp"; }
 
+    const char *GetCatalogDir() { return "/var/infinity/catalog"; }
+
     const char *GetFullPersistDir() { return "/var/infinity/persistence"; }
 
     const char *GetTmpDir() { return "tmp"; }
 
     void CleanupDbDirs() {
-        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir()};
+        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir()};
         for (auto &dir : infinity_db_dirs) {
             CleanupDirectory(dir);
         }
@@ -82,7 +92,7 @@ protected:
     void CleanupTmpDir() { CleanupDirectory(GetFullTmpDir()); }
 
     void RemoveDbDirs() {
-        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir()};
+        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir(), GetCatalogDir()};
         for (auto &dir : infinity_db_dirs) {
             RemoveDirectory(dir);
         }
@@ -154,6 +164,50 @@ private:
 
 export using BaseTest = BaseTestWithParam<void>;
 
+export class BaseTestNoParam : public BaseTestWithParam<void> {
+public:
+    void SetUp() override {
+        CleanupDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        auto config_path = std::make_shared<std::string>(BaseTestNoParam::NULL_CONFIG_PATH);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+    }
+};
+
+export class NewBaseTestNoParam : public BaseTestWithParam<void> {
+public:
+    void SetUp() override {
+        CleanupDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        auto config_path = std::make_shared<std::string>(BaseTestNoParam::NEW_CONFIG_PATH);
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+    }
+};
+
 export class BaseTestParamStr : public BaseTestWithParam<std::string> {
 public:
     void SetUp() override {
@@ -162,7 +216,7 @@ public:
         infinity::GlobalResourceUsage::Init();
 #endif
         std::string config_path_str = GetParam();
-        std::shared_ptr<std::string> config_path = nullptr;
+        config_path = nullptr;
         if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
             config_path = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
         }
@@ -178,6 +232,9 @@ public:
         infinity::GlobalResourceUsage::UnInit();
 #endif
     }
+
+protected:
+    std::shared_ptr<std::string> config_path;
 };
 
 } // namespace infinity

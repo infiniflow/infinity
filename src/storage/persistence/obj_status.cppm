@@ -85,6 +85,10 @@ export struct ObjStat {
 
     void Deserialize(const nlohmann::json &obj);
 
+    String ToString() const;
+
+    void Deserialize(const String &str);
+
     SizeT GetSizeInBytes() const;
 
     void WriteBufAdv(char *&buf) const;

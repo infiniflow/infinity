@@ -629,7 +629,7 @@ TEST_P(CompactTaskTest, compact_not_exist_table) {
     {
         { // drop tb1
             auto drop_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-            auto status = drop_txn->DropTableCollectionByName("default_db", table_name, ConflictType::kError);
+            auto status = drop_txn->DropTable("default_db", table_name, ConflictType::kError);
             ASSERT_TRUE(status.ok());
             txn_mgr->CommitTxn(drop_txn);
         }
@@ -657,7 +657,7 @@ TEST_P(CompactTaskTest, compact_not_exist_table) {
         auto commit_ts = compaction_process->ManualDoCompact("default_db", table_name, false, [&]() {
             { // drop tb1
                 auto drop_txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-                auto status = drop_txn->DropTableCollectionByName("default_db", table_name, ConflictType::kError);
+                auto status = drop_txn->DropTable("default_db", table_name, ConflictType::kError);
                 ASSERT_TRUE(status.ok());
                 txn_mgr->CommitTxn(drop_txn);
             }

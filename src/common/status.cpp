@@ -26,6 +26,10 @@ namespace infinity {
 
 Status::Status(ErrorCode code, const char *msg) : code_(code) { msg_ = MakeUnique<String>(msg); }
 
+Status::Status(ErrorCode code, rocksdb::Status detail) : code_(code) { rocksdb_status_ = MakeUnique<rocksdb::Status>(std::move(detail)); }
+
+Status::Status(ErrorCode code, rocksdb::IOStatus detail) : code_(code) { rocksdb_status_ = MakeUnique<rocksdb::IOStatus>(std::move(detail)); }
+
 Status::Status(Status &s) { MoveStatus(s); }
 
 Status::Status(Status &&s) noexcept { MoveStatus(s); }
@@ -43,12 +47,13 @@ Status &Status::operator=(Status &&s) noexcept {
 void Status::MoveStatus(Status &s) {
     code_ = s.code_;
     msg_ = std::move(s.msg_);
+    rocksdb_status_ = std::move(s.rocksdb_status_);
 }
 
 void Status::MoveStatus(Status &&s) {
     code_ = s.code_;
     msg_ = std::move(s.msg_);
-    s.msg_ = nullptr;
+    rocksdb_status_ = std::move(s.rocksdb_status_);
 }
 
 void Status::Init(ErrorCode code, const char *msg) {
@@ -64,6 +69,22 @@ void Status::AppendMessage(const String &msg) {
         msg_->append(msg);
     } else {
         msg_ = MakeUnique<String>(msg);
+    }
+}
+
+const char *Status::message() const {
+    if (msg_.get() != nullptr) {
+        return msg_->c_str();
+    } else {
+        if (code_ == ErrorCode::kRocksDBError) {
+            if (rocksdb_status_->IsBusy()) {
+                msg_ = MakeUnique<String>(fmt::format("Rocksdb error: Busy"));
+            } else {
+                msg_ = MakeUnique<String>(fmt::format("Rocksdb error: other cause"));
+            }
+            return msg_->c_str();
+        }
+        return nullptr;
     }
 }
 
@@ -440,7 +461,7 @@ Status Status::FunctionIsDisable(const String &function_name) {
     return Status(ErrorCode::kFunctionIsDisable, MakeUnique<String>(fmt::format("Function: {} is disable", function_name)));
 }
 
-Status Status::NotFound(const String &detailed_info) { return Status(ErrorCode::kFunctionIsDisable, MakeUnique<String>(detailed_info)); }
+Status Status::NotFound(const String &detailed_info) { return Status(ErrorCode::kNotFound, MakeUnique<String>(detailed_info)); }
 
 Status Status::ErrorInit(const String &detailed_info) { return Status(ErrorCode::kErrorInit, MakeUnique<String>(detailed_info)); }
 
@@ -458,7 +479,15 @@ Status Status::AlreadyLocked(const String &detail) { return Status(ErrorCode::kA
 
 Status Status::NotLocked(const String &detail) { return Status(ErrorCode::kNotLocked, MakeUnique<String>(detail)); }
 
+Status Status::TableIsUsing(const String &detail) { return Status(ErrorCode::kTableIsUsing, MakeUnique<String>(detail)); }
+
+Status Status::DuplicateColumnIndex(const String &detail) { return Status(ErrorCode::kDuplicateColumnIndex, MakeUnique<String>(detail)); }
+
 Status Status::InvalidParameter(const String &detail) { return Status(ErrorCode::kInvalidParameter, MakeUnique<String>(detail)); }
+
+Status Status::IndexOnColumn(const String &column_name) {
+    return Status(ErrorCode::kIndexOnColumn, MakeUnique<String>(fmt::format("Index is created on column: {}", column_name)));
+}
 
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
@@ -469,6 +498,10 @@ Status Status::TxnConflict(u64 txn_id, const String &conflict_reason) {
     return Status(ErrorCode::kTxnConflict,
                   MakeUnique<String>(fmt::format("Transaction: {} is conflicted, detailed info: {}", txn_id, conflict_reason)));
 }
+
+Status Status::TxnWWConflict(const String &detailed_message) { return Status(ErrorCode::kTxnWWConflict, MakeUnique<String>(detailed_message)); }
+
+Status Status::TxnRWConflict(const String &detailed_message) { return Status(ErrorCode::kTxnRWConflict, MakeUnique<String>(detailed_message)); }
 
 // 5. Insufficient resource or exceed limits
 Status Status::DiskFull(const String &detailed_info) {
@@ -622,7 +655,7 @@ Status Status::InvalidEntry() { return Status(ErrorCode::kInvalidEntry, MakeUniq
 
 Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUnique<String>("Not found entry")); }
 
-Status Status::DuplicateEntry() { return Status(ErrorCode::kDuplicateEntry, MakeUnique<String>("Duplicate entry")); }
+Status Status::DuplicateEntry(const String &detail_info) { return Status(ErrorCode::kDuplicateEntry, MakeUnique<String>(detail_info)); }
 
 Status Status::EmptyEntryList() { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>("Empty entry list")); }
 
@@ -645,5 +678,17 @@ Status Status::NodeNameMismatch(const String &actual_node_name, const String &ex
     return Status(ErrorCode::kNodeNameMismatch,
                   MakeUnique<String>(fmt::format("Expect node name: {}, actual node name: {}", expected_node_name, actual_node_name)));
 }
+
+Status Status::CatalogError(const String &detailed_info) {
+    return Status(ErrorCode::kCatalogError, MakeUnique<String>(fmt::format("Catalog error: {}", detailed_info)));
+}
+
+Status Status::BufferManagerError(const String &detailed_info) {
+    return Status(ErrorCode::kBufferManagerError, MakeUnique<String>(fmt::format("Buffer manager error: {}", detailed_info)));
+}
+
+Status Status::RocksDBError(rocksdb::Status rocksdb_s) { return Status(ErrorCode::kRocksDBError, std::move(rocksdb_s)); }
+
+Status Status::RocksDBError(rocksdb::IOStatus rocksdb_s) { return Status(ErrorCode::kRocksDBError, MakeUnique<String>(rocksdb_s.ToString())); }
 
 } // namespace infinity

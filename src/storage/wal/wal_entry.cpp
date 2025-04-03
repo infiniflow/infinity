@@ -42,6 +42,13 @@ import create_index_info;
 import persistence_manager;
 import infinity_context;
 import virtual_store;
+import chunk_index_meta;
+import table_meeta;
+import segment_meta;
+import block_meta;
+import column_meta;
+import default_values;
+import status;
 
 namespace infinity {
 
@@ -57,6 +64,50 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
     }
     String version_file_path = fmt::format("{}/{}", *block_entry->block_dir(), *BlockVersion::FileName());
     paths_.push_back(version_file_path);
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
+#ifdef INFINITY_DEBUG
+    for (auto &pth : paths_) {
+        assert(!std::filesystem::path(pth).is_absolute());
+    }
+#endif
+}
+
+WalBlockInfo::WalBlockInfo(BlockMeta &block_meta) : block_id_(block_meta.block_id()) {
+    Status status;
+    // auto [row_count, status] = block_meta.GetRowCnt();
+    // if (!status.ok()) {
+    //     UnrecoverableError(status.message());
+    // }
+
+    // row_count_ = row_count;
+    row_capacity_ = block_meta.block_capacity();
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    std::tie(column_defs_ptr, status) = block_meta.segment_meta().table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    outline_infos_.resize(column_defs_ptr->size());
+    Vector<String> paths;
+    for (SizeT column_idx = 0; column_idx < column_defs_ptr->size(); ++column_idx) {
+        ColumnMeta column_meta(column_idx, block_meta);
+        SizeT chunk_offset = 0;
+        status = column_meta.GetChunkOffset(chunk_offset);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        outline_infos_[column_idx] = {1, chunk_offset};
+
+        Status status = column_meta.FilePaths(paths);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        paths_.insert(paths_.end(), paths.begin(), paths.end());
+    }
+    paths = block_meta.FilePaths();
+    paths_.insert(paths_.end(), paths.begin(), paths.end());
+
     auto *pm = InfinityContext::instance().persistence_manager();
     addr_serializer_.Initialize(pm, paths_);
 #ifdef INFINITY_DEBUG
@@ -156,6 +207,40 @@ WalSegmentInfo::WalSegmentInfo(SegmentEntry *segment_entry)
     }
 }
 
+WalSegmentInfo::WalSegmentInfo(SegmentMeta &segment_meta, TxnTimeStamp begin_ts) : segment_id_(segment_meta.segment_id()) {
+    Status status;
+
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs_ptr;
+    std::tie(column_defs_ptr, status) = segment_meta.table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    column_count_ = column_defs_ptr->size();
+
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    // SizeT row_count = 0;
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, segment_meta);
+        block_infos_.emplace_back(block_meta);
+
+        // SizeT block_row_cnt = 0;
+        // std::tie(block_row_cnt, status) = block_meta.GetRowCnt();
+        // if (!status.ok()) {
+        //     UnrecoverableError(status.message());
+        // }
+        // row_count += block_row_cnt;
+    }
+
+    // row_count_ = row_count;
+    // actual_row_count_ = -1; // TODO
+    row_capacity_ = segment_meta.segment_capacity();
+}
+
 bool WalSegmentInfo::operator==(const WalSegmentInfo &other) const {
     return segment_id_ == other.segment_id_ && column_count_ == other.column_count_ && row_count_ == other.row_count_ &&
            actual_row_count_ == other.actual_row_count_ && row_capacity_ == other.row_capacity_ && block_infos_ == other.block_infos_;
@@ -236,6 +321,23 @@ WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
     addr_serializer_.Initialize(pm, paths_);
 }
 
+WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexMeta &chunk_index_meta) : chunk_id_(chunk_index_meta.chunk_id()) {
+    ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+    Status status = chunk_index_meta.GetChunkInfo(chunk_info_ptr);
+    if (!status.ok()) {
+        UnrecoverableError("Failed to get chunk info from chunk index meta.");
+    }
+    base_name_ = chunk_info_ptr->base_name_;
+    base_rowid_ = chunk_info_ptr->base_row_id_;
+    row_count_ = chunk_info_ptr->row_cnt_;
+    deprecate_ts_ = UNCOMMIT_TS;
+
+    // TODO
+
+    auto *pm = InfinityContext::instance().persistence_manager();
+    addr_serializer_.Initialize(pm, paths_);
+}
+
 bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
     return chunk_id_ == other.chunk_id_ && base_name_ == other.base_name_ && base_rowid_ == other.base_rowid_ && row_count_ == other.row_count_ &&
            deprecate_ts_ == other.deprecate_ts_;
@@ -297,6 +399,42 @@ String WalChunkIndexInfo::ToString() const {
     std::stringstream ss;
     ss << "chunk_id: " << chunk_id_ << ", base_name: " << base_name_ << ", base_rowid: " << base_rowid_.ToString() << ", row_count: " << row_count_
        << ", deprecate_ts: " << deprecate_ts_;
+    return std::move(ss).str();
+}
+
+bool WalSegmentIndexInfo::operator==(const WalSegmentIndexInfo &other) const = default;
+
+i32 WalSegmentIndexInfo::GetSizeInBytes() const {
+    i32 size = sizeof(SegmentID) + sizeof(i32);
+    for (const auto &chunk_info : chunk_infos_) {
+        size += chunk_info.GetSizeInBytes();
+    }
+    return size;
+}
+
+void WalSegmentIndexInfo::WriteBufferAdv(char *&buf) const {
+    WriteBufAdv(buf, segment_id_);
+    WriteBufAdv(buf, static_cast<i32>(chunk_infos_.size()));
+    for (const auto &chunk_info : chunk_infos_) {
+        chunk_info.WriteBufferAdv(buf);
+    }
+}
+
+WalSegmentIndexInfo WalSegmentIndexInfo::ReadBufferAdv(const char *&ptr) {
+    SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
+    i32 count = ReadBufAdv<i32>(ptr);
+    WalSegmentIndexInfo segment_index_info;
+    segment_index_info.segment_id_ = segment_id;
+    for (i32 i = 0; i < count; i++) {
+        segment_index_info.chunk_infos_.push_back(WalChunkIndexInfo::ReadBufferAdv(ptr));
+    }
+
+    return segment_index_info;
+}
+
+String WalSegmentIndexInfo::ToString() const {
+    std::stringstream ss;
+    ss << "segment_id: " << segment_id_ << ", chunk_info count: " << chunk_infos_.size() << std::endl;
     return std::move(ss).str();
 }
 
@@ -405,7 +543,13 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(const char *&ptr, i32 max_bytes) {
             String table_name = ReadBufAdv<String>(ptr);
             String index_dir_tail = ReadBufAdv<String>(ptr);
             SharedPtr<IndexBase> index_base = IndexBase::ReadAdv(ptr, ptr_end - ptr);
-            cmd = MakeShared<WalCmdCreateIndex>(std::move(db_name), std::move(table_name), std::move(index_dir_tail), std::move(index_base));
+            auto create_index_cmd = MakeShared<WalCmdCreateIndex>(std::move(db_name), std::move(table_name), std::move(index_dir_tail), std::move(index_base));
+            i32 segment_info_n = ReadBufAdv<i32>(ptr);
+            for (i32 i = 0; i < segment_info_n; ++i) {
+                WalSegmentIndexInfo segment_index_info = WalSegmentIndexInfo::ReadBufferAdv(ptr);
+                create_index_cmd->segment_index_infos_.push_back(std::move(segment_index_info));
+            }
+            cmd = std::move(create_index_cmd);
             break;
         }
         case WalCommandType::DROP_INDEX: {
@@ -521,7 +665,7 @@ bool WalCmdCreateIndex::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdCreateIndex *>(&other);
     return other_cmd != nullptr && db_name_ == other_cmd->db_name_ && table_name_ == other_cmd->table_name_ &&
            IsEqual(index_dir_tail_, other_cmd->index_dir_tail_) && index_base_.get() != nullptr && other_cmd->index_base_.get() != nullptr &&
-           *index_base_ == *other_cmd->index_base_;
+           *index_base_ == *other_cmd->index_base_ && segment_index_infos_ == other_cmd->segment_index_infos_;
 }
 
 bool WalCmdDropIndex::operator==(const WalCmd &other) const {
@@ -655,8 +799,13 @@ i32 WalCmdCreateTable::GetSizeInBytes() const {
 }
 
 i32 WalCmdCreateIndex::GetSizeInBytes() const {
-    return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
-           this->index_dir_tail_.size() + this->index_base_->GetSizeInBytes();
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+               this->index_dir_tail_.size() + this->index_base_->GetSizeInBytes();
+    size += sizeof(i32);
+    for (const auto &segment_index_info : segment_index_infos_) {
+        size += segment_index_info.GetSizeInBytes();
+    }
+    return size;
 }
 
 i32 WalCmdDropTable::GetSizeInBytes() const {
@@ -780,6 +929,10 @@ void WalCmdCreateIndex::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->table_name_);
     WriteBufAdv(buf, this->index_dir_tail_);
     index_base_->WriteAdv(buf);
+    WriteBufAdv(buf, static_cast<i32>(segment_index_infos_.size()));
+    for (const auto &segment_index_info : segment_index_infos_) {
+        segment_index_info.WriteBufferAdv(buf);
+    }
 }
 
 void WalCmdDropTable::WriteAdv(char *&buf) const {
@@ -967,6 +1120,9 @@ String WalCmdCreateIndex::ToString() const {
     ss << "db name: " << db_name_ << std::endl;
     ss << "table name: " << table_name_ << std::endl;
     ss << "index def: " << index_base_->ToString() << std::endl;
+    for (const auto &segment_index_info : segment_index_infos_) {
+        ss << segment_index_info.ToString() << std::endl;
+    }
     return std::move(ss).str();
 }
 
@@ -1364,16 +1520,18 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(const char *&ptr, i32 max_bytes) {
 
 bool WalEntry::IsCheckPoint(WalCmdCheckpoint *&last_checkpoint_cmd) const {
     TxnTimeStamp max_commit_ts = 0;
+    bool found = false;
     for (auto &cmd : cmds_) {
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
             auto checkpoint_cmd = static_cast<WalCmdCheckpoint *>(cmd.get());
-            if (TxnTimeStamp(checkpoint_cmd->max_commit_ts_) > max_commit_ts) {
+            if (!found || TxnTimeStamp(checkpoint_cmd->max_commit_ts_) > max_commit_ts) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 last_checkpoint_cmd = checkpoint_cmd;
+                found = true;
             }
         }
     }
-    return max_commit_ts != 0;
+    return found;
 }
 
 String WalEntry::ToString() const {

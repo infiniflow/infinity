@@ -36,7 +36,7 @@ public:
                       SharedPtr<Vector<LoadMeta>> load_metas,
                       bool is_min_heap);
 
-    void Init(QueryContext* query_context) override {};
+    void Init(QueryContext* query_context) override;
 
     virtual SizeT TaskletCount() override { return 1; }
 

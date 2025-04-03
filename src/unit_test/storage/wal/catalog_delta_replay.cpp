@@ -198,7 +198,7 @@ TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
 
             txn->CreateTable(*db_name, table_def1, ConflictType::kError);
             txn->CreateTable(*db_name, table_def2, ConflictType::kError);
-            txn->DropTableCollectionByName(*db_name, *table_name2, ConflictType::kError);
+            txn->DropTable(*db_name, *table_name2, ConflictType::kError);
 
             auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name1);
             EXPECT_TRUE(status.ok());

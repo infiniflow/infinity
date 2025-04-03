@@ -385,6 +385,18 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
             UnrecoverableError(status.message());
         }
 
+        // Use new catalog
+        bool use_new_catalog = false;
+        if (default_config != nullptr) {
+            use_new_catalog = default_config->default_use_new_catalog_;
+        }
+        UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
+        status = global_options_.AddOption(std::move(use_new_catalog_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Data Dir
         String data_dir = "/var/infinity/data";
         if (default_config != nullptr) {
@@ -392,6 +404,18 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
         }
         UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
         status = global_options_.AddOption(std::move(data_dir_option));
+        if (!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
+        // Catalog Dir
+        String catalog_dir = "/var/infinity/catalog";
+        if (default_config != nullptr) {
+            catalog_dir = default_config->default_catalog_dir_;
+        }
+        UniquePtr<StringOption> catalog_dir_option = MakeUnique<StringOption>(CATALOG_DIR_OPTION_NAME, catalog_dir);
+        status = global_options_.AddOption(std::move(catalog_dir_option));
         if (!status.ok()) {
             fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
@@ -1518,6 +1542,37 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     }
 
                     switch (option_index) {
+                        case GlobalOptionIndex::kUseNewCatalog: {
+                            // Use new catalog
+                            bool use_new_catalog = false;
+                            if (elem.second.is_boolean()) {
+                                use_new_catalog = elem.second.value_or(use_new_catalog);
+                            } else {
+                                return Status::InvalidConfig("'use_new_catalog' field isn't boolean.");
+                            }
+                            UniquePtr<BooleanOption> use_new_catalog_option =
+                                MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
+                            Status status = global_options_.AddOption(std::move(use_new_catalog_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kReplayWal: {
+                            // Replay wal
+                            bool replay_wal = true;
+                            if (elem.second.is_boolean()) {
+                                replay_wal = elem.second.value_or(replay_wal);
+                            } else {
+                                return Status::InvalidConfig("'replay_wal' field isn't boolean.");
+                            }
+                            UniquePtr<BooleanOption> replay_wal_option = MakeUnique<BooleanOption>(REPLAY_WAL_OPTION_NAME, replay_wal);
+                            Status status = global_options_.AddOption(std::move(replay_wal_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
                         case GlobalOptionIndex::kDataDir: {
                             // Data Dir
                             String data_dir = "/var/infinity/data";
@@ -1529,6 +1584,22 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
 
                             UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
                             Status status = global_options_.AddOption(std::move(data_dir_option));
+                            if (!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
+                        case GlobalOptionIndex::kCatalogDir: {
+                            // Catalog Dir
+                            String catalog_dir = "/var/infinity/catalog";
+                            if (elem.second.is_string()) {
+                                catalog_dir = elem.second.value_or(catalog_dir);
+                            } else {
+                                return Status::InvalidConfig("'catalog_dir' field isn't string.");
+                            }
+
+                            UniquePtr<StringOption> catalog_dir_option = MakeUnique<StringOption>(CATALOG_DIR_OPTION_NAME, catalog_dir);
+                            Status status = global_options_.AddOption(std::move(catalog_dir_option));
                             if (!status.ok()) {
                                 UnrecoverableError(status.message());
                             }
@@ -1871,6 +1942,25 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                     }
                 }
 
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kUseNewCatalog) == nullptr) {
+                    // Use new catalog
+                    bool use_new_catalog = false;
+                    UniquePtr<BooleanOption> use_new_catalog_option = MakeUnique<BooleanOption>(USE_NEW_CATALOG_OPTION_NAME, use_new_catalog);
+                    Status status = global_options_.AddOption(std::move(use_new_catalog_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kReplayWal) == nullptr) {
+                    bool replay_wal = true;
+                    UniquePtr<BooleanOption> replay_wal_option = MakeUnique<BooleanOption>(REPLAY_WAL_OPTION_NAME, replay_wal);
+                    Status status = global_options_.AddOption(std::move(replay_wal_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPersistenceDir) == nullptr) {
                     String persistence_dir =
                         (global_options_.GetOptionByIndex(GlobalOptionIndex::kDataDir) == nullptr) ? DEFAULT_PERSISTENCE_DIR.data() : "";
@@ -1886,11 +1976,22 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig *default
                                                   0);
                     global_options_.AddOption(std::move(persistence_object_size_limit_option));
                 }
+
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kDataDir) == nullptr) {
                     // Data Dir
                     String data_dir = "/var/infinity/data";
                     UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
                     Status status = global_options_.AddOption(std::move(data_dir_option));
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kCatalogDir) == nullptr) {
+                    // Catalog Dir
+                    String catalog_dir = "/var/infinity/catalog";
+                    UniquePtr<StringOption> catalog_dir_option = MakeUnique<StringOption>(CATALOG_DIR_OPTION_NAME, catalog_dir);
+                    Status status = global_options_.AddOption(std::move(catalog_dir_option));
                     if (!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -2655,9 +2756,24 @@ LogLevel Config::GetLogLevel() {
 }
 
 // Storage
+bool Config::UseNewCatalog() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetBoolValue(GlobalOptionIndex::kUseNewCatalog);
+}
+
+bool Config::ReplayWal() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetBoolValue(GlobalOptionIndex::kReplayWal);
+}
+
 String Config::DataDir() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetStringValue(GlobalOptionIndex::kDataDir);
+}
+
+String Config::CatalogDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kCatalogDir);
 }
 
 i64 Config::CleanupInterval() {

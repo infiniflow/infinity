@@ -666,7 +666,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
-        txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        txn->DropTable(*db_name, *table_name, ConflictType::kError);
         txn_mgr->CommitTxn(txn);
     }
     WaitCleanup(storage);
@@ -760,7 +760,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
 
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }
@@ -862,7 +862,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
 
     {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-        auto status = txn->DropTableCollectionByName(*db_name, *table_name, ConflictType::kError);
+        auto status = txn->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
         txn_mgr->CommitTxn(txn);
     }

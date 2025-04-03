@@ -37,6 +37,8 @@ import buffer_handle;
 import logger;
 import base_memindex;
 import memindex_tracer;
+import column_vector;
+import buffer_obj;
 
 namespace infinity {
 
@@ -60,6 +62,7 @@ public:
         IncreaseMemoryUsageBase(MemoryCostOfThis());
     }
     ~SecondaryIndexInMemT() override { DecreaseMemoryUsageBase(MemoryCostOfThis() + GetRowCount() * MemoryCostOfEachRow()); }
+    virtual RowID GetBeginRowID() const override { return begin_row_id_; }
     u32 GetRowCount() const override {
         std::shared_lock lock(map_mutex_);
         return in_mem_secondary_index_.size();
@@ -74,6 +77,12 @@ public:
         assert(inserted_rows == row_count);
         IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
     }
+    void InsertBlockData(SegmentOffset block_offset, const ColumnVector &col, BlockOffset offset, BlockOffset row_count) override {
+        MemIndexInserterIter1<RawValueType> iter(block_offset, col, offset, row_count);
+        const auto inserted_rows = InsertInner(iter);
+        assert(inserted_rows == row_count);
+        IncreaseMemoryUsageBase(inserted_rows * MemoryCostOfEachRow());
+    }
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) const override {
         assert(segment_index_entry == segment_index_entry_);
         std::shared_lock lock(map_mutex_);
@@ -83,6 +92,11 @@ public:
         auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
         data_ptr->InsertData(&in_mem_secondary_index_);
         return new_chunk_index_entry;
+    }
+    void Dump(BufferObj *buffer_obj) const override {
+        BufferHandle handle = buffer_obj->Load();
+        auto data_ptr = static_cast<SecondaryIndexData *>(handle.GetDataMut());
+        data_ptr->InsertData(&in_mem_secondary_index_);
     }
     Pair<u32, Bitmask> RangeQuery(const void *input) const override {
         const auto &[segment_row_count, b, e] = *static_cast<const std::tuple<u32, KeyType, KeyType> *>(input);

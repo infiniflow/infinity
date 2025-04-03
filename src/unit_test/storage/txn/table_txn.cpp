@@ -136,7 +136,7 @@ TEST_P(TableTxnTest, test2) {
     EXPECT_NE(table_entry2, nullptr);
 
     // Txn1: Drop tbl1, OK
-    Status status3 = new_txn->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
+    Status status3 = new_txn->DropTable("db1", "tbl1", ConflictType::kError);
     EXPECT_TRUE(status3.ok());
 
     // Txn1: Get db1, OK
@@ -189,7 +189,7 @@ TEST_P(TableTxnTest, test3) {
     new_txn = txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
 
     // Txn2: Drop tbl1, OK
-    Status status2 = new_txn->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
+    Status status2 = new_txn->DropTable("db1", "tbl1", ConflictType::kError);
     EXPECT_TRUE(status2.ok());
 
     // Txn2: Create tbl1, OK
@@ -468,7 +468,7 @@ TEST_P(TableTxnTest, test10) {
     EXPECT_TRUE(s1.ok());
 
     // Txn2: Drop tbl1, OK
-    Status s2 = new_txn2->DropTableCollectionByName("db1", "tbl1", ConflictType::kError);
+    Status s2 = new_txn2->DropTable("db1", "tbl1", ConflictType::kError);
     EXPECT_TRUE(s2.ok());
 
     // Txn3: Create tbl1, OK

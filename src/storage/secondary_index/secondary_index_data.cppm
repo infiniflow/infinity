@@ -32,6 +32,7 @@ import logger;
 
 namespace infinity {
 struct ChunkIndexEntry;
+class BufferObj;
 
 template <typename T>
 concept KeepOrderedSelf = IsAnyOf<T, TinyIntT, SmallIntT, IntegerT, BigIntT, FloatT, DoubleT>;
@@ -168,6 +169,8 @@ public:
     virtual void InsertData(const void *ptr) = 0;
 
     virtual void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks) = 0;
+
+    virtual void InsertMergeData(const Vector<Pair<u32, BufferObj *>> &old_chunks) = 0;
 };
 
 export SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, u32 chunk_row_count, bool allocate);

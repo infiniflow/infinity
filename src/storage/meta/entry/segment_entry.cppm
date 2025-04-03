@@ -20,7 +20,6 @@ import stl;
 import default_values;
 import third_party;
 import buffer_manager;
-import data_access_state;
 import block_entry;
 import base_entry;
 import infinity_exception;
@@ -31,7 +30,6 @@ import value;
 import cleanup_scanner;
 import logger;
 import roaring_bitmap;
-import wal_entry;
 import column_def;
 import constant_expr;
 import snapshot_info;
@@ -45,6 +43,9 @@ struct TxnSegmentStore;
 struct TableEntry;
 class CompactStateData;
 class BlockEntryIter;
+struct WalSegmentInfo;
+struct AppendState;
+struct DeleteState;
 
 export struct BlocksGuard {
     const Vector<SharedPtr<BlockEntry>> &block_entries_;
