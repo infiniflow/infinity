@@ -73,7 +73,7 @@ TEST_P(TestAppend, test_append0) {
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
-        Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+        Status status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

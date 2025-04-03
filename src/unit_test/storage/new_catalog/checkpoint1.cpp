@@ -72,6 +72,22 @@ using namespace infinity;
 
 class NewCheckpointTest : public NewReplayTest {
 protected:
+    void SetUp() override {
+        NewReplayTest::SetUp();
+
+        db_name = std::make_shared<String>("db1");
+        column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+        column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+        table_name = std::make_shared<std::string>("tb1");
+        table_def = TableDef::Make(db_name, table_name, MakeShared<String>(), {column_def1, column_def2});
+    }
+
+protected:
+    SharedPtr<String> db_name;
+    SharedPtr<ColumnDef> column_def1;
+    SharedPtr<ColumnDef> column_def2;
+    SharedPtr<String> table_name;
+    SharedPtr<TableDef> table_def;
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
@@ -79,8 +95,6 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(NewCheckpointTest::NEW_CONFIG_NOWAL_PATH, NewCheckpointTest::NEW_VFS_OFF_CONFIG_NOWAL_PATH));
 
 TEST_P(NewCheckpointTest, checkpoint_and_create_db) {
-    SharedPtr<String> db_name = std::make_shared<String>("db1");
-
     Status status;
     {
         {
@@ -205,6 +219,139 @@ TEST_P(NewCheckpointTest, checkpoint_and_create_db) {
     //         Status status = txn->ListDatabase(db_names);
     //         EXPECT_TRUE(status.ok());
     //         EXPECT_EQ(db_names, Vector<String>({"default_db"}));
+
+    //         status = new_txn_mgr->CommitTxn(txn);
+    //         EXPECT_TRUE(status.ok());
+    //     }
+    // }
+}
+
+TEST_P(NewCheckpointTest, checkpoint_and_create_table) {
+    SharedPtr<String> db_name = std::make_shared<String>("default_db");
+
+    Status status;
+    {
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+
+            auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
+            Status status = txn2->Checkpoint();
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
+        }
+        RestartTxnMgr();
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+
+            Vector<String> table_names;
+            status = txn->ListTable(*db_name, table_names);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(table_names, Vector<String>({"tb1"}));
+
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    }
+
+    UninitTxnMgr();
+    CleanupDbDirs();
+    InitTxnMgr();
+
+    {
+        {
+            auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
+            Status status = txn2->Checkpoint();
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
+
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        RestartTxnMgr();
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+
+            Vector<String> table_names;
+            status = txn->ListTable(*db_name, table_names);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(table_names, Vector<String>({}));
+
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    }
+
+    UninitTxnMgr();
+    CleanupDbDirs();
+    InitTxnMgr();
+
+    {
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+
+            auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
+            Status status = txn2->Checkpoint();
+            EXPECT_TRUE(status.ok());
+
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+
+            status = new_txn_mgr->CommitTxn(txn2);
+            EXPECT_TRUE(status.ok());
+        }
+        RestartTxnMgr();
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+
+            Vector<String> table_names;
+            status = txn->ListTable(*db_name, table_names);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(table_names, Vector<String>({}));
+
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    }
+
+    // UninitTxnMgr();
+    // CleanupDbDirs();
+    // InitTxnMgr();
+
+    // {
+    //     {
+    //         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+    //         status = txn->CreateTable(*db_name, table_def, ConflictType::kIgnore);
+    //         EXPECT_TRUE(status.ok());
+
+    //         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("checkpoint"), TransactionType::kNormal);
+
+    //         status = new_txn_mgr->CommitTxn(txn);
+    //         EXPECT_TRUE(status.ok());
+
+    //         Status status = txn2->Checkpoint();
+    //         EXPECT_TRUE(status.ok());
+    //         status = new_txn_mgr->CommitTxn(txn2);
+    //         EXPECT_TRUE(status.ok());
+    //     }
+    //     RestartTxnMgr();
+    //     {
+    //         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check"), TransactionType::kNormal);
+
+    // Vector<String> table_names;
+    // status = txn->ListTable(*db_name, table_names);
+    // EXPECT_TRUE(status.ok());
+    // EXPECT_EQ(table_names, Vector<String>({"tb1"}));
 
     //         status = new_txn_mgr->CommitTxn(txn);
     //         EXPECT_TRUE(status.ok());
