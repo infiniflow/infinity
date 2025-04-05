@@ -112,7 +112,7 @@ void DropIndex() {
 void DropTable() {
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
     auto *txn1 = txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
-    auto status = txn1->DropTableCollectionByName("default_db", "tbl1", ConflictType::kError);
+    auto status = txn1->DropTable("default_db", "tbl1", ConflictType::kError);
     EXPECT_TRUE(status.ok());
     txn_mgr->CommitTxn(txn1);
 }

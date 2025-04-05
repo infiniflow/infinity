@@ -22,7 +22,6 @@ import table_def;
 import index_base;
 import data_block;
 import meta_state;
-import data_access_state;
 import buffer_manager;
 import txn_state;
 import txn_store;
@@ -34,7 +33,6 @@ import column_def;
 import value;
 import snapshot_info;
 import txn_context;
-import block_index;
 
 namespace infinity {
 
@@ -50,6 +48,7 @@ struct ScanParam {
     const Vector<ColumnID> &column_ids_{};
 };
 
+struct BlockIndex;
 class TxnManager;
 struct Catalog;
 struct TableEntry;
@@ -138,7 +137,7 @@ public:
 
     Status CreateCollection(const String &db_name, const String &collection_name, ConflictType conflict_type, BaseEntry *&collection_entry);
 
-    Status DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type);
+    Status DropTable(const String &db_name, const String &table_name, ConflictType conflict_type);
 
     Tuple<TableEntry *, Status> GetTableByName(const String &db_name, const String &table_name);
 

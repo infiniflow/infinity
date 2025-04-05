@@ -26,7 +26,7 @@ import physical_operator;
 import query_context;
 import operator_state;
 import load_meta;
-
+import block_index;
 import status;
 import infinity_exception;
 import index_base;

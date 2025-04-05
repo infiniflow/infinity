@@ -20,10 +20,14 @@ import column_def;
 import default_values;
 import data_type;
 import create_index_info;
+import internal_types;
+import third_party;
 
 export module meta_info;
 
 namespace infinity {
+
+struct WalChunkIndexInfo;
 
 enum class SegmentStatus;
 
@@ -46,6 +50,9 @@ export struct TableInfo {
     TableEntryType table_entry_type_{TableEntryType::kTableEntry};
     TxnTimeStamp max_commit_ts_{UNCOMMIT_TS};
     Vector<SharedPtr<ColumnDef>> column_defs_{};
+    String db_id_{};
+    String table_id_{};
+    String table_key_{};
 
 public:
     u64 GetColumnIdByName(const String &column_name) const;

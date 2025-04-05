@@ -108,6 +108,11 @@ import wal_manager;
 import infinity_context;
 import table_entry;
 
+import new_txn;
+import meta_info;
+import db_meeta;
+import table_meeta;
+
 namespace infinity {
 
 Status LogicalPlanner::Build(const BaseStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
@@ -271,15 +276,36 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
         UnrecoverableError(error_message);
     }
     // Check schema and table in the catalog
-    Txn *txn = query_context_ptr_->GetTxn();
-    Status status = txn->AddWriteTxnNum(schema_name, table_name);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
 
-    auto [table_info, info_status] = txn->GetTableInfo(schema_name, table_name);
-    if (!info_status.ok()) {
-        RecoverableError(info_status);
+    SharedPtr<TableInfo> table_info;
+    if (!query_context_ptr_->global_config()->UseNewCatalog()) {
+        Txn *txn = query_context_ptr_->GetTxn();
+        Status status = txn->AddWriteTxnNum(schema_name, table_name);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+
+        std::tie(table_info, status) = txn->GetTableInfo(schema_name, table_name);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    } else {
+        NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        String table_key;
+        Status status = new_txn->GetTableMeta(schema_name, table_name, db_meta, table_meta, &table_key);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info = MakeShared<TableInfo>();
+        status = table_meta->GetTableInfo(*table_info);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info->db_name_ = MakeShared<String>(schema_name);
+        table_info->table_name_ = MakeShared<String>(table_name);
+        table_info->table_key_ = table_key;
     }
 
     if (table_info->table_entry_type_ == TableEntryType::kCollectionEntry) {

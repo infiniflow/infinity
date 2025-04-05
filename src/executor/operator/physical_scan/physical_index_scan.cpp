@@ -39,6 +39,7 @@ import roaring_bitmap;
 import filter_value_type_classification;
 import physical_scan_base;
 import result_cache_manager;
+import block_index;
 
 namespace infinity {
 
@@ -93,7 +94,7 @@ Vector<UniquePtr<Vector<SegmentID>>> PhysicalIndexScan::PlanSegments(u32 paralle
     return result;
 }
 
-void PhysicalIndexScan::Init(QueryContext* query_context) {
+void PhysicalIndexScan::Init(QueryContext *query_context) {
     // check add_row_id_
     if (!add_row_id_) {
         String error_message = "ExecuteInternal(): add_row_id_ should be true.";
@@ -107,6 +108,8 @@ bool PhysicalIndexScan::Execute(QueryContext *query_context, OperatorState *oper
     ExecuteInternal(query_context, index_scan_operator_state);
     return true;
 }
+
+SizeT PhysicalIndexScan::TaskletCount() { return base_table_ref_->block_index_->SegmentCount(); }
 
 void PhysicalIndexScan::ExecuteInternal(QueryContext *query_context, IndexScanOperatorState *index_scan_operator_state) const {
     Txn *txn = query_context->GetTxn();

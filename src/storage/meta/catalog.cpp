@@ -65,6 +65,10 @@ import admin_statement;
 import global_resource_usage;
 import snapshot_info;
 
+import new_txn_manager;
+import new_catalog;
+import kv_store;
+
 namespace infinity {
 
 void ProfileHistory::Resize(SizeT new_size) {
@@ -1305,11 +1309,29 @@ void Catalog::InitCompactionAlg(TxnTimeStamp system_start_ts) {
 }
 
 void Catalog::MemIndexCommit() {
-    auto db_meta_map_guard = db_meta_map_.GetMetaMap();
-    for (auto &[_, db_meta] : *db_meta_map_guard) {
-        auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
-        if (status.ok()) {
-            db_entry->MemIndexCommit();
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    if (!new_txn_mgr) {
+        auto db_meta_map_guard = db_meta_map_.GetMetaMap();
+        for (auto &[_, db_meta] : *db_meta_map_guard) {
+            auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
+            if (status.ok()) {
+                db_entry->MemIndexCommit();
+            }
+        }
+    } else {
+        TxnTimeStamp begin_ts = new_txn_mgr->CurrentTS();
+
+        KVStore *kv_store = new_txn_mgr->kv_store();
+        UniquePtr<KVInstance> kv_instance = kv_store->GetInstance();
+
+        Status status = NewCatalog::MemIndexCommit(kv_instance.get(), begin_ts);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("MemIndexCommit catalog failed: {}", status.message()));
+        }
+
+        status = kv_instance->Commit();
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Commit catalog failed: {}", status.message()));
         }
     }
 }

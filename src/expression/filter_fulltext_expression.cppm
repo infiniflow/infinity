@@ -21,13 +21,16 @@ import function_expr;
 import filter_expression_push_down;
 import roaring_bitmap;
 import txn;
-import block_index;
 
 namespace infinity {
+
+struct BlockIndex;
 
 export class FilterFulltextExpression final : public BaseExpression {
 public:
     FilterFulltextExpression(String fields, String matching_text, String options_text);
+
+    ~FilterFulltextExpression() override;
 
     static SharedPtr<FilterFulltextExpression> BuildFilterFulltextExpression(const FunctionExpr &expr);
 

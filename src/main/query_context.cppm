@@ -36,6 +36,8 @@ export module query_context;
 
 namespace infinity {
 
+class NewTxn;
+
 class LogicalPlanner;
 class PhysicalPlanner;
 class FragmentBuilder;
@@ -108,6 +110,10 @@ public:
         }
         return false;
     }
+
+    [[nodiscard]] NewTxn *GetNewTxn() const;
+
+    bool SetNewTxn(NewTxn *txn) const;
 
     [[nodiscard]] inline Storage *storage() const { return storage_; }
 

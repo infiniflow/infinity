@@ -58,7 +58,7 @@ export struct LSGConfig {
 
     String ToString() const;
 
-    float sample_raito_ = 0.01;
+    float sample_ratio_ = 0.01;
     SizeT ls_k_ = 10;
     float alpha_ = 1.0;
 };

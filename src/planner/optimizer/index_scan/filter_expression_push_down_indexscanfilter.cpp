@@ -56,6 +56,7 @@ import search_driver;
 import status;
 import parse_fulltext_options;
 import table_entry;
+import block_index;
 
 namespace infinity {
 

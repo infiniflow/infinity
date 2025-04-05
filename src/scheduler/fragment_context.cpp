@@ -72,6 +72,7 @@ import explain_statement;
 import table_entry;
 import segment_entry;
 import global_resource_usage;
+import block_index;
 
 namespace infinity {
 

@@ -21,7 +21,6 @@ import logical_compact;
 import logical_compact_finish;
 import logical_compact_index;
 import base_table_ref;
-import block_index;
 import logical_node;
 import query_context;
 import bind_context;
@@ -37,51 +36,7 @@ public:
     BoundCompactStatement(SharedPtr<BindContext> bind_context, SharedPtr<BaseTableRef> base_table_ref, CompactStatementType compact_type)
         : bind_context_(std::move(bind_context)), base_table_ref_(base_table_ref), compact_type_(compact_type) {}
 
-    Vector<SharedPtr<LogicalNode>> BuildPlans(QueryContext *query_context) {
-        Vector<SharedPtr<LogicalNode>> res;
-        const SharedPtr<BindContext> &bind_context = this->bind_context_;
-
-        auto compact_node = MakeShared<LogicalCompact>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
-        auto &index_index = base_table_ref_->index_index_;
-        if (!index_index->IsEmpty()) {
-            if (index_index->index_snapshots_.size() == 1) {
-                auto compact_index_node = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref_);
-                compact_index_node->set_left_node(compact_node);
-                auto compact_finish_node = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
-                compact_finish_node->set_left_node(compact_index_node);
-                res.emplace_back(compact_finish_node);
-            } else {
-                res.emplace_back(compact_node);
-                if (index_index->index_snapshots_.size() > 2) {
-                    LOG_WARN(fmt::format("Table {} has more than 2 index, but logical plan is binary tree now", *base_table_ref_->table_name()));
-                }
-                auto index_index1 = MakeShared<IndexIndex>();
-                auto index_index2 = MakeShared<IndexIndex>();
-                SizeT idx = 0;
-                for (const auto &[index_name, index_snapshot] : index_index->index_snapshots_) {
-                    if (idx == 0) {
-                        index_index1->Insert(index_name, index_snapshot);
-                    } else {
-                        index_index2->Insert(index_name, index_snapshot);
-                    }
-                    ++idx;
-                }
-                auto base_table_ref1 = MakeShared<BaseTableRef>(base_table_ref_->table_info_, base_table_ref_->block_index_, index_index1);
-                auto base_table_ref2 = MakeShared<BaseTableRef>(base_table_ref_->table_info_, base_table_ref_->block_index_, index_index2);
-                auto compact_index_node1 = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref1);
-                auto compact_index_node2 = MakeShared<LogicalCompactIndex>(bind_context->GetNewLogicalNodeId(), base_table_ref2);
-                auto compact_finish = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
-                compact_finish->set_left_node(compact_index_node1);
-                compact_finish->set_right_node(compact_index_node2);
-                res.emplace_back(compact_finish);
-            }
-        } else {
-            auto compact_finish = MakeShared<LogicalCompactFinish>(bind_context->GetNewLogicalNodeId(), base_table_ref_, compact_type_);
-            compact_finish->set_left_node(compact_node);
-            res.emplace_back(compact_finish);
-        }
-        return res;
-    }
+    Vector<SharedPtr<LogicalNode>> BuildPlans(QueryContext *query_context);
 
 private:
     SharedPtr<BindContext> bind_context_{};

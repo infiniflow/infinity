@@ -39,6 +39,7 @@ import logger;
 import logical_type;
 import internal_types;
 import roaring_bitmap;
+import block_index;
 
 namespace infinity {
 

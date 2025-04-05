@@ -46,10 +46,32 @@ import virtual_store;
 import local_file_handle;
 import knn_filter;
 import txn;
+import block_index;
 
 namespace infinity {
 
-void PhysicalExport::Init(QueryContext* query_context) {}
+PhysicalExport::PhysicalExport(u64 id,
+                               const SharedPtr<TableInfo> &table_info,
+                               String schema_name,
+                               String table_name,
+                               String file_path,
+                               bool header,
+                               char delimiter,
+                               CopyFileType type,
+                               SizeT offset,
+                               SizeT limit,
+                               SizeT row_limit,
+                               Vector<u64> column_idx_array,
+                               SharedPtr<BlockIndex> block_index,
+                               SharedPtr<Vector<LoadMeta>> load_metas)
+    : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id, load_metas), table_info_(table_info), file_type_(type),
+      file_path_(std::move(file_path)), table_name_(std::move(table_name)), schema_name_(std::move(schema_name)), header_(header),
+      delimiter_(delimiter), offset_(offset), limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)),
+      block_index_(std::move(block_index)) {}
+
+PhysicalExport::~PhysicalExport() = default;
+
+void PhysicalExport::Init(QueryContext *query_context) {}
 
 bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operator_state) {
     ExportOperatorState *export_op_state = static_cast<ExportOperatorState *>(operator_state);

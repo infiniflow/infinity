@@ -26,7 +26,6 @@ import global_block_id;
 import table_function;
 import base_table_ref;
 import meta_info;
-import block_index;
 import load_meta;
 import internal_types;
 import data_type;
@@ -34,6 +33,8 @@ import fast_rough_filter;
 import physical_scan_base;
 
 namespace infinity {
+
+class BlockIndex;
 
 export class PhysicalTableScan : public PhysicalScanBase {
 public:

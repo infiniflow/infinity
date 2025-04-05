@@ -21,7 +21,6 @@ import physical_operator;
 import physical_operator_type;
 import global_block_id;
 import base_table_ref;
-import block_index;
 import load_meta;
 import internal_types;
 import operator_state;
@@ -32,6 +31,7 @@ namespace infinity {
 
 class ResultCacheManager;
 class DataBlock;
+struct BlockIndex;
 
 export class PhysicalScanBase : public PhysicalOperator {
 public:

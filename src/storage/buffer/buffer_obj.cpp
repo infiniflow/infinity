@@ -180,6 +180,9 @@ bool BufferObj::Save(const FileWorkerSaveCtx &ctx) {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (type_ == BufferType::kEphemeral) {
         switch (status_) {
+            case BufferStatus::kNew: {
+                file_worker_->AllocateInMemory();
+            }
             case BufferStatus::kLoaded:
             case BufferStatus::kUnloaded: {
                 LOG_TRACE(fmt::format("BufferObj::Save file: {}", GetFilename()));
@@ -424,6 +427,18 @@ void BufferObj::CheckState() const {
             }
         }
     }
+}
+
+void BufferObj::SetData(void *data) {
+    std::unique_lock<std::mutex> locker(w_locker_);
+    if (status_ != BufferStatus::kNew) {
+        String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
+        UnrecoverableError(error_message);
+    }
+    file_worker_->SetData(data);
+
+    status_ = BufferStatus::kLoaded;
+    type_ = BufferType::kEphemeral;
 }
 
 } // namespace infinity

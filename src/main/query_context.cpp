@@ -60,6 +60,9 @@ import global_resource_usage;
 import infinity_context;
 import txn_state;
 
+import new_txn;
+import new_txn_manager;
+
 namespace infinity {
 
 QueryContext::QueryContext(BaseSession *session) : session_ptr_(session) {
@@ -423,6 +426,18 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
 QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_statement) { return AdminExecutor::Execute(this, admin_statement); }
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
+    if (global_config_->UseNewCatalog()) {
+        // use new txn
+        NewTxn *new_txn = nullptr;
+        new_txn =
+            storage_->new_txn_manager()->BeginTxn(MakeUnique<String>(base_statement ? base_statement->ToString() : ""), TransactionType::kNormal);
+        if (new_txn == nullptr) {
+            UnrecoverableError("Cannot get new txn. TODO");
+        }
+        session_ptr_->SetNewTxn(new_txn);
+        return;
+    }
+
     if (session_ptr_->GetTxn() == nullptr) {
         Txn *new_txn = nullptr;
         if (base_statement == nullptr) {
@@ -443,6 +458,17 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
 }
 
 TxnTimeStamp QueryContext::CommitTxn() {
+    if (global_config_->UseNewCatalog()) {
+        TxnTimeStamp commit_ts = 0;
+        NewTxn *new_txn = session_ptr_->GetNewTxn();
+        Status status = storage_->new_txn_manager()->CommitTxn(new_txn, &commit_ts);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        session_ptr_->SetNewTxn(nullptr);
+        session_ptr_->IncreaseCommittedTxnCount();
+        return commit_ts;
+    }
     Txn *txn = session_ptr_->GetTxn();
     TxnTimeStamp commit_ts = storage_->txn_manager()->CommitTxn(txn);
     session_ptr_->SetTxn(nullptr);
@@ -452,11 +478,31 @@ TxnTimeStamp QueryContext::CommitTxn() {
 }
 
 void QueryContext::RollbackTxn() {
+    if (global_config_->UseNewCatalog()) {
+        NewTxn *new_txn = session_ptr_->GetNewTxn();
+        Status status = storage_->new_txn_manager()->RollBackTxn(new_txn);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        session_ptr_->SetNewTxn(nullptr);
+        session_ptr_->IncreaseRollbackedTxnCount();
+        return;
+    }
     Txn *txn = session_ptr_->GetTxn();
     storage_->txn_manager()->RollBackTxn(txn);
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseRollbackedTxnCount();
     storage_->txn_manager()->IncreaseRollbackedTxnCount();
+}
+
+NewTxn *QueryContext::GetNewTxn() const { return session_ptr_->GetNewTxn(); }
+
+bool QueryContext::SetNewTxn(NewTxn *txn) const {
+    if (session_ptr_->GetNewTxn() == nullptr) {
+        session_ptr_->SetNewTxn(txn);
+        return true;
+    }
+    return false;
 }
 
 } // namespace infinity

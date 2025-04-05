@@ -40,6 +40,7 @@ import logical_type;
 import infinity_context;
 import virtual_store;
 import snapshot_info;
+import wal_entry;
 
 namespace infinity {
 
@@ -728,6 +729,8 @@ i32 BlockEntry::GetAvailableCapacity() {
     std::shared_lock<std::shared_mutex> lck(this->rw_locker_);
     return this->row_capacity_ - this->block_row_count_;
 }
+
+String BlockEntry::VersionFilePath() { return VirtualStore::ConcatenatePath(*block_dir_, String(BlockVersion::PATH)); }
 
 SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID block_id) {
     SharedPtr<String> relative_dir = MakeShared<String>(fmt::format("{}/blk_{}", parent_dir, block_id));

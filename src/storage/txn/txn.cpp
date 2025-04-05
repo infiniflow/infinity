@@ -394,12 +394,12 @@ Status Txn::DropColumns(const String &db_name, const String &table_name, const V
     return Status::OK();
 }
 
-Status Txn::DropTableCollectionByName(const String &db_name, const String &table_name, ConflictType conflict_type) {
+Status Txn::DropTable(const String &db_name, const String &table_name, ConflictType conflict_type) {
     this->CheckTxn(db_name);
 
     TxnTimeStamp begin_ts = this->BeginTS();
 
-    LOG_TRACE("Txn::DropTableCollectionByName try to insert a dropped table placeholder on catalog");
+    LOG_TRACE("Txn::DropTable try to insert a dropped table placeholder on catalog");
     auto [table_entry, table_status] = catalog_->DropTableByName(db_name, table_name, conflict_type, txn_context_ptr_->txn_id_, begin_ts, txn_mgr_);
 
     if (table_entry.get() == nullptr) {
@@ -412,7 +412,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
     wal_entry_->cmds_.push_back(wal_command);
     txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
 
-    LOG_TRACE("Txn::DropTableCollectionByName dropped table entry is inserted.");
+    LOG_TRACE("Txn::DropTable dropped table entry is inserted.");
     return Status::OK();
 }
 

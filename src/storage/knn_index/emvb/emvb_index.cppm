@@ -29,6 +29,8 @@ struct SegmentEntry;
 class ColumnDef;
 class BufferManager;
 struct BlockIndex;
+class NewTxn;
+class SegmentMeta;
 
 using EMVBQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
 
@@ -60,6 +62,8 @@ public:
                         const SegmentEntry *segment_entry,
                         const SharedPtr<ColumnDef> &column_def,
                         BufferManager *buffer_mgr);
+
+    void BuildEMVBIndex(const RowID base_rowid, const u32 row_count, SegmentMeta &segment_meta, const SharedPtr<ColumnDef> &column_def);
 
     void Train(u32 centroids_num, const f32 *embedding_data, u64 embedding_num, u32 iter_cnt = 20);
 

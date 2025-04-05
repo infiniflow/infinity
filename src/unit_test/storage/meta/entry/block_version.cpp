@@ -17,7 +17,7 @@ import base_test;
 
 import infinity;
 import infinity_exception;
-
+import status;
 import stl;
 import global_resource_usage;
 import third_party;
@@ -150,7 +150,8 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
 TEST_P(BlockVersionTest, delete_test) {
     BlockVersion block_version(8192);
     block_version.Delete(2, 30);
-    EXPECT_THROW(block_version.Delete(2, 30), UnrecoverableException);
+    Status status = block_version.Delete(2, 30);
+    EXPECT_FALSE(status.ok());
 }
 
 TEST_P(BlockVersionTest, check_delete_test) {

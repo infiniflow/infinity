@@ -58,6 +58,25 @@ void ObjStat::Deserialize(const nlohmann::json &obj) {
     }
 }
 
+String ObjStat::ToString() const {
+    nlohmann::json obj;
+    obj["obj_size"] = obj_size_;
+    obj["parts"] = parts_;
+    obj["deleted_ranges"] = nlohmann::json::array();
+    for (auto &range : deleted_ranges_) {
+        nlohmann::json range_obj;
+        range_obj["start"] = range.start_;
+        range_obj["end"] = range.end_;
+        obj["deleted_ranges"].emplace_back(range_obj);
+    }
+    return obj.dump();
+}
+
+void ObjStat::Deserialize(const String &str) {
+    nlohmann::json obj = nlohmann::json::parse(str);
+    Deserialize(obj);
+}
+
 SizeT ObjStat::GetSizeInBytes() const {
     SizeT size = sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT);
     size += (sizeof(SizeT) + sizeof(SizeT)) * deleted_ranges_.size();

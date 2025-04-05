@@ -23,6 +23,8 @@ import logger;
 
 namespace infinity {
 
+Binding::~Binding() = default;
+
 SharedPtr<Binding> Binding::MakeBinding(BindingType binding_type,
                                         const String &name,
                                         u64 table_index,

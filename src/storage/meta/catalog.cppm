@@ -30,7 +30,6 @@ import default_values;
 import meta_info;
 import index_base;
 import txn_store;
-import data_access_state;
 import extra_ddl_info;
 import db_entry;
 import table_entry;
@@ -50,6 +49,7 @@ class TxnManager;
 class Txn;
 struct CatalogDeltaOpBrief;
 class SegmentIndexEntry;
+struct DeleteState;
 
 class ProfileHistory {
 private:
