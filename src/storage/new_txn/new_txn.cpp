@@ -658,8 +658,8 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
     TableIndexMeeta table_index_meta(index_id, *table_meta);
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
-        status = new_catalog_->DecreaseTableWriteCount(this, table_key);
-        if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
             UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
         }
         return index_status;
@@ -681,8 +681,8 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
             }
         }
         if (!exist) {
-            status = new_catalog_->DecreaseTableWriteCount(this, table_key);
-            if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
                 UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
             }
             return Status::ColumnNotExist(column_name);

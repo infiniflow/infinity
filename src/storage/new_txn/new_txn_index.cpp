@@ -83,8 +83,8 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     ChunkID new_chunk_id = 0;
     status = this->DumpMemIndexInner(segment_index_meta, new_chunk_id);
     if (!status.ok()) {
-        status = new_catalog_->DecreaseTableWriteCount(this, table_key);
-        if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
             UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
         }
         return status;
@@ -93,8 +93,8 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
     status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, true);
     if (!status.ok()) {
-        status = new_catalog_->DecreaseTableWriteCount(this, table_key);
-        if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
             UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
         }
         return status;
@@ -1079,34 +1079,52 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
     // dump mem index only happens in parallel with read, not write, so no lock is needed.
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
+            if (mem_index->memory_secondary_index_ == nullptr) {
+                return Status::NoMemIndexOnSegment("No secondary mem index on segment");
+            }
             row_id = mem_index->memory_secondary_index_->GetBeginRowID();
             row_count = mem_index->memory_secondary_index_->GetRowCount();
             break;
         }
         case IndexType::kFullText: {
+            if (mem_index->memory_indexer_ == nullptr) {
+                return Status::NoMemIndexOnSegment("No full text mem index on segment");
+            }
             base_name = mem_index->memory_indexer_->GetBaseName();
             row_id = mem_index->memory_indexer_->GetBaseRowId();
             row_count = mem_index->memory_indexer_->GetDocCount();
             break;
         }
         case IndexType::kIVF: {
+            if (mem_index->memory_ivf_index_ == nullptr) {
+                return Status::NoMemIndexOnSegment("No IVF mem index on segment");
+            }
             row_id = mem_index->memory_ivf_index_->GetBeginRowID();
             row_count = mem_index->memory_ivf_index_->GetRowCount();
             break;
         }
         case IndexType::kHnsw: {
+            if (mem_index->memory_hnsw_index_ == nullptr) {
+                return Status::NoMemIndexOnSegment("No HNSW mem index on segment");
+            }
             row_id = mem_index->memory_hnsw_index_->GetBeginRowID();
             row_count = mem_index->memory_hnsw_index_->GetRowCount();
             index_size = mem_index->memory_hnsw_index_->GetSizeInBytes();
             break;
         }
         case IndexType::kBMP: {
+            if (mem_index->memory_bmp_index_ == nullptr) {
+                return Status::NoMemIndexOnSegment("No BMP mem index on segment");
+            }
             row_id = mem_index->memory_bmp_index_->GetBeginRowID();
             row_count = mem_index->memory_bmp_index_->GetRowCount();
             index_size = mem_index->memory_bmp_index_->GetSizeInBytes();
             break;
         }
         case IndexType::kEMVB: {
+            if (mem_index->memory_emvb_index_ == nullptr) {
+                return Status::NoMemIndexOnSegment("No EMVB mem index on segment");
+            }
             row_id = mem_index->memory_emvb_index_->GetBeginRowID();
             row_count = mem_index->memory_emvb_index_->GetRowCount();
             break;
