@@ -763,6 +763,8 @@ Status LogicalPlanner::BuildCreateView(const CreateStatement *statement, SharedP
 Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     auto *create_index_info = (CreateIndexInfo *)statement->create_info_.get();
     Txn *txn = query_context_ptr_->GetTxn();
+    NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
 
     auto schema_name = MakeShared<String>(create_index_info->schema_name_);
     auto table_name = MakeShared<String>(create_index_info->table_name_);
@@ -779,21 +781,29 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
-    auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-
-    {
-        TableEntry::TableStatus table_status;
-        if (!table_entry->SetCreatingIndex(table_status, txn)) {
-            RecoverableError(
-                Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(table_status))));
+    if (!use_new_catalog) {
+        auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
         }
-    }
-    status = table_entry->AddWriteTxnNum(txn);
-    if (!status.ok()) {
-        RecoverableError(status);
+        {
+            TableEntry::TableStatus table_status;
+            if (!table_entry->SetCreatingIndex(table_status, txn)) {
+                RecoverableError(
+                    Status::NotSupport(fmt::format("Cannot create index when table {} status is {}", table_entry->encode(), u8(table_status))));
+            }
+        }
+        status = table_entry->AddWriteTxnNum(txn);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    } else {
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = new_txn->GetTableMeta(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
     }
 
     IndexInfo *index_info = create_index_info->index_info_;

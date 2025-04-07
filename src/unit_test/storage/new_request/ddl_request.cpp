@@ -31,6 +31,22 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TestDDLRequest,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
+TEST_P(TestDDLRequest, test_create_db) {
+    String create_db_sql = "create database db1";
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_db_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_db_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_FALSE(ok);
+    }
+}
+
 TEST_P(TestDDLRequest, test_create_table) {
     String create_table_sql = "create table t1(c1 int, c2 varchar)";
     {
@@ -42,6 +58,29 @@ TEST_P(TestDDLRequest, test_create_table) {
     { // create table with same name
         UniquePtr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_FALSE(ok);
+    }
+}
+
+TEST_P(TestDDLRequest, test_create_index) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 varchar)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    String create_index_sql = "create index idx1 on t1 (c1)";
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
     }
