@@ -1079,52 +1079,34 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
     // dump mem index only happens in parallel with read, not write, so no lock is needed.
     switch (index_base->index_type_) {
         case IndexType::kSecondary: {
-            if (mem_index->memory_secondary_index_ == nullptr) {
-                return Status::NoMemIndexOnSegment("No secondary mem index on segment");
-            }
             row_id = mem_index->memory_secondary_index_->GetBeginRowID();
             row_count = mem_index->memory_secondary_index_->GetRowCount();
             break;
         }
         case IndexType::kFullText: {
-            if (mem_index->memory_indexer_ == nullptr) {
-                return Status::NoMemIndexOnSegment("No full text mem index on segment");
-            }
             base_name = mem_index->memory_indexer_->GetBaseName();
             row_id = mem_index->memory_indexer_->GetBaseRowId();
             row_count = mem_index->memory_indexer_->GetDocCount();
             break;
         }
         case IndexType::kIVF: {
-            if (mem_index->memory_ivf_index_ == nullptr) {
-                return Status::NoMemIndexOnSegment("No IVF mem index on segment");
-            }
             row_id = mem_index->memory_ivf_index_->GetBeginRowID();
             row_count = mem_index->memory_ivf_index_->GetRowCount();
             break;
         }
         case IndexType::kHnsw: {
-            if (mem_index->memory_hnsw_index_ == nullptr) {
-                return Status::NoMemIndexOnSegment("No HNSW mem index on segment");
-            }
             row_id = mem_index->memory_hnsw_index_->GetBeginRowID();
             row_count = mem_index->memory_hnsw_index_->GetRowCount();
             index_size = mem_index->memory_hnsw_index_->GetSizeInBytes();
             break;
         }
         case IndexType::kBMP: {
-            if (mem_index->memory_bmp_index_ == nullptr) {
-                return Status::NoMemIndexOnSegment("No BMP mem index on segment");
-            }
             row_id = mem_index->memory_bmp_index_->GetBeginRowID();
             row_count = mem_index->memory_bmp_index_->GetRowCount();
             index_size = mem_index->memory_bmp_index_->GetSizeInBytes();
             break;
         }
         case IndexType::kEMVB: {
-            if (mem_index->memory_emvb_index_ == nullptr) {
-                return Status::NoMemIndexOnSegment("No EMVB mem index on segment");
-            }
             row_id = mem_index->memory_emvb_index_->GetBeginRowID();
             row_count = mem_index->memory_emvb_index_->GetRowCount();
             break;
@@ -1462,7 +1444,7 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInst
         if (!status.ok()) {
             return status;
         }
-        mem_index->Clear();
+        mem_index->ClearMemIndex();
     }
 
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;

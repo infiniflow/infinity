@@ -437,6 +437,102 @@ Status NewCatalog::DropMemIndexByMemIndexKey(const String &mem_index_key) {
     return Status::OK();
 }
 
+Status NewCatalog::IncreaseTableReferenceCountForMemIndex(const String &table_key) {
+    std::unique_lock lock(mem_index_mtx_);
+    auto iter = table_lock_for_mem_index_.find(table_key);
+    if (iter == table_lock_for_mem_index_.end()) {
+        table_lock_for_mem_index_[table_key] = MakeShared<TableLockForMemIndex>();
+    }
+
+    TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
+    if (table_lock_for_mem_index->dumping_mem_index_) {
+        return Status::DumpingMemIndex(fmt::format("Table key: {} is dumping mem index", table_key));
+    }
+
+    ++table_lock_for_mem_index->append_count_;
+
+    return Status::OK();
+}
+
+Status NewCatalog::DecreaseTableReferenceCountForMemIndex(const String &table_key) {
+    std::unique_lock lock(mem_index_mtx_);
+    auto iter = table_lock_for_mem_index_.find(table_key);
+    if (iter == table_lock_for_mem_index_.end()) {
+        table_lock_for_mem_index_[table_key] = MakeShared<TableLockForMemIndex>();
+    }
+
+    TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
+    if (table_lock_for_mem_index->dumping_mem_index_) {
+        UnrecoverableError(fmt::format("Table key: {} is dumping mem index", table_key));
+    }
+
+    --table_lock_for_mem_index->append_count_;
+    if (table_lock_for_mem_index->append_count_ == 0 and !table_lock_for_mem_index->dumping_mem_index_) {
+        table_lock_for_mem_index_.erase(table_key);
+    }
+
+    return Status::OK();
+}
+
+SizeT NewCatalog::GetTableReferenceCountForMemIndex(const String &table_key) {
+    std::unique_lock lock(mem_index_mtx_);
+    auto iter = table_lock_for_mem_index_.find(table_key);
+    if (iter == table_lock_for_mem_index_.end()) {
+        return 0;
+    }
+
+    return iter->second->append_count_;
+}
+
+Status NewCatalog::SetMemIndexDump(const String &table_key) {
+    std::unique_lock lock(mem_index_mtx_);
+    auto iter = table_lock_for_mem_index_.find(table_key);
+    if (iter == table_lock_for_mem_index_.end()) {
+        table_lock_for_mem_index_[table_key] = MakeShared<TableLockForMemIndex>();
+    }
+    TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
+    if (table_lock_for_mem_index->append_count_ > 0) {
+        return Status::DumpingMemIndex(fmt::format("Table key: {} is appending mem index", table_key));
+    }
+
+    if (table_lock_for_mem_index->dumping_mem_index_) {
+        return Status::DumpingMemIndex(fmt::format("Table key: {} is dumping mem index", table_key));
+    }
+    table_lock_for_mem_index->dumping_mem_index_ = true;
+    return Status::OK();
+}
+
+Status NewCatalog::UnsetMemIndexDump(const String &table_key) {
+    std::unique_lock lock(mem_index_mtx_);
+    auto iter = table_lock_for_mem_index_.find(table_key);
+    if (iter == table_lock_for_mem_index_.end()) {
+        table_lock_for_mem_index_[table_key] = MakeShared<TableLockForMemIndex>();
+    }
+    TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
+    if (!table_lock_for_mem_index->dumping_mem_index_) {
+        return Status::DumpingMemIndex(fmt::format("Table key: {} isn't dumping mem index", table_key));
+    }
+
+    table_lock_for_mem_index->dumping_mem_index_ = false;
+    if (table_lock_for_mem_index->append_count_ == 0) {
+        table_lock_for_mem_index_.erase(table_key);
+    } else {
+        UnrecoverableError(fmt::format("Table key: {} is appending, why unset mem index dump", table_key));
+    }
+
+    return Status::OK();
+}
+
+bool NewCatalog::IsMemIndexDump(const String &table_key) {
+    std::unique_lock lock(mem_index_mtx_);
+    auto iter = table_lock_for_mem_index_.find(table_key);
+    if (iter == table_lock_for_mem_index_.end()) {
+        return false;
+    }
+
+    return iter->second->dumping_mem_index_;
+}
+
 Status NewCatalog::AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache) {
     bool insert_success = false;
     HashMap<String, SharedPtr<TableIndexReaderCache>>::iterator iter;

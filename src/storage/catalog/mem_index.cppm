@@ -27,7 +27,7 @@ import abstract_bmp;
 namespace infinity {
 
 export struct MemIndex {
-    void Clear() {
+    void ClearMemIndex() {
         std::unique_lock<std::mutex> lock(mtx_);
         if (!to_clear_) {
             return;
@@ -40,12 +40,8 @@ export struct MemIndex {
         memory_emvb_index_.reset();
         memory_bmp_index_.reset();
     }
-    void SetToClear() {
-        std::unique_lock<std::mutex> lock(mtx_);
-        to_clear_ = true;
-    }
 
-    std::mutex mtx_;
+    std::mutex mtx_; // Used by append / mem index dump / clear
     bool to_clear_ = false;
 
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};

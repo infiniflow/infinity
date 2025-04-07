@@ -119,16 +119,6 @@ Status SegmentIndexMeta::SetNoMemIndex() {
         return status;
     }
     has_mem_index_ = false;
-    {
-        SharedPtr<MemIndex> mem_index;
-        Status status = GetMemIndex(mem_index);
-        if (!status.ok()) {
-            return status;
-        }
-        if (mem_index) {
-            mem_index->SetToClear();
-        }
-    }
     return Status::OK();
 }
 
@@ -254,7 +244,7 @@ Status SegmentIndexMeta::GetMemIndex(SharedPtr<MemIndex> &mem_index) {
         return status;
     }
     if (!has_mem_index) {
-        mem_index->Clear();
+        mem_index->ClearMemIndex();
     }
 
     return Status::OK();
@@ -296,7 +286,7 @@ Status SegmentIndexMeta::GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index) {
     }
     if (!has_mem_index) {
         // Clear here because dump mem index may not clear after commit.
-        mem_index->Clear();
+        mem_index->ClearMemIndex();
     }
     return Status::OK();
 }

@@ -60,6 +60,12 @@ export struct TableMemoryContext {
     SizeT write_txn_num_{0};
 };
 
+export struct TableLockForMemIndex {
+    std::mutex mtx_;
+    bool dumping_mem_index_ = false;
+    SizeT append_count_{0};
+};
+
 export struct BlockLock {
     BlockLock() = default;
     BlockLock(TxnTimeStamp checkpoint_ts) : checkpoint_ts_(checkpoint_ts) {}
@@ -135,8 +141,8 @@ public:
     Status ImmutateTable(const String &table_key, TransactionID txn_id);
     Status MutateTable(const String &table_key, TransactionID txn_id);
 
-    Status IncreaseTableWriteCount(NewTxn* txn_ptr, const String &table_key);
-    Status DecreaseTableWriteCount(NewTxn* txn_ptr, const String &table_key);
+    Status IncreaseTableWriteCount(NewTxn *txn_ptr, const String &table_key);
+    Status DecreaseTableWriteCount(NewTxn *txn_ptr, const String &table_key);
     SizeT GetTableWriteCount() const;
 
 private:
@@ -161,9 +167,17 @@ public:
     Status GetMemIndex(const String &mem_index_key, SharedPtr<MemIndex> &mem_index);
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
 
+    Status IncreaseTableReferenceCountForMemIndex(const String &table_key);
+    Status DecreaseTableReferenceCountForMemIndex(const String &table_key);
+    Status SetMemIndexDump(const String &table_key);
+    Status UnsetMemIndexDump(const String &table_key);
+    bool IsMemIndexDump(const String &table_key);
+    SizeT GetTableReferenceCountForMemIndex(const String &table_key);
+
 private:
     std::shared_mutex mem_index_mtx_{};
     HashMap<String, SharedPtr<MemIndex>> mem_index_map_{};
+    HashMap<String, SharedPtr<TableLockForMemIndex>> table_lock_for_mem_index_{};
 
 public:
     Status AddFtIndexCache(String ft_index_cache_key, SharedPtr<TableIndexReaderCache> ft_index_cache);
