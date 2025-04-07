@@ -40,6 +40,11 @@ import cached_match;
 import buffer_manager;
 import block_index;
 
+import block_meta;
+import column_meta;
+import new_catalog;
+import status;
+
 namespace infinity {
 
 SizeT PhysicalOperator::TaskletCount() { return 1; }
@@ -124,6 +129,44 @@ void OutputToDataBlockHelper::OutputToDataBlock(BufferManager *buffer_mgr,
                                                 const BlockIndex *block_index,
                                                 const Vector<UniquePtr<DataBlock>> &output_data_blocks) {
     std::sort(output_job_infos.begin(), output_job_infos.end());
+
+    bool use_new_catalog = block_index->table_meta_.get() != nullptr;
+    if (use_new_catalog) {
+        Status status;
+
+        auto cache_segment_id = std::numeric_limits<SegmentID>::max();
+        auto cache_block_id = std::numeric_limits<BlockID>::max();
+        // BlockEntry *cache_block_entry = nullptr;
+        BlockMeta *cached_block_meta = nullptr;
+        SizeT cached_block_row_cnt = 0;
+        auto cache_column_id = std::numeric_limits<ColumnID>::max();
+        ColumnVector cache_column_vector;
+        for (const auto [segment_id, block_id, column_id, block_offset, output_block_id, output_column_id, output_row_id] : output_job_infos) {
+            if (segment_id != cache_segment_id || block_id != cache_block_id) {
+                cache_segment_id = segment_id;
+                cache_block_id = block_id;
+                cached_block_meta = block_index->GetBlockMeta(segment_id, block_id);
+                std::tie(cached_block_row_cnt, status) = cached_block_meta->GetRowCnt1();
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+                cache_column_id = std::numeric_limits<ColumnID>::max();
+            }
+            if (column_id != cache_column_id) {
+                // LOG_TRACE(fmt::format("Get column vector from segment_id: {}, block_id: {}, column_id: {}", segment_id, block_id, column_id));
+                ColumnMeta column_meta(column_id, *cached_block_meta);
+                NewCatalog::GetColumnVector(column_meta, cached_block_row_cnt, ColumnVectorTipe::kReadOnly, cache_column_vector);
+
+                cache_column_id = column_id;
+            }
+            auto val_for_update = cache_column_vector.GetValue(block_offset);
+            output_data_blocks[output_block_id]->column_vectors[output_column_id]->SetValue(output_row_id, val_for_update);
+        }
+        output_job_infos.clear();
+
+        return;
+    }
+
     auto cache_segment_id = std::numeric_limits<SegmentID>::max();
     auto cache_block_id = std::numeric_limits<BlockID>::max();
     BlockEntry *cache_block_entry = nullptr;

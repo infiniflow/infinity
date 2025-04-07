@@ -1035,10 +1035,13 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
         RecoverableError(status);
     }
 
-    Txn *txn = query_context_ptr_->GetTxn();
-    Status status = txn->AddWriteTxnNum(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
-    if(!status.ok()) {
-        RecoverableError(status);
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+    if (!use_new_catalog) {
+        Txn *txn = query_context_ptr_->GetTxn();
+        Status status = txn->AddWriteTxnNum(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
     }
 
     bound_delete_statement->table_ref_ptr_ = base_table_ref;
@@ -1066,10 +1069,13 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         RecoverableError(status);
     }
 
-    Txn *txn = query_context_ptr_->GetTxn();
-    Status status = txn->AddWriteTxnNum(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
-    if(!status.ok()) {
-        RecoverableError(status);
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+    if (!use_new_catalog) {
+        Txn *txn = query_context_ptr_->GetTxn();
+        Status status = txn->AddWriteTxnNum(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
@@ -1167,7 +1173,7 @@ UniquePtr<BoundCompactStatement> QueryBinder::BindCompact(const CompactStatement
     }
 
     auto [table_entry, status] = txn->GetTableByName(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
-    if(!status.ok()) {
+    if (!status.ok()) {
         RecoverableError(status);
     }
 

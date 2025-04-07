@@ -96,3 +96,83 @@ TEST_P(TestDataRequest, test_select) {
         }
     }
 }
+
+TEST_P(TestDataRequest, test_delete) {
+    PrepareCreateTable();
+    {
+        String append_req_sql = "insert into t1 values(1, 'abc'),(2, 'def')";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(append_req_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String delete_req_sql = "delete from t1 where c1 = 1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(delete_req_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String select_req_sql = "select * from t1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_req_sql);
+
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+
+        EXPECT_EQ(result_table->data_blocks_.size(), 1);
+        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
+
+        {
+            SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
+            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+        }
+        {
+            SharedPtr<ColumnVector> col1 = data_block->column_vectors[1];
+            EXPECT_EQ(col1->GetValue(0), Value::MakeVarchar("def"));
+        }
+    }
+}
+
+TEST_P(TestDataRequest, test_update) {
+    PrepareCreateTable();
+    {
+        String append_req_sql = "insert into t1 values(1, 'abc'),(2, 'def')";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(append_req_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String update_req_sql = "update t1 set c2 = 'xyz' where c1 = 1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(update_req_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String select_req_sql = "select * from t1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_req_sql);
+
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+
+        EXPECT_EQ(result_table->data_blocks_.size(), 1);
+        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
+
+        {
+            SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
+            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+            EXPECT_EQ(col0->GetValue(1), Value::MakeInt(1));
+        }
+        {
+            SharedPtr<ColumnVector> col1 = data_block->column_vectors[1];
+            EXPECT_EQ(col1->GetValue(0), Value::MakeVarchar("def"));
+            EXPECT_EQ(col1->GetValue(1), Value::MakeVarchar("xyz"));
+        }
+    }
+}
