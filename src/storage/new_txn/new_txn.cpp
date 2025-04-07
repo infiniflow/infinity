@@ -1080,6 +1080,7 @@ Status NewTxn::PrepareCommit() {
                 break;
             }
             case WalCommandType::DUMP_INDEX: {
+                // TODO: move follow to post commit
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(command.get());
                 Status status = PostCommitDumpIndex(dump_index_cmd, kv_instance_.get());
                 if (!status.ok()) {
@@ -1631,7 +1632,13 @@ void NewTxn::PostCommit() {
                     auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
                     Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                     if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Fail to unlock table on post commit phase: {}", status.message()));
+                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
+                    }
+
+                    Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(cmd->table_key_);
+                    if (!mem_index_status.ok()) {
+                        UnrecoverableError(
+                            fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
                     }
                 }
                 break;
@@ -1795,6 +1802,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table when rollback append txn");
                 }
+                status = new_catalog_->DecreaseTableReferenceCountForMemIndex(cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError(
+                        fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", status.message()));
+                }
                 break;
             }
             case WalCommandType::DELETE: {
@@ -1829,6 +1841,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                         UnrecoverableError("Fail to unlock table when rollback dump mem index txn");
                     }
                 }
+                Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
+                if (!mem_index_status.ok()) {
+                    UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
+                }
+
                 break;
             }
             default: {

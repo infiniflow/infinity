@@ -4795,6 +4795,87 @@ TEST_P(TestDumpMemIndex, dump_and_append) {
         EXPECT_TRUE(status.ok());
     };
 
+    auto check_index2 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        String table_key;
+        String index_key;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        EXPECT_TRUE(status.ok());
+
+        {
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        }
+        SegmentID segment_id = 0;
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+        SharedPtr<MemIndex> mem_index;
+        status = segment_index_meta.GetMemIndex(mem_index);
+        EXPECT_TRUE(status.ok());
+        check_mem_index(mem_index);
+        {
+            Vector<ChunkID> *chunk_ids = nullptr;
+            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({}));
+        }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    auto check_index3 = [&](const String &index_name, std::function<void(const SharedPtr<MemIndex> &)> check_mem_index) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check index1"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Optional<TableIndexMeeta> table_index_meta;
+        String table_key;
+        String index_key;
+        Status status = txn->GetTableIndexMeta(*db_name, *table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+        EXPECT_TRUE(status.ok());
+
+        {
+            auto [segment_ids, status] = table_meta->GetSegmentIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*segment_ids, Vector<SegmentID>({0}));
+        }
+        SegmentID segment_id = 0;
+        SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+
+        SharedPtr<MemIndex> mem_index;
+        status = segment_index_meta.GetMemIndex(mem_index);
+        EXPECT_TRUE(status.ok());
+        check_mem_index(mem_index);
+        {
+            Vector<ChunkID> *chunk_ids = nullptr;
+            Status status = segment_index_meta.GetChunkIDs(chunk_ids);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*chunk_ids, Vector<ChunkID>({0}));
+        }
+        ChunkID chunk_id = 0;
+        ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+        {
+            ChunkIndexMetaInfo *chunk_info = nullptr;
+            Status status = chunk_index_meta.GetChunkInfo(chunk_info);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(chunk_info->row_cnt_, 2 * block_row_cnt);
+            EXPECT_EQ(chunk_info->base_row_id_, RowID(0, 0));
+        }
+
+        BufferObj *buffer_obj = nullptr;
+        status = chunk_index_meta.GetIndexBuffer(buffer_obj);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
     //  t1            dump index   commit (success)
     //  |--------------|---------------|
     //                                     |------------------|----------|
@@ -4831,12 +4912,13 @@ TEST_P(TestDumpMemIndex, dump_and_append) {
 
         NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
     //  t1            dump index   commit (success)
     //  |--------------|---------------|
     //                         |------------------|----------|
-    //                        t2                append     commit
+    //                        t2                append     commit (fail)
     {
         create_db(*db_name);
         create_table(*db_name, table_def);
@@ -4857,330 +4939,259 @@ TEST_P(TestDumpMemIndex, dump_and_append) {
         status = txn3->Append(*db_name, *table_name, make_block());
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
-
-        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-            return std::make_pair(begin_id, row_cnt);
-        });
 
         drop_db(*db_name);
 
         NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
     }
 
-    //    //  t1            dump index                 commit (success)
-    //    //  |--------------|------------------------------|
-    //    //                         |------------------|------------------|
-    //    //                        t2                append            commit
-    //    {
-    //        create_db(*db_name);
-    //        create_table(*db_name, table_def);
-    //        create_index(index_def1);
-    //
-    //        append_a_block();
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
-    //        status = txn3->Append(*db_name, *table_name, make_block());
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-    //
-    //        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-    //            return std::make_pair(begin_id, row_cnt);
-    //        });
-    //
-    //        drop_db(*db_name);
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
+    //  t1            dump index                 commit (success)
+    //  |--------------|------------------------------|
+    //                         |------------------|------------------|
+    //                        t2                append            commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
 
-    //    //  t1            dump index                                               commit (success)
-    //    //  |--------------|--------------------------------------------------------------|
-    //    //                         |------------------|--------------------|
-    //    //                        t2                 import             commit
-    //    {
-    //        create_db(*db_name);
-    //        create_table(*db_name, table_def);
-    //        create_index(index_def1);
-    //
-    //        append_a_block();
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        //        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ ==
-    //        nullptr);
-    //        //        });
-    //
-    //        append_a_block();
-    //
-    //        //        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-    //        //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-    //        //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-    //        //            return std::make_pair(begin_id, row_cnt);
-    //        //        });
-    //
-    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-    //
-    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-    //            return std::make_pair(begin_id, row_cnt);
-    //        });
-    //
-    //        drop_db(*db_name);
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //  t1            dump index                             commit (success)
-    //    //  |--------------|------------------------------------------|
-    //    //         |------------------|----------------------|
-    //    //         t2                import              commit
-    //    {
-    //        create_db(*db_name);
-    //        create_table(*db_name, table_def);
-    //        create_index(index_def1);
-    //
-    //        append_a_block();
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-    //
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //
-    //        SegmentID segment_id = 0;
-    //        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        append_a_block();
-    //
-    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-    //
-    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-    //            return std::make_pair(begin_id, row_cnt);
-    //        });
-    //
-    //        drop_db(*db_name);
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //  t1                                  dump index (fail)                           rollback (success)
-    //    //  |---------------------------------------|------------------------------------------|
-    //    //         |------------------|--------------------|
-    //    //         t2                import        commit
-    //    {
-    //        create_db(*db_name);
-    //        create_table(*db_name, table_def);
-    //        create_index(index_def1);
-    //
-    //        append_a_block();
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-    //
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        SegmentID segment_id = 0;
-    //        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        append_a_block();
-    //
-    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-    //
-    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-    //            return std::make_pair(begin_id, row_cnt);
-    //        });
-    //
-    //        drop_db(*db_name);
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //  t1                                  dump index                             commit (success)
-    //    //  |---------------------------------------|------------------------------------------|
-    //    //         |------------------|-----------|
-    //    //         t2                import  commit
-    //    {
-    //        create_db(*db_name);
-    //        create_table(*db_name, table_def);
-    //        create_index(index_def1);
-    //
-    //        append_a_block();
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-    //
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        SegmentID segment_id = 0;
-    //        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        append_a_block();
-    //
-    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-    //
-    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-    //            return std::make_pair(begin_id, row_cnt);
-    //        });
-    //
-    //        drop_db(*db_name);
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //                                 t1                    dump index                             commit (success)
-    //    //                                 |----------------------|------------------------------------------|
-    //    //         |------------------|----------|
-    //    //         t2                import    commit
-    //    {
-    //        create_db(*db_name);
-    //        create_table(*db_name, table_def);
-    //        create_index(index_def1);
-    //
-    //        append_a_block();
-    //
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-    //
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        SegmentID segment_id = 0;
-    //        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        append_a_block();
-    //
-    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-    //
-    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-    //            return std::make_pair(begin_id, row_cnt);
-    //        });
-    //
-    //        drop_db(*db_name);
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //                                            t1                    dump index                             commit (success)
-    //    //                                            |----------------------|------------------------------------------|
-    //    //         |------------------|------------|
-    //    //         t2                drop column  commit
-    //    {
-    //        create_db(*db_name);
-    //        create_table(*db_name, table_def);
-    //        create_index(index_def1);
-    //
-    //        append_a_block();
-    //
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-    //        SegmentID segment_id = 0;
-    //        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        append_a_block();
-    //
-    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-    //
-    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-    //            return std::make_pair(begin_id, row_cnt);
-    //        });
-    //
-    //        drop_db(*db_name);
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
+        append_a_block();
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, make_block());
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+
+        drop_db(*db_name);
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
+    }
+
+    //  t1            dump index                                               commit (success)
+    //  |--------------|--------------------------------------------------------------|
+    //                         |------------------|--------------------|
+    //                        t2                 append(fail)         rollback
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        status = txn3->Append(*db_name, *table_name, make_block());
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+
+        drop_db(*db_name);
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
+    }
+
+    //  t1            dump index                             commit (success)
+    //  |--------------|------------------------------------------|
+    //         |------------------|----------------------|
+    //         t2                append(fail)           rollback
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+
+        SegmentID segment_id = 0;
+        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        status = txn3->Append(*db_name, *table_name, make_block());
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+
+        drop_db(*db_name);
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
+    }
+
+    //  t1                                  dump index (fail)                           rollback (success)
+    //  |---------------------------------------|------------------------------------------|
+    //         |------------------|--------------------|
+    //         t2                append        commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        Status status = txn3->Append(*db_name, *table_name, make_block());
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+
+        drop_db(*db_name);
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
+    }
+
+    //  t1                                  dump index                                  commit
+    //  |---------------------------------------|------------------------------------------|
+    //         |------------------|-----------|
+    //         t2                append    commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        Status status = txn3->Append(*db_name, *table_name, make_block());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+
+        drop_db(*db_name);
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
+    }
+
+    //                                 t1                    dump index                             commit (success)
+    //                                 |----------------------|------------------------------------------|
+    //         |------------------|----------|
+    //         t2                append    commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        Status status = txn3->Append(*db_name, *table_name, make_block());
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+
+        drop_db(*db_name);
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
+    }
+
+    //                                            t1                    dump index                             commit (success)
+    //                                            |----------------------|------------------------------------------|
+    //         |------------------|------------|
+    //         t2               append     commit
+    {
+        create_db(*db_name);
+        create_table(*db_name, table_def);
+        create_index(index_def1);
+
+        append_a_block();
+
+        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+        Status status = txn3->Append(*db_name, *table_name, make_block());
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn3);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+        SegmentID segment_id = 0;
+        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+
+        drop_db(*db_name);
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+        EXPECT_EQ(new_catalog->GetTableReferenceCountForMemIndex(), 0);
+    }
 
     RemoveDbDirs();
 }
@@ -6160,375 +6171,376 @@ TEST_P(TestDumpMemIndex, dump_and_dump) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-//    //  t1            dump index   commit (success)
-//    //  |--------------|---------------|
-//    //                         |------------------|----------|
-//    //                        t2                import     commit
-//    {
-//        create_db(*db_name);
-//        create_table(*db_name, table_def);
-//        create_index(index_def1);
-//
-//        append_a_block();
-//
-//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-//        SegmentID segment_id = 0;
-//        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-//        EXPECT_TRUE(status.ok());
-//
-//        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-//
-//        status = new_txn_mgr->CommitTxn(txn);
-//        EXPECT_TRUE(status.ok());
-//
-//        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
-//
-//        append_a_block();
-//
-//        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-//        status = txn3->Import(*db_name, *table_name, input_blocks1);
-//        EXPECT_TRUE(status.ok());
-//        status = new_txn_mgr->CommitTxn(txn3);
-//        EXPECT_TRUE(status.ok());
-//
-//        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-//
-//        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        drop_db(*db_name);
-//
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-//    }
-//
-//    //  t1            dump index                 commit (success)
-//    //  |--------------|------------------------------|
-//    //                         |------------------|------------------|
-//    //                        t2                 import          commit
-//    {
-//        create_db(*db_name);
-//        create_table(*db_name, table_def);
-//        create_index(index_def1);
-//
-//        append_a_block();
-//
-//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-//        SegmentID segment_id = 0;
-//        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-//        EXPECT_TRUE(status.ok());
-//
-//        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-//        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-//        status = txn3->Import(*db_name, *table_name, input_blocks1);
-//        EXPECT_TRUE(status.ok());
-//
-//        status = new_txn_mgr->CommitTxn(txn);
-//        EXPECT_TRUE(status.ok());
-//
-//        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
-//
-//        append_a_block();
-//
-//        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        status = new_txn_mgr->CommitTxn(txn3);
-//        EXPECT_TRUE(status.ok());
-//
-//        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-//
-//        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        drop_db(*db_name);
-//
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-//    }
-//
-//    //  t1            dump index                                               commit (success)
-//    //  |--------------|--------------------------------------------------------------|
-//    //                         |------------------|--------------------|
-//    //                        t2                 import             commit
-//    {
-//        create_db(*db_name);
-//        create_table(*db_name, table_def);
-//        create_index(index_def1);
-//
-//        append_a_block();
-//
-//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-//        SegmentID segment_id = 0;
-//        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-//        EXPECT_TRUE(status.ok());
-//
-//        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-//        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-//        status = txn3->Import(*db_name, *table_name, input_blocks1);
-//        EXPECT_TRUE(status.ok());
-//        status = new_txn_mgr->CommitTxn(txn3);
-//        EXPECT_TRUE(status.ok());
-//
-//        status = new_txn_mgr->CommitTxn(txn);
-//        EXPECT_TRUE(status.ok());
-//
-//        //        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr);
-//        //        });
-//
-//        append_a_block();
-//
-//        //        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//        //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//        //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//        //            return std::make_pair(begin_id, row_cnt);
-//        //        });
-//
-//        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-//
-//        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        drop_db(*db_name);
-//
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-//    }
-//
-//    //  t1            dump index                             commit (success)
-//    //  |--------------|------------------------------------------|
-//    //         |------------------|----------------------|
-//    //         t2                import              commit
-//    {
-//        create_db(*db_name);
-//        create_table(*db_name, table_def);
-//        create_index(index_def1);
-//
-//        append_a_block();
-//
-//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-//
-//        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-//
-//        SegmentID segment_id = 0;
-//        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-//        EXPECT_TRUE(status.ok());
-//
-//        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-//        status = txn3->Import(*db_name, *table_name, input_blocks1);
-//        EXPECT_TRUE(status.ok());
-//        status = new_txn_mgr->CommitTxn(txn3);
-//        EXPECT_TRUE(status.ok());
-//
-//        status = new_txn_mgr->CommitTxn(txn);
-//        EXPECT_TRUE(status.ok());
-//
-//        append_a_block();
-//
-//        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-//
-//        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        drop_db(*db_name);
-//
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-//    }
-//
-//    //  t1                                  dump index (fail)                           rollback (success)
-//    //  |---------------------------------------|------------------------------------------|
-//    //         |------------------|--------------------|
-//    //         t2                import        commit
-//    {
-//        create_db(*db_name);
-//        create_table(*db_name, table_def);
-//        create_index(index_def1);
-//
-//        append_a_block();
-//
-//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-//
-//        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-//        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-//        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-//        EXPECT_TRUE(status.ok());
-//
-//        SegmentID segment_id = 0;
-//        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-//        EXPECT_TRUE(status.ok());
-//
-//        status = new_txn_mgr->CommitTxn(txn3);
-//        EXPECT_TRUE(status.ok());
-//
-//        status = new_txn_mgr->CommitTxn(txn);
-//        EXPECT_TRUE(status.ok());
-//
-//        append_a_block();
-//
-//        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-//
-//        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        drop_db(*db_name);
-//
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-//    }
-//
-//    //  t1                                  dump index                             commit (success)
-//    //  |---------------------------------------|------------------------------------------|
-//    //         |------------------|-----------|
-//    //         t2                import  commit
-//    {
-//        create_db(*db_name);
-//        create_table(*db_name, table_def);
-//        create_index(index_def1);
-//
-//        append_a_block();
-//
-//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-//
-//        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-//        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-//        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-//        EXPECT_TRUE(status.ok());
-//        status = new_txn_mgr->CommitTxn(txn3);
-//        EXPECT_TRUE(status.ok());
-//
-//        SegmentID segment_id = 0;
-//        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-//        EXPECT_TRUE(status.ok());
-//
-//        status = new_txn_mgr->CommitTxn(txn);
-//        EXPECT_TRUE(status.ok());
-//
-//        append_a_block();
-//
-//        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-//
-//        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        drop_db(*db_name);
-//
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-//    }
-//
-//    //                                 t1                    dump index                             commit (success)
-//    //                                 |----------------------|------------------------------------------|
-//    //         |------------------|----------|
-//    //         t2                import    commit
-//    {
-//        create_db(*db_name);
-//        create_table(*db_name, table_def);
-//        create_index(index_def1);
-//
-//        append_a_block();
-//
-//        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-//        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-//        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-//        EXPECT_TRUE(status.ok());
-//
-//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-//
-//        status = new_txn_mgr->CommitTxn(txn3);
-//        EXPECT_TRUE(status.ok());
-//
-//        SegmentID segment_id = 0;
-//        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-//        EXPECT_TRUE(status.ok());
-//
-//        status = new_txn_mgr->CommitTxn(txn);
-//        EXPECT_TRUE(status.ok());
-//
-//        append_a_block();
-//
-//        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-//
-//        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        drop_db(*db_name);
-//
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-//    }
-//
-//    //                                            t1                    dump index                             commit (success)
-//    //                                            |----------------------|------------------------------------------|
-//    //         |------------------|------------|
-//    //         t2                drop column  commit
-//    {
-//        create_db(*db_name);
-//        create_table(*db_name, table_def);
-//        create_index(index_def1);
-//
-//        append_a_block();
-//
-//        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-//        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
-//        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-//        EXPECT_TRUE(status.ok());
-//        status = new_txn_mgr->CommitTxn(txn3);
-//        EXPECT_TRUE(status.ok());
-//
-//        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
-//        SegmentID segment_id = 0;
-//        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
-//        EXPECT_TRUE(status.ok());
-//
-//        status = new_txn_mgr->CommitTxn(txn);
-//        EXPECT_TRUE(status.ok());
-//
-//        append_a_block();
-//
-//        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
-//
-//        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
-//            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
-//            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
-//            return std::make_pair(begin_id, row_cnt);
-//        });
-//
-//        drop_db(*db_name);
-//
-//        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-//        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-//    }
+    //    //  t1            dump index   commit (success)
+    //    //  |--------------|---------------|
+    //    //                         |------------------|----------|
+    //    //                        t2                import     commit
+    //    {
+    //        create_db(*db_name);
+    //        create_table(*db_name, table_def);
+    //        create_index(index_def1);
+    //
+    //        append_a_block();
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+    //        SegmentID segment_id = 0;
+    //        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+    //
+    //        append_a_block();
+    //
+    //        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
+    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
+    //        EXPECT_TRUE(status.ok());
+    //        status = new_txn_mgr->CommitTxn(txn3);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+    //
+    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        drop_db(*db_name);
+    //
+    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    //    }
+    //
+    //    //  t1            dump index                 commit (success)
+    //    //  |--------------|------------------------------|
+    //    //                         |------------------|------------------|
+    //    //                        t2                 import          commit
+    //    {
+    //        create_db(*db_name);
+    //        create_table(*db_name, table_def);
+    //        create_index(index_def1);
+    //
+    //        append_a_block();
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+    //        SegmentID segment_id = 0;
+    //        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
+    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ == nullptr); });
+    //
+    //        append_a_block();
+    //
+    //        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        status = new_txn_mgr->CommitTxn(txn3);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+    //
+    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        drop_db(*db_name);
+    //
+    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    //    }
+    //
+    //    //  t1            dump index                                               commit (success)
+    //    //  |--------------|--------------------------------------------------------------|
+    //    //                         |------------------|--------------------|
+    //    //                        t2                 import             commit
+    //    {
+    //        create_db(*db_name);
+    //        create_table(*db_name, table_def);
+    //        create_index(index_def1);
+    //
+    //        append_a_block();
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+    //        SegmentID segment_id = 0;
+    //        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
+    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
+    //        EXPECT_TRUE(status.ok());
+    //        status = new_txn_mgr->CommitTxn(txn3);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        //        check_index0(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ ==
+    //        nullptr);
+    //        //        });
+    //
+    //        append_a_block();
+    //
+    //        //        check_index1(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //        //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //        //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //        //            return std::make_pair(begin_id, row_cnt);
+    //        //        });
+    //
+    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+    //
+    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        drop_db(*db_name);
+    //
+    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    //    }
+    //
+    //    //  t1            dump index                             commit (success)
+    //    //  |--------------|------------------------------------------|
+    //    //         |------------------|----------------------|
+    //    //         t2                import              commit
+    //    {
+    //        create_db(*db_name);
+    //        create_table(*db_name, table_def);
+    //        create_index(index_def1);
+    //
+    //        append_a_block();
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+    //
+    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    //
+    //        SegmentID segment_id = 0;
+    //        Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
+    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
+    //        EXPECT_TRUE(status.ok());
+    //        status = new_txn_mgr->CommitTxn(txn3);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        append_a_block();
+    //
+    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+    //
+    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        drop_db(*db_name);
+    //
+    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    //    }
+    //
+    //    //  t1                                  dump index (fail)                           rollback (success)
+    //    //  |---------------------------------------|------------------------------------------|
+    //    //         |------------------|--------------------|
+    //    //         t2                import        commit
+    //    {
+    //        create_db(*db_name);
+    //        create_table(*db_name, table_def);
+    //        create_index(index_def1);
+    //
+    //        append_a_block();
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+    //
+    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
+    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        SegmentID segment_id = 0;
+    //        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn3);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        append_a_block();
+    //
+    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+    //
+    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        drop_db(*db_name);
+    //
+    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    //    }
+    //
+    //    //  t1                                  dump index                             commit (success)
+    //    //  |---------------------------------------|------------------------------------------|
+    //    //         |------------------|-----------|
+    //    //         t2                import  commit
+    //    {
+    //        create_db(*db_name);
+    //        create_table(*db_name, table_def);
+    //        create_index(index_def1);
+    //
+    //        append_a_block();
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+    //
+    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
+    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
+    //        EXPECT_TRUE(status.ok());
+    //        status = new_txn_mgr->CommitTxn(txn3);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        SegmentID segment_id = 0;
+    //        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        append_a_block();
+    //
+    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+    //
+    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        drop_db(*db_name);
+    //
+    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    //    }
+    //
+    //    //                                 t1                    dump index                             commit (success)
+    //    //                                 |----------------------|------------------------------------------|
+    //    //         |------------------|----------|
+    //    //         t2                import    commit
+    //    {
+    //        create_db(*db_name);
+    //        create_table(*db_name, table_def);
+    //        create_index(index_def1);
+    //
+    //        append_a_block();
+    //
+    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
+    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+    //
+    //        status = new_txn_mgr->CommitTxn(txn3);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        SegmentID segment_id = 0;
+    //        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        append_a_block();
+    //
+    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+    //
+    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        drop_db(*db_name);
+    //
+    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    //    }
+    //
+    //    //                                            t1                    dump index                             commit (success)
+    //    //                                            |----------------------|------------------------------------------|
+    //    //         |------------------|------------|
+    //    //         t2                drop column  commit
+    //    {
+    //        create_db(*db_name);
+    //        create_table(*db_name, table_def);
+    //        create_index(index_def1);
+    //
+    //        append_a_block();
+    //
+    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
+    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_block()};
+    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
+    //        EXPECT_TRUE(status.ok());
+    //        status = new_txn_mgr->CommitTxn(txn3);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump mem index {}", *index_name1)), TransactionType::kNormal);
+    //        SegmentID segment_id = 0;
+    //        status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        append_a_block();
+    //
+    //        check_index2(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) { EXPECT_TRUE(mem_index->memory_secondary_index_ != nullptr); });
+    //
+    //        check_index3(*index_name1, [&](const SharedPtr<MemIndex> &mem_index) {
+    //            RowID begin_id = mem_index->memory_secondary_index_->GetBeginRowID();
+    //            u32 row_cnt = mem_index->memory_secondary_index_->GetRowCount();
+    //            return std::make_pair(begin_id, row_cnt);
+    //        });
+    //
+    //        drop_db(*db_name);
+    //
+    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    //    }
 
     RemoveDbDirs();
 }

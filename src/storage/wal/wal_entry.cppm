@@ -529,6 +529,8 @@ export struct WalCmdOptimize final : public WalCmd {
     Vector<UniquePtr<InitParameter>> params_{};
 };
 
+enum class DumpIndexCause { kImport, kCompact, kCreateIndex, kOptimizeIndex, kReplayCreateIndex, kDumpMemIndex, kInvalid };
+
 export struct WalCmdDumpIndex final : public WalCmd {
     WalCmdDumpIndex(String db_name, String table_name, String index_name, SegmentID segment_id)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id) {}
@@ -561,6 +563,7 @@ export struct WalCmdDumpIndex final : public WalCmd {
     String table_id_str_{};
     String index_id_str_{};
     String table_key_{};
+    DumpIndexCause dump_cause_{DumpIndexCause::kInvalid};
 };
 
 export struct WalCmdRenameTable : public WalCmd {

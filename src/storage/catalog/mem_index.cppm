@@ -29,10 +29,7 @@ namespace infinity {
 export struct MemIndex {
     void ClearMemIndex() {
         std::unique_lock<std::mutex> lock(mtx_);
-        if (!to_clear_) {
-            return;
-        }
-        to_clear_ = false;
+
         memory_hnsw_index_.reset();
         memory_ivf_index_.reset();
         memory_indexer_.reset();
@@ -42,7 +39,6 @@ export struct MemIndex {
     }
 
     std::mutex mtx_; // Used by append / mem index dump / clear
-    bool to_clear_ = false;
 
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<IVFIndexInMem> memory_ivf_index_{};

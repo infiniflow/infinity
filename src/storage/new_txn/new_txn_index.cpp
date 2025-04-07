@@ -75,8 +75,17 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     }
     SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
 
+    status = new_catalog_->SetMemIndexDump(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     status = new_catalog_->IncreaseTableWriteCount(this, table_key);
     if (!status.ok()) {
+        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
+        if (!mem_index_status.ok()) {
+            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
+        }
         return status;
     }
 
@@ -87,15 +96,23 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
         if (!ref_cnt_status.ok()) {
             UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
         }
+        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
+        if (!mem_index_status.ok()) {
+            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
+        }
         return status;
     }
 
     ChunkIndexMeta chunk_index_meta(new_chunk_id, segment_index_meta);
-    status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, true);
+    status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, {}, DumpIndexCause::kDumpMemIndex);
     if (!status.ok()) {
         Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
         if (!ref_cnt_status.ok()) {
             UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
+        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
+        if (!mem_index_status.ok()) {
+            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", table_name, mem_index_status.message()));
         }
         return status;
     }
@@ -284,7 +301,7 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
         }
     }
 
-    status = this->AddChunkWal(db_name, table_name, index_name, table_key, *chunk_index_meta, deprecate_ids, true);
+    status = this->AddChunkWal(db_name, table_name, index_name, table_key, *chunk_index_meta, deprecate_ids, DumpIndexCause::kOptimizeIndex);
     if (!status.ok()) {
         return status;
     }
@@ -385,7 +402,10 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
         }
     }
     if (cur_row_cnt > 0) {
-        append_in_column();
+        Status status = append_in_column();
+        if (!status.ok()) {
+            return status;
+        }
     }
 
     return Status::OK();
@@ -539,6 +559,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
                              TableIndexMeeta &table_index_meta,
                              SegmentMeta &segment_meta,
                              SizeT segment_row_cnt,
+                             DumpIndexCause dump_index_cause,
                              WalCmdCreateIndex *create_index_cmd_ptr) {
     Optional<SegmentIndexMeta> segment_index_meta;
     {
@@ -620,7 +641,7 @@ Status NewTxn::PopulateIndex(const String &db_name,
 
         create_index_cmd.segment_index_infos_.emplace_back(segment_meta.segment_id(), std::move(chunk_infos));
     } else {
-        Status status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, old_chunk_ids, false);
+        Status status = this->AddChunkWal(db_name, table_name, index_name, table_key, chunk_index_meta, old_chunk_ids, dump_index_cause);
         if (!status.ok()) {
             return status;
         }
@@ -1182,19 +1203,20 @@ Status NewTxn::AddChunkWal(const String &db_name,
                            const String &table_key,
                            ChunkIndexMeta &chunk_index_meta,
                            const Vector<ChunkID> &deprecate_ids,
-                           bool clear_mem_index) {
+                           DumpIndexCause dump_index_cause) {
     SegmentIndexMeta &segment_index_meta = chunk_index_meta.segment_index_meta();
     Vector<WalChunkIndexInfo> chunk_infos;
     chunk_infos.emplace_back(chunk_index_meta);
     SegmentID segment_id = segment_index_meta.segment_id();
     auto dump_cmd = MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id, std::move(chunk_infos), deprecate_ids);
-    if (clear_mem_index) {
+    if (dump_index_cause == DumpIndexCause::kDumpMemIndex) {
         dump_cmd->clear_mem_index_ = true;
         dump_cmd->db_id_str_ = segment_index_meta.table_index_meta().table_meta().db_id_str();
         dump_cmd->table_id_str_ = segment_index_meta.table_index_meta().table_meta().table_id_str();
         dump_cmd->index_id_str_ = segment_index_meta.table_index_meta().index_id_str();
     }
     dump_cmd->table_key_ = table_key;
+    dump_cmd->dump_cause_ = dump_index_cause;
 
     wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(dump_cmd));
     txn_context_ptr_->AddOperation(MakeShared<String>(dump_cmd->ToString()));
@@ -1388,6 +1410,7 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
 
     if (this->IsReplay()) {
         WalCmdDumpIndex dump_index_cmd(db_name, table_name, index_name, 0);
+        dump_index_cmd.dump_cause_ = DumpIndexCause::kReplayCreateIndex;
         for (const WalSegmentIndexInfo &segment_index_info : create_index_cmd->segment_index_infos_) {
             dump_index_cmd.segment_id_ = segment_index_info.segment_id_;
             dump_index_cmd.chunk_infos_ = segment_index_info.chunk_infos_;
@@ -1404,8 +1427,15 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
             if (!status.ok()) {
                 return status;
             }
-            status =
-                this->PopulateIndex(db_name, table_name, index_name, table_key, table_index_meta, segment_meta, segment_row_cnt, create_index_cmd);
+            status = this->PopulateIndex(db_name,
+                                         table_name,
+                                         index_name,
+                                         table_key,
+                                         table_index_meta,
+                                         segment_meta,
+                                         segment_row_cnt,
+                                         DumpIndexCause::kCreateIndex,
+                                         create_index_cmd);
             if (!status.ok()) {
                 return status;
             }
@@ -1430,6 +1460,15 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInst
     const String &table_id_str = dump_index_cmd->table_id_str_;
     const String &index_id_str = dump_index_cmd->index_id_str_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
+
+    const String &table_key = dump_index_cmd->table_key_;
+
+    if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
+        if (!mem_index_status.ok()) {
+            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_cmd->table_name_, mem_index_status.message()));
+        }
+    }
 
     if (dump_index_cmd->clear_mem_index_) {
 

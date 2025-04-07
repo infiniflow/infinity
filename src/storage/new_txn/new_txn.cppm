@@ -90,6 +90,7 @@ struct NewTxnCompactState;
 
 struct AppendState;
 struct AppendRange;
+enum class DumpIndexCause;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -418,6 +419,7 @@ private:
                          TableIndexMeeta &table_index_meta,
                          SegmentMeta &segment_meta,
                          SizeT segment_row_cnt,
+                         DumpIndexCause dump_index_cause,
                          WalCmdCreateIndex *create_index_cmd_ptr = nullptr);
 
     Status ReplayDumpIndex(WalCmdDumpIndex *dump_index_cmd);
@@ -459,7 +461,7 @@ private:
                        const String &table_key,
                        ChunkIndexMeta &chunk_index_meta,
                        const Vector<ChunkID> &deprecate_ids,
-                       bool clear_mem_index);
+                       DumpIndexCause dump_index_cause);
 
     Status CheckpointDB(DBMeeta &db_meta, const CheckpointOption &option);
 

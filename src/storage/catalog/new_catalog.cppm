@@ -178,9 +178,10 @@ public:
     Status UnsetMemIndexDump(const String &table_key);
     bool IsMemIndexDump(const String &table_key);
     SizeT GetTableReferenceCountForMemIndex(const String &table_key);
+    SizeT GetTableReferenceCountForMemIndex() const;
 
 private:
-    std::shared_mutex mem_index_mtx_{};
+    mutable std::shared_mutex mem_index_mtx_{};
     HashMap<String, SharedPtr<MemIndex>> mem_index_map_{};
     HashMap<String, SharedPtr<TableLockForMemIndex>> table_lock_for_mem_index_{};
 

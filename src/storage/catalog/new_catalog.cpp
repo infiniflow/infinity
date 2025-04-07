@@ -458,7 +458,7 @@ Status NewCatalog::DecreaseTableReferenceCountForMemIndex(const String &table_ke
     std::unique_lock lock(mem_index_mtx_);
     auto iter = table_lock_for_mem_index_.find(table_key);
     if (iter == table_lock_for_mem_index_.end()) {
-        table_lock_for_mem_index_[table_key] = MakeShared<TableLockForMemIndex>();
+        return Status::OK();
     }
 
     TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
@@ -482,6 +482,11 @@ SizeT NewCatalog::GetTableReferenceCountForMemIndex(const String &table_key) {
     }
 
     return iter->second->append_count_;
+}
+
+SizeT NewCatalog::GetTableReferenceCountForMemIndex() const {
+    std::unique_lock lock(mem_index_mtx_);
+    return table_lock_for_mem_index_.size();
 }
 
 Status NewCatalog::SetMemIndexDump(const String &table_key) {
