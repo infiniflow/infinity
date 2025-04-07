@@ -294,6 +294,8 @@ public:
     static Status GetSegmentIndexFilepaths(SegmentIndexMeta &segment_index_meta, Vector<String> &file_paths);
 
     static Status GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, Vector<String> &file_paths);
+
+    static Status CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index);
 };
 
 } // namespace infinity

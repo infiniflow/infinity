@@ -112,6 +112,7 @@ import new_txn;
 import meta_info;
 import db_meeta;
 import table_meeta;
+import new_catalog;
 
 namespace infinity {
 
@@ -1231,14 +1232,36 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
         statement->schema_name_ = query_context_ptr_->schema_name();
     }
     Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_entry, entry_status] = txn->GetTableByName(statement->schema_name_, statement->table_name_);
-    if (!entry_status.ok()) {
-        RecoverableError(entry_status);
-    }
+    NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+    Status status;
+    TableEntry *table_entry = nullptr;
+    Optional<TableMeeta> table_meta;
 
-    auto [table_info, info_status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
-    if (!info_status.ok()) {
-        RecoverableError(info_status);
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+    SharedPtr<TableInfo> table_info;
+
+    if (use_new_catalog) {
+        Optional<DBMeeta> db_meta;
+        status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info = MakeShared<TableInfo>();
+        status = table_meta->GetTableInfo(*table_info);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info->db_name_ = MakeShared<String>(statement->schema_name_);
+        table_info->table_name_ = MakeShared<String>(statement->table_name_);
+    } else {
+        std::tie(table_entry, status) = txn->GetTableByName(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        std::tie(table_info, status) = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
     }
 
     switch (statement->type_) {
@@ -1257,13 +1280,24 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                     RecoverableError(Status::NotSupport("Add column without default value isn't supported."));
                 }
                 bool found = true;
-                try {
-                    [[maybe_unused]] i64 column_id = table_entry->GetColumnIdByName(column_def->name());
-                } catch (const RecoverableException &e) {
-                    if (e.ErrorCode() != ErrorCode::kColumnNotExist) {
-                        throw;
+                if (!use_new_catalog) {
+                    try {
+                        [[maybe_unused]] i64 column_id = table_entry->GetColumnIdByName(column_def->name());
+                    } catch (const RecoverableException &e) {
+                        if (e.ErrorCode() != ErrorCode::kColumnNotExist) {
+                            throw;
+                        }
+                        found = false;
                     }
-                    found = false;
+                } else {
+                    ColumnID column_id = 0;
+                    std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_def->name());
+                    if (!status.ok()) {
+                        if (status.code() != ErrorCode::kNotFound) {
+                            RecoverableError(status);
+                        }
+                        found = false;
+                    }
                 }
                 if (found) {
                     RecoverableError(Status::DuplicateColumnName(column_def->name()));
@@ -1276,9 +1310,25 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
             auto *drop_columns_statement = static_cast<DropColumnsStatement *>(statement);
             Vector<String> column_names = std::move(drop_columns_statement->column_names_);
             for (const auto &column_name : column_names) {
-                i64 column_id = table_entry->GetColumnIdByName(column_name);
-                if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
-                    RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+                if (!use_new_catalog) {
+                    i64 column_id = table_entry->GetColumnIdByName(column_name);
+                    if (table_entry->CheckIfIndexColumn(column_id, txn->TxnID(), txn->BeginTS())) {
+                        RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+                    }
+                } else {
+                    ColumnID column_id = 0;
+                    std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(column_name);
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
+                    bool has_index = false;
+                    status = NewCatalog::CheckColumnIfIndexed(*table_meta, column_id, has_index);
+                    if(!status.ok()) {
+                        RecoverableError(status);
+                    }
+                    if (has_index) {
+                        RecoverableError(Status::NotSupport(fmt::format("Drop column {} which is indexed.", column_name)));
+                    }
                 }
             }
             this->logical_plan_ = MakeShared<LogicalDropColumns>(bind_context_ptr->GetNewLogicalNodeId(), table_info, std::move(column_names));

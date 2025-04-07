@@ -1037,4 +1037,31 @@ Status NewCatalog::GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, Vect
     return Status::OK();
 }
 
+Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index) {
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Status status = table_meta.GetIndexIDs(index_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &index_id_str : *index_id_strs_ptr) {
+        TableIndexMeeta table_index_meta(index_id_str, table_meta);
+        SharedPtr<IndexBase> index_base;
+        std::tie(index_base, status) = table_index_meta.GetIndexBase();
+        if (!status.ok()) {
+            return status;
+        }
+        ColumnID column_id1 = 0;
+        std::tie(column_id1, status) = table_meta.GetColumnIDByColumnName(index_base->column_name());
+        if (!status.ok()) {
+            return status;
+        }
+        if (column_id1 == column_id) {
+            has_index = true;
+            return Status::OK();
+        }
+    }
+    has_index = false;
+    return Status::OK();
+}
+
 } // namespace infinity

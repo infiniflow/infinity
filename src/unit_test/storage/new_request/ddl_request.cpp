@@ -161,3 +161,49 @@ TEST_P(TestDDLRequest, test_drop_index) {
         EXPECT_FALSE(ok);
     }
 }
+
+TEST_P(TestDDLRequest, test_add_column) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 varchar)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    String add_column_sql = "alter table t1 add column (c3 int default 0)";
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(add_column_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(add_column_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_FALSE(ok);
+    }
+}
+
+TEST_P(TestDDLRequest, test_drop_column) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 varchar)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    String drop_column_sql = "alter table t1 drop column (c1)";
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(drop_column_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(drop_column_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_FALSE(ok);
+    }
+}

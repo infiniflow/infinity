@@ -28,10 +28,11 @@ import value;
 import defer_op;
 import wal_manager;
 import infinity_context;
+import new_txn;
 
 namespace infinity {
 
-void PhysicalRenameTable::Init(QueryContext* query_context) {}
+void PhysicalRenameTable::Init(QueryContext *query_context) {}
 
 bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
     RecoverableError(Status::NotSupport("Rename table is not supported."));
@@ -39,7 +40,7 @@ bool PhysicalRenameTable::Execute(QueryContext *query_context, OperatorState *op
     return true;
 }
 
-void PhysicalAddColumns::Init(QueryContext* query_context) {}
+void PhysicalAddColumns::Init(QueryContext *query_context) {}
 
 bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -53,13 +54,18 @@ bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *ope
         return true;
     }
 
-    Txn *txn = query_context->GetTxn();
-    txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
-    DeferFn defer_fn([&]() {
-        txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_);
-    });
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    Status status;
+    if (!use_new_catalog) {
+        Txn *txn = query_context->GetTxn();
+        txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
+        DeferFn defer_fn([&]() { txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_); });
 
-    auto status = txn->AddColumns(*table_info_->db_name_, *table_info_->table_name_, column_defs_);
+        status = txn->AddColumns(*table_info_->db_name_, *table_info_->table_name_, column_defs_);
+    } else {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        status = new_txn->AddColumns(*table_info_->db_name_, *table_info_->table_name_, column_defs_);
+    }
     if (!status.ok()) {
         RecoverableError(status);
     }
@@ -67,7 +73,7 @@ bool PhysicalAddColumns::Execute(QueryContext *query_context, OperatorState *ope
     return true;
 }
 
-void PhysicalDropColumns::Init(QueryContext* query_context) {}
+void PhysicalDropColumns::Init(QueryContext *query_context) {}
 
 bool PhysicalDropColumns::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -81,13 +87,19 @@ bool PhysicalDropColumns::Execute(QueryContext *query_context, OperatorState *op
         return true;
     }
 
-    Txn *txn = query_context->GetTxn();
-    txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
-    DeferFn defer_fn([&]() {
-        txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_);
-    });
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    Status status;
+    if (!use_new_catalog) {
+        Txn *txn = query_context->GetTxn();
+        txn->LockTable(*table_info_->db_name_, *table_info_->table_name_);
+        DeferFn defer_fn([&]() { txn->UnLockTable(*table_info_->db_name_, *table_info_->table_name_); });
 
-    auto status = txn->DropColumns(*table_info_->db_name_, *table_info_->table_name_, column_names_);
+        status = txn->DropColumns(*table_info_->db_name_, *table_info_->table_name_, column_names_);
+    } else {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        status = new_txn->DropColumns(*table_info_->db_name_, *table_info_->table_name_, column_names_);
+    }
+
     if (!status.ok()) {
         RecoverableError(status);
     }
