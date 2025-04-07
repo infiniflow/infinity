@@ -26,7 +26,49 @@ import table_index_entry;
 import segment_index_entry;
 import default_values;
 
+import status;
+import infinity_exception;
+import new_txn;
+import db_meeta;
+import table_meeta;
+import segment_meta;
+import block_meta;
+import kv_store;
+
 namespace infinity {
+
+BlockIndex::BlockIndex() = default;
+
+BlockIndex::~BlockIndex() = default;
+
+void BlockIndex::NewInit(NewTxn *new_txn, const String &db_name, const String &table_name) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    table_meta_ = MakeUnique<TableMeeta>(table_meta->db_id_str(), table_meta->table_id_str(), table_meta->kv_instance(), table_meta->begin_ts());
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta_->GetSegmentIDs1();
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.emplace(segment_id, NewSegmentSnapshot()).first->second;
+        segment_snapshot.segment_meta_ = MakeUnique<SegmentMeta>(segment_id, *table_meta_);
+
+        Vector<BlockID> *block_ids_ptr = nullptr;
+        std::tie(block_ids_ptr, status) = segment_snapshot.segment_meta_->GetBlockIDs1();
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        for (BlockID block_id : *block_ids_ptr) {
+            auto block_meta = MakeUnique<BlockMeta>(block_id, *segment_snapshot.segment_meta_);
+            segment_snapshot.block_map_.emplace_back(std::move(block_meta));
+        }
+    }
+}
 
 void BlockIndex::Insert(SegmentEntry *segment_entry, Txn *txn) {
     if (segment_entry->CheckVisible(txn)) {
@@ -48,6 +90,25 @@ void BlockIndex::Insert(SegmentEntry *segment_entry, Txn *txn) {
     }
 }
 
+SizeT BlockIndex::BlockCount() const {
+    SizeT count = 0;
+    if (!table_meta_)
+        for (const auto &[_, segment_info] : segment_block_index_) {
+            count += segment_info.block_map_.size();
+        }
+    else
+        for (const auto &[_, segment_info] : new_segment_block_index_) {
+            count += segment_info.block_map_.size();
+        }
+    return count;
+}
+
+SizeT BlockIndex::SegmentCount() const {
+    if (!table_meta_)
+        return segment_block_index_.size();
+    return new_segment_block_index_.size();
+}
+
 SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
     auto seg_it = segment_block_index_.find(segment_id);
     if (seg_it != segment_block_index_.end()) {
@@ -65,6 +126,12 @@ BlockOffset BlockIndex::GetBlockOffset(SegmentID segment_id, BlockID block_id) c
     return segment_offset % DEFAULT_BLOCK_CAPACITY;
 }
 
+bool BlockIndex::IsEmpty() const {
+    if (!table_meta_)
+        return segment_block_index_.empty();
+    return new_segment_block_index_.empty();
+}
+
 BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {
     auto seg_it = segment_block_index_.find(segment_id);
     if (seg_it == segment_block_index_.end()) {
@@ -75,6 +142,18 @@ BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {
         return nullptr;
     }
     return blocks_info.block_map_[block_id];
+}
+
+BlockMeta *BlockIndex::GetBlockMeta(u32 segment_id, u16 block_id) const {
+    auto seg_it = new_segment_block_index_.find(segment_id);
+    if (seg_it == new_segment_block_index_.end()) {
+        return nullptr;
+    }
+    const auto &blocks_info = seg_it->second;
+    if (blocks_info.block_map_.size() <= block_id) {
+        return nullptr;
+    }
+    return blocks_info.block_map_[block_id].get();
 }
 
 void IndexIndex::Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot) {

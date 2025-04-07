@@ -25,6 +25,7 @@ import session;
 import session_manager;
 import query_context;
 import query_result;
+import data_table;
 
 using namespace infinity;
 
@@ -53,12 +54,15 @@ protected:
         return query_context_ptr;
     }
 
-    bool HandleQueryResult(const QueryResult &result) {
+    bool HandleQueryResult(const QueryResult &result, DataTable **result_table = nullptr) {
         if (result.result_table_.get() == nullptr) {
             // error
             return false;
         }
         // handle result value here
+        if (result_table) {
+            *result_table = result.result_table_.get();
+        }
         return true;
     }
 

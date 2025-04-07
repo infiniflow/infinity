@@ -84,12 +84,17 @@ public:
 
     bool Next(BlockOffset block_offset_begin, Pair<BlockOffset, BlockOffset> &visible_range);
 
+    bool Next(Pair<BlockOffset, BlockOffset> &visible_range) { return Next(block_offset_begin_, visible_range); }
+
+    void SetBlockOffsetBegin(BlockOffset block_offset_begin) { block_offset_begin_ = block_offset_begin; }
+
     BlockOffset block_offset_end() const { return block_offset_end_; }
 
 private:
     SharedPtr<BlockLock> block_lock_;
     BufferHandle version_buffer_handle_;
     TxnTimeStamp begin_ts_ = 0;
+    BlockOffset block_offset_begin_ = 0;
     BlockOffset block_offset_end_ = 0;
 };
 

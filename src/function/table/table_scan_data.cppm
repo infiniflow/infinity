@@ -19,6 +19,8 @@ import function_data;
 import table_function;
 import global_block_id;
 
+import new_catalog;
+
 export module table_scan_function_data;
 
 namespace infinity {
@@ -35,6 +37,8 @@ public:
 
     u64 current_block_ids_idx_{0};
     SizeT current_read_offset_{0};
+
+    Optional<NewTxnGetVisibleRangeState> get_visible_range_state_{};
 };
 
 } // namespace infinity

@@ -21,13 +21,18 @@ import request_test;
 import query_context;
 import query_result;
 
+import data_table;
+import data_block;
+import column_vector;
+import value;
+
 using namespace infinity;
 
-class TestAppendRequest : public NewRequestTest {
+class TestDataRequest : public NewRequestTest {
 protected:
-    void Prepare() {
-        String create_table_sql = "create table t1(c1 int, c2 varchar)";
+    void PrepareCreateTable() {
         {
+            String create_table_sql = "create table t1(c1 int, c2 varchar)";
             UniquePtr<QueryContext> query_context = MakeQueryContext();
             QueryResult query_result = query_context->Query(create_table_sql);
             bool ok = HandleQueryResult(query_result);
@@ -37,12 +42,11 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestAppendRequest,
+                         TestDataRequest,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestAppendRequest, test_append) {
-    Prepare();
-
+TEST_P(TestDataRequest, test_append) {
+    PrepareCreateTable();
     {
         String append_req_sql = "insert into t1 values(1, 'abc')";
 
@@ -58,5 +62,37 @@ TEST_P(TestAppendRequest, test_append) {
         QueryResult query_result = query_context->Query(append_err_req_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
+    }
+}
+
+TEST_P(TestDataRequest, test_select) {
+    PrepareCreateTable();
+    {
+        String append_req_sql = "insert into t1 values(1, 'abc')";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(append_req_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String select_req_sql = "select * from t1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_req_sql);
+
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+
+        EXPECT_EQ(result_table->data_blocks_.size(), 1);
+        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
+
+        {
+            SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
+            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(1));
+        }
+        {
+            SharedPtr<ColumnVector> col1 = data_block->column_vectors[1];
+            EXPECT_EQ(col1->GetValue(0), Value::MakeVarchar("abc"));
+        }
     }
 }

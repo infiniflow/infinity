@@ -27,6 +27,11 @@ struct TableIndexEntry;
 struct SegmentIndexEntry;
 class Txn;
 
+class TableMeeta;
+class SegmentMeta;
+class BlockMeta;
+class NewTxn;
+
 export struct SegmentSnapshot {
     SegmentEntry *segment_entry_{};
 
@@ -35,30 +40,41 @@ export struct SegmentSnapshot {
     SegmentOffset segment_offset_ = 0;
 };
 
+export struct NewSegmentSnapshot {
+    UniquePtr<SegmentMeta> segment_meta_;
+    Vector<UniquePtr<BlockMeta>> block_map_;
+    // SegmentOffset segment_offset_ = 0;
+};
+
 export struct BlockIndex {
 public:
+    BlockIndex();
+
+    ~BlockIndex();
+
+    void NewInit(NewTxn *new_txn, const String &db_name, const String &table_name);
+
     void Insert(SegmentEntry *segment_entry, Txn *txn);
 
-    inline SizeT BlockCount() const {
-        SizeT count = 0;
-        for (const auto &[_, segment_info] : segment_block_index_) {
-            count += segment_info.block_map_.size();
-        }
-        return count;
-    }
+    SizeT BlockCount() const;
 
-    inline SizeT SegmentCount() const { return segment_block_index_.size(); }
+    SizeT SegmentCount() const;
 
     BlockEntry *GetBlockEntry(u32 segment_id, u16 block_id) const;
+
+    BlockMeta *GetBlockMeta(u32 segment_id, u16 block_id) const;
 
     SegmentOffset GetSegmentOffset(SegmentID segment_id) const;
 
     BlockOffset GetBlockOffset(SegmentID segment_id, BlockID block_id) const;
 
-    bool IsEmpty() const { return segment_block_index_.empty(); }
+    bool IsEmpty() const;
 
 public:
     Map<SegmentID, SegmentSnapshot> segment_block_index_;
+
+    UniquePtr<TableMeeta> table_meta_;
+    Map<SegmentID, NewSegmentSnapshot> new_segment_block_index_;
 };
 
 export struct IndexSnapshot {

@@ -58,6 +58,11 @@ import parse_fulltext_options;
 import table_entry;
 import block_index;
 
+import new_txn;
+import table_index_meeta;
+import table_meeta;
+import db_meeta;
+
 namespace infinity {
 
 struct ExpressionIndexScanInfo {
@@ -86,6 +91,8 @@ struct ExpressionIndexScanInfo {
 
     // for index scan
     HashMap<ColumnID, TableIndexEntry *> candidate_column_index_map_;
+    Optional<TableMeeta> table_meta_;
+    HashMap<ColumnID, Optional<TableIndexMeeta>> new_candidate_column_index_map_;
 
     inline void InitColumnIndexEntries(TableInfo *table_info, Txn *txn) {
         const TransactionID txn_id = txn->TxnID();
@@ -114,6 +121,45 @@ struct ExpressionIndexScanInfo {
                 LOG_TRACE(fmt::format("InitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
             } else {
                 candidate_column_index_map_.emplace(column_id, table_index_entry);
+            }
+        }
+    }
+
+    inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn) {
+        Optional<DBMeeta> db_meta;
+        Status status = new_txn->GetTableMeta(*table_info->db_name_, *table_info->table_name_, db_meta, table_meta_);
+        if (!status.ok()) {
+            LOG_ERROR(fmt::format("NewInitColumnIndexEntries: GetTableByName db: {}, table: {}, failed: {}",
+                                  *table_info->db_name_,
+                                  *table_info->table_name_,
+                                  status.message()));
+            RecoverableError(status);
+        }
+        Vector<String> *index_id_strs_ptr = nullptr;
+        status = table_meta_->GetIndexIDs(index_id_strs_ptr);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        for (const String &index_id_str : *index_id_strs_ptr) {
+            Optional<TableIndexMeeta> table_index_meta(TableIndexMeeta(index_id_str, *table_meta_));
+            SharedPtr<IndexBase> index_base;
+            std::tie(index_base, status) = table_index_meta->GetIndexBase();
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            if (index_base->index_type_ != IndexType::kSecondary) {
+                continue;
+            }
+            auto column_name = index_base->column_name();
+            ColumnID column_id = 0;
+            std::tie(column_id, status) = table_meta_->GetColumnIDByColumnName(column_name);
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+            if (new_candidate_column_index_map_.contains(column_id)) {
+                LOG_TRACE(fmt::format("NewInitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
+            } else {
+                new_candidate_column_index_map_.emplace(column_id, std::move(table_index_meta));
             }
         }
     }
@@ -251,9 +297,16 @@ public:
         const auto and_function_set_ptr = Catalog::GetFunctionSetByName(query_context_->storage()->catalog(), "AND");
         and_scalar_function_set_ptr_ = static_cast<ScalarFunctionSet *>(and_function_set_ptr.get());
         // prepare secondary index info
-        if (base_table_ref_ptr_) {
-            table_info_ = base_table_ref_ptr_->table_info_.get();
-            tree_info_.InitColumnIndexEntries(table_info_, query_context_->GetTxn());
+        if (query_context_->global_config()->UseNewCatalog()) {
+            if (base_table_ref_ptr_) {
+                table_info_ = base_table_ref_ptr_->table_info_.get();
+                tree_info_.NewInitColumnIndexEntries(table_info_, query_context_->GetNewTxn());
+            }
+        } else {
+            if (base_table_ref_ptr_) {
+                table_info_ = base_table_ref_ptr_->table_info_.get();
+                tree_info_.InitColumnIndexEntries(table_info_, query_context_->GetTxn());
+            }
         }
     }
 

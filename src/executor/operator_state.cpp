@@ -23,8 +23,12 @@ import fragment_data;
 import infinity_exception;
 import logger;
 import third_party;
+import table_scan_function_data;
 
 namespace infinity {
+
+TableScanOperatorState::TableScanOperatorState() : OperatorState(PhysicalOperatorType::kTableScan) {}
+TableScanOperatorState::~TableScanOperatorState() = default;
 
 void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
     auto it = num_tasks_.find(fragment_id);

@@ -48,6 +48,10 @@ import physical_index_scan;
 import meta_info;
 import result_cache_manager;
 
+import table_meeta;
+import segment_meta;
+import block_meta;
+
 namespace infinity {
 
 Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 parallel_count) const {
@@ -59,9 +63,17 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
 
     Vector<GlobalBlockID> global_blocks;
     global_blocks.reserve(all_block_count);
-    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
-        for (const auto *block_entry : segment_info.block_map_) {
-            global_blocks.emplace_back(segment_id, block_entry->block_id());
+    if (!block_index->table_meta_) {
+        for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+            for (const auto *block_entry : segment_info.block_map_) {
+                global_blocks.emplace_back(segment_id, block_entry->block_id());
+            }
+        }
+    } else {
+        for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
+            for (auto &block_meta : segment_info.block_map_) {
+                global_blocks.emplace_back(segment_id, block_meta->block_id());
+            }
         }
     }
     Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);

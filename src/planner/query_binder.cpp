@@ -439,10 +439,11 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 
     SharedPtr<TableInfo> table_info;
     Txn *txn = nullptr;
+    NewTxn *new_txn = nullptr;
     Status status;
     bool use_new_meta = query_context->global_config()->UseNewCatalog();
     if (use_new_meta) {
-        NewTxn *new_txn = query_context->GetNewTxn();
+        new_txn = query_context->GetNewTxn();
         Optional<DBMeeta> db_meta;
         Optional<TableMeeta> table_meta;
         Status status = new_txn->GetTableMeta(db_name, table_name, db_meta, table_meta);
@@ -495,7 +496,8 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 
     SharedPtr<BlockIndex> block_index;
     if (use_new_meta) {
-        // block_index;
+        block_index = MakeShared<BlockIndex>();
+        block_index->NewInit(new_txn, db_name, table_name);
     } else {
         block_index = txn->GetBlockIndexFromTable(db_name, from_table->table_name_);
     }

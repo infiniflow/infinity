@@ -21,7 +21,6 @@ import global_block_id;
 import physical_operator_type;
 import fragment_data;
 import data_block;
-import table_scan_function_data;
 import knn_scan_data;
 import match_tensor_scan_function_data;
 import match_sparse_scan_function_data;
@@ -40,6 +39,8 @@ import segment_entry;
 import hash_table;
 
 namespace infinity {
+
+class TableScanFunctionData;
 
 export struct OperatorState {
     inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
@@ -106,7 +107,8 @@ export struct UnionAllOperatorState : public OperatorState {
 
 // TableScan
 export struct TableScanOperatorState : public OperatorState {
-    inline explicit TableScanOperatorState() : OperatorState(PhysicalOperatorType::kTableScan) {}
+    TableScanOperatorState();
+    ~TableScanOperatorState();
 
     UniquePtr<TableScanFunctionData> table_scan_function_data_{};
 };
