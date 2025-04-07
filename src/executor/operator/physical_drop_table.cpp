@@ -30,10 +30,11 @@ import logical_type;
 import column_def;
 import wal_manager;
 import infinity_context;
+import new_txn;
 
 namespace infinity {
 
-void PhysicalDropTable::Init(QueryContext* query_context) {}
+void PhysicalDropTable::Init(QueryContext *query_context) {}
 
 bool PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -47,15 +48,24 @@ bool PhysicalDropTable::Execute(QueryContext *query_context, OperatorState *oper
         return true;
     }
 
-    auto txn = query_context->GetTxn();
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (!use_new_catalog) {
+        auto txn = query_context->GetTxn();
 
-    Status status = txn->DropTable(*schema_name_, *table_name_, conflict_type_);
-    if (ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager(); cache_mgr != nullptr) {
-        cache_mgr->DropTable(*schema_name_, *table_name_);
+        Status status = txn->DropTable(*schema_name_, *table_name_, conflict_type_);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+        }
+    } else {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        Status status = new_txn->DropTable(*schema_name_, *table_name_, conflict_type_);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+        }
     }
 
-    if (!status.ok()) {
-        operator_state->status_ = status;
+    if (ResultCacheManager *cache_mgr = query_context->storage()->result_cache_manager(); cache_mgr != nullptr) {
+        cache_mgr->DropTable(*schema_name_, *table_name_);
     }
 
     // Generate the result

@@ -47,6 +47,29 @@ TEST_P(TestDDLRequest, test_create_db) {
     }
 }
 
+TEST_P(TestDDLRequest, test_drop_db) {
+    {
+        String create_db_sql = "create database db1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_db_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    String drop_db_sql = "drop database db1";
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(drop_db_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(drop_db_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_FALSE(ok);
+    }
+}
+
 TEST_P(TestDDLRequest, test_create_table) {
     String create_table_sql = "create table t1(c1 int, c2 varchar)";
     {
@@ -58,6 +81,29 @@ TEST_P(TestDDLRequest, test_create_table) {
     { // create table with same name
         UniquePtr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_FALSE(ok);
+    }
+}
+
+TEST_P(TestDDLRequest, test_drop_table) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 varchar)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    String drop_table_sql = "drop table t1";
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(drop_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    { // create table with same name
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(drop_table_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
     }
@@ -81,6 +127,36 @@ TEST_P(TestDDLRequest, test_create_index) {
     {
         UniquePtr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_FALSE(ok);
+    }
+}
+
+TEST_P(TestDDLRequest, test_drop_index) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 varchar)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String create_index_sql = "create index idx1 on t1 (c1)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    String drop_index_sql = "drop index idx1 on t1";
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(drop_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(drop_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_FALSE(ok);
     }
