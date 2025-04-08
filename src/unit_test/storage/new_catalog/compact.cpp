@@ -528,31 +528,31 @@ TEST_P(TestCompact, compact_and_add_columns) {
         CheckTable();
         DropDB();
     }
-    // {
-    //     PrepareForCompact();
-
-    //     //  t1            compact     commit (success)
-    //     //  |--------------|---------------|
-    //     //                         |------------------|----------|
-    //     //                        t2                add column    commit
-
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //     status = txn->Compact(*db_name, *table_name);
-    //     EXPECT_TRUE(status.ok());
-
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
-
-    //     status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-    //     EXPECT_TRUE(status.ok());
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
-
-    //     CheckTable();
-    //     DropDB();
-    // }
+    //    {
+    //        PrepareForCompact();
+    //
+    //        //  t1            compact     commit (success)
+    //        //  |--------------|---------------|
+    //        //                         |------------------|----------|
+    //        //                        t2                add column    commit
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+    //        status = txn->Compact(*db_name, *table_name);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
+    //        EXPECT_TRUE(status.ok());
+    //        status = new_txn_mgr->CommitTxn(txn2);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        CheckTable();
+    //        DropDB();
+    //    }
     // {
     //     PrepareForCompact();
 

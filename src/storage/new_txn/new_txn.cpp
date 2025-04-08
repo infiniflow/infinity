@@ -1499,70 +1499,111 @@ Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
     return kv_instance_->Put(id_name.data(), id_str);
 }
 
+bool NewTxn::CheckConflictWithAppend(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::CREATE_INDEX: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+                if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
+                    cause =
+                        fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
+                    return true;
+                }
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictWithImport(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::CREATE_INDEX: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+                if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
+                    cause =
+                        fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
+                    return true;
+                }
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::CREATE_INDEX: {
+                auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
+                if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
+                    cause =
+                        fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
+                    return true;
+                }
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictWithCreateIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::APPEND: {
+                auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
+                if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Append on table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+            }
+            case WalCommandType::IMPORT: {
+                auto *import_cmd = static_cast<WalCmdImport *>(wal_cmd.get());
+                if (import_cmd->db_name_ == db_name && import_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Import on table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+            }
+            case WalCommandType::COMPACT: {
+                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Compact on table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
 bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
     // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
-
-    auto check_with_append = [&](const String &db_name, const String &table_name) {
-        const Vector<SharedPtr<WalCmd>> &wal_cmds = check_txn->wal_entry_->cmds_;
-        for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
-            WalCommandType command_type = wal_cmd->GetType();
-            switch (command_type) {
-                case WalCommandType::CREATE_INDEX: {
-                    auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
-                    if (create_index_cmd->db_name_ == db_name && create_index_cmd->table_name_ == table_name) {
-                        conflict_reason = fmt::format("Create index {} on table {} in database {}.",
-                                                      *create_index_cmd->index_base_->index_name_,
-                                                      table_name,
-                                                      db_name);
-                        return true;
-                    }
-                }
-                default: {
-                    //
-                }
-            }
-        }
-        return false;
-    };
-    auto check_with_index = [&](const String &db_name, const String &table_name) {
-        for (SharedPtr<WalCmd> &wal_cmd : check_txn->wal_entry_->cmds_) {
-            WalCommandType command_type = wal_cmd->GetType();
-            switch (command_type) {
-                case WalCommandType::APPEND: {
-                    auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                    if (append_cmd->db_name_ == db_name && append_cmd->table_name_ == table_name) {
-                        conflict_reason = fmt::format("Append on table {} in database {}.", table_name, db_name);
-                        return true;
-                    }
-                }
-                case WalCommandType::IMPORT: {
-                    auto *import_cmd = static_cast<WalCmdImport *>(wal_cmd.get());
-                    if (import_cmd->db_name_ == db_name && import_cmd->table_name_ == table_name) {
-                        conflict_reason = fmt::format("Import on table {} in database {}.", table_name, db_name);
-                        return true;
-                    }
-                }
-                case WalCommandType::COMPACT: {
-                    auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
-                    if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
-                        conflict_reason = fmt::format("Compact on table {} in database {}.", table_name, db_name);
-                        return true;
-                    }
-                }
-                default: {
-                    //
-                }
-            }
-        }
-        return false;
-    };
     for (SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
         WalCommandType command_type = wal_cmd->GetType();
 
         switch (command_type) {
             case WalCommandType::APPEND: {
                 auto *append_cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                bool conflict = check_with_append(append_cmd->db_name_, append_cmd->table_name_);
+                bool conflict = CheckConflictWithAppend(append_cmd->db_name_, append_cmd->table_name_, check_txn, conflict_reason);
                 if (conflict) {
                     return true;
                 }
@@ -1570,7 +1611,7 @@ bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
             }
             case WalCommandType::IMPORT: {
                 auto *import_cmd = static_cast<WalCmdImport *>(wal_cmd.get());
-                bool conflict = check_with_append(import_cmd->db_name_, import_cmd->table_name_);
+                bool conflict = CheckConflictWithImport(import_cmd->db_name_, import_cmd->table_name_, check_txn, conflict_reason);
                 if (conflict) {
                     return true;
                 }
@@ -1578,14 +1619,14 @@ bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
             }
             case WalCommandType::COMPACT: {
                 auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
-                bool conflict = check_with_append(compact_cmd->db_name_, compact_cmd->table_name_);
+                bool conflict = CheckConflictWithCompact(compact_cmd->db_name_, compact_cmd->table_name_, check_txn, conflict_reason);
                 if (conflict) {
                     return true;
                 }
             }
             case WalCommandType::CREATE_INDEX: {
                 auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
-                bool conflict = check_with_index(create_index_cmd->db_name_, create_index_cmd->table_name_);
+                bool conflict = CheckConflictWithCreateIndex(create_index_cmd->db_name_, create_index_cmd->table_name_, check_txn, conflict_reason);
                 if (conflict) {
                     return true;
                 }

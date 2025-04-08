@@ -505,6 +505,12 @@ private:
 
     Status IncrLatestID(String &id_str, std::string_view id_name) const;
 
+    // Check transaction conflicts
+    bool CheckConflictWithAppend(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
+    bool CheckConflictWithImport(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
+    bool CheckConflictWithCompact(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
+    bool CheckConflictWithCreateIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
+
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
 
