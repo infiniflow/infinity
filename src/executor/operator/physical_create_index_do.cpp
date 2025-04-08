@@ -53,26 +53,26 @@ void PhysicalCreateIndexDo::Init(QueryContext* query_context) {}
 
 // FIXME: fetch and add a block one time
 bool PhysicalCreateIndexDo::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
-    if (storage_mode == StorageMode::kUnInitialized) {
-        UnrecoverableError("Uninitialized storage mode");
-    }
+    // StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
+    // if (storage_mode == StorageMode::kUnInitialized) {
+    //     UnrecoverableError("Uninitialized storage mode");
+    // }
 
-    if (storage_mode != StorageMode::kWritable) {
-        operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
-        operator_state->SetComplete();
-        return true;
-    }
+    // if (storage_mode != StorageMode::kWritable) {
+    //     operator_state->status_ = Status::InvalidNodeRole("Attempt to write on non-writable node");
+    //     operator_state->SetComplete();
+    //     return true;
+    // }
 
-    auto *txn = query_context->GetTxn();
-    auto *create_index_do_state = static_cast<CreateIndexDoOperatorState *>(operator_state);
-    auto &create_index_idxes = create_index_do_state->create_index_shared_data_->create_index_idxes_;
+    // auto *txn = query_context->GetTxn();
+    // auto *create_index_do_state = static_cast<CreateIndexDoOperatorState *>(operator_state);
+    // auto &create_index_idxes = create_index_do_state->create_index_shared_data_->create_index_idxes_;
 
-    auto status = txn->CreateIndexDo(base_table_ref_.get(), *index_name_, create_index_idxes);
-    if (!status.ok()) {
-        operator_state->status_ = status;
-        return false;
-    }
+    // auto status = txn->CreateIndexDo(base_table_ref_.get(), *index_name_, create_index_idxes);
+    // if (!status.ok()) {
+    //     operator_state->status_ = status;
+    //     return false;
+    // }
     operator_state->SetComplete();
 
     return true;

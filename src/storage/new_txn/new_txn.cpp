@@ -392,7 +392,10 @@ Status NewTxn::DropColumns(const String &db_name, const String &table_name, cons
     }
 
     Vector<String> *index_id_strs_ptr = nullptr;
-    table_meta->GetIndexIDs(index_id_strs_ptr);
+    status = table_meta->GetIndexIDs(index_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
 
     for (const String &index_id : *index_id_strs_ptr) {
         TableIndexMeeta table_index_meta(index_id, *table_meta);

@@ -52,6 +52,10 @@ struct WalChunkIndexInfo;
 
 enum class ColumnVectorTipe;
 
+template <bool init_all_true>
+struct RoaringBitmap;
+using Bitmask = RoaringBitmap<true>;
+
 export enum class LockType { kLocking, kLocked, kUnlocking, kUnlocked, kImmutable };
 
 export struct TableMemoryContext {
@@ -299,6 +303,8 @@ public:
     static Status CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index);
 
     static Status CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete);
+
+    static Status SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp begin_ts, Bitmask &bitmask);
 };
 
 } // namespace infinity

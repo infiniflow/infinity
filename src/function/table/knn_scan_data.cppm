@@ -35,6 +35,10 @@ import internal_types;
 
 namespace infinity {
 
+class BlockMeta;
+class TableIndexMeeta;
+class SegmentIndexMeta;
+
 export class KnnScanSharedData {
 public:
     KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
@@ -46,16 +50,31 @@ public:
                       i64 query_embedding_count,
                       void *query_embedding,
                       EmbeddingDataType elem_type,
-                      KnnDistanceType knn_distance_type)
-        : table_ref_(table_ref), block_column_entries_(std::move(block_column_entries)), index_entries_(std::move(index_entries)),
-          opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension), query_count_(query_embedding_count),
-          query_embedding_(query_embedding), query_elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
+                      KnnDistanceType knn_distance_type);
+
+    KnnScanSharedData(SharedPtr<BaseTableRef> table_ref,
+                      UniquePtr<Vector<BlockMeta *>> block_metas,
+                      UniquePtr<TableIndexMeeta> table_index_meta,
+                      UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas,
+                      Vector<InitParameter> opt_params,
+                      i64 topk,
+                      i64 dimension,
+                      i64 query_embedding_count,
+                      void *query_embedding,
+                      EmbeddingDataType elem_type,
+                      KnnDistanceType knn_distance_type);
+
+    ~KnnScanSharedData();
 
 public:
     const SharedPtr<BaseTableRef> table_ref_{};
 
     const UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
     const UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
+
+    UniquePtr<Vector<BlockMeta *>> block_metas_{};
+    UniquePtr<TableIndexMeeta> table_index_meta_{};
+    UniquePtr<Vector<SegmentIndexMeta>> segment_index_metas_{};
 
     const Vector<InitParameter> opt_params_{};
     const i64 topk_;

@@ -125,3 +125,43 @@ TEST_P(TestIndexRequest, fulltext_index_scan) {
         }
     }
 }
+
+TEST_P(TestIndexRequest, vector_index_scan) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 embedding(float, 4))";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String append_req_sql = "insert into t1 values(1, [0.1, 0.1, 0.1, 0.1]), (2, [0.2, 0.2, 0.2, 0.2])";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(append_req_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    auto search_vec = [this] {
+        String search_req_sql = "select c1 from t1 search match vector (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(search_req_sql);
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
+
+        {
+            SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
+            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+        }
+    };
+    search_vec();
+    {
+        String create_index_sql = "create index idx2 on t1(c2) using hnsw with (M = 16, ef_construction = 200, metric = l2)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    search_vec();
+}

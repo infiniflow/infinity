@@ -21,7 +21,6 @@ import global_block_id;
 import physical_operator_type;
 import fragment_data;
 import data_block;
-import knn_scan_data;
 import match_tensor_scan_function_data;
 import match_sparse_scan_function_data;
 import compact_state_data;
@@ -41,6 +40,7 @@ import hash_table;
 namespace infinity {
 
 class TableScanFunctionData;
+class KnnScanFunctionData;
 
 export struct OperatorState {
     inline explicit OperatorState(PhysicalOperatorType operator_type) : operator_type_(operator_type) {}
@@ -148,7 +148,8 @@ export struct MergeMatchSparseOperatorState : public OperatorState {
 
 // KnnScan
 export struct KnnScanOperatorState : public OperatorState {
-    inline explicit KnnScanOperatorState() : OperatorState(PhysicalOperatorType::kKnnScan) {}
+    KnnScanOperatorState();
+    ~KnnScanOperatorState();
 
     //    Vector<SharedPtr<DataBlock>> output_data_blocks_{};
     UniquePtr<KnnScanFunctionData> knn_scan_function_data_{};
