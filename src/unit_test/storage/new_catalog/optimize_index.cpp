@@ -1007,12 +1007,12 @@ TEST_P(TestOptimizeIndex, optimize_index_and_add_column) {
         Vector<SharedPtr<ColumnDef>> columns3;
         columns3.emplace_back(column_def3);
         status = txn4->AddColumns(*db_name, *table_name, columns3);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn4);
+        status = new_txn_mgr->RollBackTxn(txn4);
         EXPECT_TRUE(status.ok());
 
         DropDB();
@@ -1038,12 +1038,12 @@ TEST_P(TestOptimizeIndex, optimize_index_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
 
         DropDB();
@@ -1069,12 +1069,12 @@ TEST_P(TestOptimizeIndex, optimize_index_and_add_column) {
         EXPECT_TRUE(status.ok());
 
         status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn4);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
 
         DropDB();

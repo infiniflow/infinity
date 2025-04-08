@@ -121,7 +121,7 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
 }
 
 Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
-    Status status;
+    Status status = Status::OK();
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
@@ -132,14 +132,24 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     if (!status.ok()) {
         return status;
     }
+
+    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     TableMeeta &table_meta = *table_meta_opt;
     TableIndexMeeta &table_index_meta = *table_index_meta_opt;
     SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
 
     Vector<ChunkID> *old_chunk_ids_ptr = nullptr;
     {
-        Status status = segment_index_meta.GetChunkIDs(old_chunk_ids_ptr);
+        status = segment_index_meta.GetChunkIDs(old_chunk_ids_ptr);
         if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
             return status;
         }
         if (old_chunk_ids_ptr->size() <= 1) {
@@ -154,11 +164,19 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
 
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
         return index_status;
     }
     if (index_base->index_type_ == IndexType::kFullText) {
-        Status status = this->OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, base_name);
+        status = this->OptimizeFtIndex(index_base, segment_index_meta, base_rowid, row_cnt, base_name);
         if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
             return status;
         }
     } else {
@@ -168,8 +186,12 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
         for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
             ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
             {
-                Status status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
+                status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
                 if (!status.ok()) {
+                    Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+                    if (!ref_cnt_status.ok()) {
+                        UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+                    }
                     return status;
                 }
             }
@@ -184,25 +206,40 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     Vector<ChunkID> deprecate_ids = *old_chunk_ids_ptr;
     ChunkID chunk_id = 0;
     {
-        Status status = segment_index_meta.GetNextChunkID(chunk_id);
+        status = segment_index_meta.GetNextChunkID(chunk_id);
         if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
             return status;
         }
         status = segment_index_meta.SetNextChunkID(chunk_id + 1);
         if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
             return status;
         }
     }
     Optional<ChunkIndexMeta> chunk_index_meta;
     BufferObj *buffer_obj = nullptr;
     {
-        Status status =
-            NewCatalog::AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, base_name, 0 /*index_size*/, chunk_index_meta);
+        status = NewCatalog::AddNewChunkIndex(segment_index_meta, chunk_id, base_rowid, row_cnt, base_name, 0 /*index_size*/, chunk_index_meta);
         if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
             return status;
         }
         status = chunk_index_meta->GetIndexBuffer(buffer_obj);
         if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
             return status;
         }
     }
@@ -218,6 +255,10 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
                     // Status status = NewCatalog::GetChunkIndex(old_chunk_meta, buffer_obj);
                     status = old_chunk_meta.GetIndexBuffer(buffer_obj);
                     if (!status.ok()) {
+                        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+                        if (!ref_cnt_status.ok()) {
+                            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+                        }
                         return status;
                     }
                 }
@@ -239,6 +280,10 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             {
                 auto [col_def, status] = table_index_meta.GetColumnDef();
                 if (!status.ok()) {
+                    Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+                    if (!ref_cnt_status.ok()) {
+                        UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+                    }
                     return status;
                 }
                 column_def = std::move(col_def);
@@ -256,12 +301,20 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             {
                 auto [col_def, status] = table_index_meta.GetColumnDef();
                 if (!status.ok()) {
+                    Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+                    if (!ref_cnt_status.ok()) {
+                        UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+                    }
                     return status;
                 }
                 column_def = std::move(col_def);
             }
-            Status status = OptimizeVecIndex(index_base, column_def, segment_meta, base_rowid, row_cnt, buffer_obj);
+            status = OptimizeVecIndex(index_base, column_def, segment_meta, base_rowid, row_cnt, buffer_obj);
             if (!status.ok()) {
+                Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+                if (!ref_cnt_status.ok()) {
+                    UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+                }
                 return status;
             }
             break;
@@ -272,6 +325,10 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
             {
                 auto [col_def, status] = table_index_meta.GetColumnDef();
                 if (!status.ok()) {
+                    Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+                    if (!ref_cnt_status.ok()) {
+                        UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+                    }
                     return status;
                 }
                 column_def = std::move(col_def);
@@ -288,8 +345,12 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
     }
     {
         Vector<ChunkID> chunk_ids = {chunk_id};
-        Status status = segment_index_meta.SetChunkIDs(chunk_ids);
+        status = segment_index_meta.SetChunkIDs(chunk_ids);
         if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
             return status;
         }
     }
@@ -303,6 +364,10 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
 
     status = this->AddChunkWal(db_name, table_name, index_name, table_key, *chunk_index_meta, deprecate_ids, DumpIndexCause::kOptimizeIndex);
     if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
         return status;
     }
     return Status::OK();
