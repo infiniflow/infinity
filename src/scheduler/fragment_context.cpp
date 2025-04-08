@@ -1033,7 +1033,7 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
             auto *match_sparse_scan_operator = static_cast<PhysicalMatchSparseScan *>(first_operator);
             Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = match_sparse_scan_operator->PlanBlockEntries(parallel_count);
-            Vector<SharedPtr<Vector<SegmentID>>> segment_group = match_sparse_scan_operator->PlanWithIndex(blocks_group, parallel_count);
+            Vector<SharedPtr<Vector<SegmentID>>> segment_group = match_sparse_scan_operator->PlanWithIndex(blocks_group, parallel_count, query_context_);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
                 tasks_[task_id]->source_state_ = MakeUnique<MatchSparseScanSourceState>(std::move(blocks_group[task_id]), segment_group[task_id]);
             }

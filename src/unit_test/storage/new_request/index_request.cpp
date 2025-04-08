@@ -165,3 +165,43 @@ TEST_P(TestIndexRequest, vector_index_scan) {
     }
     search_vec();
 }
+
+TEST_P(TestIndexRequest, sparse_index_scan) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 sparse(float, 100))";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String append_req_sql = "insert into t1 values(1, [10:1.0, 20:1.0, 30:1.0]), (2, [40:1.0,50:1.0,60:1.0  ])";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(append_req_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    auto search_vec = [this] {
+        String search_req_sql = "select c1 from t1 search match sparse (c2, [20:1.0,30:1.0,40:1.0], 'ip', 1)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(search_req_sql);
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
+
+        {
+            SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
+            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(1));
+        }
+    };
+    search_vec();
+    {
+        String create_index_sql = "create index idx2 on t1(c2) using bmp with (block_size=8, compress_type=compress)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    search_vec();
+}

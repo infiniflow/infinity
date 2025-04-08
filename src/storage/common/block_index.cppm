@@ -31,6 +31,8 @@ class TableMeeta;
 class SegmentMeta;
 class BlockMeta;
 class NewTxn;
+class TableIndexMeeta;
+class SegmentIndexMeta;
 
 export struct SegmentSnapshot {
     SegmentEntry *segment_entry_{};
@@ -83,11 +85,21 @@ export struct IndexSnapshot {
     Map<SegmentID, SegmentIndexEntry *> segment_index_entries_;
 };
 
+export struct NewIndexSnapshot {
+    SharedPtr<TableIndexMeeta> table_index_meta_;
+
+    Map<SegmentID, UniquePtr<SegmentIndexMeta>> segment_index_metas_;
+};
+
 export struct IndexIndex {
 public:
     SharedPtr<IndexSnapshot> Insert(TableIndexEntry *table_index_entry, Txn *txn);
 
+    SharedPtr<NewIndexSnapshot> Insert(const String &index_name, SharedPtr<TableIndexMeeta> table_index_meta);
+
     void Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot);
+
+    void Insert(String index_name, SharedPtr<NewIndexSnapshot> new_index_snapshot);
 
     void Insert(TableIndexEntry *table_index_entry, SegmentIndexEntry *segment_index_entry);
 
@@ -96,6 +108,9 @@ public:
 public:
     HashMap<String, SharedPtr<IndexSnapshot>> index_snapshots_;
     Vector<IndexSnapshot *> index_snapshots_vec_;
+
+    HashMap<String, SharedPtr<NewIndexSnapshot>> new_index_snapshots_;
+    Vector<NewIndexSnapshot *> new_index_snapshots_vec_;
 };
 
 } // namespace infinity

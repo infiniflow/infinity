@@ -35,6 +35,9 @@ import segment_meta;
 import block_meta;
 import kv_store;
 
+import table_index_meeta;
+import segment_index_meta;
+
 namespace infinity {
 
 BlockIndex::BlockIndex() = default;
@@ -161,6 +164,11 @@ void IndexIndex::Insert(String index_name, SharedPtr<IndexSnapshot> index_snapsh
     index_snapshots_.emplace(std::move(index_name), index_snapshot);
 }
 
+void IndexIndex::Insert(String index_name, SharedPtr<NewIndexSnapshot> new_index_snapshot) {
+    new_index_snapshots_vec_.push_back(new_index_snapshot.get());
+    new_index_snapshots_.emplace(std::move(index_name), new_index_snapshot);
+}
+
 SharedPtr<IndexSnapshot> IndexIndex::Insert(TableIndexEntry *table_index_entry, Txn *txn) {
     if (table_index_entry->CheckVisible(txn)) {
         auto index_snapshot = MakeShared<IndexSnapshot>();
@@ -178,6 +186,23 @@ SharedPtr<IndexSnapshot> IndexIndex::Insert(TableIndexEntry *table_index_entry, 
         return index_snapshot;
     }
     return nullptr;
+}
+
+SharedPtr<NewIndexSnapshot> IndexIndex::Insert(const String &index_name, SharedPtr<TableIndexMeeta> table_index_meta) {
+    auto index_snapshot = MakeShared<NewIndexSnapshot>();
+    index_snapshot->table_index_meta_ = table_index_meta;
+
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    Status status = table_index_meta->GetSegmentIDs(segment_ids_ptr);
+    if (!status.ok()) {
+        RecoverableError(status);
+    }
+    for(SegmentID segment_id : *segment_ids_ptr) {
+        index_snapshot->segment_index_metas_.emplace(segment_id, MakeUnique<SegmentIndexMeta>(segment_id, *table_index_meta));
+    }
+
+    Insert(index_name, index_snapshot);
+    return index_snapshot;
 }
 
 void IndexIndex::Insert(TableIndexEntry *table_index_entry, SegmentIndexEntry *segment_index_entry) {
