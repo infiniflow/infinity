@@ -1137,3 +1137,213 @@ TEST_P(TestOptimizeIndex, optimize_index_and_add_column) {
         DropDB();
     }
 }
+
+TEST_P(TestOptimizeIndex, optimize_index_and_drop_column) {
+    auto PrepareForOptimizeAndDumpIndex = [&] {
+        PrepareForOptimizeIndex();
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            Status status = txn->Append(*db_name, *table_name, input_block);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    };
+
+    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    default_varchar->str_value_ = strdup("");
+
+    Status status;
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1        optimize index     commit (success)
+        //  |--------------|---------------|
+        //                                     |------------------|----------|
+        //                                    t2                drop column  commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        // drop column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1        optimize index    commit (success)
+        //  |--------------|---------------|
+        //                         |------------------|----------|
+        //                        t2         drop column       commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        // drop column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1       optimize index     commit (success)
+        //  |--------------|---------------|
+        //         |------------------|-------------|
+        //        t2            drop column      rollback
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        // drop column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1        optimize index        rollback
+        //  |--------------|-------------------|
+        //         |-----|----------|
+        //        t2   drop column   commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        // drop column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //           t1      optimize index        commit
+        //           |----------|-------------------|
+        //         |-----|----------|
+        //        t2   drop column   commit
+
+        // drop column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_FALSE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //                  t1                optimize index         commit
+        //                  |--------------------------|---------------|
+        //         |-----|----------|
+        //        t2  drop column  commit
+
+        // drop column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //                             t1                  optimize index      commit
+        //                             |--------------------------|---------------|
+        //         |-----|----------|
+        //        t2  drop column  commit
+
+        // drop column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
+        Vector<String> column_names;
+        column_names.push_back("col2");
+        status = txn4->DropColumns(*db_name, *table_name, column_names);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+}
