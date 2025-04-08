@@ -1514,6 +1514,7 @@ bool NewTxn::CheckConflictWithAppend(const String &db_name, const String &table_
                         fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
                     return true;
                 }
+                break;
             }
             default: {
                 //
@@ -1535,6 +1536,28 @@ bool NewTxn::CheckConflictWithImport(const String &db_name, const String &table_
                         fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
                     return true;
                 }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictWithAddColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+    const Vector<SharedPtr<WalCmd>> &wal_cmds = previous_txn->wal_entry_->cmds_;
+    for (const SharedPtr<WalCmd> &wal_cmd : wal_cmds) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::COMPACT: {
+                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Compact table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+                break;
             }
             default: {
                 //
@@ -1556,6 +1579,15 @@ bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table
                         fmt::format("Create index {} on table {} in database {}.", *create_index_cmd->index_base_->index_name_, table_name, db_name);
                     return true;
                 }
+                break;
+            }
+            case WalCommandType::ADD_COLUMNS: {
+                auto *add_columns_cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
+                if (add_columns_cmd->db_name_ == db_name && add_columns_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Add columns on table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+                break;
             }
             default: {
                 //
@@ -1575,6 +1607,7 @@ bool NewTxn::CheckConflictWithCreateIndex(const String &db_name, const String &t
                     cause = fmt::format("Append on table {} in database {}.", table_name, db_name);
                     return true;
                 }
+                break;
             }
             case WalCommandType::IMPORT: {
                 auto *import_cmd = static_cast<WalCmdImport *>(wal_cmd.get());
@@ -1582,6 +1615,7 @@ bool NewTxn::CheckConflictWithCreateIndex(const String &db_name, const String &t
                     cause = fmt::format("Import on table {} in database {}.", table_name, db_name);
                     return true;
                 }
+                break;
             }
             case WalCommandType::COMPACT: {
                 auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
@@ -1589,6 +1623,7 @@ bool NewTxn::CheckConflictWithCreateIndex(const String &db_name, const String &t
                     cause = fmt::format("Compact on table {} in database {}.", table_name, db_name);
                     return true;
                 }
+                break;
             }
             default: {
                 //
@@ -1630,6 +1665,14 @@ bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
             case WalCommandType::CREATE_INDEX: {
                 auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
                 bool conflict = CheckConflictWithCreateIndex(create_index_cmd->db_name_, create_index_cmd->table_name_, check_txn, conflict_reason);
+                if (conflict) {
+                    return true;
+                }
+                break;
+            }
+            case WalCommandType::ADD_COLUMNS: {
+                auto *add_columns_cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
+                bool conflict = CheckConflictWithAddColumns(add_columns_cmd->db_name_, add_columns_cmd->table_name_, check_txn, conflict_reason);
                 if (conflict) {
                     return true;
                 }

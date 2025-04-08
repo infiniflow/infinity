@@ -446,9 +446,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
     default_varchar->str_value_ = strdup("");
     auto column_def3 =
         std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
-    auto CheckTable = [&] {
-        Vector<ColumnID> column_idxes = {0, 1, 2};
-
+    auto CheckTable = [&](Vector<ColumnID> column_idxes) {
         auto check_column = [&](ColumnMeta &column_meta) {
             BufferObj *column_buffer = nullptr;
             BufferObj *outline_buffer = nullptr;
@@ -504,6 +502,68 @@ TEST_P(TestCompact, compact_and_add_columns) {
         EXPECT_TRUE(status.ok());
     };
 
+    auto CheckTable1 = [&](Vector<ColumnID> column_idxes) {
+        auto check_column = [&](ColumnMeta &column_meta) {
+            BufferObj *column_buffer = nullptr;
+            BufferObj *outline_buffer = nullptr;
+            Status status = column_meta.GetColumnBuffer(column_buffer, outline_buffer);
+            EXPECT_TRUE(status.ok());
+            EXPECT_NE(column_buffer, nullptr);
+            if (column_meta.column_idx() != 0) {
+                EXPECT_NE(outline_buffer, nullptr);
+            }
+        };
+
+        auto check_block = [&](BlockMeta &block_meta) {
+            auto [row_cnt, status] = block_meta.GetRowCnt1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(row_cnt, 8192);
+
+            for (auto column_id : column_idxes) {
+                ColumnMeta column_meta(column_id, block_meta);
+                check_column(column_meta);
+            }
+        };
+
+        auto check_segment = [&](SegmentMeta &segment_meta) {
+            auto [block_ids_ptr, status] = segment_meta.GetBlockIDs1();
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(*block_ids_ptr, Vector<BlockID>({0}));
+
+            for (auto block_id : *block_ids_ptr) {
+                BlockMeta block_meta(block_id, segment_meta);
+                check_block(block_meta);
+            }
+        };
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(status.ok());
+        EXPECT_EQ(segment_ids_ptr->size(), 2);
+
+        {
+            SegmentID segment_id = (*segment_ids_ptr)[0];
+            SegmentMeta segment_meta(segment_id, *table_meta);
+            check_segment(segment_meta);
+        }
+
+        {
+            SegmentID segment_id = (*segment_ids_ptr)[0];
+            SegmentMeta segment_meta(segment_id, *table_meta);
+            check_segment(segment_meta);
+        }
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
     Status status;
     {
         PrepareForCompact();
@@ -525,112 +585,112 @@ TEST_P(TestCompact, compact_and_add_columns) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        CheckTable();
+        CheckTable({0, 1, 2});
         DropDB();
     }
-    //    {
-    //        PrepareForCompact();
-    //
-    //        //  t1            compact     commit (success)
-    //        //  |--------------|---------------|
-    //        //                         |------------------|----------|
-    //        //                        t2                add column    commit
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //        status = txn->Compact(*db_name, *table_name);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn2);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        CheckTable();
-    //        DropDB();
-    //    }
-    // {
-    //     PrepareForCompact();
+    {
+        PrepareForCompact();
 
-    //     //  t1            compact     commit (success)
-    //     //  |--------------|---------------|
-    //     //         |------------------|----------|
-    //     //        t2                add column    commit
+        //  t1            compact     commit (success)
+        //  |--------------|---------------|
+        //                         |------------------|----------|
+        //                        t2                add column    commit (fail)
 
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        status = txn->Compact(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
 
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
 
-    //     status = txn->Compact(*db_name, *table_name);
-    //     EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
 
-    //     status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-    //     EXPECT_TRUE(status.ok());
+        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_FALSE(status.ok());
 
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
+        CheckTable({0, 1});
+        DropDB();
+    }
+    {
+        PrepareForCompact();
 
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
+        //  t1            compact     commit (success)
+        //  |--------------|---------------|
+        //         |------------------|----------|
+        //        t2                add column    commit
 
-    //     CheckTable();
-    //     DropDB();
-    // }
-    // {
-    //     PrepareForCompact();
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
 
-    //     //  t1            compact     commit (success)
-    //     //  |--------------|---------------|
-    //     //         |-----|----------|
-    //     //        t2   add column    commit
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
 
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        status = txn->Compact(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
 
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-    //     status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-    //     EXPECT_TRUE(status.ok());
+        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
+        EXPECT_TRUE(status.ok());
 
-    //     status = txn->Compact(*db_name, *table_name);
-    //     EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
 
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_FALSE(status.ok());
 
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
+        CheckTable({0, 1});
+        DropDB();
+    }
+    {
+        PrepareForCompact();
 
-    //     CheckTable();
-    //     DropDB();
-    // }
-    // {
-    //     PrepareForCompact();
+        //  t1            compact     commit (success)
+        //  |--------------|---------------|
+        //         |-----|----------|
+        //        t2   add column    commit
 
-    //     //                  t1                     compact     commit (success)
-    //     //                  |--------------------------|---------------|
-    //     //         |-----|----------|
-    //     //        t2   add column    commit
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
 
-    //     auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
-    //     status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-    //     EXPECT_TRUE(status.ok());
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
+        EXPECT_TRUE(status.ok());
 
-    //     auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        status = txn->Compact(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
 
-    //     status = new_txn_mgr->CommitTxn(txn2);
-    //     EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
-    //     status = txn->Compact(*db_name, *table_name);
-    //     EXPECT_TRUE(status.ok());
-    //     status = new_txn_mgr->CommitTxn(txn);
-    //     EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
 
-    //     CheckTable();
-    //     DropDB();
-    // }
+        CheckTable1({0, 1, 2});
+        DropDB();
+    }
+    {
+        PrepareForCompact();
+
+        //                  t1                     compact     commit (success)
+        //                  |--------------------------|---------------|
+        //         |-----|----------|
+        //        t2   add column    commit
+
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        status = txn->Compact(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
+
+        CheckTable1({0, 1, 2});
+        DropDB();
+    }
     {
         PrepareForCompact();
 
@@ -651,7 +711,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        CheckTable();
+        CheckTable({0, 1, 2});
         DropDB();
     }
 }

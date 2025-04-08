@@ -515,6 +515,7 @@ private:
     bool CheckConflictWithImport(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
     bool CheckConflictWithCompact(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
     bool CheckConflictWithCreateIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
+    bool CheckConflictWithAddColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
