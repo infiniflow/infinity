@@ -46,6 +46,8 @@ public:
 
     // Status SetRowCnt(SizeT row_cnt);
 
+    Status SetFirstDeleteTS(TxnTimeStamp first_delete_ts);
+
     Status InitSet();
 
     Status UninitSet();
@@ -67,12 +69,16 @@ public:
     Tuple<SizeT, Status> GetRowCnt1();
     Tuple<BlockID, Status> GetNextBlockID();
 
+    Status GetFirstDeleteTS(TxnTimeStamp &first_delete_ts);
+
 private:
     // Status LoadBlockIDs();
 
     Status LoadBlockIDs1();
 
     Status LoadNextBlockID();
+
+    Status LoadFirstDeleteTS();
 
     // Status LoadRowCnt();
 
@@ -91,6 +97,8 @@ private:
 
     Optional<Vector<BlockID>> block_ids1_;
     Optional<SizeT> row_cnt_;
+
+    Optional<TxnTimeStamp> first_delete_ts_;
 };
 
 } // namespace infinity

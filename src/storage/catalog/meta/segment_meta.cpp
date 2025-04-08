@@ -81,6 +81,17 @@ Status SegmentMeta::SetNextBlockID(BlockID next_block_id) {
 //     return Status::OK();
 // }
 
+Status SegmentMeta::SetFirstDeleteTS(TxnTimeStamp first_delete_ts) {
+    String first_delete_ts_key = GetSegmentTag("first_delete_ts");
+    String first_delete_ts_str = fmt::format("{}", first_delete_ts);
+    Status status = kv_instance_.Put(first_delete_ts_key, first_delete_ts_str);
+    if (!status.ok()) {
+        return status;
+    }
+    first_delete_ts_ = first_delete_ts;
+    return Status::OK();
+}
+
 Status SegmentMeta::InitSet() {
     // {
     //     Status status = SetBlockIDs(Vector<BlockID>());
@@ -100,6 +111,12 @@ Status SegmentMeta::InitSet() {
     //         return status;
     //     }
     // }
+    {
+        Status status = SetFirstDeleteTS(UNCOMMIT_TS);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 
@@ -151,6 +168,13 @@ Status SegmentMeta::UninitSet() {
     //         return status;
     //     }
     // }
+    {
+        String first_delete_ts_key = GetSegmentTag("first_delete_ts");
+        Status status = kv_instance_.Delete(first_delete_ts_key);
+        if (!status.ok()) {
+            return status;
+        }
+    }
     return Status::OK();
 }
 
@@ -208,6 +232,17 @@ Status SegmentMeta::LoadNextBlockID() {
 //     row_cnt_ = std::stoull(row_cnt_str);
 //     return Status::OK();
 // }
+
+Status SegmentMeta::LoadFirstDeleteTS() {
+    String first_delete_ts_key = GetSegmentTag("first_delete_ts");
+    String first_delete_ts_str;
+    Status status = kv_instance_.Get(first_delete_ts_key, first_delete_ts_str);
+    if (!status.ok()) {
+        return status;
+    }
+    first_delete_ts_ = std::stoull(first_delete_ts_str);
+    return Status::OK();
+}
 
 String SegmentMeta::GetSegmentTag(const String &tag) const {
     return KeyEncode::CatalogTableSegmentTagKey(table_meta_.db_id_str(), table_meta_.table_id_str(), segment_id_, tag);
@@ -384,6 +419,20 @@ Tuple<BlockID, Status> SegmentMeta::GetNextBlockID() {
         }
     }
     return {*next_block_id_, Status::OK()};
+}
+
+Status SegmentMeta::GetFirstDeleteTS(TxnTimeStamp &first_delete_ts) {
+    if (!first_delete_ts_) {
+        Status status = LoadFirstDeleteTS();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    if (*first_delete_ts_ > begin_ts_) {
+        first_delete_ts = UNCOMMIT_TS;
+    }
+    first_delete_ts = *first_delete_ts_;
+    return Status::OK();
 }
 
 } // namespace infinity

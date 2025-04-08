@@ -1710,6 +1710,8 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
 
 Status NewTxn::PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *kv_instance) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
+
     const String &db_id_str = delete_cmd->db_id_str_;
     const String &table_id_str = delete_cmd->table_id_str_;
 
@@ -1739,6 +1741,20 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *k
             Status status = this->DeleteInBlock(*block_meta, block_offsets, undo_block_offsets);
             if (!status.ok()) {
                 return status;
+            }
+        }
+
+        {
+            TxnTimeStamp first_delete_ts = 0;
+            Status status = segment_meta->GetFirstDeleteTS(first_delete_ts);
+            if (!status.ok()) {
+                return status;
+            }
+            if (first_delete_ts == UNCOMMIT_TS) {
+                status = segment_meta->SetFirstDeleteTS(commit_ts);
+                if (!status.ok()) {
+                    return status;
+        }
             }
         }
     }

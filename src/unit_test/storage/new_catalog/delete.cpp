@@ -106,6 +106,7 @@ TEST_P(TestDelete, test_delete) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
     }
+    TxnTimeStamp first_delete_ts = 0;
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
         Vector<RowID> row_ids;
@@ -113,7 +114,7 @@ TEST_P(TestDelete, test_delete) {
         row_ids.push_back(RowID(0, 3));
         Status status = txn->Delete(*db_name, *table_name, row_ids);
         EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr->CommitTxn(txn, &first_delete_ts);
         EXPECT_TRUE(status.ok());
     }
 
@@ -132,6 +133,14 @@ TEST_P(TestDelete, test_delete) {
         NewTxnGetVisibleRangeState state;
 
         SegmentMeta segment_meta(segment_id, *table_meta);
+
+        {
+            TxnTimeStamp first_delete_ts = 0;
+            Status status = segment_meta.GetFirstDeleteTS(first_delete_ts);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(first_delete_ts, first_delete_ts);
+        }
+
         BlockMeta block_meta(block_id, segment_meta);
 
         status = NewCatalog::GetBlockVisibleRange(block_meta, begin_ts, state);
@@ -151,6 +160,36 @@ TEST_P(TestDelete, test_delete) {
             offset = range.second;
             has_next = state.Next(offset, range);
             EXPECT_FALSE(has_next);
+        }
+    }
+
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("delete"), TransactionType::kNormal);
+        Vector<RowID> row_ids;
+        row_ids.push_back(RowID(0, 0));
+        Status status = txn->Delete(*db_name, *table_name, row_ids);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn, &first_delete_ts);
+        EXPECT_TRUE(status.ok());
+    }
+    {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("scan"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        SegmentID segment_id = 0;
+        NewTxnGetVisibleRangeState state;
+
+        SegmentMeta segment_meta(segment_id, *table_meta);
+
+        {
+            TxnTimeStamp first_delete_ts = 0;
+            Status status = segment_meta.GetFirstDeleteTS(first_delete_ts);
+            EXPECT_TRUE(status.ok());
+            EXPECT_EQ(first_delete_ts, first_delete_ts);
         }
     }
 }
