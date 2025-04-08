@@ -390,7 +390,12 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
                     RecoverableError(Status::SyntaxError(fmt::format("INSERT: No default value found for column {}.", column_def->ToString())));
                 }
             }
-            assert(dst_value_list.size() == table_column_count);
+            if (dst_value_list.size() != table_column_count) {
+                RecoverableError(Status::SyntaxError(fmt::format("INSERT failed: The number of values ({}) does not match the number of columns "
+                                                                 "({}).",
+                                                                 dst_value_list.size(),
+                                                                 table_column_count)));
+            }
             for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
                 auto &dst_value = dst_value_list[column_idx];
                 const SharedPtr<DataType> &table_column_type = table_info->GetColumnDefByIdx(column_idx)->column_type_;
