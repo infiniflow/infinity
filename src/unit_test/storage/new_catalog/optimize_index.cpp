@@ -1541,3 +1541,297 @@ TEST_P(TestOptimizeIndex, optimize_index_and_rename_table) {
         DropDB();
     }
 }
+
+TEST_P(TestOptimizeIndex, optimize_index_and_compact_table) {
+    auto PrepareForCompactAndOptimize = [&] {
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);
+            Status status = txn->CreateDatabase(*db_name, ConflictType::kError, MakeShared<String>());
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create table"), TransactionType::kNormal);
+            Status status = txn->CreateTable(*db_name, std::move(table_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
+            Status status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+        u32 block_row_cnt = 8192;
+        auto make_input_block = [&](const Value &v1, const Value &v2) {
+            auto input_block = MakeShared<DataBlock>();
+            auto append_to_col = [&](ColumnVector &col, const Value &v) {
+                for (u32 i = 0; i < block_row_cnt; ++i) {
+                    col.AppendValue(v);
+                }
+            };
+            // Initialize input block
+            {
+                auto col1 = ColumnVector::Make(column_def1->type());
+                col1->Initialize();
+                append_to_col(*col1, v1);
+                input_block->InsertVector(col1, 0);
+            }
+            {
+                auto col2 = ColumnVector::Make(column_def2->type());
+                col2->Initialize();
+                append_to_col(*col2, v2);
+                input_block->InsertVector(col2, 1);
+            }
+            input_block->Finalize();
+            return input_block;
+        };
+
+        // For compact
+        for (int i = 0; i < 2; ++i) {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import {}", i)), TransactionType::kNormal);
+            Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+            Status status = txn->Import(*db_name, *table_name, input_blocks);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+
+        //        new_txn_mgr->PrintAllKeyValue();
+        // For optimize
+        for (int i = 0; i < 2; ++i) {
+            {
+                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("append {}", i)), TransactionType::kNormal);
+                SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+                Status status = txn->Append(*db_name, *table_name, input_block);
+                EXPECT_TRUE(status.ok());
+                status = new_txn_mgr->CommitTxn(txn);
+                EXPECT_TRUE(status.ok());
+            }
+
+            //            new_txn_mgr->PrintAllKeyValue();
+            {
+                auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("dump index {}", i)), TransactionType::kNormal);
+                Status status = txn->DumpMemIndex(*db_name, *table_name, *index_name1, 2);
+                EXPECT_TRUE(status.ok());
+                status = new_txn_mgr->CommitTxn(txn);
+                EXPECT_TRUE(status.ok());
+            }
+        }
+
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            Status status = txn->Append(*db_name, *table_name, input_block);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    };
+
+    auto CheckTable = [&](Vector<ColumnID> column_idxes) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(status.ok());
+
+        Vector<SegmentID> expected_segments{2, 3};
+        EXPECT_EQ(*segment_ids_ptr, expected_segments); // 0, 1, and 2 -> 2 (unsealed) and 3
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
+    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    default_varchar->str_value_ = strdup("");
+
+    Status status;
+    {
+        PrepareForCompactAndOptimize();
+
+        //  t1        optimize index     commit (success)
+        //  |--------------|---------------|
+        //                                     |------------------|----------|
+        //                                    t2                rename  commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        new_txn_mgr->PrintAllKeyValue();
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        status = txn2->Compact(*db_name, *table_name);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0, 1});
+
+        DropDB();
+    }
+    //    {
+    //        PrepareForOptimizeAndDumpIndex();
+    //
+    //        //  t1        optimize index    commit (success)
+    //        //  |--------------|---------------|
+    //        //                         |------------------|----------|
+    //        //                        t2               rename       commit
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        // rename
+    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
+    //        EXPECT_TRUE(status.ok());
+    //        status = new_txn_mgr->CommitTxn(txn5);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        DropDB();
+    //    }
+    //    {
+    //        PrepareForOptimizeAndDumpIndex();
+    //
+    //        //  t1       optimize index     commit (success)
+    //        //  |--------------|---------------|
+    //        //         |------------------|-------------|
+    //        //        t2            rename         rollback
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        // rename
+    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn5);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        DropDB();
+    //    }
+    //    {
+    //        PrepareForOptimizeAndDumpIndex();
+    //
+    //        //  t1        optimize index        rollback
+    //        //  |--------------|-------------------|
+    //        //         |-----|----------|
+    //        //        t2   rename   commit
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+    //
+    //        // rename
+    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn5);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        DropDB();
+    //    }
+    //    {
+    //        PrepareForOptimizeAndDumpIndex();
+    //
+    //        //           t1      optimize index        commit
+    //        //           |----------|-------------------|
+    //        //         |-----|----------|
+    //        //        t2   rename   commit
+    //
+    //        // rename
+    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+    //
+    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn5);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        DropDB();
+    //    }
+    //    {
+    //        PrepareForOptimizeAndDumpIndex();
+    //
+    //        //                  t1                optimize index         commit
+    //        //                  |--------------------------|---------------|
+    //        //         |-----|----------|
+    //        //        t2    rename  commit
+    //
+    //        // rename
+    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        status = new_txn_mgr->CommitTxn(txn5);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        DropDB();
+    //    }
+    //
+    //    {
+    //        PrepareForOptimizeAndDumpIndex();
+    //
+    //        //                             t1                  optimize index      rollback
+    //        //                             |--------------------------|---------------|
+    //        //         |-----|----------|
+    //        //        t2  drop column  commit
+    //
+    //        // rename
+    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
+    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
+    //        EXPECT_TRUE(status.ok());
+    //        status = new_txn_mgr->CommitTxn(txn5);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+    //        EXPECT_FALSE(status.ok());
+    //        status = new_txn_mgr->RollBackTxn(txn);
+    //        EXPECT_TRUE(status.ok());
+    //
+    //        DropDB();
+    //    }
+}

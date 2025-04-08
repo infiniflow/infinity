@@ -1589,6 +1589,23 @@ bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table
                 }
                 break;
             }
+            case WalCommandType::DUMP_INDEX: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+                switch (dump_index_cmd->dump_cause_) {
+                    case DumpIndexCause::kOptimizeIndex: {
+                        // Compact table conflicts with optimize index
+                        if (dump_index_cmd->db_name_ == db_name && dump_index_cmd->table_name_ == table_name) {
+                            cause = fmt::format("Optimize index on table {} in database {}.", table_name, db_name);
+                            return true;
+                        }
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+                break;
+            }
             default: {
                 //
             }
@@ -1617,6 +1634,26 @@ bool NewTxn::CheckConflictWithCreateIndex(const String &db_name, const String &t
                 }
                 break;
             }
+            case WalCommandType::COMPACT: {
+                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Compact on table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
+bool NewTxn::CheckConflictWithOptimizeIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
             case WalCommandType::COMPACT: {
                 auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
                 if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
@@ -1675,6 +1712,23 @@ bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
                 bool conflict = CheckConflictWithAddColumns(add_columns_cmd->db_name_, add_columns_cmd->table_name_, check_txn, conflict_reason);
                 if (conflict) {
                     return true;
+                }
+                break;
+            }
+            case WalCommandType::DUMP_INDEX: {
+                auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
+                switch (dump_index_cmd->dump_cause_) {
+                    case DumpIndexCause::kOptimizeIndex: {
+                        bool conflict =
+                            CheckConflictWithOptimizeIndex(dump_index_cmd->db_name_, dump_index_cmd->table_name_, check_txn, conflict_reason);
+                        if (conflict) {
+                            return true;
+                        }
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
                 }
                 break;
             }
