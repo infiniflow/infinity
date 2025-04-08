@@ -912,3 +912,228 @@ TEST_P(TestOptimizeIndex, optimize_index_and_dump_index) {
         DropDB();
     }
 }
+
+TEST_P(TestOptimizeIndex, optimize_index_and_add_column) {
+    auto PrepareForOptimizeAndDumpIndex = [&] {
+        PrepareForOptimizeIndex();
+        {
+            auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("append"), TransactionType::kNormal);
+            SharedPtr<DataBlock> input_block = MakeInputBlock(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"));
+            Status status = txn->Append(*db_name, *table_name, input_block);
+            EXPECT_TRUE(status.ok());
+            status = new_txn_mgr->CommitTxn(txn);
+            EXPECT_TRUE(status.ok());
+        }
+    };
+
+    std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
+    default_varchar->str_value_ = strdup("");
+
+    Status status;
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1        optimize index     commit (success)
+        //  |--------------|---------------|
+        //                                     |------------------|----------|
+        //                                    t2                add column  commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        // add column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns3;
+        columns3.emplace_back(column_def3);
+        status = txn4->AddColumns(*db_name, *table_name, columns3);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1        optimize index    commit (success)
+        //  |--------------|---------------|
+        //                         |------------------|----------|
+        //                        t2         add column       commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        // add column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns3;
+        columns3.emplace_back(column_def3);
+        status = txn4->AddColumns(*db_name, *table_name, columns3);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1       optimize index     commit (success)
+        //  |--------------|---------------|
+        //         |------------------|-------------|
+        //        t2            add column      commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        // add column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns3;
+        columns3.emplace_back(column_def3);
+        status = txn4->AddColumns(*db_name, *table_name, columns3);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //  t1        optimize index        commit
+        //  |--------------|-------------------|
+        //         |-----|----------|
+        //        t2   add column   commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        // add column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns3;
+        columns3.emplace_back(column_def3);
+        status = txn4->AddColumns(*db_name, *table_name, columns3);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //           t1      optimize index        commit
+        //           |----------|-------------------|
+        //         |-----|----------|
+        //        t2   add column   commit
+
+        // add column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns3;
+        columns3.emplace_back(column_def3);
+        status = txn4->AddColumns(*db_name, *table_name, columns3);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //                  t1                optimize index         commit
+        //                  |--------------------------|---------------|
+        //         |-----|----------|
+        //        t2  add column  commit
+
+        // add column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns3;
+        columns3.emplace_back(column_def3);
+        status = txn4->AddColumns(*db_name, *table_name, columns3);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+
+    {
+        PrepareForOptimizeAndDumpIndex();
+
+        //                             t1                  optimize index      commit
+        //                             |--------------------------|---------------|
+        //         |-----|----------|
+        //        t2  add column  commit
+
+        // add column
+        auto *txn4 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
+        auto column_def3 =
+            std::make_shared<ColumnDef>(2, std::make_shared<DataType>(LogicalType::kVarchar), "col3", std::set<ConstraintType>(), default_varchar);
+        Vector<SharedPtr<ColumnDef>> columns3;
+        columns3.emplace_back(column_def3);
+        status = txn4->AddColumns(*db_name, *table_name, columns3);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn4);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        DropDB();
+    }
+}
