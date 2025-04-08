@@ -91,6 +91,8 @@ import data_type;
 import internal_types;
 import txn;
 
+import new_txn;
+
 namespace infinity {
 
 SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_context) {
@@ -197,10 +199,20 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         if (default_filter_expr && search_expr_->have_filter_in_subsearch_) {
             RecoverableError(Status::SyntaxError("Cannot have filter in subsearch and where clause at the same time."));
         }
-        auto default_common_query_filter = MakeShared<CommonQueryFilter>(default_filter_expr, base_table_ref, query_context->GetTxn());
+
+        bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+        Txn *txn_ptr = query_context->GetTxn();
+        NewTxn *new_txn_ptr = query_context->GetNewTxn();
+
+        SharedPtr<CommonQueryFilter> default_common_query_filter;
+        if (use_new_catalog) {
+            default_common_query_filter = MakeShared<CommonQueryFilter>(default_filter_expr, base_table_ref, new_txn_ptr);
+        } else {
+            default_common_query_filter = MakeShared<CommonQueryFilter>(default_filter_expr, base_table_ref, txn_ptr);
+        }
+
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
         match_knn_nodes.reserve(num_children);
-        Txn *txn_ptr = query_context->GetTxn();
         for (auto &match_expr : search_expr_->match_exprs_) {
             auto filter_expr = default_filter_expr;
             auto common_query_filter = default_common_query_filter;
@@ -215,8 +227,18 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, std::move(match_text_expr));
                     match_node->filter_expression_ = std::move(filter_expr);
                     match_node->common_query_filter_ = std::move(common_query_filter);
-                    match_node->index_reader_ =
-                        txn_ptr->GetFullTextIndexReader(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+
+                    if (!use_new_catalog) {
+                        match_node->index_reader_ =
+                            txn_ptr->GetFullTextIndexReader(*base_table_ref->table_info_->db_name_, *base_table_ref->table_info_->table_name_);
+                    } else {
+                        Status status = new_txn_ptr->GetFullTextIndexReader(*base_table_ref->table_info_->db_name_,
+                                                                        *base_table_ref->table_info_->table_name_,
+                                                                        match_node->index_reader_);
+                        if (!status.ok()) {
+                            UnrecoverableError(fmt::format("Get full text index reader error: {}", status.message()));
+                        }
+                    }
 
                     Map<String, String> column2analyzer = match_node->index_reader_->GetColumn2Analyzer(match_node->match_expr_->index_names_);
                     SearchOptions search_ops(match_node->match_expr_->options_text_);

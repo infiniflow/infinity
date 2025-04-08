@@ -91,6 +91,7 @@ struct NewTxnCompactState;
 struct AppendState;
 struct AppendRange;
 enum class DumpIndexCause;
+struct IndexReader;
 
 export struct CheckpointOption {
     TxnTimeStamp checkpoint_ts_ = 0;
@@ -278,6 +279,8 @@ public:
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
 
     Status Compact(const String &db_name, const String &table_name);
+
+    Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
 
 private:
     Status ReplayCompact(WalCmdCompact *compact_cmd);
@@ -475,6 +478,8 @@ public:
     Status RecoverMemIndex(TableIndexMeeta &table_index_meta);
 
     static Status CommitMemIndex(TableIndexMeeta &table_index_meta);
+
+    Status GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader);
 
 private:
     Status CommitCreateDB(const WalCmdCreateDatabase *create_db_cmd);

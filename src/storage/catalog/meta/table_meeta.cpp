@@ -29,6 +29,10 @@ import table_def;
 import infinity_exception;
 import meta_info;
 import infinity_context;
+import storage;
+import new_catalog;
+import table_index_meeta;
+import create_index_info;
 
 namespace infinity {
 
@@ -247,6 +251,32 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
     return Status::OK();
 }
 
+Status TableMeeta::LoadSet() {
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Status status = GetIndexIDs(index_id_strs_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    for (const String &index_id_str : *index_id_strs_ptr) {
+        TableIndexMeeta table_index_meta(index_id_str, *this);
+        auto [index_def, status] = table_index_meta.GetIndexBase();
+        if (!status.ok()) {
+            return status;
+        }
+        if (index_def->index_type_ == IndexType::kFullText) {
+            NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+            String ft_index_cache_key = GetTableTag("ft_index_cache");
+            auto ft_index_cache = MakeShared<TableIndexReaderCache>(db_id_str_, table_id_str_);
+            status = new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+    }
+    return Status::OK();
+}
+
 Status TableMeeta::UninitSet() {
     Status status;
 
@@ -322,6 +352,13 @@ Status TableMeeta::UninitSet() {
         iter->Next();
     }
 
+    String ft_index_cache_key = GetTableTag("ft_index_cache");
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    status = new_catalog->DropFtIndexCacheByFtIndexCacheKey(ft_index_cache_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     return Status::OK();
 }
 
@@ -381,6 +418,37 @@ Status TableMeeta::DropColumn(const String &column_name) {
         }
     } else {
         return Status::ColumnNotExist(column_name);
+    }
+    return Status::OK();
+}
+
+Status TableMeeta::AddFtIndexCache(SharedPtr<TableIndexReaderCache> ft_index_cache) {
+    String ft_index_cache_key = GetTableTag("ft_index_cache");
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    Status status = new_catalog->AddFtIndexCache(std::move(ft_index_cache_key), std::move(ft_index_cache));
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Status TableMeeta::GetFtIndexCache(SharedPtr<TableIndexReaderCache> &ft_index_cache) {
+    String ft_index_cache_key = GetTableTag("ft_index_cache");
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+
+    Status status = new_catalog->GetFtIndexCache(ft_index_cache_key, ft_index_cache);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
+Status TableMeeta::RemoveFtIndexCache() {
+    String ft_index_cache_key = GetTableTag("ft_index_cache");
+    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
+    Status status = new_catalog->DropFtIndexCacheByFtIndexCacheKey(ft_index_cache_key);
+    if (!status.ok()) {
+        return status;
     }
     return Status::OK();
 }

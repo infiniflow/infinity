@@ -207,6 +207,11 @@ Status NewCatalog::InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_
             }
         }
 
+        status = table_meta.LoadSet();
+        if (!status.ok()) {
+            return status;
+        }
+
         return Status::OK();
     };
     auto InitDB = [&](const String &db_id_str) {
@@ -1061,6 +1066,29 @@ Status NewCatalog::CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_
         }
     }
     has_index = false;
+    return Status::OK();
+}
+
+Status NewCatalog::CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete) {
+    Status status;
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentMeta segment_meta(segment_id, table_meta);
+        TxnTimeStamp first_delete_ts = 0;
+        status = segment_meta.GetFirstDeleteTS(first_delete_ts);
+        if (!status.ok()) {
+            return status;
+        }
+        if (first_delete_ts < begin_ts) {
+            has_delete = true;
+            return Status::OK();
+        }
+    }
+    has_delete = false;
     return Status::OK();
 }
 

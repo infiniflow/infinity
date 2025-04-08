@@ -25,6 +25,7 @@ namespace infinity {
 class KVInstance;
 class TableDef;
 class TableInfo;
+class TableIndexReaderCache;
 
 export class TableMeeta {
 public:
@@ -53,6 +54,8 @@ public:
     Status GetIndexID(const String &index_name, String &index_key, String &index_id_str);
 
     Status InitSet(SharedPtr<TableDef> table_def);
+
+    Status LoadSet();
 
     Status UninitSet();
 
@@ -106,6 +109,12 @@ public:
     Status AddColumn(const ColumnDef &column_def);
 
     Status DropColumn(const String &column_name);
+
+    Status AddFtIndexCache(SharedPtr<TableIndexReaderCache> ft_index_cache);
+
+    Status GetFtIndexCache(SharedPtr<TableIndexReaderCache> &ft_index_cache);
+
+    Status RemoveFtIndexCache();
 
 private:
     Status LoadComment();

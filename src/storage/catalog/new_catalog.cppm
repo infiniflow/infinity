@@ -297,6 +297,8 @@ public:
     static Status GetChunkIndexFilePaths(ChunkIndexMeta &chunk_index_meta, Vector<String> &file_paths);
 
     static Status CheckColumnIfIndexed(TableMeeta &table_meta, ColumnID column_id, bool &has_index);
+
+    static Status CheckTableIfDelete(TableMeeta &table_meta, TxnTimeStamp begin_ts, bool &has_delete);
 };
 
 } // namespace infinity

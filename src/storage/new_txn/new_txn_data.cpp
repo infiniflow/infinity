@@ -720,6 +720,21 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
     return Status::OK();
 }
 
+Status NewTxn::CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete) {
+    TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    status = NewCatalog::CheckTableIfDelete(*table_meta, begin_ts, has_delete);
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 Status NewTxn::ReplayCompact(WalCmdCompact *compact_cmd) {
     Status status;
     TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
@@ -1754,7 +1769,7 @@ Status NewTxn::PrepareCommitDelete(const WalCmdDelete *delete_cmd, KVInstance *k
                 status = segment_meta->SetFirstDeleteTS(commit_ts);
                 if (!status.ok()) {
                     return status;
-        }
+                }
             }
         }
     }

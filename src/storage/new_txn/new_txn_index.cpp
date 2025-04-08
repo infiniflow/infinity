@@ -1459,6 +1459,22 @@ Status NewTxn::CommitMemIndex(TableIndexMeeta &table_index_meta) {
     return Status::OK();
 }
 
+Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table_name, SharedPtr<IndexReader> &index_reader) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return status;
+    }
+    SharedPtr<TableIndexReaderCache> ft_index_cache;
+    status = table_meta->GetFtIndexCache(ft_index_cache);
+    if (!status.ok()) {
+        return status;
+    }
+    index_reader = ft_index_cache->GetIndexReader(this);
+    return Status::OK();
+}
+
 Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
     TxnTimeStamp commit_ts = txn_context_ptr_->commit_ts_;
@@ -1525,10 +1541,8 @@ Status NewTxn::CommitCreateIndex(WalCmdCreateIndex *create_index_cmd) {
         }
     }
     if (create_index_cmd->index_base_->index_type_ == IndexType::kFullText) {
-        NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-        String ft_cache_key = table_index_meta.FtIndexCacheTag();
         auto ft_cache = MakeShared<TableIndexReaderCache>(db_id_str, table_id_str);
-        Status status = new_catalog->AddFtIndexCache(std::move(ft_cache_key), std::move(ft_cache));
+        Status status = table_meta.AddFtIndexCache(ft_cache);
         if (!status.ok()) {
             return status;
         }
