@@ -187,6 +187,10 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
                 NewImportJSONL(query_context, import_op_state, data_blocks);
                 break;
             }
+            case CopyFileType::kPARQUET: {
+                NewImportPARQUET(query_context, import_op_state, data_blocks);
+                break;
+            }
             default: {
                 UnrecoverableError("Unimplemented");
             }
@@ -1722,6 +1726,73 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
     }
 
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
+    import_op_state->result_msg_ = std::move(result_msg);
+}
+
+void PhysicalImport::NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
+    arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
+
+    // Configure general Parquet reader settings
+    auto reader_properties = arrow::ParquetReaderProperties(pool);
+    reader_properties.enable_buffered_stream();
+
+    // Configure Arrow-specific Parquet reader settings
+    auto arrow_reader_props = arrow::ParquetArrowReaderProperties();
+    arrow_reader_props.set_batch_size(DEFAULT_BLOCK_CAPACITY);
+
+    arrow::ParquetFileReaderBuilder reader_builder;
+    if (const auto status = reader_builder.OpenFile(file_path_, /*memory_map=*/true, reader_properties); !status.ok()) {
+        RecoverableError(Status::IOError(status.ToString()));
+    }
+    reader_builder.memory_pool(pool);
+    reader_builder.properties(arrow_reader_props);
+
+    auto build_result = reader_builder.Build();
+    if (!build_result.ok()) {
+        RecoverableError(Status::ImportFileFormatError(build_result.status().ToString()));
+    }
+    std::unique_ptr<arrow::ParquetFileReader> arrow_reader = build_result.MoveValueUnsafe();
+
+    if (Status status = CheckParquetColumns(table_info_.get(), arrow_reader.get()); !status.ok()) {
+        RecoverableError(status);
+    }
+
+    std::shared_ptr<arrow::RecordBatchReader> rb_reader;
+    if (auto status = arrow_reader->GetRecordBatchReader(&rb_reader); !status.ok()) {
+        RecoverableError(Status::ImportFileFormatError(status.ToString()));
+    }
+
+    auto import_ctx = MakeUnique<NewImportCtx>(table_info_->column_defs_);
+
+    for (arrow::ArrowResult<std::shared_ptr<arrow::RecordBatch>> maybe_batch : *rb_reader) {
+        if (!maybe_batch.ok()) {
+            continue;
+        }
+        auto batch = maybe_batch.MoveValueUnsafe();
+        const auto batch_row_count = batch->num_rows();
+        const auto batch_col_count = batch->num_columns();
+
+        for (i64 batch_row_id = 0; batch_row_id < batch_row_count; ++batch_row_id) {
+            if (!import_ctx->CheckInit()) {
+                import_ctx->Init();
+            }
+            for (int column_idx = 0; column_idx < batch_col_count; ++column_idx) {
+                SharedPtr<arrow::Array> column = batch->column(column_idx);
+                if (column->length() != batch_row_count) {
+                    UnrecoverableError("column length mismatch");
+                }
+                ParquetValueHandler(column, import_ctx->GetColumnVector(column_idx), batch_row_id);
+            }
+            import_ctx->AddRowCnt();
+            if (import_ctx->CheckFull()) {
+                import_ctx->FinalizeBlock();
+            }
+        }
+    }
+
+    data_blocks = std::move(*import_ctx).Finalize();
+
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 

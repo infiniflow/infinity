@@ -108,6 +108,8 @@ public:
 
     void ImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void NewImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
     inline const TableInfo *table_info() const { return table_info_.get(); }
 
     inline CopyFileType FileType() const { return file_type_; }
