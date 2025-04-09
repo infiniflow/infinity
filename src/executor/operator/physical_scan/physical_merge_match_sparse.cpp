@@ -17,7 +17,6 @@ module;
 module physical_merge_match_sparse;
 
 import stl;
-import txn;
 import query_context;
 import physical_operator_type;
 import operator_state;
