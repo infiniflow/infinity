@@ -41,6 +41,8 @@ import meta_info;
 
 namespace infinity {
 
+class DataBlock;
+
 class ZxvParserCtx {
 public:
     ZsvParser parser_;
@@ -67,7 +69,7 @@ public:
 export class PhysicalImport : public PhysicalOperator {
 public:
     explicit PhysicalImport(u64 id,
-                            const SharedPtr<TableInfo>& table_info,
+                            const SharedPtr<TableInfo> &table_info,
                             String file_path,
                             bool header,
                             char delimiter,
@@ -95,6 +97,8 @@ public:
     /// for push based execution
     void ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
     /// for push based execution
     void ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state);
 
@@ -102,7 +106,7 @@ public:
 
     void ImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state);
 
-    inline const TableInfo* table_info() const { return table_info_.get(); }
+    inline const TableInfo *table_info() const { return table_info_.get(); }
 
     inline CopyFileType FileType() const { return file_type_; }
 
@@ -118,6 +122,8 @@ private:
     static void CSVHeaderHandler(void *);
 
     static void CSVRowHandler(void *);
+
+    static void NewCSVRowHandler(void *);
 
     void JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors);
 

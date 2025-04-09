@@ -70,7 +70,76 @@ import local_file_handle;
 import wal_manager;
 import infinity_context;
 
+import new_txn;
+
 namespace infinity {
+
+class NewZxvParserCtx {
+public:
+    NewZxvParserCtx(Vector<SharedPtr<ColumnDef>> column_defs, SizeT block_capacity = DEFAULT_BLOCK_CAPACITY)
+        : block_capacity_(block_capacity), column_defs_(std::move(column_defs)) {
+        column_types_.reserve(column_defs_.size());
+        for (const auto &column_def : column_defs_) {
+            column_types_.push_back(column_def->type());
+        }
+    }
+
+    bool CheckInit() const { return cur_block_ != nullptr; }
+
+    void Init() {
+        auto data_block = MakeShared<DataBlock>();
+        data_block->Init(column_types_, block_capacity_);
+
+        data_blocks_.push_back(data_block);
+        cur_block_ = data_block.get();
+    }
+
+    void FinalizeBlock() {
+        cur_block_->Finalize();
+        cur_block_ = nullptr;
+        cur_row_count_ = 0;
+    }
+
+    Vector<SharedPtr<DataBlock>> Finalize() && {
+        if (CheckInit()) {
+            FinalizeBlock();
+        }
+        return std::move(data_blocks_);
+    }
+
+    bool CheckFull() const { return cur_row_count_ >= cur_block_->capacity(); }
+
+    void AddRowCnt() {
+        ++row_count_;
+        ++cur_row_count_;
+    }
+
+    ColumnVector &GetColumnVector(SizeT column_idx) {
+        assert(column_idx < column_defs_.size());
+        return *cur_block_->column_vectors[column_idx];
+    }
+
+    SharedPtr<ColumnDef> GetColumnDef(SizeT column_idx) {
+        assert(column_idx < column_defs_.size());
+        return column_defs_[column_idx];
+    }
+
+    SizeT row_count() const { return row_count_; }
+    SizeT column_count() const { return column_defs_.size(); }
+
+    ZsvParser parser_;
+
+private:
+    SizeT block_capacity_ = 0;
+    SizeT row_count_ = 0;
+    Vector<SharedPtr<ColumnDef>> column_defs_;
+    Vector<SharedPtr<DataType>> column_types_;
+
+    Vector<SharedPtr<DataBlock>> data_blocks_;
+
+    DataBlock *cur_block_ = nullptr;
+    SizeT cur_row_count_ = 0;
+};
 
 void PhysicalImport::Init(QueryContext *query_context) {}
 
@@ -93,6 +162,31 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
     }
 
     ImportOperatorState *import_op_state = static_cast<ImportOperatorState *>(operator_state);
+
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        Vector<SharedPtr<DataBlock>> data_blocks;
+
+        switch (file_type_) {
+            case CopyFileType::kCSV: {
+                NewImportCSV(query_context, import_op_state, data_blocks);
+                break;
+            }
+            default: {
+                UnrecoverableError("Unimplemented");
+            }
+        }
+
+        NewTxn *new_txn = query_context->GetNewTxn();
+        Status status = new_txn->Import(*table_info_->db_name_, *table_info_->table_name_, data_blocks);
+        if (!status.ok()) {
+            import_op_state->status_ = status;
+        }
+
+        import_op_state->SetComplete();
+        return true;
+    }
+
     switch (file_type_) {
         case CopyFileType::kCSV: {
             ImportCSV(query_context, import_op_state);
@@ -617,6 +711,39 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
+void PhysicalImport::NewImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
+    FILE *fp = fopen(file_path_.c_str(), "rb");
+    if (!fp) {
+        UnrecoverableError(strerror(errno));
+    }
+    DeferFn defer_op([&]() { fclose(fp); });
+
+    auto parser_context = MakeUnique<NewZxvParserCtx>(table_info_->column_defs_);
+
+    auto opts = MakeUnique<ZsvOpts>();
+    if (header_) {
+        UnrecoverableError("Unimplemented");
+    } else {
+        opts->row_handler = NewCSVRowHandler;
+    }
+    opts->delimiter = delimiter_;
+    opts->stream = fp;
+    opts->ctx = parser_context.get();
+    opts->buffsize = (1 << 20); // default buffer size 256k, we use 1M
+
+    parser_context->parser_ = ZsvParser(opts.get());
+
+    ZsvStatus csv_parser_status;
+    while ((csv_parser_status = parser_context->parser_.ParseMore()) == zsv_status_ok) {
+        ;
+    }
+    parser_context->parser_.Finish();
+
+    data_blocks = std::move(*parser_context).Finalize();
+
+    import_op_state->result_msg_ = MakeUnique<String>(fmt::format("IMPORT {} Rows", parser_context->row_count()));
+}
+
 void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
     UniquePtr<StreamReader> stream_reader = VirtualStore::OpenStreamReader(file_path_);
 
@@ -918,6 +1045,55 @@ void PhysicalImport::CSVRowHandler(void *context) {
 
     // set parser context
     parser_context->block_entry_ = std::move(block_entry);
+}
+
+void PhysicalImport::NewCSVRowHandler(void *context_raw_ptr) {
+    auto *parser_context = static_cast<NewZxvParserCtx *>(context_raw_ptr);
+
+    if (!parser_context->CheckInit()) {
+        parser_context->Init();
+    }
+
+    SizeT column_count = parser_context->parser_.CellCount();
+    SizeT table_column_count = parser_context->column_count();
+    if (column_count > table_column_count) {
+        Status status = Status::ColumnCountMismatch(
+            fmt::format("CSV file column count isn't match with table schema, row id: {}, column_count: {}, table_entry->ColumnCount: {}.",
+                        parser_context->row_count(),
+                        column_count,
+                        table_column_count));
+        RecoverableError(status);
+    }
+
+    Vector<String> parsed_cell;
+    parsed_cell.reserve(column_count);
+
+    for (SizeT column_idx = 0; column_idx < table_column_count; ++column_idx) {
+        ColumnVector &column_vector = parser_context->GetColumnVector(column_idx);
+
+        if (column_idx < column_count) {
+            ZsvCell cell = parser_context->parser_.GetCell(column_idx);
+            if (cell.len) {
+                std::string_view str_view = std::string_view((char *)cell.str, cell.len);
+                column_vector.AppendByStringView(str_view);
+                continue;
+            }
+        }
+        SharedPtr<ColumnDef> column_def = parser_context->GetColumnDef(column_idx);
+        if (column_def->has_default_value()) {
+            auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
+            column_vector.AppendByConstantExpr(const_expr);
+        } else {
+            Status status = Status::ImportFileFormatError(
+                fmt::format("No value in column {} in CSV of row number: {}", column_def->name_, parser_context->row_count()));
+            RecoverableError(status);
+        }
+    }
+    parser_context->AddRowCnt();
+
+    if (parser_context->CheckFull()) {
+        parser_context->FinalizeBlock();
+    }
 }
 
 SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object) {

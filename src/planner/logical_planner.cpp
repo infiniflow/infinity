@@ -1205,14 +1205,34 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
 
 Status LogicalPlanner::BuildImport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Check the table existence
-    Txn *txn = query_context_ptr_->GetTxn();
-    auto [table_info, status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
-    }
-    status = txn->AddWriteTxnNum(statement->schema_name_, statement->table_name_);
-    if (!status.ok()) {
-        RecoverableError(status);
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+    SharedPtr<TableInfo> table_info;
+    if (!use_new_catalog) {
+        Status status;
+        Txn *txn = query_context_ptr_->GetTxn();
+        std::tie(table_info, status) = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        status = txn->AddWriteTxnNum(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    } else {
+        NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info = MakeShared<TableInfo>();
+        status = table_meta->GetTableInfo(*table_info);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info->db_name_ = MakeShared<String>(statement->schema_name_);
+        table_info->table_name_ = MakeShared<String>(statement->table_name_);
     }
 
     // Check the file existence
@@ -1328,7 +1348,7 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
                     }
                     bool has_index = false;
                     status = NewCatalog::CheckColumnIfIndexed(*table_meta, column_id, has_index);
-                    if(!status.ok()) {
+                    if (!status.ok()) {
                         RecoverableError(status);
                     }
                     if (has_index) {
