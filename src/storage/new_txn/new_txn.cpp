@@ -724,6 +724,62 @@ Tuple<SharedPtr<TableInfo>, Status> NewTxn::GetTableInfo(const String &db_name, 
     return {std::move(table_info), Status::OK()};
 }
 
+Tuple<SharedPtr<TableIndexInfo>, Status> NewTxn::GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    String table_key;
+    String index_key;
+    Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
+    status = table_index_meta->GetTableIndexInfo(*table_index_info);
+    return {std::move(table_index_info), Status::OK()};
+}
+
+Tuple<SharedPtr<SegmentIndexInfo>, Status>
+NewTxn::GetSegmentIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    String table_key;
+    String index_key;
+    Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+    SharedPtr<SegmentIndexInfo> segment_index_info = segment_index_meta.GetSegmentIndexInfo();
+    return {std::move(segment_index_info), Status::OK()};
+}
+
+Tuple<SharedPtr<ChunkIndexMetaInfo>, Status>
+NewTxn::GetChunkIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, ChunkID chunk_id) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Optional<TableIndexMeeta> table_index_meta;
+    String table_key;
+    String index_key;
+    Status status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta, table_index_meta, &table_key, &index_key);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta);
+    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+    ChunkIndexMetaInfo *chunk_index_info_ptr;
+    status = chunk_index_meta.GetChunkInfo(chunk_index_info_ptr);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    SharedPtr<ChunkIndexMetaInfo> chunk_index_info = MakeShared<ChunkIndexMetaInfo>(*chunk_index_info_ptr);
+    return {std::move(chunk_index_info), status};
+}
+
 Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const String &db_name, const String &table_name) {
     this->CheckTxn(db_name);
     return catalog_->GetTableSnapshot(db_name, table_name, nullptr);

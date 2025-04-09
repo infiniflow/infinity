@@ -71,49 +71,6 @@ import kv_store;
 
 namespace infinity {
 
-void ProfileHistory::Resize(SizeT new_size) {
-    std::unique_lock<std::mutex> lk(lock_);
-    if (new_size == 0) {
-        deque_.clear();
-        return;
-    }
-
-    if (new_size == max_size_) {
-        return;
-    }
-
-    if (new_size < deque_.size()) {
-        SizeT diff = max_size_ - new_size;
-        for (SizeT i = 0; i < diff; ++i) {
-            deque_.pop_back();
-        }
-    }
-
-    max_size_ = new_size;
-}
-
-QueryProfiler *ProfileHistory::GetElement(SizeT index) {
-    std::unique_lock<std::mutex> lk(lock_);
-    if (index < 0 || index > max_size_) {
-        return nullptr;
-    }
-
-    return deque_[index].get();
-}
-
-Vector<SharedPtr<QueryProfiler>> ProfileHistory::GetElements() {
-    Vector<SharedPtr<QueryProfiler>> elements;
-    elements.reserve(max_size_);
-
-    std::unique_lock<std::mutex> lk(lock_);
-    for (SizeT i = 0; i < deque_.size(); ++i) {
-        if (deque_[i].get() != nullptr) {
-            elements.push_back(deque_[i]);
-        }
-    }
-    return elements;
-}
-
 // TODO Consider letting it commit as a transaction.
 Catalog::Catalog() : catalog_dir_(MakeShared<String>(CATALOG_FILE_DIR)), running_(true) {
     String abs_catalog_dir = Path(InfinityContext::instance().config()->DataDir()) / String(CATALOG_FILE_DIR);

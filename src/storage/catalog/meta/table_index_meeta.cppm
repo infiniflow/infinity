@@ -19,6 +19,7 @@ export module table_index_meeta;
 import stl;
 import status;
 import column_def;
+import meta_info;
 
 namespace infinity {
 
@@ -43,6 +44,8 @@ public:
     SharedPtr<String> GetTableIndexDir();
 
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef();
+
+    Status GetTableIndexInfo(TableIndexInfo &table_index_info);
 
     Status GetSegmentIDs(Vector<SegmentID> *&segment_ids);
 

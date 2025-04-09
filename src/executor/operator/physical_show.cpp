@@ -21,6 +21,7 @@ module physical_show;
 
 import stl;
 import txn;
+import new_txn;
 import query_context;
 
 import profiler;
@@ -87,6 +88,7 @@ import txn_context;
 import txn_state;
 import snapshot_brief;
 import command_statement;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -789,9 +791,16 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    Txn *txn = query_context->GetTxn();
-
-    auto [database_info, status] = txn->GetDatabaseInfo(db_name_);
+    SharedPtr<DatabaseInfo> database_info;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(database_info, status) = txn->GetDatabaseInfo(db_name_);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(database_info, status) = txn->GetDatabaseInfo(db_name_);
+    }
 
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
@@ -882,9 +891,16 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    Txn *txn = query_context->GetTxn();
-
-    auto [table_info, status] = txn->GetTableInfo(db_name_, *object_name_);
+    SharedPtr<TableInfo> table_info;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(table_info, status) = txn->GetTableInfo(db_name_, *object_name_);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(table_info, status) = txn->GetTableInfo(db_name_, *object_name_);
+    }
 
     if (!status.ok()) {
         RecoverableError(status);
@@ -1019,9 +1035,17 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    Txn *txn = query_context->GetTxn();
+    SharedPtr<TableIndexInfo> table_index_info;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(table_index_info, status) = txn->GetTableIndexInfo(db_name_, *object_name_, index_name_.value());
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(table_index_info, status) = txn->GetTableIndexInfo(db_name_, *object_name_, index_name_.value());
+    }
 
-    auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, *object_name_, index_name_.value());
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -1232,9 +1256,17 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    Txn *txn = query_context->GetTxn();
+    SharedPtr<SegmentIndexInfo> segment_index_info;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(segment_index_info, status) = txn->GetSegmentIndexInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value());
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(segment_index_info, status) = txn->GetSegmentIndexInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value());
+    }
 
-    auto [segment_index_info, status] = txn->GetSegmentIndexInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value());
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -1335,80 +1367,103 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperatorState *show_operator_state) {
     // Define output table detailed info
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    String base_name;
+    RowID base_row_id;
+    SizeT row_cnt = 0;
+    TxnTimeStamp deprecate_ts = 0;
 
     // Get tables from catalog
-    Txn *txn = query_context->GetTxn();
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        auto [chunk_index_info, status] =
+            txn->GetChunkIndexInfo(db_name_, *object_name_, index_name_.value(), segment_id_.value(), chunk_id_.value());
+        if (!status.ok()) {
+            RecoverableError(status);
+            return;
+        }
 
-    auto [table_entry, status1] = txn->GetTableByName(db_name_, *object_name_);
-    if (!status1.ok()) {
-        RecoverableError(status1);
-        return;
+        base_name = chunk_index_info->base_name_;
+        base_row_id = chunk_index_info->base_row_id_;
+        row_cnt = chunk_index_info->row_cnt_;
+    } else {
+        Txn *txn = query_context->GetTxn();
+
+        auto [table_entry, status1] = txn->GetTableByName(db_name_, *object_name_);
+        if (!status1.ok()) {
+            RecoverableError(status1);
+            return;
+        }
+
+        auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
+        if (!status2.ok()) {
+            RecoverableError(status2);
+            return;
+        }
+
+        Map<SegmentID, SharedPtr<SegmentIndexEntry>> segment_map = table_index_entry->GetIndexBySegmentSnapshot(table_entry, txn);
+        auto iter = segment_map.find(segment_id_.value());
+        if (iter == segment_map.end()) {
+            show_operator_state->status_ = Status::SegmentNotExist(segment_id_.value());
+            RecoverableError(show_operator_state->status_);
+        }
+
+        SegmentIndexEntry *segment_index_entry = iter->second.get();
+        IndexBase *index_base = table_index_entry->table_index_def().get();
+        String index_type_name = IndexInfo::IndexTypeToString(index_base->index_type_);
+
+        Vector<SharedPtr<ChunkIndexEntry>> chunk_indexes;
+        switch (index_base->index_type_) {
+            case IndexType::kIVF: {
+                auto [chunk_index_entries, _] = segment_index_entry->GetIVFIndexSnapshot();
+                chunk_indexes = chunk_index_entries;
+                break;
+            }
+            case IndexType::kHnsw: {
+                auto [chunk_index_entries, _] = segment_index_entry->GetHnswIndexSnapshot();
+                chunk_indexes = chunk_index_entries;
+                break;
+            }
+            case IndexType::kFullText: {
+                SharedPtr<MemoryIndexer> memory_indexer;
+                segment_index_entry->GetChunkIndexEntries(chunk_indexes, memory_indexer, query_context->GetTxn());
+                break;
+            }
+            case IndexType::kSecondary: {
+                auto [chunk_index_entries, _] = segment_index_entry->GetSecondaryIndexSnapshot();
+                chunk_indexes = chunk_index_entries;
+                break;
+            }
+            case IndexType::kEMVB: {
+                auto [chunk_index_entries, _] = segment_index_entry->GetEMVBIndexSnapshot();
+                chunk_indexes = chunk_index_entries;
+                break;
+            }
+            case IndexType::kBMP: {
+                auto [chunk_index_entries, _] = segment_index_entry->GetBMPIndexSnapshot();
+                chunk_indexes = chunk_index_entries;
+                break;
+            }
+            case IndexType::kDiskAnn:
+            case IndexType::kInvalid: {
+                Status status3 = Status::InvalidIndexName(index_type_name);
+                RecoverableError(status3);
+                break;
+            }
+        }
+
+        ChunkID chunk_id = chunk_id_.value();
+        if (chunk_id >= chunk_indexes.size()) {
+            show_operator_state->status_ = Status::ChunkNotExist(chunk_id);
+            RecoverableError(show_operator_state->status_);
+        }
+
+        ChunkIndexEntry *chunk_index_entry = chunk_indexes[chunk_id].get();
+        base_name = chunk_index_entry->base_name_;
+        base_row_id = chunk_index_entry->base_rowid_;
+        row_cnt = chunk_index_entry->row_count_;
+        deprecate_ts = chunk_index_entry->deprecate_ts_;
     }
-
-    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, *object_name_, index_name_.value());
-    if (!status2.ok()) {
-        RecoverableError(status2);
-        return;
-    }
-
-    Map<SegmentID, SharedPtr<SegmentIndexEntry>> segment_map = table_index_entry->GetIndexBySegmentSnapshot(table_entry, txn);
-    auto iter = segment_map.find(segment_id_.value());
-    if (iter == segment_map.end()) {
-        show_operator_state->status_ = Status::SegmentNotExist(segment_id_.value());
-        RecoverableError(show_operator_state->status_);
-    }
-
-    SegmentIndexEntry *segment_index_entry = iter->second.get();
-    IndexBase *index_base = table_index_entry->table_index_def().get();
-    String index_type_name = IndexInfo::IndexTypeToString(index_base->index_type_);
-
-    Vector<SharedPtr<ChunkIndexEntry>> chunk_indexes;
-    switch (index_base->index_type_) {
-        case IndexType::kIVF: {
-            auto [chunk_index_entries, _] = segment_index_entry->GetIVFIndexSnapshot();
-            chunk_indexes = chunk_index_entries;
-            break;
-        }
-        case IndexType::kHnsw: {
-            auto [chunk_index_entries, _] = segment_index_entry->GetHnswIndexSnapshot();
-            chunk_indexes = chunk_index_entries;
-            break;
-        }
-        case IndexType::kFullText: {
-            SharedPtr<MemoryIndexer> memory_indexer;
-            segment_index_entry->GetChunkIndexEntries(chunk_indexes, memory_indexer, query_context->GetTxn());
-            break;
-        }
-        case IndexType::kSecondary: {
-            auto [chunk_index_entries, _] = segment_index_entry->GetSecondaryIndexSnapshot();
-            chunk_indexes = chunk_index_entries;
-            break;
-        }
-        case IndexType::kEMVB: {
-            auto [chunk_index_entries, _] = segment_index_entry->GetEMVBIndexSnapshot();
-            chunk_indexes = chunk_index_entries;
-            break;
-        }
-        case IndexType::kBMP: {
-            auto [chunk_index_entries, _] = segment_index_entry->GetBMPIndexSnapshot();
-            chunk_indexes = chunk_index_entries;
-            break;
-        }
-        case IndexType::kDiskAnn:
-        case IndexType::kInvalid: {
-            Status status3 = Status::InvalidIndexName(index_type_name);
-            RecoverableError(status3);
-            break;
-        }
-    }
-
-    ChunkID chunk_id = chunk_id_.value();
-    if (chunk_id >= chunk_indexes.size()) {
-        show_operator_state->status_ = Status::ChunkNotExist(chunk_id);
-        RecoverableError(show_operator_state->status_);
-    }
-
-    ChunkIndexEntry *chunk_index_entry = chunk_indexes[chunk_id].get();
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -1426,7 +1481,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(chunk_index_entry->base_name_);
+            Value value = Value::MakeVarchar(base_name);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1442,7 +1497,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(chunk_index_entry->base_rowid_.ToString());
+            Value value = Value::MakeVarchar(base_row_id.ToString());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1458,7 +1513,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(chunk_index_entry->row_count_));
+            Value value = Value::MakeVarchar(std::to_string(row_cnt));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1474,7 +1529,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(chunk_index_entry->deprecate_ts_));
+            Value value = Value::MakeVarchar(std::to_string(deprecate_ts));
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1495,9 +1550,32 @@ void PhysicalShow::ExecuteShowDatabases(QueryContext *query_context, ShowOperato
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
 
     // Get tables from catalog
-    Txn *txn = query_context->GetTxn();
-
-    Vector<DatabaseDetail> databases_detail = txn->ListDatabases();
+    Vector<DatabaseDetail> databases_detail;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        Vector<String> db_names;
+        Status status = txn->ListDatabase(db_names);
+        if (!status.ok()) {
+            RecoverableError(status);
+            return;
+        }
+        for (auto &db_name : db_names) {
+            auto [database_info, status] = txn->GetDatabaseInfo(db_name);
+            if (!status.ok()) {
+                RecoverableError(status);
+                return;
+            }
+            databases_detail.emplace_back(DatabaseDetail{
+                .db_name_ = MakeShared<String>(db_name),
+                .db_entry_dir_ = std::move(database_info->db_entry_dir_),
+                .db_comment_ = std::move(database_info->db_comment_),
+            });
+        }
+    } else {
+        Txn *txn = query_context->GetTxn();
+        databases_detail = txn->ListDatabases();
+    }
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -1564,11 +1642,16 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
     // Get tables from catalog
-    Txn *txn = query_context->GetTxn();
-
-    Vector<TableDetail> table_collections_detail;
-    Status status = txn->GetTables(db_name_, table_collections_detail);
-
+    Vector<TableDetail> tables_detail;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        status = txn->GetTables(db_name_, tables_detail);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        status = txn->GetTables(db_name_, tables_detail);
+    }
     if (!status.ok()) {
         RecoverableError(status);
         return;
@@ -1581,7 +1664,7 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
-    for (auto &table_detail : table_collections_detail) {
+    for (auto &table_detail : tables_detail) {
         // Initialize the output data block
         if (!output_block_ptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -1727,10 +1810,16 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
     // Get tables from catalog
-    Txn *txn = query_context->GetTxn();
-
     Vector<ViewDetail> views_detail;
-    Status status = txn->GetViews(db_name_, views_detail);
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        status = txn->GetViews(db_name_, views_detail);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        status = txn->GetViews(db_name_, views_detail);
+    }
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);

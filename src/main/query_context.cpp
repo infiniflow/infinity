@@ -62,6 +62,8 @@ import txn_state;
 
 import new_txn;
 import new_txn_manager;
+import catalog;
+import new_catalog;
 
 namespace infinity {
 
@@ -322,11 +324,21 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
 }
 
 void QueryContext::CreateQueryProfiler() {
-    if (InfinityContext::instance().storage()->catalog() == nullptr) {
-        return;
+    bool query_profiler_flag = false;
+    bool use_new_catalog = global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
+        if (catalog == nullptr) {
+            return;
+        }
+        query_profiler_flag = catalog->GetProfile();
+    } else {
+        Catalog *catalog = InfinityContext::instance().storage()->catalog();
+        if (catalog == nullptr) {
+            return;
+        }
+        query_profiler_flag = catalog->GetProfile();
     }
-
-    bool query_profiler_flag = InfinityContext::instance().storage()->catalog()->GetProfile();
 
     if (query_profiler_flag or explain_analyze_) {
         if (query_profiler_ == nullptr) {
@@ -337,7 +349,14 @@ void QueryContext::CreateQueryProfiler() {
 
 void QueryContext::RecordQueryProfiler(const StatementType &type) {
     if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
-        InfinityContext::instance().storage()->catalog()->AppendProfileRecord(query_profiler_);
+        bool use_new_catalog = global_config()->UseNewCatalog();
+        if (use_new_catalog) {
+            NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
+            catalog->AppendProfileRecord(query_profiler_);
+        } else {
+            Catalog *catalog = InfinityContext::instance().storage()->catalog();
+            catalog->AppendProfileRecord(query_profiler_);
+        }
     }
 }
 

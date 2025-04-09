@@ -24,7 +24,7 @@ import default_values;
 import internal_types;
 import buffer_handle;
 import column_def;
-
+import profiler;
 namespace infinity {
 
 class NewTxn;
@@ -203,9 +203,27 @@ public:
 
     void GetCleanedMeta(TxnTimeStamp ts, Vector<UniquePtr<MetaKey>> &metas);
 
+    // Profile related methods
+    void SetProfile(bool flag) { enable_profile_ = flag; }
+
+    [[nodiscard]] bool GetProfile() const { return enable_profile_; }
+
+    void AppendProfileRecord(SharedPtr<QueryProfiler> profiler) { history_.Enqueue(std::move(profiler)); }
+
+    const QueryProfiler *GetProfileRecord(SizeT index) { return history_.GetElement(index); }
+
+    Vector<SharedPtr<QueryProfiler>> GetProfileRecords() { return history_.GetElements(); }
+
+    void ResizeProfileHistory(SizeT new_size) { history_.Resize(new_size); }
+
+    SizeT ProfileHistorySize() const { return history_.HistoryCapacity(); }
+
 private:
     std::mutex cleaned_meta_mtx_{};
     MultiMap<TxnTimeStamp, UniquePtr<MetaKey>> cleaned_meta_{};
+
+    ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
+    atomic_bool enable_profile_{false};
 
 public:
     static Status InitCatalog(KVInstance *kv_instance, TxnTimeStamp checkpoint_ts);

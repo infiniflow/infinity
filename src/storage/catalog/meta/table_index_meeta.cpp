@@ -24,6 +24,8 @@ import kv_code;
 import third_party;
 import logger;
 import index_base;
+import meta_info;
+import create_index_info;
 
 namespace infinity {
 
@@ -162,5 +164,38 @@ String TableIndexMeeta::GetTableIndexTag(const String &tag) const {
 }
 
 String TableIndexMeeta::FtIndexCacheTag() const { return GetTableIndexTag("ft_cache"); }
+
+Status TableIndexMeeta::GetTableIndexInfo(TableIndexInfo &table_index_info) {
+    Status status;
+    if (!segment_ids_) {
+        status = LoadSegmentIDs();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    if (!index_def_) {
+        status = LoadIndexDef();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    SharedPtr<ColumnDef> column_def = nullptr;
+    std::tie(column_def, status) = table_meta_.GetColumnDefByColumnName(index_def_->column_names_[0]);
+    if (!status.ok()) {
+        return status;
+    }
+
+    table_index_info.index_name_ = index_def_->index_name_;
+    table_index_info.index_entry_dir_ = GetTableIndexDir();
+    table_index_info.segment_index_count_ = segment_ids_.value().size();
+    table_index_info.index_comment_ = MakeShared<String>(*index_def_->index_comment_);
+    table_index_info.index_type_ = MakeShared<String>(IndexInfo::IndexTypeToString(index_def_->index_type_));
+    table_index_info.index_other_params_ = MakeShared<String>(index_def_->BuildOtherParamsString());
+    table_index_info.index_column_names_ = MakeShared<String>(column_def->name_);
+    table_index_info.index_column_ids_ = MakeShared<String>(std::to_string(column_def->id_));
+
+    return Status::OK();
+}
 
 } // namespace infinity

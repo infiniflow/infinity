@@ -28,6 +28,8 @@ import new_catalog;
 import mem_index;
 import index_base;
 import create_index_info;
+import meta_info;
+import chunk_index_meta;
 
 namespace infinity {
 
@@ -343,6 +345,47 @@ Status SegmentIndexMeta::LoadFtInfo() {
 String SegmentIndexMeta::GetSegmentIndexTag(const String &tag) {
     const TableMeeta &table_meta = table_index_meta_.table_meta();
     return KeyEncode::CatalogIdxSegmentTagKey(table_meta.db_id_str(), table_meta.table_id_str(), table_index_meta_.index_id_str(), segment_id_, tag);
+}
+
+SharedPtr<String> SegmentIndexMeta::GetSegmentIndexDir() const {
+    SharedPtr<String> table_index_dir = table_index_meta_.GetTableIndexDir();
+    if (!table_index_dir) {
+        return nullptr;
+    }
+    return MakeShared<String>(fmt::format("{}/seg_{}", *table_index_dir, segment_id_));
+}
+
+SharedPtr<SegmentIndexInfo> SegmentIndexMeta::GetSegmentIndexInfo() {
+    SharedPtr<IndexBase> index_def;
+    Status status;
+    std::tie(index_def, status) = table_index_meta_.GetIndexBase();
+    if (!status.ok()) {
+        return nullptr;
+    }
+    if (!chunk_ids_) {
+        Status status = LoadChunkIDs();
+        if (!status.ok()) {
+            return nullptr;
+        }
+    }
+    Vector<String> segment_index_files;
+    for (auto &chunk_id : *chunk_ids_) {
+        ChunkIndexMeta chunk_index_meta(chunk_id, *this);
+        Vector<String> chunk_index_files;
+        status = chunk_index_meta.FilePaths(chunk_index_files);
+        if (!status.ok()) {
+            return nullptr;
+        }
+        segment_index_files.insert(segment_index_files.end(), chunk_index_files.begin(), chunk_index_files.end());
+    }
+
+    SharedPtr<SegmentIndexInfo> segment_index_info = MakeShared<SegmentIndexInfo>();
+    segment_index_info->segment_id_ = segment_id_;
+    segment_index_info->index_type_ = index_def->index_type_;
+    segment_index_info->index_dir_ = GetSegmentIndexDir();
+    segment_index_info->chunk_count_ = chunk_ids_.value().size();
+    segment_index_info->files_ = std::move(segment_index_files);
+    return segment_index_info;
 }
 
 } // namespace infinity

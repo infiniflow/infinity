@@ -19,6 +19,7 @@ export module segment_index_meta;
 import stl;
 import status;
 import third_party;
+import meta_info;
 
 namespace infinity {
 
@@ -100,6 +101,10 @@ public:
 
     // write mem index should use this function
     Status GetAndWriteMemIndex(SharedPtr<MemIndex> &mem_index);
+
+    SharedPtr<String> GetSegmentIndexDir() const;
+
+    SharedPtr<SegmentIndexInfo> GetSegmentIndexInfo();
 
 private:
     Status GetHasMemIndex(bool &has_mem_index);

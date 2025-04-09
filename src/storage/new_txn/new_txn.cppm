@@ -36,7 +36,6 @@ import column_def;
 import extra_command;
 import column_vector;
 import buffer_handle;
-
 namespace infinity {
 
 class KVInstance;
@@ -82,6 +81,7 @@ class BlockMeta;
 class SegmentMeta;
 class TableMeeta;
 class ChunkIndexMeta;
+class ChunkIndexMetaInfo;
 class SegmentIndexMeta;
 class TableIndexMeeta;
 class DBMeeta;
@@ -201,6 +201,14 @@ public:
 
     Tuple<SharedPtr<TableInfo>, Status> GetTableInfo(const String &db_name, const String &table_name);
 
+    Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name);
+
+    Tuple<SharedPtr<SegmentIndexInfo>, Status>
+    GetSegmentIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
+    Tuple<SharedPtr<ChunkIndexMetaInfo>, Status>
+    GetChunkIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, ChunkID chunk_id);
+
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);
@@ -237,8 +245,6 @@ public:
     // Tuple<TableIndexEntry *, Status> CreateIndexDef(TableEntry *table_entry, const SharedPtr<IndexBase> &index_base, ConflictType conflict_type);
 
     // Tuple<TableIndexEntry *, Status> GetIndexByName(const String &db_name, const String &table_name, const String &index_name);
-
-    // Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(const String &db_name, const String &table_name, const String &index_name);
 
     // Pair<Vector<SegmentIndexEntry *>, Status>
     // CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_ref, bool prepare, bool check_ts = true);
