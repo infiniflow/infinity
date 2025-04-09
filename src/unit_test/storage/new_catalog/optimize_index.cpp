@@ -1661,7 +1661,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_compact_table) {
         //  t1        optimize index     commit (success)
         //  |--------------|---------------|
         //                                     |------------------|----------|
-        //                                    t2                rename  commit
+        //                                    t2                compact  commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
