@@ -330,13 +330,13 @@ int main() {
   endif()
 endif()
 
-if (WITH_LIBURING)
-  find_package(uring)
-  if (uring_FOUND)
-    add_definitions(-DROCKSDB_IOURING_PRESENT)
-    list(APPEND THIRDPARTY_LIBS uring::uring)
-  endif()
-endif()
+#if (WITH_LIBURING)
+#  find_package(uring)
+#  if (uring_FOUND)
+#    add_definitions(-DROCKSDB_IOURING_PRESENT)
+#    list(APPEND THIRDPARTY_LIBS uring::uring)
+#  endif()
+#endif()
 
 # Reset the required flags
 set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})

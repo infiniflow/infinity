@@ -362,7 +362,6 @@ target_link_libraries(infinity
         re2.a
         pcre2-8-static
         rocksdb.a
-        uring.a
 )
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -594,7 +593,6 @@ target_link_libraries(unit_test
         ssl.a
         crypto.a
         rocksdb.a
-        uring.a
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
