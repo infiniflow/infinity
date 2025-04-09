@@ -69,6 +69,8 @@ public:
 
     SizeT ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state);
 
+    SizeT ExportToFileInner(QueryContext *query_context, ExportOperatorState *export_op_state, std::function<String(const Vector<ColumnVector> &, SizeT)> line_to_string);
+
     SizeT ExportToFVECS(QueryContext *query_context, ExportOperatorState *export_op_state);
 
     SizeT ExportToPARQUET(QueryContext *query_context, ExportOperatorState *export_op_state);
