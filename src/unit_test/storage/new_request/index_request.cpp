@@ -141,8 +141,13 @@ TEST_P(TestIndexRequest, vector_index_scan) {
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
-    auto search_vec = [this] {
-        String search_req_sql = "select c1 from t1 search match vector (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)";
+    auto search_vec = [this](const String &index_name = "") {
+        String search_req_sql;
+        if (index_name.empty()) {
+            search_req_sql = "select c1 from t1 search match vector (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1)";
+        } else {
+            search_req_sql = "select c1 from t1 search match vector (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 1) using index (" + index_name + ")";
+        }
         UniquePtr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(search_req_sql);
         DataTable *result_table = nullptr;
@@ -157,13 +162,22 @@ TEST_P(TestIndexRequest, vector_index_scan) {
     };
     search_vec();
     {
-        String create_index_sql = "create index idx2 on t1(c2) using hnsw with (M = 16, ef_construction = 200, metric = l2)";
+        String create_index_sql = "create index idx1 on t1(c2) using hnsw with (M=16, ef_construction=200, metric=l2)";
         UniquePtr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(create_index_sql);
         bool ok = HandleQueryResult(query_result);
         EXPECT_TRUE(ok);
     }
-    search_vec();
+    search_vec("");
+    search_vec("idx1");
+    {
+        String create_index_sql = "create index idx2 on t1(c2) using ivf with (metric=l2)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_index_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    search_vec("idx2");
 }
 
 TEST_P(TestIndexRequest, sparse_index_scan) {
@@ -204,4 +218,54 @@ TEST_P(TestIndexRequest, sparse_index_scan) {
         EXPECT_TRUE(ok);
     }
     search_vec();
+}
+
+TEST_P(TestIndexRequest, tensor_index_scan) {
+    auto search_tensor = [this] {
+        String search_req_sql = "select c1 from t1 search match tensor(c2, [0.4,0.5,0.6,0.7], 'float', 'maxsim', '')";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(search_req_sql);
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
+
+        {
+            SharedPtr<ColumnVector> col0 = data_block->column_vectors[0];
+            EXPECT_EQ(col0->GetValue(0), Value::MakeInt(2));
+        }
+    };
+    auto test = [&](bool use_index) {
+        {
+            String create_table_sql = "create table t1(c1 int, c2 tensor(float, 4))";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(create_table_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+        if (use_index) {
+            String create_index_sql = "create index idx1 on t1(c2) using emvb with(pq_subspace_num=4, pq_subspace_bits=8)";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(create_index_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+        {
+            String append_req_sql = "insert into t1 values(1, [0.0,1.0,2.0,3.0]), (2, [0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0])";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(append_req_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+        search_tensor();
+        {
+            String create_table_sql = "drop table t1";
+            UniquePtr<QueryContext> query_context = MakeQueryContext();
+            QueryResult query_result = query_context->Query(create_table_sql);
+            bool ok = HandleQueryResult(query_result);
+            EXPECT_TRUE(ok);
+        }
+    };
+    test(false);
+    test(true);
 }

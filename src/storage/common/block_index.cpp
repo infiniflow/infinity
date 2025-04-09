@@ -60,6 +60,10 @@ void BlockIndex::NewInit(NewTxn *new_txn, const String &db_name, const String &t
     for (SegmentID segment_id : *segment_ids_ptr) {
         NewSegmentSnapshot &segment_snapshot = new_segment_block_index_.emplace(segment_id, NewSegmentSnapshot()).first->second;
         segment_snapshot.segment_meta_ = MakeUnique<SegmentMeta>(segment_id, *table_meta_);
+        std::tie(segment_snapshot.segment_offset_, status) = segment_snapshot.segment_meta_->GetRowCnt1();
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
 
         Vector<BlockID> *block_ids_ptr = nullptr;
         std::tie(block_ids_ptr, status) = segment_snapshot.segment_meta_->GetBlockIDs1();
@@ -113,10 +117,18 @@ SizeT BlockIndex::SegmentCount() const {
 }
 
 SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
-    auto seg_it = segment_block_index_.find(segment_id);
-    if (seg_it != segment_block_index_.end()) {
-        const auto &blocks_info = seg_it->second;
-        return blocks_info.segment_offset_;
+    if (!table_meta_) {
+        auto seg_it = segment_block_index_.find(segment_id);
+        if (seg_it != segment_block_index_.end()) {
+            const auto &blocks_info = seg_it->second;
+            return blocks_info.segment_offset_;
+        }
+    } else {
+        auto seg_it = new_segment_block_index_.find(segment_id);
+        if (seg_it != new_segment_block_index_.end()) {
+            const auto &blocks_info = seg_it->second;
+            return blocks_info.segment_offset_;
+        }
     }
     return 0;
 }
@@ -197,7 +209,7 @@ SharedPtr<NewIndexSnapshot> IndexIndex::Insert(const String &index_name, SharedP
     if (!status.ok()) {
         RecoverableError(status);
     }
-    for(SegmentID segment_id : *segment_ids_ptr) {
+    for (SegmentID segment_id : *segment_ids_ptr) {
         index_snapshot->segment_index_metas_.emplace(segment_id, MakeUnique<SegmentIndexMeta>(segment_id, *table_index_meta));
     }
 

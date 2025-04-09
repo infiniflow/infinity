@@ -90,7 +90,6 @@ public:
                                                                              u32 query_embedding_num,
                                                                              u32 top_n,
                                                                              Bitmask &bitmask,
-                                                                             const SegmentEntry *segment_entry,
                                                                              const BlockIndex *block_index,
                                                                              TxnTimeStamp begin_ts,
                                                                              u32 centroid_nprobe,

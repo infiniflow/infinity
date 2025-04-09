@@ -76,6 +76,20 @@ import simd_functions;
 import knn_expression;
 import search_options;
 import result_cache_manager;
+import buffer_obj;
+
+import table_meeta;
+import table_index_meeta;
+import segment_index_meta;
+import chunk_index_meta;
+import segment_meta;
+import block_meta;
+import table_meeta;
+import new_txn;
+import new_catalog;
+import index_base;
+import column_meta;
+import mem_index;
 
 namespace infinity {
 
@@ -104,6 +118,8 @@ PhysicalMatchTensorScan::PhysicalMatchTensorScan(const u64 id,
       src_match_tensor_expr_(std::move(match_tensor_expression)), topn_(topn), knn_threshold_(knn_threshold), index_options_(index_options) {
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
+
+PhysicalMatchTensorScan::~PhysicalMatchTensorScan() = default;
 
 void PhysicalMatchTensorScan::Init(QueryContext *query_context) {}
 
@@ -168,6 +184,115 @@ void PhysicalMatchTensorScan::CheckColumn() {
 }
 
 void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+
+    if (use_new_catalog) {
+        Status status;
+        SizeT search_column_id = SearchColumnID();
+
+        block_metas_ = MakeUnique<Vector<BlockMeta *>>();
+        segment_index_metas_ = MakeUnique<Vector<SegmentIndexMeta>>();
+
+        TableMeeta *table_meta = base_table_ref_->block_index_->table_meta_.get();
+
+        Set<SegmentID> index_entry_map;
+
+        if (!src_match_tensor_expr_->ignore_index_) {
+            Vector<String> *index_id_strs_ptr = nullptr;
+            Vector<String> *index_names_ptr = nullptr;
+            status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+            if (!status.ok()) {
+                RecoverableError(status);
+            }
+
+            if (src_match_tensor_expr_->index_name_.empty()) {
+                LOG_TRACE("Try to find an index to use");
+                for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+                    const String &index_id_str = (*index_id_strs_ptr)[i];
+                    table_index_meta_ = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
+
+                    SharedPtr<IndexBase> index_base;
+                    std::tie(index_base, status) = table_index_meta_->GetIndexBase();
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
+
+                    ColumnID column_id = 0;
+                    std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
+                    if (!status.ok()) {
+                        RecoverableError(status);
+                    }
+                    if (column_id != search_column_id) {
+                        // search_column_id isn't in this table index
+                        continue;
+                    }
+                    // check index type
+                    if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB) {
+                        LOG_TRACE(fmt::format("MatchTensorScan: PlanWithIndex(): Skipping non-knn index."));
+                        continue;
+                    }
+                }
+            } else {
+                LOG_TRACE(fmt::format("Use index: {}", src_match_tensor_expr_->index_name_));
+                auto iter = std::find(index_names_ptr->begin(), index_names_ptr->end(), src_match_tensor_expr_->index_name_);
+                if (iter == index_names_ptr->end()) {
+                    Status status = Status::IndexNotExist(src_match_tensor_expr_->index_name_);
+                    RecoverableError(std::move(status));
+                }
+                const String &index_id_str = (*index_id_strs_ptr)[iter - index_names_ptr->begin()];
+                table_index_meta_ = MakeUnique<TableIndexMeeta>(index_id_str, *table_meta);
+
+                SharedPtr<IndexBase> index_base;
+                std::tie(index_base, status) = table_index_meta_->GetIndexBase();
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+
+                ColumnID column_id = 0;
+                std::tie(column_id, status) = table_meta->GetColumnIDByColumnName(index_base->column_name());
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+                if (column_id != search_column_id) {
+                    // search_column_id isn't in this table index
+                    LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
+                    Status error_status = Status::ColumnNotExist(index_base->column_name());
+                    RecoverableError(std::move(error_status));
+                }
+                // check index type
+                if (auto index_type = index_base->index_type_; index_type != IndexType::kEMVB) {
+                    Status error_status = Status::InvalidIndexType("invalid index");
+                    RecoverableError(std::move(error_status));
+                }
+            }
+            // Fill the segment with index
+            if (table_index_meta_) {
+                Vector<SegmentID> *segment_ids_ptr = nullptr;
+                status = table_index_meta_->GetSegmentIDs(segment_ids_ptr);
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+                index_entry_map.insert(segment_ids_ptr->begin(), segment_ids_ptr->end());
+            }
+        }
+
+        // Generate task set: index segment and no index block
+        BlockIndex *block_index = base_table_ref_->block_index_.get();
+        for (const auto &[segment_id, segment_info] : block_index->new_segment_block_index_) {
+            if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
+                segment_index_metas_->emplace_back(segment_id, *table_index_meta_);
+            } else {
+                const auto &block_map = segment_info.block_map_;
+                for (const auto &block_meta : block_map) {
+                    block_metas_->emplace_back(block_meta.get());
+                }
+            }
+        }
+        LOG_TRACE(fmt::format("MatchTensorScan: brute force task: {}, index task: {}", block_metas_->size(), segment_index_metas_->size()));
+
+        return;
+    }
+
     Txn *txn = query_context->GetTxn();
 
     auto *table_info = base_table_ref_->table_info_.get();
@@ -294,6 +419,205 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         String error_message = "TensorScan output data block array should be empty";
         UnrecoverableError(error_message);
     }
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+
+    if (use_new_catalog) {
+        Status status;
+        NewTxn *new_txn = query_context->GetNewTxn();
+        const TxnTimeStamp begin_ts = new_txn->BeginTS();
+        if (!common_query_filter_->TryFinishBuild()) {
+            // not ready, abort and wait for next time
+            return;
+        }
+        MatchTensorScanFunctionData &function_data = *(operator_state->match_tensor_scan_function_data_);
+        if (function_data.finished_) [[unlikely]] {
+            String error_message = "MatchTensorScanFunctionData is finished";
+            UnrecoverableError(error_message);
+        }
+        const BlockIndex *block_index = base_table_ref_->block_index_.get();
+        if (const u32 task_job_index = task_executed_++; task_job_index < segment_index_metas_->size()) {
+            // use index
+            SegmentIndexMeta &segment_index_meta = (*segment_index_metas_)[task_job_index];
+            SegmentID segment_id = segment_index_meta.segment_id();
+            // SegmentEntry *segment_entry = nullptr;
+            SegmentOffset segment_row_count = 0;
+            SegmentMeta *segment_meta = nullptr;
+            const auto &segment_index_hashmap = base_table_ref_->block_index_->new_segment_block_index_;
+            if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
+                String error_message = fmt::format("Cannot find SegmentMeta for segment id: {}", segment_id);
+                UnrecoverableError(error_message);
+            } else {
+                // segment_entry = iter->second.segment_entry_;
+                segment_meta = iter->second.segment_meta_.get();
+                std::tie(segment_row_count, status) = segment_meta->GetRowCnt1();
+                if (!status.ok()) {
+                    String error_message = fmt::format("GetRowCnt1 failed: {}", status.message());
+                    UnrecoverableError(error_message);
+                }
+            }
+
+            bool has_some_result = false;
+            Bitmask segment_bitmask;
+            if (common_query_filter_->AlwaysTrue()) {
+                has_some_result = true;
+                segment_bitmask.SetAllTrue();
+            } else {
+                if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
+                    LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter",
+                                          task_job_index,
+                                          segment_index_metas_->size()));
+                    segment_bitmask = it->second;
+                    if (segment_row_count != segment_bitmask.count()) {
+                        UnrecoverableError(
+                            fmt::format("Segment row count {} not match with bitmask size {}", segment_row_count, segment_bitmask.count()));
+                    }
+                    has_some_result = true;
+                }
+            }
+
+            if (has_some_result) {
+                LOG_TRACE(
+                    fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, segment_index_metas_->size()));
+                // TODO: now only have EMVB index
+                // const Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> emvb_snapshot = index_entry->GetEMVBIndexSnapshot();
+                Vector<ChunkID> *chunk_ids_ptr = nullptr;
+                Status status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+                SharedPtr<MemIndex> mem_index;
+                status = segment_index_meta.GetMemIndex(mem_index);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+
+                // 1. in mem index
+                if (const EMVBIndexInMem *emvb_index_in_mem = mem_index->memory_emvb_index_.get(); emvb_index_in_mem) {
+                    // TODO: fix the parameters
+                    const auto result =
+                        emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
+                                                             calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                                                             topn_,
+                                                             segment_bitmask,
+                                                             block_index,
+                                                             begin_ts,
+                                                             index_options_->emvb_centroid_nprobe_,
+                                                             index_options_->emvb_threshold_first_,
+                                                             index_options_->emvb_n_doc_to_score_,
+                                                             index_options_->emvb_n_doc_out_second_stage_,
+                                                             index_options_->emvb_threshold_final_);
+                    std::visit(
+                        Overload{[segment_id, &function_data](const Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> &index_result) {
+                                     const auto &[result_num, score_ptr, row_id_ptr] = index_result;
+                                     for (u32 i = 0; i < result_num; ++i) {
+                                         function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                                     }
+                                 },
+                                 [this, begin_ts, segment_id, &function_data, &segment_meta](const Pair<u32, u32> &in_mem_result) {
+                                     const auto &[start_offset, total_row_count] = in_mem_result;
+                                     BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
+                                     BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
+                                     u32 row_leftover = total_row_count;
+                                     do {
+                                         const u32 row_to_read = std::min<u32>(row_leftover, DEFAULT_BLOCK_CAPACITY - block_offset);
+                                         Bitmask block_bitmask;
+                                         if (this->CalculateFilterBitmask(segment_id, block_id, row_to_read, block_bitmask)) {
+                                             BlockMeta block_meta(block_id, *segment_meta);
+                                             Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, block_bitmask);
+                                             if (!status.ok()) {
+                                                 UnrecoverableError(status.message());
+                                             }
+                                             ColumnMeta column_meta(this->search_column_id_, block_meta);
+                                             ColumnVector column_vector;
+                                             status =
+                                                 NewCatalog::GetColumnVector(column_meta, row_to_read, ColumnVectorTipe::kReadOnly, column_vector);
+                                             if (!status.ok()) {
+                                                 UnrecoverableError(status.message());
+                                             }
+
+                                             // output score will always be float type
+                                             CalculateScoreOnColumnVector(column_vector,
+                                                                          segment_id,
+                                                                          block_id,
+                                                                          block_offset,
+                                                                          row_to_read,
+                                                                          block_bitmask,
+                                                                          *(this->calc_match_tensor_expr_),
+                                                                          function_data);
+                                         }
+                                         // prepare next block
+                                         row_leftover -= row_to_read;
+                                         ++block_id;
+                                         block_offset = 0;
+                                     } while (row_leftover);
+                                 }},
+                        result);
+                }
+                // 2. chunk index
+                for (ChunkID chunk_id : *chunk_ids_ptr) {
+                    ChunkIndexMeta chunk_index_meta(chunk_id, segment_index_meta);
+                    BufferObj *index_buffer = nullptr;
+                    Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+                    if (!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                    BufferHandle index_handle = index_buffer->Load();
+                    const auto *emvb_index = static_cast<const EMVBIndex *>(index_handle.GetData());
+
+                    const auto [result_num, score_ptr, row_id_ptr] =
+                        emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
+                                                      calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                                                      topn_,
+                                                      segment_bitmask,
+                                                      block_index,
+                                                      begin_ts,
+                                                      index_options_->emvb_centroid_nprobe_,
+                                                      index_options_->emvb_threshold_first_,
+                                                      index_options_->emvb_n_doc_to_score_,
+                                                      index_options_->emvb_n_doc_out_second_stage_,
+                                                      index_options_->emvb_threshold_final_);
+                    for (u32 i = 0; i < result_num; ++i) {
+                        function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                    }
+                }
+            }
+        } else if (const u32 task_job_block = task_job_index - segment_index_metas_->size(); task_job_block < block_metas_->size()) {
+            BlockMeta *block_meta = (*block_metas_)[task_job_block];
+            BlockID block_id = block_meta->block_id();
+            SegmentID segment_id = block_meta->segment_meta().segment_id();
+            BlockOffset row_count = block_index->GetBlockOffset(segment_id, block_id);
+
+            Bitmask bitmask;
+            if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
+                Status status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+                ColumnMeta column_meta(this->search_column_id_, *block_meta);
+                ColumnVector column_vector;
+                status = NewCatalog::GetColumnVector(column_meta, row_count, ColumnVectorTipe::kReadOnly, column_vector);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+                // output score will always be float type
+                CalculateScoreOnColumnVector(column_vector, segment_id, block_id, 0, row_count, bitmask, *calc_match_tensor_expr_, function_data);
+            }
+        } else {
+            // all task Complete
+            const u32 result_n = function_data.End();
+            float *result_scores = function_data.score_result_.get();
+            RowID *result_row_ids = function_data.row_id_result_.get();
+            SetOutput(Vector<char *>{reinterpret_cast<char *>(result_scores)},
+                      Vector<RowID *>{result_row_ids},
+                      sizeof(std::remove_pointer_t<decltype(result_scores)>),
+                      result_n,
+                      query_context,
+                      operator_state);
+            operator_state->SetComplete();
+        }
+        return;
+    }
+
     Txn *txn = query_context->GetTxn();
     const TxnTimeStamp begin_ts = txn->BeginTS();
     BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
@@ -350,7 +674,6 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                                          calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
                                                                          topn_,
                                                                          segment_bitmask,
-                                                                         segment_entry,
                                                                          block_index,
                                                                          begin_ts,
                                                                          index_options_->emvb_centroid_nprobe_,
@@ -406,7 +729,6 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                       calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
                                                       topn_,
                                                       segment_bitmask,
-                                                      segment_entry,
                                                       block_index,
                                                       begin_ts,
                                                       index_options_->emvb_centroid_nprobe_,
