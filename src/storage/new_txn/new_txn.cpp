@@ -1698,6 +1698,7 @@ bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
                 if (conflict) {
                     return true;
                 }
+                break;
             }
             case WalCommandType::CREATE_INDEX: {
                 auto *create_index_cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
