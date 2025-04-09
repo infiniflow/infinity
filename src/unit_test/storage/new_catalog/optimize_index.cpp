@@ -653,10 +653,10 @@ TEST_P(TestOptimizeIndex, optimize_index_and_optimize_index) {
     {
         PrepareForOptimizeIndex();
 
-        //  t1            compact   commit (success)
+        //  t1            optimize   commit (success)
         //  |--------------|---------------|
         //                                     |------------------|------------------|
-        //                                    t2                compact          commit
+        //                                    t2                optimize          commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 1"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -676,10 +676,10 @@ TEST_P(TestOptimizeIndex, optimize_index_and_optimize_index) {
     {
         PrepareForOptimizeIndex();
 
-        //  t1            compact   commit (success)
+        //  t1            optimize   commit (success)
         //  |--------------|---------------|
         //                         |------------------|------------------|
-        //                        t2                compact (fail)    rollback
+        //                        t2                optimize (fail)    rollback
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 1"), TransactionType::kNormal);
         status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
@@ -701,10 +701,10 @@ TEST_P(TestOptimizeIndex, optimize_index_and_optimize_index) {
     {
         PrepareForOptimizeIndex();
 
-        //  t1            compact   commit (success)
+        //  t1            optimize   commit (success)
         //  |--------------|---------------|
         //         |------------------|------------------|
-        //        t2                compact (fail)       rollback
+        //        t2                optimize (fail)       rollback
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 1"), TransactionType::kNormal);
 
@@ -728,10 +728,10 @@ TEST_P(TestOptimizeIndex, optimize_index_and_optimize_index) {
     {
         PrepareForOptimizeIndex();
 
-        //  t1            compact                        commit
+        //  t1            optimize                        commit
         //  |--------------|--------------------------------|
         //         |------------------|------------------|
-        //        t2                compact (fail)      rollback
+        //        t2                optimize (fail)      rollback
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index 1"), TransactionType::kNormal);
 
