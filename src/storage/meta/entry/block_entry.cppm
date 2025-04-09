@@ -92,6 +92,8 @@ public:
     static SharedPtr<BlockEntry>
     ApplyBlockSnapshot(SegmentEntry *segment_entry, BlockSnapshotInfo *block_snapshot_info, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    void CommitApplySnapshot(TransactionID txn_id, TxnTimeStamp commit_ts);
+
     void UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String block_filter_binary_data);
 
 public:

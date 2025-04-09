@@ -70,8 +70,7 @@ public:
                                                                   TxnTimeStamp begin_ts,
                                                                   TxnManager *txn_mgr);
 
-    Tuple<SharedPtr<TableIndexInfo>, Status>
-    GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, Txn *txn_ptr);
+    Tuple<SharedPtr<TableIndexInfo>, Status> GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, Txn *txn_ptr);
 
     Tuple<TableIndexEntry *, Status> GetEntry(std::shared_lock<std::shared_mutex> &&r_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
         return index_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
@@ -87,6 +86,8 @@ public:
     TableIndexEntry *CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(TableIndexMeta *, TransactionID, TxnTimeStamp)> &&init_entry,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts);
+
+    Status ApplyTableIndexSnapshot(std::function<SharedPtr<TableIndexEntry>()> &&restore_entry, Txn *txn_ptr);
 
     void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
