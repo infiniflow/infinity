@@ -25,6 +25,7 @@ import data_table;
 import data_block;
 import column_vector;
 import value;
+import third_party;
 
 using namespace infinity;
 
@@ -267,5 +268,30 @@ TEST_P(TestDataRequest, test_import_parquet) {
         SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
 
         EXPECT_EQ(data_block->row_count(), 10);
+    }
+}
+
+TEST_P(TestDataRequest, test_export_csv) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String import_table_sql = "copy t1 from 'test/data/csv/embedding_int_dim3.csv' with(delimiter ',', format csv)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(import_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String export_path = String(GetFullTmpDir()) + "/export_csv_test.csv";
+        String import_table_sql = fmt::format("copy t1 to '{}' with(delimiter ',', format csv)", export_path);
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(import_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
     }
 }

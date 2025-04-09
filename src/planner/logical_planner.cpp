@@ -1062,11 +1062,33 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
         RecoverableError(status);
     }
 
-    Txn *txn = query_context_ptr_->GetTxn();
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+    SharedPtr<TableInfo> table_info;
+    Status status;
+    Txn *txn = nullptr;
+    NewTxn *new_txn = nullptr;
+    if (!use_new_catalog) {
+        txn = query_context_ptr_->GetTxn();
 
-    auto [table_info, info_status] = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
-    if (!info_status.ok()) {
-        RecoverableError(info_status);
+        std::tie(table_info, status) = txn->GetTableInfo(statement->schema_name_, statement->table_name_);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+    } else {
+        new_txn = query_context_ptr_->GetNewTxn();
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = new_txn->GetTableMeta(statement->schema_name_, statement->table_name_, db_meta, table_meta);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info = MakeShared<TableInfo>();
+        status = table_meta->GetTableInfo(*table_info);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        table_info->db_name_ = MakeShared<String>(statement->schema_name_);
+        table_info->table_name_ = MakeShared<String>(statement->table_name_);
     }
 
     Vector<u64> column_idx_array;
@@ -1183,7 +1205,13 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
         }
     }
 
-    SharedPtr<BlockIndex> block_index = txn->GetBlockIndexFromTable(statement->schema_name_, statement->table_name_);
+    SharedPtr<BlockIndex> block_index;
+    if (use_new_catalog) {
+        block_index = MakeShared<BlockIndex>();
+        block_index->NewInit(new_txn, statement->schema_name_, statement->table_name_);
+    } else {
+        block_index = txn->GetBlockIndexFromTable(statement->schema_name_, statement->table_name_);
+    }
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                       table_info,

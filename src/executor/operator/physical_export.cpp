@@ -48,6 +48,12 @@ import knn_filter;
 import txn;
 import block_index;
 
+import new_txn;
+import block_meta;
+import column_meta;
+import new_catalog;
+import roaring_bitmap;
+
 namespace infinity {
 
 PhysicalExport::PhysicalExport(u64 id,
@@ -171,6 +177,120 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     SizeT offset = offset_;
     SizeT row_count{0};
     SizeT file_no_{0};
+
+    auto append_line = [select_column_count, this, &row_count, &file_handle, &file_no_](const Vector<ColumnVector> &column_vectors, SizeT row_idx) {
+        String line;
+        for (SizeT select_column_idx = 0; select_column_idx < select_column_count; ++select_column_idx) {
+            Value v = column_vectors[select_column_idx].GetValue(row_idx);
+            switch (v.type().type()) {
+                case LogicalType::kArray:
+                case LogicalType::kEmbedding:
+                case LogicalType::kMultiVector:
+                case LogicalType::kTensor:
+                case LogicalType::kTensorArray:
+                case LogicalType::kSparse: {
+                    line += fmt::format("\"{}\"", v.ToString());
+                    break;
+                }
+                default: {
+                    line += v.ToString();
+                }
+            }
+            if (select_column_idx == select_column_count - 1) {
+                line += "\n";
+            } else {
+                line += delimiter_;
+            }
+        }
+
+        if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+            ++file_no_;
+            String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
+            auto [new_file_handle, new_status] = VirtualStore::Open(new_file_path, FileAccessMode::kWrite);
+            if (!new_status.ok()) {
+                RecoverableError(new_status);
+            }
+            file_handle = std::move(new_file_handle);
+        }
+        file_handle->Append(line.c_str(), line.size());
+        ++row_count;
+        if (limit_ != 0 && row_count == limit_) {
+            return true;
+        }
+        return false;
+    };
+
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        TxnTimeStamp begin_ts = new_txn->BeginTS();
+
+        const Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
+        LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
+
+        for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
+            SizeT block_count = segment_snapshot.block_map_.size();
+            LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
+            for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
+                LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
+
+                BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
+                Vector<ColumnVector> column_vectors;
+                column_vectors.resize(select_column_count);
+                auto [block_row_count, status] = block_meta->GetRowCnt1();
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+
+                for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
+                    ColumnID select_column_idx = select_columns[block_column_idx];
+                    switch (select_column_idx) {
+                        case COLUMN_IDENTIFIER_ROW_ID:
+                        case COLUMN_IDENTIFIER_CREATE:
+                        case COLUMN_IDENTIFIER_DELETE: {
+                            UnrecoverableError("Not implemented");
+                            break;
+                        }
+                        default: {
+                            ColumnMeta column_meta(select_column_idx, *block_meta);
+                            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                        block_row_count,
+                                                                        ColumnVectorTipe::kReadOnly,
+                                                                        column_vectors[block_column_idx]);
+                            if (!status.ok()) {
+                                UnrecoverableError("Failed to get column vector");
+                            }
+                        }
+                    }
+                }
+
+                Bitmask bitmask;
+                status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+                if (!status.ok()) {
+                    UnrecoverableError(status.message());
+                }
+
+                for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
+                    if (!bitmask.IsTrue(row_idx)) {
+                        continue;
+                    }
+                    if (offset > 0) {
+                        --offset;
+                        continue;
+                    }
+
+                    bool end = append_line(column_vectors, row_idx);
+                    if (end) {
+                        goto new_label_return;
+                    }
+                }
+            }
+        }
+    new_label_return:
+        LOG_DEBUG(fmt::format("Export to CSV, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
+        return row_count;
+    }
+
     Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     Txn *txn = query_context->GetTxn();
@@ -227,42 +347,9 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                     --offset;
                     continue;
                 }
-                String line;
-                for (SizeT select_column_idx = 0; select_column_idx < select_column_count; ++select_column_idx) {
-                    Value v = column_vectors[select_column_idx].GetValue(row_idx);
-                    switch (v.type().type()) {
-                        case LogicalType::kArray:
-                        case LogicalType::kEmbedding:
-                        case LogicalType::kMultiVector:
-                        case LogicalType::kTensor:
-                        case LogicalType::kTensorArray:
-                        case LogicalType::kSparse: {
-                            line += fmt::format("\"{}\"", v.ToString());
-                            break;
-                        }
-                        default: {
-                            line += v.ToString();
-                        }
-                    }
-                    if (select_column_idx == select_column_count - 1) {
-                        line += "\n";
-                    } else {
-                        line += delimiter_;
-                    }
-                }
 
-                if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
-                    ++file_no_;
-                    String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
-                    auto [new_file_handle, new_status] = VirtualStore::Open(new_file_path, FileAccessMode::kWrite);
-                    if (!new_status.ok()) {
-                        RecoverableError(new_status);
-                    }
-                    file_handle = std::move(new_file_handle);
-                }
-                file_handle->Append(line.c_str(), line.size());
-                ++row_count;
-                if (limit_ != 0 && row_count == limit_) {
+                bool end = append_line(column_vectors, row_idx);
+                if (end) {
                     goto label_return;
                 }
             }
