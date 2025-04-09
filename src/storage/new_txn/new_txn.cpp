@@ -1869,6 +1869,12 @@ void NewTxn::PostCommit() {
                 if (!status.ok()) {
                     UnrecoverableError("Fail to unlock table");
                 }
+                if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+                    Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
+                    if (!mem_index_status.ok()) {
+                        UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
+                    }
+                }
                 break;
             }
             default: {
@@ -1982,9 +1988,11 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                         UnrecoverableError("Fail to unlock table when rollback dump mem index txn");
                     }
                 }
-                Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
-                if (!mem_index_status.ok()) {
-                    UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
+                if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+                    Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
+                    if (!mem_index_status.ok()) {
+                        UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", cmd->table_name_, mem_index_status.message()));
+                    }
                 }
 
                 break;

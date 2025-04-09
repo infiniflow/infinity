@@ -511,7 +511,7 @@ Status NewCatalog::UnsetMemIndexDump(const String &table_key) {
     std::unique_lock lock(mem_index_mtx_);
     auto iter = table_lock_for_mem_index_.find(table_key);
     if (iter == table_lock_for_mem_index_.end()) {
-        table_lock_for_mem_index_[table_key] = MakeShared<TableLockForMemIndex>();
+        UnrecoverableError(fmt::format("Table key: {} isn't found in mem index dump", table_key));
     }
     TableLockForMemIndex *table_lock_for_mem_index = table_lock_for_mem_index_[table_key].get();
     if (!table_lock_for_mem_index->dumping_mem_index_) {

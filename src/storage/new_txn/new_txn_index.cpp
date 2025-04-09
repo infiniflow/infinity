@@ -1558,14 +1558,14 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInst
     const String &index_id_str = dump_index_cmd->index_id_str_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
-    const String &table_key = dump_index_cmd->table_key_;
+//    const String &table_key = dump_index_cmd->table_key_;
 
-    if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
-        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
-        if (!mem_index_status.ok()) {
-            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_cmd->table_name_, mem_index_status.message()));
-        }
-    }
+//    if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+//        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
+//        if (!mem_index_status.ok()) {
+//            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_cmd->table_name_, mem_index_status.message()));
+//        }
+//    }
 
     if (dump_index_cmd->clear_mem_index_) {
 

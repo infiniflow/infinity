@@ -1651,6 +1651,25 @@ TEST_P(TestOptimizeIndex, optimize_index_and_compact_table) {
         EXPECT_TRUE(status.ok());
     };
 
+    auto CheckTable1 = [&](Vector<ColumnID> column_idxes) {
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
+
+        Optional<DBMeeta> db_meta;
+        Optional<TableMeeta> table_meta;
+        Status status = txn->GetTableMeta(*db_name, *table_name, db_meta, table_meta);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        std::tie(segment_ids_ptr, status) = table_meta->GetSegmentIDs1();
+        EXPECT_TRUE(status.ok());
+
+        Vector<SegmentID> expected_segments{0, 1, 2};
+        EXPECT_EQ(*segment_ids_ptr, expected_segments);
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    };
+
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
 
@@ -1664,12 +1683,10 @@ TEST_P(TestOptimizeIndex, optimize_index_and_compact_table) {
         //                                    t2                compact  commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
-        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, 2);
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
-
-        new_txn_mgr->PrintAllKeyValue();
 
         // compact
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
@@ -1682,156 +1699,173 @@ TEST_P(TestOptimizeIndex, optimize_index_and_compact_table) {
 
         DropDB();
     }
-    //    {
-    //        PrepareForOptimizeAndDumpIndex();
-    //
-    //        //  t1        optimize index    commit (success)
-    //        //  |--------------|---------------|
-    //        //                         |------------------|----------|
-    //        //                        t2               rename       commit
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
-    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        // rename
-    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn5);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        DropDB();
-    //    }
-    //    {
-    //        PrepareForOptimizeAndDumpIndex();
-    //
-    //        //  t1       optimize index     commit (success)
-    //        //  |--------------|---------------|
-    //        //         |------------------|-------------|
-    //        //        t2            rename         rollback
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
-    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        // rename
-    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
-    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn5);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        DropDB();
-    //    }
-    //    {
-    //        PrepareForOptimizeAndDumpIndex();
-    //
-    //        //  t1        optimize index        rollback
-    //        //  |--------------|-------------------|
-    //        //         |-----|----------|
-    //        //        t2   rename   commit
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
-    //
-    //        // rename
-    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
-    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn5);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        DropDB();
-    //    }
-    //    {
-    //        PrepareForOptimizeAndDumpIndex();
-    //
-    //        //           t1      optimize index        commit
-    //        //           |----------|-------------------|
-    //        //         |-----|----------|
-    //        //        t2   rename   commit
-    //
-    //        // rename
-    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
-    //
-    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn5);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        DropDB();
-    //    }
-    //    {
-    //        PrepareForOptimizeAndDumpIndex();
-    //
-    //        //                  t1                optimize index         commit
-    //        //                  |--------------------------|---------------|
-    //        //         |-----|----------|
-    //        //        t2    rename  commit
-    //
-    //        // rename
-    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
-    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
-    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn5);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        DropDB();
-    //    }
-    //
-    //    {
-    //        PrepareForOptimizeAndDumpIndex();
-    //
-    //        //                             t1                  optimize index      rollback
-    //        //                             |--------------------------|---------------|
-    //        //         |-----|----------|
-    //        //        t2  drop column  commit
-    //
-    //        // rename
-    //        auto *txn5 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename table"), TransactionType::kNormal);
-    //        status = txn5->RenameTable(*db_name, *table_name, "table2");
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn5);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
-    //        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, segment_id);
-    //        EXPECT_FALSE(status.ok());
-    //        status = new_txn_mgr->RollBackTxn(txn);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        DropDB();
-    //    }
+    {
+        PrepareForCompactAndOptimize();
+
+        //  t1        optimize index    commit (success)
+        //  |--------------|---------------|
+        //                         |------------------|----------|
+        //                        t2               compact       commit (fail)
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, 2);
+        EXPECT_TRUE(status.ok());
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_FALSE(status.ok());
+
+        CheckTable1({0, 1});
+
+        DropDB();
+    }
+    {
+        PrepareForCompactAndOptimize();
+
+        //  t1       optimize index     commit (success)
+        //  |--------------|---------------|
+        //         |------------------|-------------|
+        //        t2            compact         commit(fail)
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, 2);
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_FALSE(status.ok());
+
+        CheckTable1({0, 1});
+
+        DropDB();
+    }
+    {
+        PrepareForCompactAndOptimize();
+
+        //  t1        optimize index         commit
+        //  |--------------|-------------------|
+        //         |-----|----------|
+        //        t2   compact   commit
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, 2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
+
+        CheckTable({0, 1});
+
+        DropDB();
+    }
+    {
+        PrepareForCompactAndOptimize();
+
+        //           t1      optimize index        commit (fail)
+        //           |----------|-------------------|
+        //         |-----|----------|
+        //        t2   compact   commit
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, 2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
+
+        CheckTable({0, 1});
+
+        DropDB();
+    }
+    {
+        PrepareForCompactAndOptimize();
+
+        //                  t1                optimize index         commit
+        //                  |--------------------------|---------------|
+        //         |-----|----------|
+        //        t2    compact  commit
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, 2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_FALSE(status.ok());
+
+        CheckTable({0, 1});
+
+        DropDB();
+    }
+
+    {
+        PrepareForCompactAndOptimize();
+
+        //                             t1                  optimize index      rollback
+        //                             |--------------------------|---------------|
+        //         |-----|----------|
+        //        t2  compact    commit
+
+        // compact
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn->OptimizeIndex(*db_name, *table_name, *index_name1, 2);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({0, 1});
+
+        DropDB();
+    }
 }
