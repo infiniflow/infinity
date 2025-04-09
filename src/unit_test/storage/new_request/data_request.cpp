@@ -177,7 +177,7 @@ TEST_P(TestDataRequest, test_update) {
     }
 }
 
-TEST_P(TestDataRequest, test_import) {
+TEST_P(TestDataRequest, test_import_csv) {
     {
         String create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
         UniquePtr<QueryContext> query_context = MakeQueryContext();
@@ -205,5 +205,36 @@ TEST_P(TestDataRequest, test_import) {
         SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
 
         EXPECT_EQ(data_block->row_count(), 3);
+    }
+}
+
+TEST_P(TestDataRequest, test_import_jsonl) {
+    {
+        String create_table_sql = "create table t1(name varchar, age int, embedding_column embedding(int,5))";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String import_table_sql = "copy t1 from 'test/data/jsonl/test_jsonl.jsonl' with(format jsonl)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(import_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String select_req_sql = "select * from t1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_req_sql);
+
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+
+        EXPECT_EQ(result_table->data_blocks_.size(), 1);
+        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
+
+        EXPECT_EQ(data_block->row_count(), 14);
     }
 }

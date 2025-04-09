@@ -74,9 +74,9 @@ import new_txn;
 
 namespace infinity {
 
-class NewZxvParserCtx {
+class NewImportCtx {
 public:
-    NewZxvParserCtx(Vector<SharedPtr<ColumnDef>> column_defs, SizeT block_capacity = DEFAULT_BLOCK_CAPACITY)
+    NewImportCtx(Vector<SharedPtr<ColumnDef>> column_defs, SizeT block_capacity = DEFAULT_BLOCK_CAPACITY)
         : block_capacity_(block_capacity), column_defs_(std::move(column_defs)) {
         column_types_.reserve(column_defs_.size());
         for (const auto &column_def : column_defs_) {
@@ -119,6 +119,8 @@ public:
         return *cur_block_->column_vectors[column_idx];
     }
 
+    Vector<SharedPtr<ColumnVector>> &GetColumnVectors() { return cur_block_->column_vectors; }
+
     SharedPtr<ColumnDef> GetColumnDef(SizeT column_idx) {
         assert(column_idx < column_defs_.size());
         return column_defs_[column_idx];
@@ -139,6 +141,15 @@ private:
 
     DataBlock *cur_block_ = nullptr;
     SizeT cur_row_count_ = 0;
+};
+
+class NewZxvParserCtx : public NewImportCtx {
+public:
+    NewZxvParserCtx(Vector<SharedPtr<ColumnDef>> column_defs, SizeT block_capacity = DEFAULT_BLOCK_CAPACITY)
+        : NewImportCtx(std::move(column_defs), block_capacity) {}
+
+public:
+    ZsvParser parser_;
 };
 
 void PhysicalImport::Init(QueryContext *query_context) {}
@@ -170,6 +181,10 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
         switch (file_type_) {
             case CopyFileType::kCSV: {
                 NewImportCSV(query_context, import_op_state, data_blocks);
+                break;
+            }
+            case CopyFileType::kJSONL: {
+                NewImportJSONL(query_context, import_op_state, data_blocks);
                 break;
             }
             default: {
@@ -756,9 +771,9 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     //    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_info_->column_count_, txn);
 
-    Vector<ColumnVector> column_vectors;
+    Vector<SharedPtr<ColumnVector>> column_vectors;
     for (i64 i = 0; i < table_info_->column_count_; ++i) {
-        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
+        column_vectors.emplace_back(MakeShared<ColumnVector>(block_entry->GetColumnVector(txn->buffer_mgr(), i)));
     }
 
     SizeT row_count{0};
@@ -794,7 +809,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
                 block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_info_->column_count_, txn);
                 column_vectors.clear();
                 for (i64 i = 0; i < table_info_->column_count_; ++i) {
-                    column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
+                    column_vectors.emplace_back(MakeShared<ColumnVector>(block_entry->GetColumnVector(txn->buffer_mgr(), i)));
                 }
             }
         } else {
@@ -815,6 +830,35 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     }
 
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
+    import_op_state->result_msg_ = std::move(result_msg);
+}
+
+void PhysicalImport::NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks) {
+    UniquePtr<StreamReader> stream_reader = VirtualStore::OpenStreamReader(file_path_);
+
+    auto import_ctx = MakeUnique<NewImportCtx>(table_info_->column_defs_);
+
+    while (true) {
+        String json_str;
+        if (!stream_reader->ReadLine(json_str)) {
+            break;
+        }
+        nlohmann::json line_json = nlohmann::json::parse(json_str);
+
+        if (!import_ctx->CheckInit()) {
+            import_ctx->Init();
+        }
+        JSONLRowHandler(line_json, import_ctx->GetColumnVectors());
+        import_ctx->AddRowCnt();
+
+        if (import_ctx->CheckFull()) {
+            import_ctx->FinalizeBlock();
+        }
+    }
+
+    data_blocks = std::move(*import_ctx).Finalize();
+
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", import_ctx->row_count()));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
@@ -858,9 +902,9 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
     //    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_info_->column_count_, txn);
 
-    Vector<ColumnVector> column_vectors;
+    Vector<SharedPtr<ColumnVector>> column_vectors;
     for (i64 i = 0; i < table_info_->column_count_; ++i) {
-        column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
+        column_vectors.emplace_back(MakeShared<ColumnVector>(block_entry->GetColumnVector(txn->buffer_mgr(), i)));
     }
 
     if (!json_arr.is_array()) {
@@ -888,7 +932,7 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
             block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_info_->column_count_, txn);
             column_vectors.clear();
             for (i64 i = 0; i < table_info_->column_count_; ++i) {
-                column_vectors.emplace_back(block_entry->GetColumnVector(txn->buffer_mgr(), i));
+                column_vectors.emplace_back(MakeShared<ColumnVector>(block_entry->GetColumnVector(txn->buffer_mgr(), i)));
             }
         }
         try {
@@ -1294,8 +1338,9 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
     }
 }
 
-void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors) {
-    for (SizeT i = 0; auto &column_vector : column_vectors) {
+void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<SharedPtr<ColumnVector>> &column_vectors) {
+    for (SizeT i = 0; auto &column_vector_ptr : column_vectors) {
+        ColumnVector &column_vector = *column_vector_ptr;
         const ColumnDef *column_def = table_info_->GetColumnDefByIdx(i++);
 
         if (line_json.contains(column_def->name_)) {

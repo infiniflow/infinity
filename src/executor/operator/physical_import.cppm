@@ -104,6 +104,8 @@ public:
 
     void ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void NewImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
     void ImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state);
 
     inline const TableInfo *table_info() const { return table_info_.get(); }
@@ -125,7 +127,7 @@ private:
 
     static void NewCSVRowHandler(void *);
 
-    void JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors);
+    void JSONLRowHandler(const nlohmann::json &line_json, Vector<SharedPtr<ColumnVector>> &column_vectors);
 
     void ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx);
 

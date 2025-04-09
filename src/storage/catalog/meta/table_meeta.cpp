@@ -479,6 +479,7 @@ Status TableMeeta::LoadColumnDefs() {
         column_defs.emplace_back(column_def);
         iter2->Next();
     }
+    std::sort(column_defs.begin(), column_defs.end(), [](const SharedPtr<ColumnDef> &a, const SharedPtr<ColumnDef> &b) { return a->id_ < b->id_; });
     column_defs_ = std::move(column_defs);
 
     return Status::OK();
@@ -625,7 +626,7 @@ Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
 }
 
 Status TableMeeta::CheckSegments(const Vector<SegmentID> &segment_ids) {
-    for(SegmentID segment_id : segment_ids) {
+    for (SegmentID segment_id : segment_ids) {
         String segment_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
         String commit_ts_str;
         Status status = kv_instance_.Get(segment_key, commit_ts_str);
