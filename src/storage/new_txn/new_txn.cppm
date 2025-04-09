@@ -278,7 +278,7 @@ public:
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
 
-    Status Compact(const String &db_name, const String &table_name);
+    Status Compact(const String &db_name, const String &table_name, const Vector<SegmentID>& segment_ids);
 
     Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
 

@@ -624,6 +624,18 @@ Tuple<Vector<SegmentID> *, Status> TableMeeta::GetSegmentIDs1() {
     return {&*segment_ids1_, Status::OK()};
 }
 
+Status TableMeeta::CheckSegments(const Vector<SegmentID> &segment_ids) {
+    for(SegmentID segment_id : segment_ids) {
+        String segment_key = KeyEncode::CatalogTableSegmentKey(db_id_str_, table_id_str_, segment_id);
+        String commit_ts_str;
+        Status status = kv_instance_.Get(segment_key, commit_ts_str);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> TableMeeta::GetColumnDefs() {
     if (!column_defs_) {
         auto status = LoadColumnDefs();

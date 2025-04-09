@@ -422,7 +422,7 @@ TEST_P(TestCleanup, test_cleanup_compact) {
         status = txn->GetTableFilePaths(*db_name, *table_name, file_paths_);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

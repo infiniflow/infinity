@@ -100,6 +100,7 @@ public:
     // Tuple<SharedPtr<Vector<SegmentID>>, Status> GetSegmentIDs();
 
     Tuple<Vector<SegmentID> *, Status> GetSegmentIDs1();
+    Status CheckSegments(const Vector<SegmentID> &segment_ids);
 
     Tuple<SharedPtr<Vector<SharedPtr<ColumnDef>>>, Status> GetColumnDefs();
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDefByColumnName(const String &column_name);

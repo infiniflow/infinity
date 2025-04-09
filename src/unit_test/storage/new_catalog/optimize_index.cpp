@@ -1673,7 +1673,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_compact_table) {
 
         // compact
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());

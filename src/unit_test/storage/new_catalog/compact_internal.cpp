@@ -147,7 +147,7 @@ TEST_P(TestCompactInternal, test_compact) {
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        Status status = txn->Compact(*db_name, *table_name);
+        Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -334,7 +334,7 @@ TEST_P(TestCompactInternal, test_compact_with_index) {
     }
     {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        Status status = txn->Compact(*db_name, *table_name);
+        Status status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());

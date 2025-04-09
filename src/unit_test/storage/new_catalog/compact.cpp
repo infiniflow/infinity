@@ -170,7 +170,7 @@ TEST_P(TestCompact, compact_and_drop_db) {
         //                                    t2                drop db    commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -190,7 +190,7 @@ TEST_P(TestCompact, compact_and_drop_db) {
         //                        t2                drop db    commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
@@ -215,7 +215,7 @@ TEST_P(TestCompact, compact_and_drop_db) {
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop db"), TransactionType::kNormal);
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = txn2->DropDatabase(*db_name, ConflictType::kError);
@@ -241,7 +241,7 @@ TEST_P(TestCompact, compact_and_drop_db) {
         status = txn2->DropDatabase(*db_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
@@ -267,7 +267,7 @@ TEST_P(TestCompact, compact_and_drop_db) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -287,7 +287,7 @@ TEST_P(TestCompact, compact_and_drop_db) {
         EXPECT_TRUE(status.ok());
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -305,7 +305,7 @@ TEST_P(TestCompact, compact_and_drop_table) {
         //                                    t2                drop table    commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -327,7 +327,7 @@ TEST_P(TestCompact, compact_and_drop_table) {
         //                        t2                drop table    commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
@@ -354,7 +354,7 @@ TEST_P(TestCompact, compact_and_drop_table) {
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop table"), TransactionType::kNormal);
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = txn2->DropTable(*db_name, *table_name, ConflictType::kError);
@@ -382,7 +382,7 @@ TEST_P(TestCompact, compact_and_drop_table) {
         status = txn2->DropTable(*db_name, *table_name, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
@@ -410,7 +410,7 @@ TEST_P(TestCompact, compact_and_drop_table) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -432,7 +432,7 @@ TEST_P(TestCompact, compact_and_drop_table) {
         EXPECT_TRUE(status.ok());
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -574,7 +574,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
         //                                    t2                add column    commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -597,7 +597,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
         //                        t2                add column    commit (fail)
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
@@ -625,7 +625,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("add column"), TransactionType::kNormal);
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
@@ -654,7 +654,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
         status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
@@ -679,7 +679,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
         EXPECT_TRUE(status.ok());
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
@@ -706,7 +706,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
         EXPECT_TRUE(status.ok());
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -783,7 +783,7 @@ TEST_P(TestCompact, compact_and_drop_columns) {
         //                                    t2                drop column    commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -806,7 +806,7 @@ TEST_P(TestCompact, compact_and_drop_columns) {
         //                        t2                drop column    commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
@@ -834,7 +834,7 @@ TEST_P(TestCompact, compact_and_drop_columns) {
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("drop column"), TransactionType::kNormal);
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
@@ -863,7 +863,7 @@ TEST_P(TestCompact, compact_and_drop_columns) {
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
@@ -892,7 +892,7 @@ TEST_P(TestCompact, compact_and_drop_columns) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -915,7 +915,7 @@ TEST_P(TestCompact, compact_and_drop_columns) {
         EXPECT_TRUE(status.ok());
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -938,7 +938,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
         //                                    t2                rename          commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -960,7 +960,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
         //                          t2                rename          commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
@@ -987,7 +987,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -1011,7 +1011,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("rename"), TransactionType::kNormal);
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
@@ -1040,7 +1040,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
         status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -1064,7 +1064,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
         status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
@@ -1090,7 +1090,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
         status = txn2->RenameTable(*db_name, *table_name, *new_table_name);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -1105,7 +1105,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
         PrepareForCompact();
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -1135,7 +1135,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
@@ -1166,18 +1166,20 @@ TEST_P(TestCompact, compact_and_compact) {
         //  t1            compact   commit (success)
         //  |--------------|---------------|
         //                                     |------------------|------------------|
-        //                                    t2                compact          commit
+        //                                    t2                compact (fail)     commit
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact1"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
+        //        new_txn_mgr->PrintAllKeyValue();
+
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact2"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
-        EXPECT_TRUE(status.ok());
-        status = new_txn_mgr->CommitTxn(txn2);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
+        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         CheckTable();
@@ -1192,7 +1194,7 @@ TEST_P(TestCompact, compact_and_compact) {
         //                        t2                compact (fail)    rollback
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact1"), TransactionType::kNormal);
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact2"), TransactionType::kNormal);
@@ -1200,7 +1202,7 @@ TEST_P(TestCompact, compact_and_compact) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -1220,10 +1222,10 @@ TEST_P(TestCompact, compact_and_compact) {
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact2"), TransactionType::kNormal);
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -1247,10 +1249,10 @@ TEST_P(TestCompact, compact_and_compact) {
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact2"), TransactionType::kNormal);
 
-        status = txn->Compact(*db_name, *table_name);
+        status = txn->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_FALSE(status.ok());
         status = new_txn_mgr->RollBackTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -1339,7 +1341,7 @@ TEST_P(TestCompact, compact_and_create_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -1364,7 +1366,7 @@ TEST_P(TestCompact, compact_and_create_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_FALSE(status.ok());
@@ -1387,7 +1389,7 @@ TEST_P(TestCompact, compact_and_create_index) {
         status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
         EXPECT_TRUE(status.ok());
 
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -1410,7 +1412,7 @@ TEST_P(TestCompact, compact_and_create_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = txn->CreateIndex(*db_name, *table_name, index_def1, ConflictType::kError);
@@ -1434,7 +1436,7 @@ TEST_P(TestCompact, compact_and_create_index) {
         //        t2   compact    commit
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create index"), TransactionType::kNormal);
@@ -1459,7 +1461,7 @@ TEST_P(TestCompact, compact_and_create_index) {
         //        t2   compact    commit
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -1562,7 +1564,7 @@ TEST_P(TestCompact, compact_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -1587,7 +1589,7 @@ TEST_P(TestCompact, compact_and_drop_index) {
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -1608,7 +1610,7 @@ TEST_P(TestCompact, compact_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
@@ -1633,7 +1635,7 @@ TEST_P(TestCompact, compact_and_drop_index) {
         EXPECT_TRUE(status.ok());
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -1655,7 +1657,7 @@ TEST_P(TestCompact, compact_and_drop_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         status = txn->DropIndexByName(*db_name, *table_name, *index_name1, ConflictType::kError);
@@ -1681,7 +1683,7 @@ TEST_P(TestCompact, compact_and_drop_index) {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
@@ -1703,7 +1705,7 @@ TEST_P(TestCompact, compact_and_drop_index) {
         //                    t2                   compact     commit (success)
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("drop index"), TransactionType::kNormal);
@@ -1728,7 +1730,7 @@ TEST_P(TestCompact, compact_and_drop_index) {
         //                    t2              compact     commit (success)
 
         auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-        status = txn2->Compact(*db_name, *table_name);
+        status = txn2->Compact(*db_name, *table_name, {0, 1});
         EXPECT_TRUE(status.ok());
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());

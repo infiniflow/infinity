@@ -599,38 +599,30 @@ Status NewTxn::PrintVersion(const String &db_name, const String &table_name, con
     return Status::OK();
 }
 
-Status NewTxn::Compact(const String &db_name, const String &table_name) {
-    Status status;
+Status NewTxn::Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids) {
 
     this->CheckTxn(db_name);
+    if (segment_ids.empty()) {
+        return Status::UnexpectedError("No segment is given in compact operation");
+    }
+
     TxnTimeStamp begin_ts = txn_context_ptr_->begin_ts_;
 
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta_opt;
     String table_key;
-    status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta_opt, &table_key);
     if (!status.ok()) {
         return status;
     }
     TableMeeta &table_meta = *table_meta_opt;
-
-    Vector<SegmentID> segment_ids;
-    {
-        Vector<SegmentID> *segment_ids_ptr = nullptr;
-        std::tie(segment_ids_ptr, status) = table_meta.GetSegmentIDs1();
-        if (!status.ok()) {
-            return status;
-        }
-        segment_ids = *segment_ids_ptr;
+    status = table_meta.CheckSegments(segment_ids);
+    if (!status.ok()) {
+        return status;
     }
-    TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
-    // SegmentID new_segment_id = 0;
-    // status = table_meta.GetNextSegmentID(new_segment_id);
-    // if (!status.ok()) {
-    //     return status;
-    // }
-    // status = table_meta.SetNextSegmentID(new_segment_id + 1);
+    // Fake commit timestamp, in prepare commit phase, it will be replaced by real commit timestamp
+    TxnTimeStamp fake_commit_ts = txn_context_ptr_->begin_ts_;
 
     NewTxnCompactState compact_state;
     status = NewTxnCompactState::Make(table_meta, fake_commit_ts, compact_state);
@@ -660,10 +652,6 @@ Status NewTxn::Compact(const String &db_name, const String &table_name) {
         return status;
     }
 
-    // status = table_meta.SetSegmentIDs(Vector<SegmentID>{new_segment_id});
-    // if (!status.ok()) {
-    //     return status;
-    // }
     status = table_meta.RemoveSegmentIDs1(segment_ids);
     if (!status.ok()) {
         return status;
