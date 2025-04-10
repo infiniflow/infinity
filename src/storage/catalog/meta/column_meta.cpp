@@ -32,6 +32,8 @@ import var_file_worker;
 import vector_buffer;
 import column_vector;
 
+import logical_type;
+
 namespace infinity {
 
 ColumnMeta::ColumnMeta(SizeT column_idx, BlockMeta &block_meta)
@@ -68,7 +70,12 @@ Status ColumnMeta::InitSet() {
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     {
         auto filename = MakeShared<String>(fmt::format("{}.col", column_id));
-        SizeT total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
+        SizeT total_data_size = 0;
+        if (col_def->type()->type() == LogicalType::kBoolean) {
+            total_data_size = (block_meta_.block_capacity() + 7) / 8;
+        } else {
+            total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
+        }
         auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       block_dir_ptr,
@@ -115,7 +122,12 @@ Status ColumnMeta::LoadSet() {
     SharedPtr<String> block_dir_ptr = block_meta_.GetBlockDir();
     {
         auto filename = MakeShared<String>(fmt::format("{}.col", col_def->id()));
-        SizeT total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
+        SizeT total_data_size = 0;
+        if (col_def->type()->type() == LogicalType::kBoolean) {
+            total_data_size = (block_meta_.block_capacity() + 7) / 8;
+        } else {
+            total_data_size = block_meta_.block_capacity() * col_def->type()->Size();
+        }
         auto file_worker = MakeUnique<DataFileWorker>(MakeShared<String>(InfinityContext::instance().config()->DataDir()),
                                                       MakeShared<String>(InfinityContext::instance().config()->TempDir()),
                                                       block_dir_ptr,
