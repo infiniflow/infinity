@@ -1395,10 +1395,25 @@ Status LogicalPlanner::BuildAlter(AlterStatement *statement, SharedPtr<BindConte
 }
 
 Status LogicalPlanner::BuildCommand(const CommandStatement *command_statement, SharedPtr<BindContext> &bind_context_ptr) {
+    bool use_new_catalog = query_context_ptr_->global_config()->UseNewCatalog();
+
     Txn *txn = query_context_ptr_->GetTxn();
     switch (command_statement->command_info_->type()) {
         case CommandType::kUse: {
             UseCmd *use_command_info = (UseCmd *)(command_statement->command_info_.get());
+
+            if (use_new_catalog) {
+                NewTxn *new_txn = query_context_ptr_->GetNewTxn();
+                auto [db_info, status] = new_txn->GetDatabaseInfo(use_command_info->db_name());
+                if (!status.ok()) {
+                    return status;
+                }
+                SharedPtr<LogicalNode> logical_command =
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
+                this->logical_plan_ = logical_command;
+                break;
+            }
+
             Status status = txn->GetDatabase(use_command_info->db_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =

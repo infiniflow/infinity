@@ -207,3 +207,27 @@ TEST_P(TestDDLRequest, test_drop_column) {
         EXPECT_FALSE(ok);
     }
 }
+
+TEST_P(TestDDLRequest, test_use_schema) {
+    {
+        String create_db_sql = "create database db1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_db_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String use_db_sql = "use db1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(use_db_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String use_db_sql = "use db2";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(use_db_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_FALSE(ok);
+    }
+}
