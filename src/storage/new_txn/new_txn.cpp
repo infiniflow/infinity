@@ -1649,6 +1649,14 @@ bool NewTxn::CheckConflictWithCompact(const String &db_name, const String &table
                 }
                 break;
             }
+            case WalCommandType::DELETE: {
+                auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
+                if (delete_cmd->db_name_ == db_name && delete_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Delete on table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+                break;
+            }
             case WalCommandType::DUMP_INDEX: {
                 auto *dump_index_cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
                 switch (dump_index_cmd->dump_cause_) {
@@ -1730,6 +1738,26 @@ bool NewTxn::CheckConflictWithOptimizeIndex(const String &db_name, const String 
     return false;
 }
 
+bool NewTxn::CheckConflictWithDelete(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {
+    for (SharedPtr<WalCmd> &wal_cmd : previous_txn->wal_entry_->cmds_) {
+        WalCommandType command_type = wal_cmd->GetType();
+        switch (command_type) {
+            case WalCommandType::COMPACT: {
+                auto *compact_cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                if (compact_cmd->db_name_ == db_name && compact_cmd->table_name_ == table_name) {
+                    cause = fmt::format("Compact on table {} in database {}.", table_name, db_name);
+                    return true;
+                }
+                break;
+            }
+            default: {
+                //
+            }
+        }
+    }
+    return false;
+}
+
 bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
     // LOG_INFO(fmt::format("Txn {} check conflict with txn: {}.", *txn_text_, *check_txn->txn_text_));
     for (SharedPtr<WalCmd> &wal_cmd : wal_entry_->cmds_) {
@@ -1790,6 +1818,14 @@ bool NewTxn::CheckConflict1(NewTxn *check_txn, String &conflict_reason) {
                     default: {
                         break;
                     }
+                }
+                break;
+            }
+            case WalCommandType::DELETE: {
+                auto *delete_cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
+                bool conflict = CheckConflictWithDelete(delete_cmd->db_name_, delete_cmd->table_name_, check_txn, conflict_reason);
+                if (conflict) {
+                    return true;
                 }
                 break;
             }

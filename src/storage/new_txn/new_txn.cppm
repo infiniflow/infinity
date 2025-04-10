@@ -540,6 +540,7 @@ private:
     bool CheckConflictWithCreateIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
     bool CheckConflictWithAddColumns(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
     bool CheckConflictWithOptimizeIndex(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
+    bool CheckConflictWithDelete(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause);
 
 public:
     static Status Cleanup(TxnTimeStamp ts, KVInstance *kv_instance);
