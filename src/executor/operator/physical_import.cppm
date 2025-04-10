@@ -90,9 +90,20 @@ public:
 
     void ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void NewImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
     void ImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void NewImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
     void ImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
+
+    void NewImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
+
+    void NewImportTypeVecs(QueryContext *query_context,
+                           ImportOperatorState *import_op_state,
+                           EmbeddingDataType embedding_data_type,
+                           Vector<SharedPtr<DataBlock>> &data_blocks);
 
     /// for push based execution
     void ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state);
@@ -101,6 +112,8 @@ public:
 
     /// for push based execution
     void ImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state);
+
+    void NewImportJSON(QueryContext *query_context, ImportOperatorState *import_op_state, Vector<SharedPtr<DataBlock>> &data_blocks);
 
     void ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state);
 

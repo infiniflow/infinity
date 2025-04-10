@@ -194,7 +194,7 @@ TEST_P(TestDataRequest, test_import_csv) {
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select * from t1";
+        String select_req_sql = "select count(*) from t1";
         UniquePtr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -202,10 +202,36 @@ TEST_P(TestDataRequest, test_import_csv) {
         bool ok = HandleQueryResult(query_result, &result_table);
         EXPECT_TRUE(ok);
 
-        EXPECT_EQ(result_table->data_blocks_.size(), 1);
-        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
+        Value row_count = result_table->data_blocks_[0]->GetValue(0, 0);
+        EXPECT_EQ(row_count, Value::MakeBigInt(3));
+    }
+}
 
-        EXPECT_EQ(data_block->row_count(), 3);
+TEST_P(TestDataRequest, test_import_json) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 embedding(int,3))";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String import_table_sql = "copy t1 from 'test/data/json/pysdk_test.json' with(format json)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(import_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String select_req_sql = "select count(*) from t1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_req_sql);
+
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+        Value row_count = result_table->data_blocks_[0]->GetValue(0, 0);
+        EXPECT_EQ(row_count, Value::MakeBigInt(3));
     }
 }
 
@@ -225,7 +251,7 @@ TEST_P(TestDataRequest, test_import_jsonl) {
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select * from t1";
+        String select_req_sql = "select count(*) from t1";
         UniquePtr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -233,10 +259,95 @@ TEST_P(TestDataRequest, test_import_jsonl) {
         bool ok = HandleQueryResult(query_result, &result_table);
         EXPECT_TRUE(ok);
 
-        EXPECT_EQ(result_table->data_blocks_.size(), 1);
-        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
+        Value row_count = result_table->data_blocks_[0]->GetValue(0, 0);
+        EXPECT_EQ(row_count, Value::MakeBigInt(14));
+    }
+}
 
-        EXPECT_EQ(data_block->row_count(), 14);
+TEST_P(TestDataRequest, test_import_fvecs) {
+    {
+        String create_table_sql = "create table t1(c1 embedding(float,128))";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String import_table_sql = "copy t1 from 'test/data/fvecs/test.fvecs' with(format fvecs)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(import_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String select_req_sql = "select count(*) from t1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_req_sql);
+
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+
+        Value row_count = result_table->data_blocks_[0]->GetValue(0, 0);
+        EXPECT_EQ(row_count, Value::MakeBigInt(1000));
+    }
+}
+
+TEST_P(TestDataRequest, test_import_csr) {
+    {
+        String create_table_sql = "create table t1(c1 sparse(float,30000))";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String import_table_sql = "copy t1 from 'test/data/csr/test.csr' with(format csr)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(import_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String select_req_sql = "select count(*) from t1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_req_sql);
+
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+
+        Value row_count = result_table->data_blocks_[0]->GetValue(0, 0);
+        EXPECT_EQ(row_count, Value::MakeBigInt(10000));
+    }
+}
+
+TEST_P(TestDataRequest, test_import_bvecs) {
+    {
+        String create_table_sql = "create table t1(c1 embedding(unsigned tinyint,128))";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String import_table_sql = "copy t1 from 'test/data/bvecs/test.bvecs' with(format bvecs)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(import_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String select_req_sql = "select count(*) from t1";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(select_req_sql);
+
+        DataTable *result_table = nullptr;
+        bool ok = HandleQueryResult(query_result, &result_table);
+        EXPECT_TRUE(ok);
+
+        Value row_count = result_table->data_blocks_[0]->GetValue(0, 0);
+        EXPECT_EQ(row_count, Value::MakeBigInt(1000));
     }
 }
 
@@ -256,7 +367,7 @@ TEST_P(TestDataRequest, test_import_parquet) {
         EXPECT_TRUE(ok);
     }
     {
-        String select_req_sql = "select * from t1";
+        String select_req_sql = "select count(*) from t1";
         UniquePtr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(select_req_sql);
 
@@ -264,10 +375,8 @@ TEST_P(TestDataRequest, test_import_parquet) {
         bool ok = HandleQueryResult(query_result, &result_table);
         EXPECT_TRUE(ok);
 
-        EXPECT_EQ(result_table->data_blocks_.size(), 1);
-        SharedPtr<DataBlock> data_block = result_table->data_blocks_[0];
-
-        EXPECT_EQ(data_block->row_count(), 10);
+        Value row_count = result_table->data_blocks_[0]->GetValue(0, 0);
+        EXPECT_EQ(row_count, Value::MakeBigInt(10));
     }
 }
 
@@ -314,6 +423,31 @@ TEST_P(TestDataRequest, test_export_jsonl) {
     {
         String export_path = String(GetFullTmpDir()) + "/export_csv_test.jsonl";
         String import_table_sql = fmt::format("copy t1 to '{}' with(delimiter ',', format jsonl)", export_path);
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(import_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+}
+
+TEST_P(TestDataRequest, test_export_parquet) {
+    {
+        String create_table_sql = "create table t1(c1 int, c2 embedding(int,128))";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(create_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String import_table_sql = "copy t1 from 'test/data/parquet/gen_embedding.parquet' with(format parquet)";
+        UniquePtr<QueryContext> query_context = MakeQueryContext();
+        QueryResult query_result = query_context->Query(import_table_sql);
+        bool ok = HandleQueryResult(query_result);
+        EXPECT_TRUE(ok);
+    }
+    {
+        String export_path = String(GetFullTmpDir()) + "/export_csv_test.parquet";
+        String import_table_sql = fmt::format("copy t1 to '{}' with(format parquet)", export_path);
         UniquePtr<QueryContext> query_context = MakeQueryContext();
         QueryResult query_result = query_context->Query(import_table_sql);
         bool ok = HandleQueryResult(query_result);

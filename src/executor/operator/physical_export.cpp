@@ -580,14 +580,24 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     SizeT row_count{0};
     SizeT file_no_{0};
     bool switch_to_new_file = false;
-    auto consume_block =
-        [&](Vector<ColumnVector> &column_vectors, const DeleteFilter &visible, const SegmentOffset seg_off, const SizeT block_row_count) -> bool {
+    auto consume_block = [&](Vector<ColumnVector> &column_vectors,
+                             const Bitmask *bitmask,
+                             const DeleteFilter *delete_filter,
+                             SegmentOffset segment_offset,
+                             bool use_new_filter,
+                             const SizeT block_row_count) -> bool {
         Vector<u32> block_rows_for_output;
         for (SizeT start_block_row_idx = 0; start_block_row_idx < block_row_count; ++start_block_row_idx) {
             bool need_switch_to_new_file = false;
             for (block_rows_for_output.clear(); start_block_row_idx < block_row_count; ++start_block_row_idx) {
-                if (!visible(seg_off + start_block_row_idx)) {
-                    continue;
+                if (use_new_filter) {
+                    if (bitmask->IsTrue(start_block_row_idx)) {
+                        continue;
+                    }
+                } else {
+                    if (!(*delete_filter)(segment_offset + start_block_row_idx)) {
+                        continue;
+                    }
                 }
                 if (offset > 0) {
                     --offset;
@@ -631,6 +641,66 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
         }
         return true;
     };
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        Map<SegmentID, NewSegmentSnapshot> &segment_block_index_ref = block_index_->new_segment_block_index_;
+        NewTxn *new_txn = query_context->GetNewTxn();
+        TxnTimeStamp begin_ts = new_txn->BeginTS();
+
+        for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
+            SizeT block_count = segment_snapshot.block_map_.size();
+            LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
+            for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
+                LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
+                BlockMeta *block_meta = segment_snapshot.block_map_[block_idx].get();
+                auto [block_row_count, status] = block_meta->GetRowCnt1();
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+
+                Vector<ColumnVector> column_vectors;
+                column_vectors.resize(select_column_count);
+
+                for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
+                    ColumnID select_column_idx = select_columns[block_column_idx];
+                    switch (select_column_idx) {
+                        case COLUMN_IDENTIFIER_ROW_ID:
+                        case COLUMN_IDENTIFIER_CREATE:
+                        case COLUMN_IDENTIFIER_DELETE: {
+                            UnrecoverableError("Not implemented");
+                            break;
+                        }
+                        default: {
+                            ColumnMeta column_meta(select_column_idx, *block_meta);
+                            Status status = NewCatalog::GetColumnVector(column_meta,
+                                                                        block_row_count,
+                                                                        ColumnVectorTipe::kReadOnly,
+                                                                        column_vectors[block_column_idx]);
+                            if (!status.ok()) {
+                                RecoverableError(status);
+                            }
+                        }
+                    }
+                }
+                Bitmask bitmask;
+                status = NewCatalog::SetBlockDeleteBitmask(*block_meta, begin_ts, bitmask);
+                if (!status.ok()) {
+                    RecoverableError(status);
+                }
+                if (!consume_block(column_vectors, &bitmask, nullptr, 0, true, block_row_count)) {
+                    goto new_label_return;
+                }
+            }
+        }
+
+    new_label_return:
+        if (auto status = file_writer->Close(); !status.ok()) {
+            RecoverableError(Status::IOError(fmt::format("Failed to close parquet file: {}", status.ToString())));
+        }
+        LOG_DEBUG(fmt::format("Export to PARQUET, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
+        return row_count;
+    }
+
     Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     Txn *txn = query_context->GetTxn();
@@ -678,7 +748,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                     }
                 }
             }
-            if (!consume_block(column_vectors, visible, seg_off, block_row_count)) {
+            if (!consume_block(column_vectors, nullptr, &visible, seg_off, false, block_row_count)) {
                 goto label_return;
             }
         }
