@@ -40,6 +40,15 @@ Tuple<SharedPtr<IndexBase>, Status> TableIndexMeeta::GetIndexBase() {
     return {index_def_, Status::OK()};
 }
 
+Status TableIndexMeeta::SetIndexBase(const SharedPtr<IndexBase> &index_base) {
+    String index_def_key = GetTableIndexTag("index_base");
+    Status status = kv_instance_.Put(index_def_key, index_base->Serialize().dump());
+    if (!status.ok()) {
+        return status;
+    }
+    return Status::OK();
+}
+
 SharedPtr<String> TableIndexMeeta::GetTableIndexDir() {
     return MakeShared<String>(fmt::format("tbl_{}/idx_{}", table_meta_.GetTableDir()->c_str(), index_id_str_));
 }
@@ -97,8 +106,7 @@ Status TableIndexMeeta::InitSet(const SharedPtr<IndexBase> &index_base) {
         }
     }
     {
-        String index_def_key = GetTableIndexTag("index_base");
-        Status status = kv_instance_.Put(index_def_key, index_base->Serialize().dump());
+        Status status = SetIndexBase(index_base);
         if (!status.ok()) {
             return status;
         }

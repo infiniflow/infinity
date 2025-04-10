@@ -1177,6 +1177,10 @@ Status NewTxn::PrepareCommit() {
                 }
                 break;
             }
+            case WalCommandType::OPTIMIZE: {
+                [[maybe_unused]] auto *optimize_cmd = static_cast<WalCmdOptimize *>(command.get());
+                break;
+            }
             default: {
                 UnrecoverableError(fmt::format("NewTxn::PrepareCommit Wal type not implemented: {}", static_cast<u8>(command_type)));
                 break;
@@ -2252,6 +2256,15 @@ Status NewTxn::ReplayWalCmd(const SharedPtr<WalCmd> &command) {
             auto *compact_cmd = static_cast<WalCmdCompact *>(command.get());
 
             Status status = ReplayCompact(compact_cmd);
+            if (!status.ok()) {
+                return status;
+            }
+            break;
+        }
+        case WalCommandType::OPTIMIZE: {
+            auto *optimize_cmd = static_cast<WalCmdOptimize *>(command.get());
+
+            Status status = ReplayOptimizeIndeByParams(optimize_cmd);
             if (!status.ok()) {
                 return status;
             }

@@ -38,6 +38,8 @@ public:
 
     Tuple<SharedPtr<IndexBase>, Status> GetIndexBase();
 
+    Status SetIndexBase(const SharedPtr<IndexBase> &index_base);
+
     SharedPtr<String> GetTableIndexDir();
 
     Tuple<SharedPtr<ColumnDef>, Status> GetColumnDef();

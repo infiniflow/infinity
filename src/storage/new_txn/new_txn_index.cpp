@@ -58,6 +58,8 @@ import emvb_index_in_mem;
 import emvb_index;
 import meta_key;
 import data_access_state;
+import hnsw_util;
+import bmp_util;
 
 namespace infinity {
 
@@ -120,6 +122,43 @@ Status NewTxn::DumpMemIndex(const String &db_name, const String &table_name, con
     return Status::OK();
 }
 
+Status NewTxn::OptimizeTableIndexes(const String &db_name, const String &table_name) {
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    String table_key;
+    Status status = GetTableMeta(db_name, table_name, db_meta, table_meta, &table_key);
+    if (!status.ok()) {
+        return status;
+    }
+    Vector<String> *index_id_strs_ptr = nullptr;
+    Vector<String> *index_names_ptr = nullptr;
+    status = table_meta->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+        const String &index_id_str = (*index_id_strs_ptr)[i];
+        const String &index_name = (*index_names_ptr)[i];
+        TableIndexMeeta table_index_meta(index_id_str, *table_meta);
+
+        Vector<SegmentID> *segment_ids_ptr = nullptr;
+        status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+        if (!status.ok()) {
+            return status;
+        }
+        for (SegmentID segment_id : *segment_ids_ptr) {
+            SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+            status = this->OptimizeIndexInner(segment_index_meta, index_name, table_name, db_name, table_key);
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
+
+    return Status::OK();
+}
+
 Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id) {
     Status status = Status::OK();
 
@@ -138,9 +177,20 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
         return status;
     }
 
-    TableMeeta &table_meta = *table_meta_opt;
-    TableIndexMeeta &table_index_meta = *table_index_meta_opt;
-    SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+    SegmentIndexMeta segment_index_meta(segment_id, *table_index_meta_opt);
+
+    return OptimizeIndexInner(segment_index_meta, index_name, table_name, db_name, table_key);
+}
+
+Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
+                                  const String &index_name,
+                                  const String &table_name,
+                                  const String &db_name,
+                                  const String &table_key) {
+    Status status;
+    TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
+    TableMeeta &table_meta = table_index_meta.table_meta();
+    SegmentID segment_id = segment_index_meta.segment_id();
 
     Vector<ChunkID> *old_chunk_ids_ptr = nullptr;
     {
@@ -370,6 +420,91 @@ Status NewTxn::OptimizeIndex(const String &db_name, const String &table_name, co
         }
         return status;
     }
+    return Status::OK();
+}
+
+Status NewTxn::OptimizeIndexByParams(const String &db_name,
+                                     const String &table_name,
+                                     const String &index_name,
+                                     Vector<UniquePtr<InitParameter>> raw_params) {
+    Status status = Status::OK();
+
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta_opt;
+    Optional<TableIndexMeeta> table_index_meta_opt;
+    String table_key;
+    String index_key;
+    status = GetTableIndexMeta(db_name, table_name, index_name, db_meta, table_meta_opt, table_index_meta_opt, &table_key, &index_key);
+    if (!status.ok()) {
+        return status;
+    }
+    TableIndexMeeta &table_index_meta = *table_index_meta_opt;
+
+    auto [index_base, index_status] = table_index_meta.GetIndexBase();
+    if (!index_status.ok()) {
+        return index_status;
+    }
+
+    bool opt = false;
+    SharedPtr<IndexBase> new_index_base;
+    switch (index_base->index_type_) {
+        case IndexType::kBMP: {
+            opt = true;
+            break;
+        }
+        case IndexType::kHnsw: {
+            auto params = HnswUtil::ParseOptimizeOptions(raw_params);
+            if (!params) {
+                break;
+            }
+            opt = true;
+            if (params->compress_to_lvq) {
+                auto *hnsw_index = static_cast<IndexHnsw *>(index_base.get());
+                if (hnsw_index->encode_type_ != HnswEncodeType::kPlain) {
+                    LOG_WARN("Not implemented");
+                    break;
+                }
+                auto new_index_hnsw = MakeShared<IndexHnsw>(*hnsw_index);
+                // IndexHnsw old_index_hnsw = *hnsw_index;
+                new_index_hnsw->encode_type_ = HnswEncodeType::kLVQ;
+                if (new_index_hnsw->build_type_ == HnswBuildType::kLSG) {
+                    new_index_hnsw->build_type_ = HnswBuildType::kPlain;
+                }
+                new_index_base = std::move(new_index_hnsw);
+            }
+            break;
+        }
+        default: {
+        }
+    }
+    if (!opt) {
+        return Status::OK();
+    }
+    Vector<SegmentID> *segment_ids_ptr = nullptr;
+    status = table_index_meta.GetSegmentIDs(segment_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+
+    for (SegmentID segment_id : *segment_ids_ptr) {
+        SegmentIndexMeta segment_index_meta(segment_id, table_index_meta);
+        Status status = OptimizeSegmentIndexByParams(segment_index_meta, raw_params);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    if (new_index_base) {
+        Status status = table_index_meta.SetIndexBase(new_index_base);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
+    SharedPtr<WalCmd> wal_command = MakeShared<WalCmdOptimize>(db_name, table_name, index_name, std::move(raw_params));
+    wal_entry_->cmds_.push_back(wal_command);
+    txn_context_ptr_->AddOperation(MakeShared<String>(wal_command->ToString()));
+
     return Status::OK();
 }
 
@@ -1128,6 +1263,113 @@ Status NewTxn::OptimizeVecIndex(SharedPtr<IndexBase> index_base,
     return Status::OK();
 }
 
+Status NewTxn::OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const Vector<UniquePtr<InitParameter>> &raw_params) {
+    Status status;
+    SharedPtr<IndexBase> index_base;
+
+    std::tie(index_base, status) = segment_index_meta.table_index_meta().GetIndexBase();
+    if (!status.ok()) {
+        return status;
+    }
+    Vector<ChunkID> *chunk_ids_ptr = nullptr;
+    status = segment_index_meta.GetChunkIDs(chunk_ids_ptr);
+    if (!status.ok()) {
+        return status;
+    }
+    if (!chunk_ids_ptr->empty()) {
+        return Status::NotSupport("Not implemented");
+    }
+    SharedPtr<MemIndex> mem_index;
+    status = segment_index_meta.GetMemIndex(mem_index);
+    if (!status.ok()) {
+        return status;
+    }
+
+    switch (index_base->index_type_) {
+        case IndexType::kBMP: {
+            Optional<BMPOptimizeOptions> ret = BMPUtil::ParseBMPOptimizeOptions(raw_params);
+            if (!ret) {
+                break;
+            }
+            const auto &options = ret.value();
+
+            auto optimize_index = [&](const AbstractBMP &index) {
+                std::visit(
+                    [&](auto &&index) {
+                        using T = std::decay_t<decltype(index)>;
+                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                            UnrecoverableError("Invalid index type.");
+                        } else {
+                            using IndexT = typename std::remove_pointer_t<T>;
+                            if constexpr (IndexT::kOwnMem) {
+                                index->Optimize(options);
+                            } else {
+                                UnrecoverableError("Invalid index type.");
+                            }
+                        }
+                    },
+                    index);
+            };
+
+            if (mem_index && mem_index->memory_bmp_index_) {
+                optimize_index(mem_index->memory_bmp_index_->get());
+            }
+
+            break;
+        }
+        case IndexType::kHnsw: {
+            auto params = HnswUtil::ParseOptimizeOptions(raw_params);
+            if (!params) {
+                break;
+            }
+
+            auto optimize_index = [&](AbstractHnsw *abstract_hnsw) {
+                std::visit(
+                    [&](auto &&index) {
+                        using T = std::decay_t<decltype(index)>;
+                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                            UnrecoverableError("Invalid index type.");
+                        } else {
+                            using IndexT = typename std::remove_pointer_t<T>;
+                            if constexpr (IndexT::kOwnMem) {
+                                using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
+                                if (params->compress_to_lvq) {
+                                    if constexpr (IsAnyOf<HnswIndexDataType, i8, u8>) {
+                                        UnrecoverableError("Invalid index type.");
+                                    } else {
+                                        auto *p = std::move(*index).CompressToLVQ().release();
+                                        delete index;
+                                        *abstract_hnsw = p;
+                                    }
+                                }
+                                if (params->lvq_avg) {
+                                    index->Optimize();
+                                }
+                            } else {
+                                UnrecoverableError("Invalid index type.");
+                            }
+                        }
+                    },
+                    *abstract_hnsw);
+            };
+
+            if (mem_index && mem_index->memory_hnsw_index_) {
+                optimize_index(mem_index->memory_hnsw_index_->get_ptr());
+            }
+            break;
+        }
+        default: {
+            return Status::OK();
+        }
+    }
+
+    return Status::OK();
+}
+
+Status NewTxn::ReplayOptimizeIndeByParams(WalCmdOptimize *optimize_cmd) {
+    return OptimizeIndexByParams(optimize_cmd->db_name_, optimize_cmd->table_name_, optimize_cmd->index_name_, std::move(optimize_cmd->params_));
+}
+
 Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id) {
     TableIndexMeeta &table_index_meta = segment_index_meta.table_index_meta();
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
@@ -1558,14 +1800,15 @@ Status NewTxn::PostCommitDumpIndex(const WalCmdDumpIndex *dump_index_cmd, KVInst
     const String &index_id_str = dump_index_cmd->index_id_str_;
     SegmentID segment_id = dump_index_cmd->segment_id_;
 
-//    const String &table_key = dump_index_cmd->table_key_;
+    //    const String &table_key = dump_index_cmd->table_key_;
 
-//    if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
-//        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
-//        if (!mem_index_status.ok()) {
-//            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_cmd->table_name_, mem_index_status.message()));
-//        }
-//    }
+    //    if (dump_index_cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
+    //        Status mem_index_status = new_catalog_->UnsetMemIndexDump(table_key);
+    //        if (!mem_index_status.ok()) {
+    //            UnrecoverableError(fmt::format("Can't unset mem index dump: {}, cause: {}", dump_index_cmd->table_name_,
+    //            mem_index_status.message()));
+    //        }
+    //    }
 
     if (dump_index_cmd->clear_mem_index_) {
 

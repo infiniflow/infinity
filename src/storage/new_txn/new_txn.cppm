@@ -67,6 +67,7 @@ struct WalCmdDumpIndex;
 struct WalChunkIndexInfo;
 struct WalSegmentInfo;
 struct WalCmdCheckpoint;
+struct WalCmdOptimize;
 
 class CatalogDeltaEntry;
 class CatalogDeltaOperation;
@@ -214,7 +215,19 @@ public:
 
     Status DumpMemIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
 
+    Status OptimizeTableIndexes(const String &db_name, const String &table_name);
+
     Status OptimizeIndex(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
+private:
+    Status OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
+                              const String &index_name,
+                              const String &table_name,
+                              const String &db_name,
+                              const String &table_key);
+
+public:
+    Status OptimizeIndexByParams(const String &db_name, const String &table_name, const String &index_name, Vector<UniquePtr<InitParameter>> params);
 
     Status ListIndex(const String &db_name, const String &table_name, Vector<String> &index_names);
 
@@ -278,7 +291,7 @@ public:
 
     Status Delete(const String &db_name, const String &table_name, const Vector<RowID> &row_ids);
 
-    Status Compact(const String &db_name, const String &table_name, const Vector<SegmentID>& segment_ids);
+    Status Compact(const String &db_name, const String &table_name, const Vector<SegmentID> &segment_ids);
 
     Status CheckTableIfDelete(const String &db_name, const String &table_name, bool &has_delete);
 
@@ -455,6 +468,10 @@ private:
                             RowID base_rowid,
                             u32 row_cnt,
                             BufferObj *buffer_obj);
+
+    Status OptimizeSegmentIndexByParams(SegmentIndexMeta &segment_index_meta, const Vector<UniquePtr<InitParameter>> &params);
+
+    Status ReplayOptimizeIndeByParams(WalCmdOptimize *optimize_cmd);
 
     Status DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &new_chunk_id);
 
