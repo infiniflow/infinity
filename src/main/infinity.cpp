@@ -113,6 +113,7 @@ void Infinity::LocalInit(const String &path, const String &config_path) {
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
         default_config->default_log_dir_ = fmt::format("{}/log", path);
         default_config->default_data_dir_ = fmt::format("{}/data", path);
+        default_config->default_catalog_dir_ = fmt::format("{}/catalog", path);
         default_config->default_wal_dir_ = fmt::format("{}/wal", path);
         default_config->default_temp_dir_ = fmt::format("{}/tmp", path);
         default_config->default_resource_dir_ = fmt::format("{}/resource", path);

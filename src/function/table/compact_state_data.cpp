@@ -21,6 +21,7 @@ module compact_state_data;
 
 import third_party;
 import logger;
+import block_index;
 
 namespace infinity {
 
@@ -62,6 +63,12 @@ void RowIDRemap::AddMap(RowID old_row_id, RowID new_row_id) {
 RowID RowIDRemap::GetNewRowID(RowID old_row_id) const {
     return GetNewRowID(old_row_id.segment_id_, old_row_id.segment_offset_ / block_capacity_, old_row_id.segment_offset_ % block_capacity_);
 }
+
+CompactStateData::CompactStateData(SharedPtr<TableInfo> table_info)
+    : new_table_ref_(MakeShared<BaseTableRef>(std::move(table_info), MakeShared<BlockIndex>())) {
+    // src/executor/operator/physical_create_index_prepare.cpp: Note1
+    new_table_ref_->index_index_ = MakeShared<IndexIndex>();
+};
 
 void CompactStateData::AddToDelete(TxnTimeStamp commit_ts, SegmentID segment_id, Vector<SegmentOffset> delete_offsets) {
     std::lock_guard lock(mutex_);

@@ -22,8 +22,6 @@ import txn_store;
 import buffer_manager;
 import third_party;
 import table_entry_type;
-import block_index;
-import data_access_state;
 import status;
 import extra_ddl_info;
 import column_def;
@@ -50,6 +48,8 @@ import txn;
 
 namespace infinity {
 
+struct BlockIndex;
+struct IndexIndex;
 class IndexBase;
 struct DBEntry;
 struct TableIndexEntry;
@@ -58,6 +58,9 @@ struct Catalog;
 class AddTableEntryOp;
 class SegmentIndexEntry;
 class ChunkIndexEntry;
+
+struct AppendRange;
+struct DeleteState;
 
 export struct TableEntry final : public BaseEntry {
     friend struct Catalog;

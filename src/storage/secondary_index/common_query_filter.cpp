@@ -49,6 +49,9 @@ import logger;
 import index_defines;
 import logger;
 
+import new_txn;
+import status;
+
 namespace infinity {
 
 void ReadDataBlock(DataBlock *output,
@@ -130,6 +133,31 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
 
     always_true_ = original_filter_ == nullptr &&
                    !txn_ptr->CheckTableHasDelete(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_);
+    if (always_true_) {
+        finish_build_.test_and_set(std::memory_order_release);
+    }
+}
+
+CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, SharedPtr<BaseTableRef> base_table_ref, NewTxn *new_txn)
+    : new_txn_ptr_(new_txn), original_filter_(std::move(original_filter)), base_table_ref_(std::move(base_table_ref)) {
+    const auto &segment_index = base_table_ref_->block_index_->new_segment_block_index_;
+    if (segment_index.empty()) {
+        finish_build_.test_and_set(std::memory_order_release);
+    } else {
+        tasks_.reserve(segment_index.size());
+        for (const auto &[segment_id, _] : segment_index) {
+            tasks_.push_back(segment_id);
+        }
+        total_task_num_ = tasks_.size();
+    }
+
+    bool has_delete = false;
+    Status status = new_txn->CheckTableIfDelete(*base_table_ref_->table_info_->db_name_, *base_table_ref_->table_info_->table_name_, has_delete);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Check table has delete error: {}", status.message()));
+    }
+    always_true_ = original_filter_ == nullptr && !has_delete;
+
     if (always_true_) {
         finish_build_.test_and_set(std::memory_order_release);
     }

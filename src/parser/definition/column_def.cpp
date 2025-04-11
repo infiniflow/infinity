@@ -217,4 +217,52 @@ std::string ColumnDef::ToString() const {
     return ss.str();
 }
 
+nlohmann::json ColumnDef::ToJson() const {
+    nlohmann::json column_def_json;
+    column_def_json["column_type"] = this->type()->Serialize();
+    column_def_json["column_id"] = this->id();
+    column_def_json["column_name"] = this->name();
+
+    for (const auto &column_constraint : this->constraints_) {
+        column_def_json["constraints"].emplace_back(column_constraint);
+    }
+
+    if (!(this->comment().empty())) {
+        column_def_json["column_comment"] = this->comment();
+    }
+
+    if (this->has_default_value()) {
+        auto default_expr = dynamic_pointer_cast<ConstantExpr>(this->default_expr_);
+        column_def_json["default"] = default_expr->Serialize();
+    }
+
+    return column_def_json;
+}
+
+std::shared_ptr<ColumnDef> ColumnDef::FromJson(const nlohmann::json &json) {
+    auto column_type = DataType::Deserialize(json.at("column_type"));
+    auto column_id = json.at("column_id").get<int64_t>();
+    auto column_name = json.at("column_name").get<std::string>();
+
+    std::set<ConstraintType> constraints;
+    if (json.contains("constraints")) {
+        for (const auto &constraint : json.at("constraints")) {
+            constraints.insert(constraint.get<ConstraintType>());
+        }
+    }
+
+    std::string column_comment;
+    if (json.contains("column_comment")) {
+        column_comment = json.at("column_comment").get<std::string>();
+    }
+
+    std::shared_ptr<ParsedExpr> default_expr = nullptr;
+    if (json.contains("default")) {
+        auto default_expr_json = json.at("default");
+        default_expr = ConstantExpr::Deserialize(default_expr_json);
+    }
+
+    return std::make_shared<ColumnDef>(column_id, column_type, column_name, constraints, column_comment, default_expr);
+}
+
 } // namespace infinity

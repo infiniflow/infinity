@@ -18,12 +18,10 @@ export module txn_store;
 
 import stl;
 
-import data_access_state;
 import status;
 import internal_types;
 import index_base;
 import extra_ddl_info;
-import wal_entry;
 
 namespace infinity {
 
@@ -43,6 +41,10 @@ class TxnManager;
 enum class CompactStatementType;
 class CatalogDeltaEntry;
 class BufferManager;
+struct WalSegmentInfo;
+
+struct AppendState;
+struct DeleteState;
 
 export struct TxnSegmentStore {
 public:
@@ -101,7 +103,9 @@ export struct TxnCompactStore {
 
 export class TxnTableStore {
 public:
-    explicit inline TxnTableStore(Txn *txn, TableEntry *table_entry) : txn_(txn), table_entry_(table_entry) {}
+    TxnTableStore(Txn *txn, TableEntry *table_entry);
+
+    ~TxnTableStore();
 
     Tuple<UniquePtr<String>, Status> Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn);
 
@@ -163,13 +167,13 @@ public: // Setter, Getter
 
     inline bool HasUpdate() const { return has_update_; }
 
-    DeleteState &GetDeleteStateRef() { return delete_state_; }
+    DeleteState &GetDeleteStateRef();
 
-    inline DeleteState *GetDeleteStatePtr() { return &delete_state_; }
+    DeleteState *GetDeleteStatePtr();
 
     inline const Vector<SharedPtr<DataBlock>> &GetBlocks() const { return blocks_; }
 
-    inline void SetAppendState(UniquePtr<AppendState> append_state) { append_state_ = std::move(append_state); }
+    void SetAppendState(UniquePtr<AppendState> append_state);
 
     inline AppendState *GetAppendState() const { return append_state_.get(); }
 
@@ -194,7 +198,7 @@ private:
     Vector<SharedPtr<DataBlock>> blocks_{};
 
     UniquePtr<AppendState> append_state_{};
-    DeleteState delete_state_{};
+    UniquePtr<DeleteState> delete_state_{};
 
     SizeT current_block_id_{0};
 

@@ -60,6 +60,11 @@ import global_resource_usage;
 import infinity_context;
 import txn_state;
 
+import new_txn;
+import new_txn_manager;
+import catalog;
+import new_catalog;
+
 namespace infinity {
 
 QueryContext::QueryContext(BaseSession *session) : session_ptr_(session) {
@@ -319,11 +324,21 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
 }
 
 void QueryContext::CreateQueryProfiler() {
-    if (InfinityContext::instance().storage()->catalog() == nullptr) {
-        return;
+    bool query_profiler_flag = false;
+    bool use_new_catalog = global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
+        if (catalog == nullptr) {
+            return;
+        }
+        query_profiler_flag = catalog->GetProfile();
+    } else {
+        Catalog *catalog = InfinityContext::instance().storage()->catalog();
+        if (catalog == nullptr) {
+            return;
+        }
+        query_profiler_flag = catalog->GetProfile();
     }
-
-    bool query_profiler_flag = InfinityContext::instance().storage()->catalog()->GetProfile();
 
     if (query_profiler_flag or explain_analyze_) {
         if (query_profiler_ == nullptr) {
@@ -334,7 +349,14 @@ void QueryContext::CreateQueryProfiler() {
 
 void QueryContext::RecordQueryProfiler(const StatementType &type) {
     if (type != StatementType::kCommand && type != StatementType::kExplain && type != StatementType::kShow) {
-        InfinityContext::instance().storage()->catalog()->AppendProfileRecord(query_profiler_);
+        bool use_new_catalog = global_config()->UseNewCatalog();
+        if (use_new_catalog) {
+            NewCatalog *catalog = InfinityContext::instance().storage()->new_catalog();
+            catalog->AppendProfileRecord(query_profiler_);
+        } else {
+            Catalog *catalog = InfinityContext::instance().storage()->catalog();
+            catalog->AppendProfileRecord(query_profiler_);
+        }
     }
 }
 
@@ -423,6 +445,18 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
 QueryResult QueryContext::HandleAdminStatement(const AdminStatement *admin_statement) { return AdminExecutor::Execute(this, admin_statement); }
 
 void QueryContext::BeginTxn(const BaseStatement *base_statement) {
+    if (global_config_->UseNewCatalog()) {
+        // use new txn
+        NewTxn *new_txn = nullptr;
+        new_txn =
+            storage_->new_txn_manager()->BeginTxn(MakeUnique<String>(base_statement ? base_statement->ToString() : ""), TransactionType::kNormal);
+        if (new_txn == nullptr) {
+            UnrecoverableError("Cannot get new txn. TODO");
+        }
+        session_ptr_->SetNewTxn(new_txn);
+        return;
+    }
+
     if (session_ptr_->GetTxn() == nullptr) {
         Txn *new_txn = nullptr;
         if (base_statement == nullptr) {
@@ -443,6 +477,17 @@ void QueryContext::BeginTxn(const BaseStatement *base_statement) {
 }
 
 TxnTimeStamp QueryContext::CommitTxn() {
+    if (global_config_->UseNewCatalog()) {
+        TxnTimeStamp commit_ts = 0;
+        NewTxn *new_txn = session_ptr_->GetNewTxn();
+        Status status = storage_->new_txn_manager()->CommitTxn(new_txn, &commit_ts);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        session_ptr_->SetNewTxn(nullptr);
+        session_ptr_->IncreaseCommittedTxnCount();
+        return commit_ts;
+    }
     Txn *txn = session_ptr_->GetTxn();
     TxnTimeStamp commit_ts = storage_->txn_manager()->CommitTxn(txn);
     session_ptr_->SetTxn(nullptr);
@@ -452,11 +497,31 @@ TxnTimeStamp QueryContext::CommitTxn() {
 }
 
 void QueryContext::RollbackTxn() {
+    if (global_config_->UseNewCatalog()) {
+        NewTxn *new_txn = session_ptr_->GetNewTxn();
+        Status status = storage_->new_txn_manager()->RollBackTxn(new_txn);
+        if (!status.ok()) {
+            RecoverableError(status);
+        }
+        session_ptr_->SetNewTxn(nullptr);
+        session_ptr_->IncreaseRollbackedTxnCount();
+        return;
+    }
     Txn *txn = session_ptr_->GetTxn();
     storage_->txn_manager()->RollBackTxn(txn);
     session_ptr_->SetTxn(nullptr);
     session_ptr_->IncreaseRollbackedTxnCount();
     storage_->txn_manager()->IncreaseRollbackedTxnCount();
+}
+
+NewTxn *QueryContext::GetNewTxn() const { return session_ptr_->GetNewTxn(); }
+
+bool QueryContext::SetNewTxn(NewTxn *txn) const {
+    if (session_ptr_->GetNewTxn() == nullptr) {
+        session_ptr_->SetNewTxn(txn);
+        return true;
+    }
+    return false;
 }
 
 } // namespace infinity

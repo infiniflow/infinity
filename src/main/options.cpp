@@ -57,6 +57,8 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(LOG_LEVEL_OPTION_NAME)] = GlobalOptionIndex::kLogLevel;
 
     name2index_[String(DATA_DIR_OPTION_NAME)] = GlobalOptionIndex::kDataDir;
+    name2index_[String(CATALOG_DIR_OPTION_NAME)] = GlobalOptionIndex::kCatalogDir;
+    name2index_[String(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
     name2index_[String(CLEANUP_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kCleanupInterval;
     name2index_[String(COMPACT_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kCompactInterval;
     name2index_[String(OPTIMIZE_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kOptimizeIndexInterval;
@@ -96,6 +98,8 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(SNAPSHOT_DIR_OPTION_NAME)] = GlobalOptionIndex::kSnapshotDir;
 
     name2index_[String(RECORD_RUNNING_QUERY_OPTION_NAME)] = GlobalOptionIndex::kRecordRunningQuery;
+    name2index_[String(USE_NEW_CATALOG_OPTION_NAME)] = GlobalOptionIndex::kUseNewCatalog;
+    name2index_[String(REPLAY_WAL_OPTION_NAME)] = GlobalOptionIndex::kReplayWal;
 }
 
 Status GlobalOptions::AddOption(UniquePtr<BaseOption> option) {

@@ -24,7 +24,43 @@ import logger;
 import third_party;
 import obj_status;
 
+import kv_store;
+import storage;
+import kv_code;
+import status;
+import infinity_context;
+
 namespace infinity {
+
+void ObjectStatAccessorBase::AddObjStatToKVStore(const String &key, const ObjStat &obj_stat) {
+    Storage *storage = InfinityContext::instance().storage();
+    if (!storage) {
+        return;
+    }
+    KVStore *kv_store = storage->kv_store();
+    if (!kv_store) {
+        return;
+    }
+    Status status = kv_store->Put(KeyEncode::PMObjectStatKey(key), obj_stat.ToString());
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
+
+void ObjectStatAccessorBase::RemoveObjStatFromKVStore(const String &key) {
+    Storage *storage = InfinityContext::instance().storage();
+    if (!storage) {
+        return;
+    }
+    KVStore *kv_store = storage->kv_store();
+    if (!kv_store) {
+        return;
+    }
+    Status status = kv_store->Delete(KeyEncode::PMObjectStatKey(key));
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+}
 
 // ObjectStatMap
 
@@ -193,6 +229,8 @@ ObjStat *ObjectStatAccessor_LocalStorage::Release(const String &key, Vector<Stri
 }
 
 void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &) {
+    this->AddObjStatToKVStore(key, obj_stat);
+
     auto map_iter = obj_map_.find(key);
     if (map_iter != obj_map_.end()) {
         UnrecoverableError(fmt::format("PutNew object {} is already in object map", key));
@@ -203,6 +241,9 @@ void ObjectStatAccessor_LocalStorage::PutNew(const String &key, ObjStat obj_stat
 
 void ObjectStatAccessor_LocalStorage::PutNoCount(const String &key, ObjStat obj_stat) {
     obj_stat.cached_ = ObjCached::kCached;
+
+    this->AddObjStatToKVStore(key, obj_stat);
+
     auto [iter, insert_ok] = obj_map_.insert_or_assign(key, std::move(obj_stat));
     if (!insert_ok) {
         LOG_DEBUG(fmt::format("PutNew: {} is already in object map", key));
@@ -216,6 +257,8 @@ Optional<ObjStat> ObjectStatAccessor_LocalStorage::Invalidate(const String &key)
     }
     ObjStat obj_stat = std::move(iter->second);
     obj_map_.erase(iter);
+
+    this->RemoveObjStatFromKVStore(key);
     return obj_stat;
 }
 
@@ -254,6 +297,23 @@ void ObjectStatAccessor_LocalStorage::Deserialize(const nlohmann::json &obj) {
     }
 }
 
+void ObjectStatAccessor_LocalStorage::Deserialize(KVInstance *kv_instance) {
+    const String &obj_stat_prefix = KeyEncode::PMObjectStatPrefix();
+    SizeT obj_stat_prefix_len = obj_stat_prefix.size();
+
+    auto iter = kv_instance->GetIterator();
+    iter->Seek(obj_stat_prefix);
+    while (iter->Valid() && iter->Key().starts_with(obj_stat_prefix)) {
+        String obj_key = iter->Key().ToString().substr(obj_stat_prefix_len);
+        ObjStat obj_stat;
+        obj_stat.Deserialize(iter->Value().ToString());
+        obj_stat.cached_ = ObjCached::kCached;
+        LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
+        obj_map_.emplace(std::move(obj_key), std::move(obj_stat));
+        iter->Next();
+    }
+}
+
 HashMap<String, ObjStat> ObjectStatAccessor_LocalStorage::GetAllObjects() const { return obj_map_; }
 
 // ObjectStatAccessor_ObjectStorage
@@ -289,6 +349,8 @@ ObjStat *ObjectStatAccessor_ObjectStorage::Release(const String &key, Vector<Str
 }
 
 void ObjectStatAccessor_ObjectStorage::PutNew(const String &key, ObjStat obj_stat, Vector<String> &drop_keys) {
+    this->AddObjStatToKVStore(key, obj_stat);
+
     obj_map_.PutNew(key, std::move(obj_stat));
     disk_used_ += obj_stat.obj_size_;
     if (disk_used_ > disk_capacity_limit_) {
@@ -296,7 +358,11 @@ void ObjectStatAccessor_ObjectStorage::PutNew(const String &key, ObjStat obj_sta
     }
 }
 
-void ObjectStatAccessor_ObjectStorage::PutNoCount(const String &key, ObjStat obj_stat) { obj_map_.PutNew(key, std::move(obj_stat)); }
+void ObjectStatAccessor_ObjectStorage::PutNoCount(const String &key, ObjStat obj_stat) {
+    this->AddObjStatToKVStore(key, obj_stat);
+
+    obj_map_.PutNew(key, std::move(obj_stat));
+}
 
 Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Invalidate(const String &key) {
     Optional<ObjStat> obj_stat = obj_map_.Invalidate(key);
@@ -304,6 +370,8 @@ Optional<ObjStat> ObjectStatAccessor_ObjectStorage::Invalidate(const String &key
         return None;
     }
     disk_used_ -= obj_stat->obj_size_;
+
+    this->RemoveObjStatFromKVStore(key);
     return obj_stat;
 }
 
@@ -339,6 +407,23 @@ void ObjectStatAccessor_ObjectStorage::Deserialize(const nlohmann::json &obj) {
         obj_stat.cached_ = ObjCached::kNotCached;
         obj_map_.PutNew(obj_key, std::move(obj_stat));
         LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
+    }
+}
+
+void ObjectStatAccessor_ObjectStorage::Deserialize(KVInstance *kv_instance) {
+    const String &obj_stat_prefix = KeyEncode::PMObjectStatPrefix();
+    SizeT obj_stat_prefix_len = obj_stat_prefix.size();
+
+    auto iter = kv_instance->GetIterator();
+
+    while (iter->Valid() && iter->Key().starts_with(obj_stat_prefix)) {
+        String obj_key = iter->Key().ToString().substr(obj_stat_prefix_len);
+        ObjStat obj_stat;
+        obj_stat.Deserialize(iter->Value().ToString());
+        obj_stat.cached_ = ObjCached::kNotCached;
+        LOG_TRACE(fmt::format("Deserialize added object {}", obj_key));
+        obj_map_.PutNew(std::move(obj_key), std::move(obj_stat));
+        iter->Next();
     }
 }
 

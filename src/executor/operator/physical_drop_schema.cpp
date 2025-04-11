@@ -31,10 +31,11 @@ import column_def;
 
 import wal_manager;
 import infinity_context;
+import new_txn;
 
 namespace infinity {
 
-void PhysicalDropSchema::Init(QueryContext* query_context) {}
+void PhysicalDropSchema::Init(QueryContext *query_context) {}
 
 bool PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *operator_state) {
     StorageMode storage_mode = InfinityContext::instance().storage()->GetStorageMode();
@@ -48,10 +49,19 @@ bool PhysicalDropSchema::Execute(QueryContext *query_context, OperatorState *ope
         return true;
     }
 
-    auto txn = query_context->GetTxn();
-    Status status = txn->DropDatabase(*schema_name_, conflict_type_);
-    if (!status.ok()) {
-        operator_state->status_ = status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *new_txn = query_context->GetNewTxn();
+        Status status = new_txn->DropDatabase(*schema_name_, conflict_type_);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+        }
+    } else {
+        auto txn = query_context->GetTxn();
+        Status status = txn->DropDatabase(*schema_name_, conflict_type_);
+        if (!status.ok()) {
+            operator_state->status_ = status;
+        }
     }
 
     // Generate the result

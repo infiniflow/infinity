@@ -44,7 +44,6 @@ import logger;
 import logical_type;
 import knn_expr;
 import match_tensor_expr;
-import txn;
 import buffer_manager;
 import meta_info;
 import column_def;

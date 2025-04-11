@@ -32,7 +32,7 @@ module;
 module memory_indexer;
 
 import stl;
-
+import status;
 import index_defines;
 import posting_writer;
 import column_vector;
@@ -129,7 +129,8 @@ void MemoryIndexer::Insert(SharedPtr<ColumnVector> column_vector, u32 row_offset
 
     auto task = MakeShared<BatchInvertTask>(seq_inserted, column_vector, row_offset, row_count, doc_count);
     if (offline) {
-        auto inverter = MakeShared<ColumnInverter>(nullptr, column_lengths_);
+        PostingWriterProvider provider = [this](const String &term) -> SharedPtr<PostingWriter> { return GetOrAddPosting(term); };
+        auto inverter = MakeShared<ColumnInverter>(provider, column_lengths_);
         inverter->InitAnalyzer(this->analyzer_);
         auto func = [this, task, inverter](int id) {
             SizeT column_length_sum = inverter->InvertColumn(task->column_vector_, task->row_offset_, task->row_count_, task->start_doc_id_);
@@ -348,6 +349,11 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         tmp_posting_file = tmp_dir / StringTransform(tmp_posting_file, "/", "_");
         tmp_dict_file = tmp_dir / StringTransform(tmp_dict_file, "/", "_");
         tmp_column_length_file = tmp_dir / StringTransform(tmp_column_length_file, "/", "_");
+    } else {
+        Status status = VirtualStore::MakeDirectory(index_dir_);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
     }
 
     SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(tmp_posting_file, 128000);

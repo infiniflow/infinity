@@ -26,10 +26,11 @@ import table_index_entry;
 import segment_entry;
 import segment_index_entry;
 import base_table_ref;
-import block_index;
 import txn;
 
 namespace infinity {
+
+struct BlockIndex;
 
 export class RowIDRemap {
     using RowIDMap = HashMap<GlobalBlockID, Map<BlockOffset, RowID>, GlobalBlockIDHash>;
@@ -60,10 +61,7 @@ public:
 
 export class CompactStateData {
 public:
-    CompactStateData(SharedPtr<TableInfo> table_info) : new_table_ref_(MakeShared<BaseTableRef>(std::move(table_info), MakeShared<BlockIndex>())) {
-        // src/executor/operator/physical_create_index_prepare.cpp: Note1
-        new_table_ref_->index_index_ = MakeShared<IndexIndex>();
-    };
+    CompactStateData(SharedPtr<TableInfo> table_info);
 
     void AddToDelete(TxnTimeStamp commit_ts, SegmentID segment_id, Vector<SegmentOffset> delete_offsets);
 

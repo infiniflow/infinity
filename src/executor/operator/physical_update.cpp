@@ -41,6 +41,7 @@ import wal_manager;
 import infinity_context;
 import status;
 import txn;
+import new_txn;
 
 namespace infinity {
 
@@ -58,9 +59,14 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
         return true;
     }
 
-    auto txn = query_context->GetTxn();
+    Txn *txn = query_context->GetTxn();
+    NewTxn *new_txn = query_context->GetNewTxn();
+
     OperatorState *prev_op_state = operator_state->prev_op_state_;
     SizeT input_data_block_count = prev_op_state->data_block_array_.size();
+
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+
     for (SizeT block_idx = 0; block_idx < input_data_block_count; ++block_idx) {
         DataBlock *input_data_block_ptr = prev_op_state->data_block_array_[block_idx].get();
         Vector<RowID> row_ids;
@@ -104,8 +110,24 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
             }
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();
             output_data_block->Init(output_column_vectors);
-            txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_data_block);
-            txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids);
+
+            if (use_new_catalog) {
+                Status status = new_txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_data_block);
+                if (!status.ok()) {
+                    operator_state->status_ = status;
+                    RecoverableError(status);
+                    return false;
+                }
+                status = new_txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids);
+                if (!status.ok()) {
+                    operator_state->status_ = status;
+                    RecoverableError(status);
+                    return false;
+                }
+            } else {
+                txn->Append(*table_info_->db_name_, *table_info_->table_name_, output_data_block);
+                txn->Delete(*table_info_->db_name_, *table_info_->table_name_, row_ids);
+            }
 
             UpdateOperatorState *update_operator_state = static_cast<UpdateOperatorState *>(operator_state);
             ++update_operator_state->count_;

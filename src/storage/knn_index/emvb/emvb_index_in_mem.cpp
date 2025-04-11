@@ -45,6 +45,12 @@ import emvb_product_quantization;
 import column_vector;
 import block_index;
 
+import table_meeta;
+import segment_meta;
+import new_txn;
+import buffer_obj;
+import kv_store;
+
 namespace infinity {
 
 EMVBIndexInMem::EMVBIndexInMem(const u32 residual_pq_subspace_num,
@@ -101,6 +107,37 @@ void EMVBIndexInMem::Insert(BlockEntry *block_entry, SizeT column_idx, BufferMan
     }
 }
 
+void EMVBIndexInMem::Insert(const ColumnVector &column_vector, u32 row_offset, u32 row_count, KVInstance &kv_instance, TxnTimeStamp begin_ts) {
+    std::unique_lock lock(rw_mutex_);
+    if (is_built_.test(std::memory_order_acquire)) {
+        for (u32 i = 0; i < row_count; ++i) {
+            auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
+            emvb_index_->AddOneDocEmbeddings(reinterpret_cast<const f32 *>(raw_data.data()), embedding_num);
+            ++row_count_;
+            embedding_count_ += embedding_num;
+        }
+    } else {
+        for (u32 i = 0; i < row_count; ++i) {
+            auto [raw_data, embedding_num] = column_vector.GetTensorRaw(row_offset + i);
+            ++row_count_;
+            embedding_count_ += embedding_num;
+        }
+        // build index if have enough data
+        if (embedding_count_ >= build_index_threshold_) {
+            emvb_index_ =
+                MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
+
+            TableMeeta table_meta(db_id_str_, table_id_str_, kv_instance, begin_ts);
+            SegmentMeta segment_meta(segment_id_, table_meta);
+            emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_meta, column_def_);
+            if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {
+                UnrecoverableError("EMVBIndexInMem Insert doc num or embedding num not consistent!");
+            }
+            is_built_.test_and_set(std::memory_order_release);
+        }
+    }
+}
+
 SharedPtr<ChunkIndexEntry> EMVBIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) {
     std::unique_lock lock(rw_mutex_);
     if (!is_built_.test(std::memory_order_acquire)) {
@@ -113,6 +150,19 @@ SharedPtr<ChunkIndexEntry> EMVBIndexInMem::Dump(SegmentIndexEntry *segment_index
     *data_ptr = std::move(*emvb_index_); // call move in lock
     emvb_index_.reset();
     return new_chunk_index_entry;
+}
+
+void EMVBIndexInMem::Dump(BufferObj *buffer_obj) {
+    std::unique_lock lock(rw_mutex_);
+    if (!is_built_.test(std::memory_order_acquire)) {
+        UnrecoverableError("EMVBIndexInMem Dump: index not built yet!");
+    }
+    is_built_.clear(std::memory_order_release);
+
+    BufferHandle handle = buffer_obj->Load();
+    auto data_ptr = static_cast<EMVBIndex *>(handle.GetDataMut());
+    *data_ptr = std::move(*emvb_index_); // call move in lock
+    emvb_index_.reset();
 }
 
 SharedPtr<EMVBIndexInMem>
@@ -140,7 +190,6 @@ std::variant<Pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::SearchWit
                                                                                          const u32 query_embedding_num,
                                                                                          const u32 top_n,
                                                                                          Bitmask &bitmask,
-                                                                                         const SegmentEntry *segment_entry,
                                                                                          const BlockIndex *block_index,
                                                                                          const TxnTimeStamp begin_ts,
                                                                                          const u32 centroid_nprobe,
@@ -155,7 +204,6 @@ std::variant<Pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::SearchWit
                                               query_embedding_num,
                                               top_n,
                                               bitmask,
-                                              segment_entry,
                                               block_index,
                                               begin_ts,
                                               centroid_nprobe,
