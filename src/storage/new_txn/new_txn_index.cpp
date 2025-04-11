@@ -530,13 +530,12 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
     if (!index_status.ok()) {
         return index_status;
     }
-    ColumnID column_id = 0;
+    SizeT column_idx = 0;
     {
-        auto [column_def, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_base->column_name());
+        auto [column_def, status] = table_index_meta.table_meta().GetColumnDefByColumnName(index_base->column_name(), &column_idx);
         if (!status.ok()) {
             return status;
         }
-        column_id = column_def->id();
     }
     Optional<SegmentMeta> segment_meta;
     Optional<SegmentIndexMeta> segment_index_meta;
@@ -591,7 +590,7 @@ Status NewTxn::AppendIndex(TableIndexMeeta &table_index_meta, const Vector<Appen
                 append_in_column();
             }
             block_meta.emplace(range.block_id_, segment_meta.value());
-            column_meta.emplace(column_id, *block_meta);
+            column_meta.emplace(column_idx, *block_meta);
             cur_offset = range.start_offset_;
             cur_row_cnt = range.row_count_;
         } else {
@@ -818,6 +817,10 @@ Status NewTxn::PopulateIndex(const String &db_name,
                 if (!status.ok()) {
                     return status;
                 }
+                break;
+            }
+            case IndexType::kDiskAnn: { // TODO
+                LOG_WARN("Not implemented yet");
                 break;
             }
             default: {
@@ -1457,6 +1460,10 @@ Status NewTxn::DumpMemIndexInner(SegmentIndexMeta &segment_index_meta, ChunkID &
             row_count = mem_index->memory_emvb_index_->GetRowCount();
             break;
         }
+        case IndexType::kDiskAnn: {
+            LOG_WARN("Not implemented yet");
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -1711,7 +1718,16 @@ Status NewTxn::GetFullTextIndexReader(const String &db_name, const String &table
     SharedPtr<TableIndexReaderCache> ft_index_cache;
     status = table_meta->GetFtIndexCache(ft_index_cache);
     if (!status.ok()) {
-        return status;
+        // Add cache if not exist
+        if (status.code() == ErrorCode::kCatalogError) {
+            ft_index_cache = MakeShared<TableIndexReaderCache>(table_meta->db_id_str(), table_meta->table_id_str());
+            status = table_meta->AddFtIndexCache(ft_index_cache);
+            if (!status.ok()) {
+                return status;
+            }
+        } else {
+            return status;
+        }
     }
     index_reader = ft_index_cache->GetIndexReader(this);
     return Status::OK();

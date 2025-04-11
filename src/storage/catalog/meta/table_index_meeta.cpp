@@ -119,6 +119,18 @@ Status TableIndexMeeta::InitSet(const SharedPtr<IndexBase> &index_base) {
 Status TableIndexMeeta::UninitSet() {
     Status status;
 
+    SharedPtr<IndexBase> index_base;
+    std::tie(index_base, status) = GetIndexBase();
+    if (!status.ok()) {
+        return status;
+    }
+    if (index_base->index_type_ == IndexType::kFullText) {
+        status = table_meta_.RemoveFtIndexCache();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
     String segment_ids_key = GetTableIndexTag("segment_ids");
     status = kv_instance_.Delete(segment_ids_key);
     if (!status.ok()) {

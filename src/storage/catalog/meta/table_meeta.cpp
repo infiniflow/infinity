@@ -88,15 +88,22 @@ Status TableMeeta::GetIndexID(const String &index_name, String &index_key, Strin
     return Status::OK();
 }
 
-Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name) {
-    String column_key = KeyEncode::TableColumnKey(db_id_str_, table_id_str_, column_name);
-    String column_def_str;
-    Status status = kv_instance_.Get(column_key, column_def_str);
-    if (!status.ok()) {
-        LOG_ERROR(fmt::format("Fail to get column definition from kv store, key: {}, cause: {}", column_key, status.message()));
-        return {nullptr, status};
+Tuple<SharedPtr<ColumnDef>, Status> TableMeeta::GetColumnDefByColumnName(const String &column_name, SizeT *column_idx_ptr) {
+    if (!column_defs_) {
+        Status status = LoadColumnDefs();
+        if (!status.ok()) {
+            return {nullptr, status};
+        }
     }
-    return {ColumnDef::FromJson(nlohmann::json::parse(column_def_str)), Status::OK()};
+    for (SizeT column_idx = 0; column_idx < column_defs_->size(); ++column_idx) {
+        if ((*column_defs_)[column_idx]->name() == column_name) {
+            if (column_idx_ptr) {
+                *column_idx_ptr = column_idx;
+            }
+            return {(*column_defs_)[column_idx], Status::OK()};
+        }
+    }
+    return {nullptr, Status::ColumnNotExist(column_name)};
 }
 
 // Status TableMeeta::SetSegmentIDs(const Vector<SegmentID> &segment_ids) {
@@ -353,11 +360,11 @@ Status TableMeeta::UninitSet() {
         iter->Next();
     }
 
-    String ft_index_cache_key = GetTableTag("ft_index_cache");
-    NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
-    status = new_catalog->DropFtIndexCacheByFtIndexCacheKey(ft_index_cache_key);
+    status = RemoveFtIndexCache();
     if (!status.ok()) {
-        return status;
+        if (status.code() != ErrorCode::kNotFound) {
+            return status;
+        }
     }
 
     return Status::OK();
