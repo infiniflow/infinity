@@ -25,6 +25,8 @@ import internal_types;
 import buffer_handle;
 import column_def;
 import profiler;
+import third_party;
+
 namespace infinity {
 
 class NewTxn;
@@ -109,7 +111,17 @@ public:
 
 public:
     Status UpdateCatalog(const String &full_ckp_path, const Vector<String> &delta_ckp_path_array);
+    static String GetPathNameTail(const String &path);
 
+private:
+    Status TransformCatalogDatabase(const nlohmann::json &column_data_json);
+    Status TransformCatalogTable(const nlohmann::json &column_data_json);
+    Status TransformCatalogSegment(const nlohmann::json &column_data_json);
+    Status TransformCatalogBlock(const nlohmann::json &column_data_json);
+    Status TransformCatalogBlockColumn(const nlohmann::json &column_data_json);
+    Status TransformCatalogTableIndex(const nlohmann::json &column_data_json);
+    Status TransformCatalogSegmentIndex(const nlohmann::json &column_data_json);
+    Status TransformCatalogChunkIndex(const nlohmann::json &column_data_json);
     // // Database related functions
     // Status CreateDatabase(const SharedPtr<String> &db_name,
     //                       const SharedPtr<String> &comment,
@@ -137,8 +149,6 @@ public:
     //                            TxnTimeStamp begin_ts);
     //
     //    DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
-
-    static String GetPathNameTail(const String &path);
 
 public:
     Status LockTable(const String &table_key, TransactionID txn_id);

@@ -52,6 +52,15 @@ Status NewCatalog::UpdateCatalog(const String &full_ckp_path, const Vector<Strin
     return Status::OK();
 }
 
+Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &column_data_json) { return Status::OK(); }
+Status NewCatalog::TransformCatalogTable(const nlohmann::json &column_data_json) { return Status::OK(); }
+Status NewCatalog::TransformCatalogSegment(const nlohmann::json &column_data_json) { return Status::OK(); }
+Status NewCatalog::TransformCatalogBlock(const nlohmann::json &column_data_json) { return Status::OK(); }
+Status NewCatalog::TransformCatalogBlockColumn(const nlohmann::json &column_data_json) { return Status::OK(); }
+Status NewCatalog::TransformCatalogTableIndex(const nlohmann::json &column_data_json) { return Status::OK(); }
+Status NewCatalog::TransformCatalogSegmentIndex(const nlohmann::json &column_data_json) { return Status::OK(); }
+Status NewCatalog::TransformCatalogChunkIndex(const nlohmann::json &column_data_json) { return Status::OK(); }
+
 String NewCatalog::GetPathNameTail(const String &path) {
     SizeT delimiter_i = path.rfind('/');
     if (delimiter_i == String::npos) {
