@@ -1961,7 +1961,7 @@ void NewTxn::PostCommit() {
                     auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
                     Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                     if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Fail to unlock table on post commit phase: {}", status.message()));
+                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                     }
                 }
                 break;
@@ -1971,7 +1971,7 @@ void NewTxn::PostCommit() {
                     auto *cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
                     Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                     if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Fail to unlock table on post commit phase: {}", status.message()));
+                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                     }
                 }
                 break;
@@ -2006,7 +2006,7 @@ void NewTxn::PostCommit() {
                 if (!this->IsReplay()) {
                     Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                     if (!status.ok()) {
-                        UnrecoverableError("Fail to unlock table");
+                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                     }
                 }
                 break;
@@ -2015,7 +2015,7 @@ void NewTxn::PostCommit() {
                 auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
@@ -2023,7 +2023,7 @@ void NewTxn::PostCommit() {
                 auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
                 Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
@@ -2031,7 +2031,7 @@ void NewTxn::PostCommit() {
                 auto *cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
                 Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
@@ -2039,7 +2039,7 @@ void NewTxn::PostCommit() {
                 auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
                     Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
@@ -2071,7 +2071,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto *cmd = static_cast<WalCmdDropColumns *>(wal_cmd.get());
                 Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
@@ -2079,7 +2079,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto *cmd = static_cast<WalCmdAddColumns *>(wal_cmd.get());
                 Status status = new_catalog_->MutateTable(cmd->table_key_, txn_context_ptr_->txn_id_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
@@ -2087,7 +2087,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
@@ -2095,7 +2095,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->old_table_key_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
@@ -2103,7 +2103,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
@@ -2111,7 +2111,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
                 Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
                 if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
                 }
                 break;
             }
@@ -2167,6 +2167,14 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                     }
                 }
 
+                break;
+            }
+            case WalCommandType::COMPACT: {
+                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
+                }
                 break;
             }
             default: {

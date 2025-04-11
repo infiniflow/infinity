@@ -615,9 +615,19 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     if (!status.ok()) {
         return status;
     }
+
+    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     TableMeeta &table_meta = *table_meta_opt;
     status = table_meta.CheckSegments(segment_ids);
     if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
         return status;
     }
 
@@ -627,6 +637,10 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
     NewTxnCompactState compact_state;
     status = NewTxnCompactState::Make(table_meta, fake_commit_ts, compact_state);
     if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
         return status;
     }
 
@@ -636,6 +650,10 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         Vector<BlockID> *block_ids_ptr;
         std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
         if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
             return status;
         }
 
@@ -643,17 +661,29 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
             BlockMeta block_meta(block_id, segment_meta);
             status = this->CompactBlock(block_meta, compact_state);
             if (!status.ok()) {
+                Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+                if (!ref_cnt_status.ok()) {
+                    UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+                }
                 return status;
             }
         }
     }
     status = compact_state.Finalize();
     if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
         return status;
     }
 
     status = table_meta.RemoveSegmentIDs1(segment_ids);
     if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
         return status;
     }
     {
@@ -678,12 +708,17 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
         txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
         compact_command->db_id_str_ = db_meta->db_id_str();
         compact_command->table_id_str_ = table_meta.table_id_str();
+        compact_command->table_id_str_ = table_key;
     }
 
     Vector<String> *index_id_strs_ptr = nullptr;
     Vector<String> *index_name_ptr = nullptr;
     status = table_meta.GetIndexIDs(index_id_strs_ptr, &index_name_ptr);
     if (!status.ok()) {
+        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+        if (!ref_cnt_status.ok()) {
+            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+        }
         return status;
     }
 
@@ -701,6 +736,10 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
                                      compact_state.segment_row_cnt_,
                                      DumpIndexCause::kCompact);
         if (!status.ok()) {
+            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
+            if (!ref_cnt_status.ok()) {
+                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
+            }
             return status;
         }
     }
