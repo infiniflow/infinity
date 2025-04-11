@@ -108,7 +108,7 @@ public:
     ~NewCatalog();
 
 public:
-    Status UpdateCatalog();
+    Status UpdateCatalog(const String &full_ckp_path, const Vector<String> &delta_ckp_path_array);
 
     // // Database related functions
     // Status CreateDatabase(const SharedPtr<String> &db_name,

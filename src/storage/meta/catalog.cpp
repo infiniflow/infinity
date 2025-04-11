@@ -1062,7 +1062,7 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
     }
 }
 
-UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
+UniquePtr<nlohmann::json> Catalog::LoadFullCheckpointToJson(const String &file_name) {
     const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / file_name;
     String dst_dir = catalog_path.parent_path().string();
     String dst_file_name = catalog_path.filename().string();
@@ -1093,10 +1093,13 @@ UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
         RecoverableError(status);
     }
 
-    nlohmann::json catalog_json = nlohmann::json::parse(json_str);
+    return MakeUnique<nlohmann::json>(nlohmann::json::parse(json_str));
+}
 
+UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
+    UniquePtr<nlohmann::json> catalog_json = LoadFullCheckpointToJson(file_name);
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
-    return Deserialize(catalog_json, buffer_mgr);
+    return Deserialize(*catalog_json, buffer_mgr);
 }
 
 UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr) {
@@ -1315,7 +1318,7 @@ void Catalog::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
             db_entry->MemIndexRecover(buffer_manager, ts);
         }
     }
-    for(auto& segment_index_entry:all_memindex_recover_segment_){
+    for (auto &segment_index_entry : all_memindex_recover_segment_) {
         segment_index_entry->MemIndexWaitInflightTasks();
     }
     all_memindex_recover_segment_.clear();

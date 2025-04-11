@@ -30,6 +30,8 @@ import default_values;
 import mem_index;
 import column_index_reader;
 import meta_key;
+import catalog;
+import catalog_delta_entry;
 
 namespace infinity {
 
@@ -37,9 +39,18 @@ NewCatalog::NewCatalog(KVStore *kv_store) : kv_store_(kv_store) {}
 
 NewCatalog::~NewCatalog() = default;
 
-Status NewCatalog::UpdateCatalog() {
-    // Check if the old meta exists
+Status NewCatalog::UpdateCatalog(const String &full_ckp_path, const Vector<String> &delta_ckp_path_array) {
+    // TODO: Check if the old meta exists
+
     // If so, read the old meta into memory and store it into as new meta
+    // Read full checkpoint file
+    UniquePtr<nlohmann::json> full_ckp_json = Catalog::LoadFullCheckpointToJson(full_ckp_path);
+
+    // Read delta checkpoint files
+    for (const String &delta_ckp_path : delta_ckp_path_array) {
+        UniquePtr<CatalogDeltaEntry> catalog_delta_entry = Catalog::LoadFromFileDelta(delta_ckp_path);
+    }
+
     // Rename the old meta filename
     return Status::OK();
 }
