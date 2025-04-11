@@ -178,6 +178,9 @@ struct ExpressionIndexScanInfo {
                 if (candidate_column_index_map_.contains(column_id)) {
                     tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
                                                                                           : Enum::kSecondaryIndexColumnExprOrAfterCast;
+                } else if (new_candidate_column_index_map_.contains(column_id)) {
+                    tree.info = column_expression->Type().type() == LogicalType::kVarchar ? Enum::kVarcharSecondaryIndexColumnExprOrAfterCast
+                                                                                          : Enum::kSecondaryIndexColumnExprOrAfterCast;
                 }
                 break;
             }
@@ -485,8 +488,24 @@ private:
                         case FilterCompareType::kEqual:
                         case FilterCompareType::kLessEqual:
                         case FilterCompareType::kGreaterEqual: {
-                            const auto *secondary_index = tree_info_.candidate_column_index_map_.at(column_id);
-                            return IndexFilterEvaluatorSecondary::Make(function_expression, column_id, secondary_index, compare_type, value);
+                            bool use_new_catalog = query_context_->global_config()->UseNewCatalog();
+                            if (use_new_catalog) {
+                                const TableIndexMeeta *secondary_index = &*tree_info_.new_candidate_column_index_map_.at(column_id);
+                                return IndexFilterEvaluatorSecondary::Make(function_expression,
+                                                                           column_id,
+                                                                           nullptr,
+                                                                           const_cast<TableIndexMeeta *>(secondary_index),
+                                                                           compare_type,
+                                                                           value);
+                            } else {
+                                const auto *secondary_index = tree_info_.candidate_column_index_map_.at(column_id);
+                                return IndexFilterEvaluatorSecondary::Make(function_expression,
+                                                                           column_id,
+                                                                           secondary_index,
+                                                                           nullptr,
+                                                                           compare_type,
+                                                                           value);
+                            }
                         }
                         case FilterCompareType::kAlwaysTrue: {
                             return MakeUnique<IndexFilterEvaluatorAllTrue>();

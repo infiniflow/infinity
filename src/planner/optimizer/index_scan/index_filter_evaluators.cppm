@@ -32,6 +32,7 @@ import logical_type;
 import value;
 import doc_iterator;
 import parse_fulltext_options;
+import table_index_meeta;
 
 namespace infinity {
 
@@ -63,6 +64,7 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     ColumnID column_id_ = std::numeric_limits<ColumnID>::max();
     LogicalType column_logical_type_ = LogicalType::kInvalid;
     const TableIndexEntry *secondary_index_ = nullptr;
+    TableIndexMeeta *new_secondary_index_ = nullptr;
 
     ColumnID column_id() const { return column_id_; }
     virtual bool IsValid() const = 0;
@@ -70,6 +72,7 @@ export struct IndexFilterEvaluatorSecondary : IndexFilterEvaluator {
     static UniquePtr<IndexFilterEvaluatorSecondary> Make(const BaseExpression *src_filter_secondary_index_expressions,
                                                          ColumnID column_id,
                                                          const TableIndexEntry *secondary_index,
+                                                         TableIndexMeeta *new_secondary_index,
                                                          FilterCompareType compare_type,
                                                          const Value &val);
 
@@ -77,9 +80,10 @@ protected:
     IndexFilterEvaluatorSecondary(const BaseExpression *src_expr,
                                   const ColumnID column_id,
                                   const LogicalType column_logical_type,
-                                  const TableIndexEntry *secondary_index)
+                                  const TableIndexEntry *secondary_index,
+                                  TableIndexMeeta *new_secondary_index)
         : IndexFilterEvaluator(Type::kSecondaryIndex), src_filter_secondary_index_expressions_({src_expr}), column_id_(column_id),
-          column_logical_type_(column_logical_type), secondary_index_(secondary_index) {}
+          column_logical_type_(column_logical_type), secondary_index_(secondary_index), new_secondary_index_(new_secondary_index) {}
 };
 
 // maybe combined from multiple filter_fulltext exprs

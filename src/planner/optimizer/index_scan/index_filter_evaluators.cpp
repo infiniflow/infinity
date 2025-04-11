@@ -24,6 +24,7 @@ import table_index_entry;
 import secondary_index_data;
 import secondary_index_in_mem;
 import chunk_index_entry;
+import buffer_obj;
 import buffer_handle;
 import filter_expression_push_down;
 import filter_fulltext_expression;
@@ -38,6 +39,11 @@ import third_party;
 import segment_index_entry;
 import doc_iterator;
 import score_threshold_iterator;
+import column_def;
+import table_index_meeta;
+import segment_index_meta;
+import chunk_index_meta;
+import mem_index;
 
 namespace infinity {
 
@@ -371,19 +377,21 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
     IndexFilterEvaluatorSecondaryT(const BaseExpression *src_expr,
                                    const ColumnID column_id,
                                    const LogicalType column_logical_type,
-                                   const TableIndexEntry *secondary_index)
-        : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, secondary_index) {}
+                                   const TableIndexEntry *secondary_index,
+                                   TableIndexMeeta *new_secondary_index)
+        : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, secondary_index, new_secondary_index) {}
 
     static UniquePtr<IndexFilterEvaluatorSecondaryT> Make(const BaseExpression *src_expr,
                                                           const ColumnID column_id,
                                                           const TableIndexEntry *secondary_index,
+                                                          TableIndexMeeta *new_secondary_index,
                                                           const FilterCompareType compare_type,
                                                           const Value &val) {
         constexpr auto expect_logical_type = GetLogicalType<ColumnValueT>;
-        if (expect_logical_type != secondary_index->column_def()->type()->type() || expect_logical_type != val.type().type()) {
+        if (secondary_index && (expect_logical_type != secondary_index->column_def()->type()->type() || expect_logical_type != val.type().type())) {
             UnrecoverableError("Column type mismatch");
         }
-        auto result = MakeUnique<IndexFilterEvaluatorSecondaryT>(src_expr, column_id, expect_logical_type, secondary_index);
+        auto result = MakeUnique<IndexFilterEvaluatorSecondaryT>(src_expr, column_id, expect_logical_type, secondary_index, new_secondary_index);
         const SecondaryIndexOrderedT val_ordered = GetOrderedV<ColumnValueT>(val);
         switch (compare_type) {
             case FilterCompareType::kEqual: {
@@ -409,46 +417,56 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
 UniquePtr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
                                                                              ColumnID column_id,
                                                                              const TableIndexEntry *secondary_index,
+                                                                             TableIndexMeeta *new_secondary_index,
                                                                              FilterCompareType compare_type,
                                                                              const Value &val) {
-    auto *column_def = secondary_index->column_def().get();
+    ColumnDef *column_def;
+    if (secondary_index) {
+        column_def = secondary_index->column_def().get();
+    } else {
+        auto [column_def_ptr, status] = new_secondary_index->GetColumnDef();
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        column_def = column_def_ptr.get();
+    }
     if (column_def->id() != static_cast<i64>(column_id)) {
         UnrecoverableError("Invalid column id");
     }
     switch (column_def->type()->type()) {
         case LogicalType::kTinyInt: {
-            return IndexFilterEvaluatorSecondaryT<TinyIntT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<TinyIntT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kSmallInt: {
-            return IndexFilterEvaluatorSecondaryT<SmallIntT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<SmallIntT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kInteger: {
-            return IndexFilterEvaluatorSecondaryT<IntegerT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<IntegerT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kBigInt: {
-            return IndexFilterEvaluatorSecondaryT<BigIntT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<BigIntT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kFloat: {
-            return IndexFilterEvaluatorSecondaryT<FloatT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<FloatT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kDouble: {
-            return IndexFilterEvaluatorSecondaryT<DoubleT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<DoubleT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kDate: {
-            return IndexFilterEvaluatorSecondaryT<DateT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<DateT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kTime: {
-            return IndexFilterEvaluatorSecondaryT<TimeT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<TimeT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kDateTime: {
-            return IndexFilterEvaluatorSecondaryT<DateTimeT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<DateTimeT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kTimestamp: {
-            return IndexFilterEvaluatorSecondaryT<TimestampT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+            return IndexFilterEvaluatorSecondaryT<TimestampT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
         }
         case LogicalType::kVarchar: {
             if (compare_type == FilterCompareType::kEqual) {
-                return IndexFilterEvaluatorSecondaryT<VarcharT>::Make(src_expr, column_id, secondary_index, compare_type, val);
+                return IndexFilterEvaluatorSecondaryT<VarcharT>::Make(src_expr, column_id, secondary_index, new_secondary_index, compare_type, val);
             }
             RecoverableError(Status::SyntaxError("VarcharT only support kEqual compare type in secondary index."));
             return {};
@@ -610,19 +628,17 @@ template <typename ColumnValueType>
 struct TrunkReaderT final : TrunkReader<ColumnValueType> {
     using KeyType = typename TrunkReader<ColumnValueType>::SecondaryIndexOrderedT;
     const u32 segment_row_count_;
-    SharedPtr<ChunkIndexEntry> chunk_index_entry_;
+    BufferObj *index_buffer_ = nullptr;
     const SecondaryIndexData *index_ = nullptr;
     u32 begin_pos_ = 0;
     u32 end_pos_ = 0;
-    TrunkReaderT(const u32 segment_row_count, const SharedPtr<ChunkIndexEntry> &chunk_index_entry)
-        : segment_row_count_(segment_row_count), chunk_index_entry_(chunk_index_entry) {}
-    TrunkReaderT(const u32 segment_row_count, const SecondaryIndexData *index)
-        : segment_row_count_(segment_row_count), index_(index) {}
+    TrunkReaderT(const u32 segment_row_count, BufferObj *index_buffer) : segment_row_count_(segment_row_count), index_buffer_(index_buffer) {}
+    TrunkReaderT(const u32 segment_row_count, const SecondaryIndexData *index) : segment_row_count_(segment_row_count), index_(index) {}
     u32 GetResultCnt(const Pair<KeyType, KeyType> interval_range) override {
         Optional<BufferHandle> index_handle;
         const SecondaryIndexData *index = nullptr;
-        if (chunk_index_entry_) {
-            index_handle = chunk_index_entry_->GetIndex();
+        if (index_buffer_) {
+            index_handle = index_buffer_->Load();
             index = static_cast<const SecondaryIndexData *>(index_handle->GetData());
         } else {
             index = index_;
@@ -705,7 +721,7 @@ struct TrunkReaderT final : TrunkReader<ColumnValueType> {
     void OutPut(Bitmask &selected_rows) override {
         const u32 begin_pos = begin_pos_;
         const u32 end_pos = end_pos_;
-        const auto index_handle = chunk_index_entry_->GetIndex();
+        const auto index_handle = index_buffer_->Load();
         const auto index = static_cast<const SecondaryIndexData *>(index_handle.GetData());
         const auto [key_ptr, offset_ptr] = index->GetKeyOffsetPointer();
         // output result
@@ -734,19 +750,46 @@ struct TrunkReaderM final : TrunkReader<ColumnValueType> {
 
 template <typename ColumnValueType>
 Bitmask ExecuteSingleRangeT(const Pair<ConvertToOrderedType<ColumnValueType>, ConvertToOrderedType<ColumnValueType>> interval_range,
-                            SegmentIndexEntry &index_entry,
+                            SegmentIndexEntry *index_entry,
+                            SegmentIndexMeta *index_meta,
                             const SegmentOffset segment_row_count,
                             Txn *txn) {
     Vector<UniquePtr<TrunkReader<ColumnValueType>>> trunk_readers;
-    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> chunks_snapshot = index_entry.GetSecondaryIndexSnapshot();
-    auto &[chunk_index_entries, memory_secondary_index] = chunks_snapshot;
-    for (const auto &chunk_index_entry : chunk_index_entries) {
-        if (chunk_index_entry->CheckVisible(txn)) {
-            trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, chunk_index_entry));
+    if (index_entry) {
+        Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> chunks_snapshot = index_entry->GetSecondaryIndexSnapshot();
+        auto &[chunk_index_entries, memory_secondary_index] = chunks_snapshot;
+        for (const auto &chunk_index_entry : chunk_index_entries) {
+            if (chunk_index_entry->CheckVisible(txn)) {
+                BufferObj *index_buffer = chunk_index_entry->GetBufferObj();
+                trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, index_buffer));
+            }
         }
-    }
-    if (memory_secondary_index) {
-        trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, memory_secondary_index));
+        if (memory_secondary_index) {
+            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, memory_secondary_index));
+        }
+    } else {
+        Vector<ChunkID> *chunk_ids_ptr = nullptr;
+        Status status = index_meta->GetChunkIDs(chunk_ids_ptr);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        for (ChunkID chunk_id : *chunk_ids_ptr) {
+            ChunkIndexMeta chunk_index_meta(chunk_id, *index_meta);
+            BufferObj *index_buffer = nullptr;
+            Status status = chunk_index_meta.GetIndexBuffer(index_buffer);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            trunk_readers.emplace_back(MakeUnique<TrunkReaderT<ColumnValueType>>(segment_row_count, index_buffer));
+        }
+        SharedPtr<MemIndex> mem_index;
+        status = index_meta->GetMemIndex(mem_index);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        if (mem_index && mem_index->memory_secondary_index_) {
+            trunk_readers.emplace_back(MakeUnique<TrunkReaderM<ColumnValueType>>(segment_row_count, mem_index->memory_secondary_index_));
+        }
     }
     // output result
     Bitmask part_result(segment_row_count);
@@ -763,12 +806,18 @@ Bitmask ExecuteSingleRangeT(const Pair<ConvertToOrderedType<ColumnValueType>, Co
 
 template <typename ColumnValueT>
 Bitmask IndexFilterEvaluatorSecondaryT<ColumnValueT>::Evaluate(const SegmentID segment_id, const SegmentOffset segment_row_count, Txn *txn) const {
-    auto const &index_by_segment = secondary_index_->GetSegmentIndexesGuard();
-    SegmentIndexEntry &index_entry = *(index_by_segment.index_by_segment_.at(segment_id));
+    SegmentIndexEntry *index_entry = nullptr;
+    Optional<SegmentIndexMeta> index_meta;
+    if (secondary_index_) {
+        auto const &index_by_segment = secondary_index_->GetSegmentIndexesGuard();
+        index_entry = index_by_segment.index_by_segment_.at(segment_id).get();
+    } else {
+        index_meta.emplace(segment_id, *new_secondary_index_);
+    }
     Bitmask result(segment_row_count);
     result.SetAllFalse();
     for (const auto rng : secondary_index_start_end_pairs_) {
-        const auto part_result = ExecuteSingleRangeT<ColumnValueT>(rng, index_entry, segment_row_count, txn);
+        const auto part_result = ExecuteSingleRangeT<ColumnValueT>(rng, index_entry, &*index_meta, segment_row_count, txn);
         result.MergeOr(part_result);
     }
     result.RunOptimize();
