@@ -209,6 +209,8 @@ public:
     Tuple<SharedPtr<ChunkIndexMetaInfo>, Status>
     GetChunkIndexInfo(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, ChunkID chunk_id);
 
+    Tuple<Vector<SharedPtr<SegmentInfo>>, Status> GetSegmentsInfo(const String &db_name, const String &table_name);
+
     Status GetCollectionByName(const String &db_name, const String &table_name, BaseEntry *&collection_entry);
 
     Tuple<SharedPtr<TableSnapshotInfo>, Status> GetTableSnapshot(const String &db_name, const String &table_name);

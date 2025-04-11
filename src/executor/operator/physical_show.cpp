@@ -1947,9 +1947,16 @@ void PhysicalShow::ExecuteShowProfiles(QueryContext *query_context, ShowOperator
  * @param output_state
  */
 void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto txn = query_context->GetTxn();
-
-    auto [table_info, status] = txn->GetTableInfo(db_name_, *object_name_);
+    SharedPtr<TableInfo> table_info;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(table_info, status) = txn->GetTableInfo(db_name_, *object_name_);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(table_info, status) = txn->GetTableInfo(db_name_, *object_name_);
+    }
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2027,9 +2034,16 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
 }
 
 void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto txn = query_context->GetTxn();
-
-    auto [segment_info_list, status] = txn->GetSegmentsInfo(db_name_, *object_name_);
+    Vector<SharedPtr<SegmentInfo>> segment_info_list;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(segment_info_list, status) = txn->GetSegmentsInfo(db_name_, *object_name_);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(segment_info_list, status) = txn->GetSegmentsInfo(db_name_, *object_name_);
+    }
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
