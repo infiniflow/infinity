@@ -40,9 +40,6 @@ NewCatalog::NewCatalog(KVStore *kv_store) : kv_store_(kv_store) {}
 NewCatalog::~NewCatalog() = default;
 
 Status NewCatalog::UpdateCatalog(const String &full_ckp_path, const Vector<String> &delta_ckp_path_array) {
-    // TODO: Check if the old meta exists
-
-    // If so, read the old meta into memory and store it into as new meta
     // Read full checkpoint file
     UniquePtr<nlohmann::json> full_ckp_json = Catalog::LoadFullCheckpointToJson(full_ckp_path);
 
