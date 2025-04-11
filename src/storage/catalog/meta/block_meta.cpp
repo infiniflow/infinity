@@ -32,6 +32,8 @@ import version_file_worker;
 
 import buffer_handle;
 import meta_info;
+import column_def;
+import column_meta;
 
 namespace infinity {
 
@@ -254,6 +256,44 @@ Tuple<SharedPtr<BlockInfo>, Status> BlockMeta::GetBlockInfo() {
     block_info->storage_size_ = 0;         // TODO
     block_info->files_ = this->FilePaths();
     return {block_info, Status::OK()};
+}
+
+Tuple<SharedPtr<BlockColumnInfo>, Status> BlockMeta::GetBlockColumnInfo(ColumnID column_id) {
+    SharedPtr<BlockColumnInfo> block_column_info = MakeShared<BlockColumnInfo>();
+    SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs = nullptr;
+    SharedPtr<ColumnDef> column_def = nullptr;
+    Status status;
+    SizeT select_column_idx = 0;
+    std::tie(column_defs, status) = segment_meta_.table_meta().GetColumnDefs();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    for (auto &column_def_ptr : *column_defs) {
+        if (ColumnID(column_def_ptr->id()) == column_id) {
+            column_def = column_def_ptr;
+            break;
+        }
+        select_column_idx++;
+    }
+    if (column_def == nullptr) {
+        return {nullptr, Status::CatalogError("Column not found")};
+    }
+    ColumnMeta column_meta(select_column_idx, *this);
+    Vector<String> file_paths;
+    status = column_meta.FilePaths(file_paths);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    block_column_info->column_id_ = column_id;
+    block_column_info->data_type_ = column_def->type();
+    block_column_info->filename_ = nullptr; // TODO
+    block_column_info->storage_size_ = 0;   // TODO
+    block_column_info->extra_file_count_ = file_paths.size();
+    for (auto &file_path : file_paths) {
+        block_column_info->extra_file_names_.push_back(MakeShared<String>(file_path));
+    }
+    return {block_column_info, Status::OK()};
 }
 
 } // namespace infinity

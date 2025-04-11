@@ -2552,8 +2552,16 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
 }
 
 void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto txn = query_context->GetTxn();
-    auto [block_column_info, status] = txn->GetBlockColumnInfo(db_name_, *object_name_, *segment_id_, *block_id_, *column_id_);
+    SharedPtr<BlockColumnInfo> block_column_info;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(block_column_info, status) = txn->GetBlockColumnInfo(db_name_, *object_name_, *segment_id_, *block_id_, *column_id_);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(block_column_info, status) = txn->GetBlockColumnInfo(db_name_, *object_name_, *segment_id_, *block_id_, *column_id_);
+    }
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);

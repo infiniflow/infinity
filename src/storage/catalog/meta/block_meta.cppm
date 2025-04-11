@@ -62,6 +62,8 @@ public:
 
     Tuple<SharedPtr<BlockInfo>, Status> GetBlockInfo();
 
+    Tuple<SharedPtr<BlockColumnInfo>, Status> GetBlockColumnInfo(ColumnID column_id);
+
 private:
     // Status LoadRowCnt();
 

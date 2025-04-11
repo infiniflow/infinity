@@ -872,6 +872,20 @@ Tuple<Vector<SharedPtr<BlockInfo>>, Status> NewTxn::GetBlocksInfo(const String &
     return {block_info_list, status};
 }
 
+Tuple<SharedPtr<BlockColumnInfo>, Status>
+NewTxn::GetBlockColumnInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id, ColumnID column_id) {
+    SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    SegmentMeta segment_meta(segment_id, table_meta.value());
+    BlockMeta block_meta(block_id, segment_meta);
+    return block_meta.GetBlockColumnInfo(column_id);
+}
+
 Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const String &db_name, const String &table_name) {
     this->CheckTxn(db_name);
     return catalog_->GetTableSnapshot(db_name, table_name, nullptr);
