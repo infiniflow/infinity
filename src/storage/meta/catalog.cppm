@@ -45,6 +45,7 @@ import snapshot_info;
 
 namespace infinity {
 
+class Config;
 class TxnManager;
 class Txn;
 struct CatalogDeltaOpBrief;
@@ -223,7 +224,7 @@ public:
 
     Vector<CatalogDeltaOpBrief> GetDeltaLogBriefs() const;
 
-    static UniquePtr<nlohmann::json> LoadFullCheckpointToJson(const String& file_name);
+    static UniquePtr<nlohmann::json> LoadFullCheckpointToJson(Config* config_ptr, const String& file_name);
     static UniquePtr<Catalog> LoadFullCheckpoint(const String &file_name);
     void AttachDeltaCheckpoint(const String &file_name);
 

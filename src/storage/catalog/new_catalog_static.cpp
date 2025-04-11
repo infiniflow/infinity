@@ -350,6 +350,7 @@ Status NewCatalog::IncrLatestID(KVInstance *kv_instance, String &id_str, std::st
     if (!status.ok()) {
         return status;
     }
+
     SizeT id_num = std::stoull(string_id);
     ++id_num;
     id_str = fmt::format("{}", id_num);

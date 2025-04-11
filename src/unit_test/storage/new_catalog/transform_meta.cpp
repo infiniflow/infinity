@@ -18,8 +18,10 @@ import base_test;
 import stl;
 import third_party;
 import new_catalog;
+import compilation_config;
 import kv_store;
 import config;
+import status;
 
 using namespace infinity;
 
@@ -44,22 +46,68 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TransformMeta,
                          ::testing::Values(TransformMeta::NEW_CONFIG_PATH, TransformMeta::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TransformMeta, transform_meta) {
+TEST_P(TransformMeta, transform_meta00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
-    auto status = config_ptr->Init(config_path, nullptr);
+    Status status = config_ptr->Init(config_path, nullptr);
     EXPECT_TRUE(status.ok());
     UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
-    kv_store_ptr->Init(config_ptr->CatalogDir());
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
     UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
 
-    //    String full_ckp_path = "";
-    //    Vector<String> delta_ckp_path_array = {""};
-    //    new_catalog_ptr->TransformCatalog(full_ckp_path, delta_ckp_path_array);
+    String full_ckp_path = String(test_data_path()) + "/json/db_meta_00.json";
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
     std::cout << String("All store key and value: ") << std::endl;
     std::cout << kv_store_ptr->ToString() << std::endl;
     std::cout << String(" -------------- ") << std::endl;
 
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+}
+
+TEST_P(TransformMeta, transform_meta01) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = String(test_data_path()) + "/json/db_meta_01.json";
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    std::cout << String("All store key and value: ") << std::endl;
+    std::cout << kv_store_ptr->ToString() << std::endl;
+    std::cout << String(" -------------- ") << std::endl;
+
+    kv_store_ptr->Uninit();
+    kv_store_ptr.reset();
+    new_catalog_ptr.reset();
+}
+
+TEST_P(TransformMeta, transform_meta02) {
+    UniquePtr<Config> config_ptr = MakeUnique<Config>();
+    Status status = config_ptr->Init(config_path, nullptr);
+    EXPECT_TRUE(status.ok());
+    UniquePtr<KVStore> kv_store_ptr = MakeUnique<KVStore>();
+    status = kv_store_ptr->Init(config_ptr->CatalogDir());
+    EXPECT_TRUE(status.ok());
+    UniquePtr<NewCatalog> new_catalog_ptr = MakeUnique<NewCatalog>(kv_store_ptr.get());
+
+    String full_ckp_path = String(test_data_path()) + "/json/db_meta_02.json";
+    Vector<String> delta_ckp_path_array;
+    new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
+
+    std::cout << String("All store key and value: ") << std::endl;
+    std::cout << kv_store_ptr->ToString() << std::endl;
+    std::cout << String(" -------------- ") << std::endl;
+
+    kv_store_ptr->Uninit();
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
 }

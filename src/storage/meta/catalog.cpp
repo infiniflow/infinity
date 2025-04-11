@@ -68,6 +68,7 @@ import snapshot_info;
 import new_txn_manager;
 import new_catalog;
 import kv_store;
+import config;
 
 namespace infinity {
 
@@ -1062,8 +1063,8 @@ void Catalog::LoadFromEntryDelta(UniquePtr<CatalogDeltaEntry> delta_entry, Buffe
     }
 }
 
-UniquePtr<nlohmann::json> Catalog::LoadFullCheckpointToJson(const String &file_name) {
-    const auto &catalog_path = Path(InfinityContext::instance().config()->DataDir()) / file_name;
+UniquePtr<nlohmann::json> Catalog::LoadFullCheckpointToJson(Config* config_ptr, const String &file_name) {
+    const auto &catalog_path = Path(config_ptr->DataDir()) / file_name;
     String dst_dir = catalog_path.parent_path().string();
     String dst_file_name = catalog_path.filename().string();
 
@@ -1097,7 +1098,7 @@ UniquePtr<nlohmann::json> Catalog::LoadFullCheckpointToJson(const String &file_n
 }
 
 UniquePtr<Catalog> Catalog::LoadFullCheckpoint(const String &file_name) {
-    UniquePtr<nlohmann::json> catalog_json = LoadFullCheckpointToJson(file_name);
+    UniquePtr<nlohmann::json> catalog_json = LoadFullCheckpointToJson(InfinityContext::instance().config(), file_name);
     BufferManager *buffer_mgr = InfinityContext::instance().storage()->buffer_manager();
     return Deserialize(*catalog_json, buffer_mgr);
 }
