@@ -94,7 +94,7 @@ struct ExpressionIndexScanInfo {
     // for index scan
     HashMap<ColumnID, TableIndexEntry *> candidate_column_index_map_;
     TableMeeta *table_meta_ = nullptr;
-    HashMap<ColumnID, TableIndexMeeta *> new_candidate_column_index_map_;
+    HashMap<ColumnID, SharedPtr<TableIndexMeeta>> new_candidate_column_index_map_;
 
     inline void InitColumnIndexEntries(TableInfo *table_info, Txn *txn) {
         const TransactionID txn_id = txn->TxnID();
@@ -136,22 +136,16 @@ struct ExpressionIndexScanInfo {
         table_meta_ = base_table_ref->block_index_->table_meta_.get();
 
         Vector<String> *index_id_strs_ptr = nullptr;
-        Vector<String> *index_names_ptr = nullptr;
-        status = table_meta_->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
+        status = table_meta_->GetIndexIDs(index_id_strs_ptr);
         if (!status.ok()) {
             RecoverableError(status);
         }
         if (!base_table_ref->index_index_) {
             base_table_ref->index_index_ = MakeShared<IndexIndex>();
         }
-        IndexIndex &index_index = *base_table_ref->index_index_;
         for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
             const String &index_id_str = (*index_id_strs_ptr)[i];
-            const String &index_name = (*index_names_ptr)[i];
-            auto index_snapshot = MakeShared<NewIndexSnapshot>();
-            index_index.new_index_snapshots_.emplace(index_name, index_snapshot);
-            index_snapshot->table_index_meta_ = MakeShared<TableIndexMeeta>(index_id_str, *table_meta_);
-            TableIndexMeeta *table_index_meta = index_snapshot->table_index_meta_.get();
+            auto table_index_meta = MakeShared<TableIndexMeeta>(index_id_str, *table_meta_);
 
             SharedPtr<IndexBase> index_base;
             std::tie(index_base, status) = table_index_meta->GetIndexBase();
@@ -501,11 +495,11 @@ private:
                         case FilterCompareType::kGreaterEqual: {
                             bool use_new_catalog = query_context_->global_config()->UseNewCatalog();
                             if (use_new_catalog) {
-                                const TableIndexMeeta *secondary_index = &*tree_info_.new_candidate_column_index_map_.at(column_id);
+                                SharedPtr<TableIndexMeeta> secondary_index = tree_info_.new_candidate_column_index_map_.at(column_id);
                                 return IndexFilterEvaluatorSecondary::Make(function_expression,
                                                                            column_id,
                                                                            nullptr,
-                                                                           const_cast<TableIndexMeeta *>(secondary_index),
+                                                                           secondary_index,
                                                                            compare_type,
                                                                            value);
                             } else {

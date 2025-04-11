@@ -124,16 +124,26 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes()
 SizeT PhysicalMatchSparseScan::TaskletCount() {
     SizeT ret = base_table_ref_->block_index_->BlockCount();
     if (base_table_ref_->index_index_.get() != nullptr) {
-        const auto &index_snapshots = base_table_ref_->index_index_->index_snapshots_vec_;
-        if (index_snapshots.size() != 1) {
-            UnrecoverableError("Multiple index snapshots are not supported.");
+        if (base_table_ref_->index_index_->new_index_snapshots_vec_.empty()) {
+            const auto &index_snapshots = base_table_ref_->index_index_->index_snapshots_vec_;
+            if (index_snapshots.size() != 1) {
+                UnrecoverableError("Multiple index snapshots are not supported.");
+            }
+            ret = index_snapshots[0]->segment_index_entries_.size();
+        } else {
+            const auto &index_snapshots = base_table_ref_->index_index_->new_index_snapshots_vec_;
+            if (index_snapshots.size() != 1) {
+                UnrecoverableError("Multiple index snapshots are not supported.");
+            }
+            ret = index_snapshots[0]->segment_index_metas_.size();
         }
-        ret = index_snapshots[0]->segment_index_entries_.size();
     }
     return ret;
 }
 
 SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
+    SizeT search_column_id = match_sparse_expr_->column_expr_->binding().column_idx;
+
     bool use_new_catalog = query_context->global_config()->UseNewCatalog();
     if (use_new_catalog) {
         Status status;
@@ -165,7 +175,7 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
                 if (!status.ok()) {
                     RecoverableError(status);
                 }
-                if (column_id != search_column_id_) {
+                if (column_id != search_column_id) {
                     continue;
                 }
                 if (index_base->index_type_ != IndexType::kBMP) {
@@ -198,7 +208,7 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
             if (!status.ok()) {
                 RecoverableError(status);
             }
-            if (column_id != search_column_id_) {
+            if (column_id != search_column_id) {
                 // knn_column_id isn't in this table index
                 LOG_ERROR(fmt::format("Column {} not found", index_base->column_name()));
                 Status error_status = Status::ColumnNotExist(index_base->column_name());
@@ -622,7 +632,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         const BlockIndex *block_index = base_table_ref_->block_index_.get();
         SegmentIndexEntry *segment_index_entry = nullptr;
         SegmentIndexMeta *segment_index_meta = nullptr;
-        if (use_new_catalog) {
+        if (!use_new_catalog) {
             IndexSnapshot *index_snapshot = index_index->index_snapshots_vec_[0];
             auto iter = index_snapshot->segment_index_entries_.find(segment_id);
             if (iter == index_snapshot->segment_index_entries_.end()) {
@@ -727,7 +737,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                 if (!status.ok()) {
                     UnrecoverableError(status.message());
                 }
-                
+
                 for (ChunkID chunk_id : *chunk_ids_ptr) {
                     ChunkIndexMeta chunk_index_meta(chunk_id, *segment_index_meta);
                     BufferObj *index_buffer = nullptr;

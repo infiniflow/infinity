@@ -32,7 +32,10 @@ namespace infinity {
 
 void PrintTransactionHistory() {
     TxnManager *txn_manager = InfinityContext::instance().storage()->txn_manager();
-
+    if (!txn_manager) {
+        LOG_WARN("TxnManager is null");
+        return;
+    }
     Vector<SharedPtr<TxnContext>> txn_contexts = txn_manager->GetTxnContextHistories();
 
     SizeT history_count = txn_contexts.size();

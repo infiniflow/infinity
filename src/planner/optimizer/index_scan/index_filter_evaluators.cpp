@@ -378,13 +378,13 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
                                    const ColumnID column_id,
                                    const LogicalType column_logical_type,
                                    const TableIndexEntry *secondary_index,
-                                   TableIndexMeeta *new_secondary_index)
+                                   SharedPtr<TableIndexMeeta> new_secondary_index)
         : IndexFilterEvaluatorSecondary(src_expr, column_id, column_logical_type, secondary_index, new_secondary_index) {}
 
     static UniquePtr<IndexFilterEvaluatorSecondaryT> Make(const BaseExpression *src_expr,
                                                           const ColumnID column_id,
                                                           const TableIndexEntry *secondary_index,
-                                                          TableIndexMeeta *new_secondary_index,
+                                                          SharedPtr<TableIndexMeeta> new_secondary_index,
                                                           const FilterCompareType compare_type,
                                                           const Value &val) {
         constexpr auto expect_logical_type = GetLogicalType<ColumnValueT>;
@@ -417,7 +417,7 @@ struct IndexFilterEvaluatorSecondaryT final : IndexFilterEvaluatorSecondary {
 UniquePtr<IndexFilterEvaluatorSecondary> IndexFilterEvaluatorSecondary::Make(const BaseExpression *src_expr,
                                                                              ColumnID column_id,
                                                                              const TableIndexEntry *secondary_index,
-                                                                             TableIndexMeeta *new_secondary_index,
+                                                                             SharedPtr<TableIndexMeeta> new_secondary_index,
                                                                              FilterCompareType compare_type,
                                                                              const Value &val) {
     ColumnDef *column_def;
