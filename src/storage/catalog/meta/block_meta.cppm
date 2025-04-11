@@ -19,6 +19,7 @@ export module block_meta;
 import stl;
 import status;
 import default_values;
+import meta_info;
 
 namespace infinity {
 
@@ -58,6 +59,8 @@ public:
     Tuple<BufferObj *, Status> GetVersionBuffer();
 
     Vector<String> FilePaths();
+
+    Tuple<SharedPtr<BlockInfo>, Status> GetBlockInfo();
 
 private:
     // Status LoadRowCnt();

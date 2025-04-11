@@ -31,6 +31,7 @@ import block_version;
 import version_file_worker;
 
 import buffer_handle;
+import meta_info;
 
 namespace infinity {
 
@@ -234,6 +235,25 @@ Tuple<SizeT, Status> BlockMeta::GetRowCnt1() {
     }
     row_cnt_ = row_cnt;
     return {row_cnt, Status::OK()};
+}
+
+Tuple<SharedPtr<BlockInfo>, Status> BlockMeta::GetBlockInfo() {
+    SharedPtr<BlockInfo> block_info = MakeShared<BlockInfo>();
+    auto [row_count, status] = this->GetRowCnt1();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+
+    block_info->block_id_ = this->block_id();
+    block_info->block_dir_ = this->GetBlockDir();
+    block_info->row_count_ = row_count;
+    block_info->row_capacity_ = this->block_capacity();
+    block_info->checkpoint_row_count_ = 0; // TODO
+    block_info->column_count_ = 0;         // TODO
+    block_info->checkpoint_ts_ = 0;        // TODO
+    block_info->storage_size_ = 0;         // TODO
+    block_info->files_ = this->FilePaths();
+    return {block_info, Status::OK()};
 }
 
 } // namespace infinity

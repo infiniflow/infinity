@@ -781,13 +781,28 @@ NewTxn::GetChunkIndexInfo(const String &db_name, const String &table_name, const
     return {std::move(chunk_index_info), status};
 }
 
+Tuple<SharedPtr<SegmentInfo>, Status> NewTxn::GetSegmentInfo(const String &db_name, const String &table_name, SegmentID segment_id) {
+    SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    SegmentMeta segment_meta(segment_id, table_meta.value());
+    std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    return {std::move(segment_info), Status::OK()};
+}
+
 Tuple<Vector<SharedPtr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const String &db_name, const String &table_name) {
     Vector<SharedPtr<SegmentInfo>> segment_info_list;
     Optional<DBMeeta> db_meta;
     Optional<TableMeeta> table_meta;
     Vector<SegmentID> *segment_ids_ptr = nullptr;
     SharedPtr<Vector<SharedPtr<ColumnDef>>> column_defs = nullptr;
-    i64 column_count = 0;
     SegmentID unsealed_segment_id = 0;
     Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
     if (!status.ok()) {
@@ -801,7 +816,6 @@ Tuple<Vector<SharedPtr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const Stri
     if (!status.ok()) {
         return {segment_info_list, status};
     }
-    column_count = column_defs->size();
     status = table_meta->GetUnsealedSegmentID(unsealed_segment_id);
     if (!status.ok()) {
         return {segment_info_list, status};
@@ -809,39 +823,53 @@ Tuple<Vector<SharedPtr<SegmentInfo>>, Status> NewTxn::GetSegmentsInfo(const Stri
     for (SegmentID segment_id : *segment_ids_ptr) {
         SegmentMeta segment_meta(segment_id, table_meta.value());
         auto segment_info = MakeShared<SegmentInfo>();
-        segment_info->segment_id_ = segment_id;
-        segment_info->status_ =
-            (segment_id == unsealed_segment_id) ? SegmentStatus::kUnsealed : SegmentStatus::kSealed; // TODO: How to determine other status?
-        segment_info->column_count_ = column_count;
-        segment_info->row_capacity_ = segment_meta.segment_capacity();
-        segment_info->storage_size_ = 0; // TODO: How to determine storage size?
-        std::tie(segment_info->segment_dir_, status) = segment_meta.GetSegmentDir();
+        std::tie(segment_info, status) = segment_meta.GetSegmentInfo();
         if (!status.ok()) {
             return {segment_info_list, status};
-        }
-        Vector<BlockID> *block_ids_ptr = nullptr;
-        std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
-        if (!status.ok()) {
-            return {segment_info_list, status};
-        }
-        segment_info->block_count_ = block_ids_ptr->size();
-        std::tie(segment_info->row_count_, status) = segment_meta.GetRowCnt1();
-        if (!status.ok()) {
-            return {segment_info_list, status};
-        }
-        segment_info->actual_row_count_ = segment_info->row_count_;
-        for (BlockID block_id : *block_ids_ptr) {
-            BlockMeta block_meta(block_id, segment_meta);
-            Vector<String> file_paths;
-            status = NewCatalog::GetBlockFilePaths(block_meta, file_paths, nullptr);
-            if (!status.ok()) {
-                return {segment_info_list, status};
-            }
-            segment_info->files_.insert(segment_info->files_.end(), file_paths.begin(), file_paths.end());
         }
         segment_info_list.push_back(std::move(segment_info));
     }
     return {std::move(segment_info_list), status};
+}
+
+Tuple<SharedPtr<BlockInfo>, Status> NewTxn::GetBlockInfo(const String &db_name, const String &table_name, SegmentID segment_id, BlockID block_id) {
+    SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return {nullptr, status};
+    }
+    SegmentMeta segment_meta(segment_id, table_meta.value());
+    BlockMeta block_meta(block_id, segment_meta);
+    return block_meta.GetBlockInfo();
+}
+
+Tuple<Vector<SharedPtr<BlockInfo>>, Status> NewTxn::GetBlocksInfo(const String &db_name, const String &table_name, SegmentID segment_id) {
+    Vector<SharedPtr<BlockInfo>> block_info_list;
+    SharedPtr<SegmentInfo> segment_info = MakeShared<SegmentInfo>();
+    Optional<DBMeeta> db_meta;
+    Optional<TableMeeta> table_meta;
+    Status status = this->GetTableMeta(db_name, table_name, db_meta, table_meta);
+    if (!status.ok()) {
+        return {block_info_list, status};
+    }
+    SegmentMeta segment_meta(segment_id, table_meta.value());
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+    if (!status.ok()) {
+        return {block_info_list, status};
+    }
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, segment_meta);
+        auto block_info = MakeShared<BlockInfo>();
+        std::tie(block_info, status) = block_meta.GetBlockInfo();
+        if (!status.ok()) {
+            return {block_info_list, status};
+        }
+        block_info_list.push_back(std::move(block_info));
+    }
+    return {block_info_list, status};
 }
 
 Tuple<SharedPtr<TableSnapshotInfo>, Status> NewTxn::GetTableSnapshot(const String &db_name, const String &table_name) {

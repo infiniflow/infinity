@@ -2119,10 +2119,17 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 }
 
 void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto txn = query_context->GetTxn();
-    auto [segment_info, status] = txn->GetSegmentInfo(db_name_, *object_name_, *segment_id_);
+    SharedPtr<SegmentInfo> segment_info;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(segment_info, status) = txn->GetSegmentInfo(db_name_, *object_name_, *segment_id_);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(segment_info, status) = txn->GetSegmentInfo(db_name_, *object_name_, *segment_id_);
+    }
     if (!status.ok()) {
-        Status status = Status::SegmentNotExist(*segment_id_);
         RecoverableError(status);
         return;
     }
@@ -2299,8 +2306,16 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 }
 
 void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto txn = query_context->GetTxn();
-    auto [block_info_array, status] = txn->GetBlocksInfo(db_name_, *object_name_, *segment_id_);
+    Vector<SharedPtr<BlockInfo>> block_info_array;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(block_info_array, status) = txn->GetBlocksInfo(db_name_, *object_name_, *segment_id_);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(block_info_array, status) = txn->GetBlocksInfo(db_name_, *object_name_, *segment_id_);
+    }
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);
@@ -2375,8 +2390,16 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 }
 
 void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto txn = query_context->GetTxn();
-    auto [block_info, status] = txn->GetBlockInfo(db_name_, *object_name_, *segment_id_, *block_id_);
+    SharedPtr<BlockInfo> block_info;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        std::tie(block_info, status) = txn->GetBlockInfo(db_name_, *object_name_, *segment_id_, *block_id_);
+    } else {
+        Txn *txn = query_context->GetTxn();
+        std::tie(block_info, status) = txn->GetBlockInfo(db_name_, *object_name_, *segment_id_, *block_id_);
+    }
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
         RecoverableError(status);

@@ -25,6 +25,7 @@ namespace infinity {
 class KVInstance;
 class ColumnDef;
 class TableMeeta;
+class SegmentInfo;
 
 export class SegmentMeta {
 public:
@@ -70,6 +71,8 @@ public:
     Tuple<BlockID, Status> GetNextBlockID();
 
     Status GetFirstDeleteTS(TxnTimeStamp &first_delete_ts);
+
+    Tuple<SharedPtr<SegmentInfo>, Status> GetSegmentInfo();
 
 private:
     // Status LoadBlockIDs();
