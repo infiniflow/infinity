@@ -1130,4 +1130,28 @@ Status NewCatalog::SetBlockDeleteBitmask(BlockMeta &block_meta, TxnTimeStamp beg
     return Status::OK();
 }
 
+Status NewCatalog::CheckSegmentRowsVisible(SegmentMeta &segment_meta, TxnTimeStamp begin_ts, Bitmask &bitmask) {
+    TxnTimeStamp first_delete_ts = 0;
+    Status status = segment_meta.GetFirstDeleteTS(first_delete_ts);
+    if (!status.ok()) {
+        return status;
+    }
+    if (first_delete_ts > begin_ts) {
+        return Status::OK();
+    }
+    Vector<BlockID> *block_ids_ptr = nullptr;
+    std::tie(block_ids_ptr, status) = segment_meta.GetBlockIDs1();
+    if (!status.ok()) {
+        return status;
+    }
+    for (BlockID block_id : *block_ids_ptr) {
+        BlockMeta block_meta(block_id, segment_meta);
+        Status status = NewCatalog::SetBlockDeleteBitmask(block_meta, begin_ts, bitmask);
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    return Status::OK();
+}
+
 } // namespace infinity

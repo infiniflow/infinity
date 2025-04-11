@@ -60,8 +60,10 @@ import block_index;
 
 import new_txn;
 import table_index_meeta;
+import segment_index_meta;
 import table_meeta;
 import db_meeta;
+import kv_store;
 
 namespace infinity {
 
@@ -91,8 +93,8 @@ struct ExpressionIndexScanInfo {
 
     // for index scan
     HashMap<ColumnID, TableIndexEntry *> candidate_column_index_map_;
-    Optional<TableMeeta> table_meta_;
-    HashMap<ColumnID, Optional<TableIndexMeeta>> new_candidate_column_index_map_;
+    TableMeeta *table_meta_ = nullptr;
+    HashMap<ColumnID, TableIndexMeeta *> new_candidate_column_index_map_;
 
     inline void InitColumnIndexEntries(TableInfo *table_info, Txn *txn) {
         const TransactionID txn_id = txn->TxnID();
@@ -125,23 +127,32 @@ struct ExpressionIndexScanInfo {
         }
     }
 
-    inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn) {
-        Optional<DBMeeta> db_meta;
-        Status status = new_txn->GetTableMeta(*table_info->db_name_, *table_info->table_name_, db_meta, table_meta_);
-        if (!status.ok()) {
-            LOG_ERROR(fmt::format("NewInitColumnIndexEntries: GetTableByName db: {}, table: {}, failed: {}",
-                                  *table_info->db_name_,
-                                  *table_info->table_name_,
-                                  status.message()));
-            RecoverableError(status);
+    inline void NewInitColumnIndexEntries(TableInfo *table_info, NewTxn *new_txn, BaseTableRef *base_table_ref) {
+        Status status;
+        if (!base_table_ref->block_index_->table_meta_) {
+            base_table_ref->block_index_->table_meta_ =
+                MakeUnique<TableMeeta>(table_info->db_id_, table_info->table_id_, *new_txn->kv_instance(), new_txn->BeginTS());
         }
+        table_meta_ = base_table_ref->block_index_->table_meta_.get();
+
         Vector<String> *index_id_strs_ptr = nullptr;
-        status = table_meta_->GetIndexIDs(index_id_strs_ptr);
+        Vector<String> *index_names_ptr = nullptr;
+        status = table_meta_->GetIndexIDs(index_id_strs_ptr, &index_names_ptr);
         if (!status.ok()) {
             RecoverableError(status);
         }
-        for (const String &index_id_str : *index_id_strs_ptr) {
-            Optional<TableIndexMeeta> table_index_meta(TableIndexMeeta(index_id_str, *table_meta_));
+        if (!base_table_ref->index_index_) {
+            base_table_ref->index_index_ = MakeShared<IndexIndex>();
+        }
+        IndexIndex &index_index = *base_table_ref->index_index_;
+        for (SizeT i = 0; i < index_id_strs_ptr->size(); ++i) {
+            const String &index_id_str = (*index_id_strs_ptr)[i];
+            const String &index_name = (*index_names_ptr)[i];
+            auto index_snapshot = MakeShared<NewIndexSnapshot>();
+            index_index.new_index_snapshots_.emplace(index_name, index_snapshot);
+            index_snapshot->table_index_meta_ = MakeShared<TableIndexMeeta>(index_id_str, *table_meta_);
+            TableIndexMeeta *table_index_meta = index_snapshot->table_index_meta_.get();
+
             SharedPtr<IndexBase> index_base;
             std::tie(index_base, status) = table_index_meta->GetIndexBase();
             if (!status.ok()) {
@@ -159,7 +170,7 @@ struct ExpressionIndexScanInfo {
             if (new_candidate_column_index_map_.contains(column_id)) {
                 LOG_TRACE(fmt::format("NewInitColumnIndexEntries(): Column {} has multiple secondary indexes. Skipping one.", column_id));
             } else {
-                new_candidate_column_index_map_.emplace(column_id, std::move(table_index_meta));
+                new_candidate_column_index_map_.emplace(column_id, table_index_meta);
             }
         }
     }
@@ -303,7 +314,7 @@ public:
         if (query_context_->global_config()->UseNewCatalog()) {
             if (base_table_ref_ptr_) {
                 table_info_ = base_table_ref_ptr_->table_info_.get();
-                tree_info_.NewInitColumnIndexEntries(table_info_, query_context_->GetNewTxn());
+                tree_info_.NewInitColumnIndexEntries(table_info_, query_context_->GetNewTxn(), const_cast<BaseTableRef *>(base_table_ref_ptr_));
             }
         } else {
             if (base_table_ref_ptr_) {

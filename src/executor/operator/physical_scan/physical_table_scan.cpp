@@ -49,7 +49,7 @@ import status;
 
 namespace infinity {
 
-void PhysicalTableScan::Init(QueryContext* query_context) {}
+void PhysicalTableScan::Init(QueryContext *query_context) {}
 
 bool PhysicalTableScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *table_scan_operator_state = static_cast<TableScanOperatorState *>(operator_state);
@@ -144,6 +144,25 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
         if (use_new_catalog) {
             BlockMeta *current_block_meta = block_index->GetBlockMeta(segment_id, block_id);
+
+            // TODO
+            // if (read_offset == 0) {
+            //     // new block, check FastRoughFilter
+            //     const auto &fast_rough_filter = *current_block_entry->GetFastRoughFilter();
+            //     if (fast_rough_filter_evaluator_ and !fast_rough_filter_evaluator_->Evaluate(begin_ts, fast_rough_filter)) {
+            //         // skip this block
+            //         LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
+            //                               block_ids_idx,
+            //                               block_ids_count));
+            //         ++block_ids_idx;
+            //         continue;
+            //     } else {
+            //         LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
+            //                               block_ids_idx,
+            //                               block_ids_count));
+            //     }
+            // }
+
             Optional<NewTxnGetVisibleRangeState> &range_state = table_scan_function_data_ptr->get_visible_range_state_;
             if (!range_state) {
                 // TODO
