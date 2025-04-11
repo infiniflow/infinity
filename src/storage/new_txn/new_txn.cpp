@@ -1450,11 +1450,21 @@ Status NewTxn::CommitAddColumns(const WalCmdAddColumns *add_columns_cmd) {
         return status;
     }
 
+    ColumnID next_column_id = 0;
+    status = table_meta->GetNextColumnID(next_column_id);
+    if (!status.ok()) {
+        return status;
+    }
     for (const auto &column : add_columns_cmd->column_defs_) {
+        column->id_ = next_column_id++;
         Status status = table_meta->AddColumn(*column);
         if (!status.ok()) {
             return status;
         }
+    }
+    status = table_meta->SetNextColumnID(next_column_id);
+    if (!status.ok()) {
+        return status;
     }
 
     status = this->AddColumnsData(*table_meta, add_columns_cmd->column_defs_);

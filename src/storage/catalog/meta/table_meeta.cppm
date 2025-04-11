@@ -117,6 +117,10 @@ public:
 
     Status RemoveFtIndexCache();
 
+    Status GetNextColumnID(ColumnID &next_column_id);
+
+    Status SetNextColumnID(ColumnID next_column_id);
+
 private:
     Status LoadComment();
 
@@ -131,6 +135,8 @@ private:
     Status LoadNextSegmentID();
 
     Status LoadUnsealedSegmentID();
+
+    Status LoadNextColumnID();
 
     String GetTableTag(const String &tag) const;
 
@@ -149,6 +155,7 @@ private:
     Optional<Vector<String>> index_names_;
     Optional<SegmentID> next_segment_id_;
     Optional<SegmentID> unsealed_segment_id_;
+    Optional<ColumnID> next_column_id_;
 };
 
 } // namespace infinity

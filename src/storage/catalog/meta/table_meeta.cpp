@@ -217,8 +217,9 @@ Status TableMeeta::InitSet(SharedPtr<TableDef> table_def) {
     }
 
     // Create table column id;
-    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
-    status = kv_instance_.Put(table_latest_column_id_key, "0");
+
+    SizeT column_size = table_def->column_count();
+    status = SetNextColumnID(column_size);
     if (!status.ok()) {
         return status;
     }
@@ -453,6 +454,28 @@ Status TableMeeta::RemoveFtIndexCache() {
     return Status::OK();
 }
 
+Status TableMeeta::GetNextColumnID(ColumnID &next_column_id) {
+    if (!next_column_id_) {
+        Status status = LoadNextColumnID();
+        if (!status.ok()) {
+            return status;
+        }
+    }
+    next_column_id = *next_column_id_;
+    return Status::OK();
+}
+
+Status TableMeeta::SetNextColumnID(ColumnID next_column_id) {
+    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    String next_column_id_str = fmt::format("{}", next_column_id);
+    Status status = kv_instance_.Put(table_latest_column_id_key, next_column_id_str);
+    if (!status.ok()) {
+        return status;
+    }
+    next_column_id_ = next_column_id;
+    return Status::OK();
+}
+
 Status TableMeeta::LoadComment() {
     String table_comment_key = GetTableTag("comment");
     String table_comment;
@@ -558,6 +581,18 @@ Status TableMeeta::LoadUnsealedSegmentID() {
         return status;
     }
     unsealed_segment_id_ = std::stoull(unsealed_seg_id_str);
+    return Status::OK();
+}
+
+Status TableMeeta::LoadNextColumnID() {
+    String table_latest_column_id_key = GetTableTag(LATEST_COLUMN_ID.data());
+    String next_column_id_str;
+    Status status = kv_instance_.Get(table_latest_column_id_key, next_column_id_str);
+    if (!status.ok()) {
+        LOG_ERROR(fmt::format("Fail to get next column id from kv store, key: {}, cause: {}", table_latest_column_id_key, status.message()));
+        return status;
+    }
+    next_column_id_ = std::stoull(next_column_id_str);
     return Status::OK();
 }
 
