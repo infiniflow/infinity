@@ -108,6 +108,8 @@ public:
     ~NewCatalog();
 
 public:
+    Status UpdateCatalog();
+
     // // Database related functions
     // Status CreateDatabase(const SharedPtr<String> &db_name,
     //                       const SharedPtr<String> &comment,

@@ -37,6 +37,13 @@ NewCatalog::NewCatalog(KVStore *kv_store) : kv_store_(kv_store) {}
 
 NewCatalog::~NewCatalog() = default;
 
+Status NewCatalog::UpdateCatalog() {
+    // Check if the old meta exists
+    // If so, read the old meta into memory and store it into as new meta
+    // Rename the old meta filename
+    return Status::OK();
+}
+
 String NewCatalog::GetPathNameTail(const String &path) {
     SizeT delimiter_i = path.rfind('/');
     if (delimiter_i == String::npos) {
