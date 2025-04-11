@@ -704,11 +704,11 @@ Status NewTxn::Compact(const String &db_name, const String &table_name, const Ve
             }
         }
         auto compact_command = MakeShared<WalCmdCompact>(db_name, table_name, std::move(segment_infos), std::move(deprecated_segment_ids));
-        wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
-        txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
         compact_command->db_id_str_ = db_meta->db_id_str();
         compact_command->table_id_str_ = table_meta.table_id_str();
-        compact_command->table_id_str_ = table_key;
+        compact_command->table_key_ = table_key;
+        wal_entry_->cmds_.push_back(static_pointer_cast<WalCmd>(compact_command));
+        txn_context_ptr_->AddOperation(MakeShared<String>(compact_command->ToString()));
     }
 
     Vector<String> *index_id_strs_ptr = nullptr;
