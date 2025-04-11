@@ -2091,6 +2091,14 @@ void NewTxn::PostCommit() {
                 }
                 break;
             }
+            case WalCommandType::COMPACT: {
+                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
+                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
+                if (!status.ok()) {
+                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
+                }
+                break;
+            }
             default: {
                 break;
             }

@@ -555,7 +555,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
         }
 
         {
-            SegmentID segment_id = (*segment_ids_ptr)[0];
+            SegmentID segment_id = (*segment_ids_ptr)[1];
             SegmentMeta segment_meta(segment_id, *table_meta);
             check_segment(segment_meta);
         }
@@ -629,13 +629,13 @@ TEST_P(TestCompact, compact_and_add_columns) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->AddColumns(*db_name, *table_name, Vector<SharedPtr<ColumnDef>>{column_def3});
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn2);
-        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn2);
+        EXPECT_TRUE(status.ok());
 
         CheckTable({0, 1});
         DropDB();
@@ -655,13 +655,13 @@ TEST_P(TestCompact, compact_and_add_columns) {
         EXPECT_TRUE(status.ok());
 
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
 
         CheckTable1({0, 1, 2});
         DropDB();
@@ -680,13 +680,13 @@ TEST_P(TestCompact, compact_and_add_columns) {
 
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn);
-        EXPECT_FALSE(status.ok());
+        status = new_txn_mgr->RollBackTxn(txn);
+        EXPECT_TRUE(status.ok());
 
         CheckTable1({0, 1, 2});
         DropDB();
@@ -838,12 +838,12 @@ TEST_P(TestCompact, compact_and_drop_columns) {
         EXPECT_TRUE(status.ok());
 
         status = txn2->DropColumns(*db_name, *table_name, Vector<String>({column_def1->name()}));
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn2);
+        status = new_txn_mgr->RollBackTxn(txn2);
         EXPECT_TRUE(status.ok());
 
         CheckTable();
@@ -864,12 +864,12 @@ TEST_P(TestCompact, compact_and_drop_columns) {
         EXPECT_TRUE(status.ok());
 
         status = txn->Compact(*db_name, *table_name, {0, 1});
-        EXPECT_TRUE(status.ok());
+        EXPECT_FALSE(status.ok());
 
         status = new_txn_mgr->CommitTxn(txn2);
         EXPECT_TRUE(status.ok());
 
-        status = new_txn_mgr->CommitTxn(txn);
+        status = new_txn_mgr->RollBackTxn(txn);
         EXPECT_TRUE(status.ok());
 
         CheckTable();
