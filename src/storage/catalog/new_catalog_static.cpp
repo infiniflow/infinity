@@ -44,6 +44,9 @@ import table_index_meeta;
 import segment_index_meta;
 import chunk_index_meta;
 
+import logical_type;
+import data_type;
+
 namespace infinity {
 
 // namespace {
@@ -904,6 +907,52 @@ Status NewCatalog::GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begi
         }
     }
     state.Init(std::move(block_lock), std::move(buffer_handle), begin_ts);
+    return Status::OK();
+}
+
+Status NewCatalog::GetCreateTSVector(BlockMeta &block_meta, SizeT offset, SizeT size, ColumnVector &column_vector) {
+    column_vector = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
+    column_vector.Initialize(ColumnVectorType::kFlat, size);
+
+    auto [version_buffer, status] = block_meta.GetVersionBuffer();
+    if (!status.ok()) {
+        return status;
+    }
+    SharedPtr<BlockLock> block_lock;
+    status = block_meta.GetBlockLock(block_lock);
+    if (!status.ok()) {
+        return status;
+    }
+
+    BufferHandle buffer_handle = version_buffer->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    {
+        std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+        block_version->GetCreateTS(offset, size, column_vector);
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::GetDeleteTSVector(BlockMeta &block_meta, SizeT offset, SizeT size, ColumnVector &column_vector) {
+    column_vector = ColumnVector(MakeShared<DataType>(LogicalType::kBigInt));
+    column_vector.Initialize(ColumnVectorType::kFlat, size);
+
+    auto [version_buffer, status] = block_meta.GetVersionBuffer();
+    if (!status.ok()) {
+        return status;
+    }
+    SharedPtr<BlockLock> block_lock;
+    status = block_meta.GetBlockLock(block_lock);
+    if (!status.ok()) {
+        return status;
+    }
+
+    BufferHandle buffer_handle = version_buffer->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(buffer_handle.GetData());
+    {
+        std::shared_lock<std::shared_mutex> lock(block_lock->mtx_);
+        block_version->GetDeleteTS(offset, size, column_vector);
+    }
     return Status::OK();
 }
 

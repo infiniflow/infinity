@@ -196,11 +196,17 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                         break;
                     }
                     case COLUMN_IDENTIFIER_CREATE: {
-                        UnrecoverableError("Not implemented yet");
+                        Status status = NewCatalog::GetCreateTSVector(*current_block_meta, visible_range.first, write_size, *output_ptr->column_vectors[output_column_id]);
+                        if (!status.ok()) {
+                            RecoverableError(status);
+                        }
                         break;
                     }
                     case COLUMN_IDENTIFIER_DELETE: {
-                        UnrecoverableError("Not implemented yet");
+                        Status status = NewCatalog::GetDeleteTSVector(*current_block_meta, visible_range.first, write_size, *output_ptr->column_vectors[output_column_id]);
+                        if (!status.ok()) {
+                            RecoverableError(status);
+                        }
                         break;
                     }
                     default: {

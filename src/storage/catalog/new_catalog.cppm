@@ -312,6 +312,10 @@ public:
 
     static Status GetBlockVisibleRange(BlockMeta &block_meta, TxnTimeStamp begin_ts, NewTxnGetVisibleRangeState &state);
 
+    static Status GetCreateTSVector(BlockMeta &block_meta, SizeT offset, SizeT row_count, ColumnVector &column_vector);
+
+    static Status GetDeleteTSVector(BlockMeta &block_meta, SizeT offset, SizeT row_count, ColumnVector &column_vector);
+
     static Status GetDBFilePaths(TxnTimeStamp begin_ts, DBMeeta &db_meta, Vector<String> &file_paths);
 
     static Status
