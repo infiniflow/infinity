@@ -54,7 +54,12 @@ TEST_P(TransformMeta, transform_meta) {
 
     //    String full_ckp_path = "";
     //    Vector<String> delta_ckp_path_array = {""};
-    //    new_catalog_ptr->UpdateCatalog(full_ckp_path, delta_ckp_path_array);
+    //    new_catalog_ptr->TransformCatalog(full_ckp_path, delta_ckp_path_array);
+
+    std::cout << String("All store key and value: ") << std::endl;
+    std::cout << kv_store_ptr->ToString() << std::endl;
+    std::cout << String(" -------------- ") << std::endl;
+
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
 }

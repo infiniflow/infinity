@@ -32,6 +32,7 @@ import column_index_reader;
 import meta_key;
 import catalog;
 import catalog_delta_entry;
+import db_meeta;
 
 namespace infinity {
 
@@ -39,9 +40,20 @@ NewCatalog::NewCatalog(KVStore *kv_store) : kv_store_(kv_store) {}
 
 NewCatalog::~NewCatalog() = default;
 
-Status NewCatalog::UpdateCatalog(const String &full_ckp_path, const Vector<String> &delta_ckp_path_array) {
+Status NewCatalog::TransformCatalog(const String &full_ckp_path, const Vector<String> &delta_ckp_path_array) {
     // Read full checkpoint file
     UniquePtr<nlohmann::json> full_ckp_json = Catalog::LoadFullCheckpointToJson(full_ckp_path);
+
+    UniquePtr<KVInstance> kv_instance = kv_store_->GetInstance();
+
+    if (full_ckp_json->contains("databases")) {
+        for (const auto &db_json : (*full_ckp_json)["databases"]) {
+            Status status = TransformCatalogDatabase(db_json, kv_instance.get());
+            if (!status.ok()) {
+                return status;
+            }
+        }
+    }
 
     // Read delta checkpoint files
     for (const String &delta_ckp_path : delta_ckp_path_array) {
@@ -52,14 +64,51 @@ Status NewCatalog::UpdateCatalog(const String &full_ckp_path, const Vector<Strin
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &column_data_json) { return Status::OK(); }
-Status NewCatalog::TransformCatalogTable(const nlohmann::json &column_data_json) { return Status::OK(); }
-Status NewCatalog::TransformCatalogSegment(const nlohmann::json &column_data_json) { return Status::OK(); }
-Status NewCatalog::TransformCatalogBlock(const nlohmann::json &column_data_json) { return Status::OK(); }
-Status NewCatalog::TransformCatalogBlockColumn(const nlohmann::json &column_data_json) { return Status::OK(); }
-Status NewCatalog::TransformCatalogTableIndex(const nlohmann::json &column_data_json) { return Status::OK(); }
-Status NewCatalog::TransformCatalogSegmentIndex(const nlohmann::json &column_data_json) { return Status::OK(); }
-Status NewCatalog::TransformCatalogChunkIndex(const nlohmann::json &column_data_json) { return Status::OK(); }
+Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance) {
+    String db_name = db_meta_json["db_name"];
+    if (db_meta_json.contains("db_entries")) {
+
+        TxnTimeStamp max_commit_ts = 0;
+
+        for (const auto &db_entry_json : db_meta_json["db_entries"]) {
+            TxnTimeStamp current_commit_ts = db_entry_json["commit_ts"];
+            max_commit_ts = std::max(max_commit_ts, current_commit_ts);
+        }
+
+        for (const auto &db_entry_json : db_meta_json["db_entries"]) {
+            if (max_commit_ts == db_entry_json["commit_ts"]) {
+                if (db_entry_json["deleted"] == true) {
+                    return Status::OK();
+                }
+
+                SharedPtr<String> db_comment = nullptr;
+                if (db_entry_json.contains("db_comment")) {
+                    db_comment = MakeShared<String>(db_entry_json["db_comment"]);
+                } else {
+                    db_comment = MakeShared<String>();
+                }
+
+                String db_id_str;
+                Status status = IncrLatestID(kv_instance, db_id_str, LATEST_DATABASE_ID);
+                if (!status.ok()) {
+                    return status;
+                }
+
+                Optional<DBMeeta> db_meta;
+                return NewCatalog::AddNewDB(kv_instance, db_id_str, max_commit_ts, db_name, db_comment.get(), db_meta);
+            }
+        }
+    }
+    return Status::OK();
+}
+
+Status NewCatalog::TransformCatalogTable(const nlohmann::json &column_data_json, KVInstance *kv_instance) { return Status::OK(); }
+Status NewCatalog::TransformCatalogSegment(const nlohmann::json &column_data_json, KVInstance *kv_instance) { return Status::OK(); }
+Status NewCatalog::TransformCatalogBlock(const nlohmann::json &column_data_json, KVInstance *kv_instance) { return Status::OK(); }
+Status NewCatalog::TransformCatalogBlockColumn(const nlohmann::json &column_data_json, KVInstance *kv_instance) { return Status::OK(); }
+Status NewCatalog::TransformCatalogTableIndex(const nlohmann::json &column_data_json, KVInstance *kv_instance) { return Status::OK(); }
+Status NewCatalog::TransformCatalogSegmentIndex(const nlohmann::json &column_data_json, KVInstance *kv_instance) { return Status::OK(); }
+Status NewCatalog::TransformCatalogChunkIndex(const nlohmann::json &column_data_json, KVInstance *kv_instance) { return Status::OK(); }
 
 String NewCatalog::GetPathNameTail(const String &path) {
     SizeT delimiter_i = path.rfind('/');

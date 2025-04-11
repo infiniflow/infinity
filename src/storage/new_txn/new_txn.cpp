@@ -1625,15 +1625,16 @@ Status NewTxn::CommitCheckpointTable(TableMeeta &table_meta, const WalCmdCheckpo
 }
 
 Status NewTxn::IncrLatestID(String &id_str, std::string_view id_name) const {
-    String string_id;
-    Status status = kv_instance_->Get(id_name.data(), string_id);
-    if (!status.ok()) {
-        return status;
-    }
-    SizeT id_num = std::stoull(string_id);
-    ++id_num;
-    id_str = fmt::format("{}", id_num);
-    return kv_instance_->Put(id_name.data(), id_str);
+    //    String string_id;
+    //    Status status = kv_instance_->Get(id_name.data(), string_id);
+    //    if (!status.ok()) {
+    //        return status;
+    //    }
+    //    SizeT id_num = std::stoull(string_id);
+    //    ++id_num;
+    //    id_str = fmt::format("{}", id_num);
+    //    return kv_instance_->Put(id_name.data(), id_str);
+    return NewCatalog::IncrLatestID(kv_instance_.get(), id_str, id_name);
 }
 
 bool NewTxn::CheckConflictWithAppend(const String &db_name, const String &table_name, NewTxn *previous_txn, String &cause) {

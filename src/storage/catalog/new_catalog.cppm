@@ -110,18 +110,18 @@ public:
     ~NewCatalog();
 
 public:
-    Status UpdateCatalog(const String &full_ckp_path, const Vector<String> &delta_ckp_path_array);
+    Status TransformCatalog(const String &full_ckp_path, const Vector<String> &delta_ckp_path_array);
     static String GetPathNameTail(const String &path);
 
 private:
-    Status TransformCatalogDatabase(const nlohmann::json &column_data_json);
-    Status TransformCatalogTable(const nlohmann::json &column_data_json);
-    Status TransformCatalogSegment(const nlohmann::json &column_data_json);
-    Status TransformCatalogBlock(const nlohmann::json &column_data_json);
-    Status TransformCatalogBlockColumn(const nlohmann::json &column_data_json);
-    Status TransformCatalogTableIndex(const nlohmann::json &column_data_json);
-    Status TransformCatalogSegmentIndex(const nlohmann::json &column_data_json);
-    Status TransformCatalogChunkIndex(const nlohmann::json &column_data_json);
+    Status TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance);
+    Status TransformCatalogTable(const nlohmann::json &table_meta_json, KVInstance *kv_instance);
+    Status TransformCatalogSegment(const nlohmann::json &segment_entry_json, KVInstance *kv_instance);
+    Status TransformCatalogBlock(const nlohmann::json &block_entry_json, KVInstance *kv_instance);
+    Status TransformCatalogBlockColumn(const nlohmann::json &block_column_entry_json, KVInstance *kv_instance);
+    Status TransformCatalogTableIndex(const nlohmann::json &table_index_entry_json, KVInstance *kv_instance);
+    Status TransformCatalogSegmentIndex(const nlohmann::json &segment_index_entry_json, KVInstance *kv_instance);
+    Status TransformCatalogChunkIndex(const nlohmann::json &chunk_index_entry_json, KVInstance *kv_instance);
     // // Database related functions
     // Status CreateDatabase(const SharedPtr<String> &db_name,
     //                       const SharedPtr<String> &comment,
@@ -243,6 +243,8 @@ public:
     static Status MemIndexRecover(NewTxn *txn);
 
     static Status MemIndexCommit(KVInstance *kv_instance, TxnTimeStamp begin_ts);
+
+    static Status IncrLatestID(KVInstance *kv_instance, String &id_str, std::string_view id_name);
 
     static Status AddNewDB(KVInstance *kv_instance,
                            const String &db_id_str,
