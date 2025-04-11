@@ -22,6 +22,12 @@ import compilation_config;
 import kv_store;
 import config;
 import status;
+import infinity_context;
+import new_txn_manager;
+import db_meeta;
+import txn_state;
+import catalog;
+import new_txn;
 
 using namespace infinity;
 
@@ -38,6 +44,26 @@ public:
 
     void TearDown() override {}
 
+    void test_print() {
+        std::cerr << "some OK\n";
+    }
+
+    void Init() {
+        std::string config_path_str = GetParam();
+        config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = std::make_shared<std::string>(std::filesystem::absolute(config_path_str));
+        }
+        infinity::InfinityContext::instance().InitPhase1(config_path);
+        infinity::InfinityContext::instance().InitPhase2();
+        std::cerr << "init done!\n";
+    }
+
+    void UnInit() {
+        infinity::InfinityContext::instance().UnInit();
+        std::cerr << "uninit done!\n";
+    }
+
 protected:
     std::shared_ptr<String> config_path;
 };
@@ -47,6 +73,7 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          ::testing::Values(TransformMeta::NEW_CONFIG_PATH, TransformMeta::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TransformMeta, transform_meta00) {
+
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
     Status status = config_ptr->Init(config_path, nullptr);
     EXPECT_TRUE(status.ok());
@@ -62,10 +89,30 @@ TEST_P(TransformMeta, transform_meta00) {
     std::cout << String("All store key and value: ") << std::endl;
     std::cout << kv_store_ptr->ToString() << std::endl;
     std::cout << String(" -------------- ") << std::endl;
-
     kv_store_ptr->Uninit();
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("db1", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("default_db", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    UnInit();
 }
 
 TEST_P(TransformMeta, transform_meta01) {

@@ -3009,7 +3009,7 @@ void TestSuite::Run() {
     if (skip_all) {
       GetMutableTestInfo(i)->Skip();
     } else {
-        GetMutableTestInfo(i)->Run();
+      GetMutableTestInfo(i)->Run();
     }
     if (GTEST_FLAG_GET(fail_fast) &&
         GetMutableTestInfo(i)->result()->Failed()) {
