@@ -43,7 +43,7 @@ NewCatalog::NewCatalog(KVStore *kv_store) : kv_store_(kv_store) {}
 
 NewCatalog::~NewCatalog() = default;
 
-Status NewCatalog::Init(KVStore* kv_store) {
+Status NewCatalog::Init(KVStore *kv_store) {
     auto kv_instance = kv_store->GetInstance();
     String db_string_id;
     Status status = kv_instance->Get(LATEST_DATABASE_ID.data(), db_string_id);
@@ -67,7 +67,7 @@ Status NewCatalog::Init(KVStore* kv_store) {
     return Status::OK();
 }
 
-Status NewCatalog::TransformCatalog(Config* config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_path_array) {
+Status NewCatalog::TransformCatalog(Config *config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_path_array) {
     // Read full checkpoint file
     UniquePtr<nlohmann::json> full_ckp_json = Catalog::LoadFullCheckpointToJson(config_ptr, full_ckp_path);
     Status status = NewCatalog::Init(kv_store_);
@@ -169,92 +169,92 @@ Status NewCatalog::TransformCatalogDatabase(const nlohmann::json &db_meta_json, 
 //     return status;
 // }
 
-Status NewCatalog::TransformCatalogTable(Optional<DBMeeta>& db_meta, const nlohmann::json &table_meta_json, KVInstance *kv_instance) {
-//     String table_name = table_meta_json["table_name"];
-//     if (table_meta_json.contains("table_entries")) {
-//
-//         for (auto& table_entry_json : table_meta_json["table_entries"]) {
-//             bool deleted = table_entry_json["deleted"];
-//             if (deleted) {
-//                 continue;
-//             }
-//
-//             String table_id_str;
-//             Status status = IncrLatestID(kv_instance, table_id_str, LATEST_DATABASE_ID);
-//             if (!status.ok()) {
-//                 return status;
-//             }
-//
-//             TxnTimeStamp table_begin_ts = table_entry_json["begin_ts"];
-//             TxnTimeStamp table_end_ts = table_entry_json["end_ts"];
-//
-//             Optional<TableMeeta> table_meta;
-//
-//             Vector<SharedPtr<ColumnDef>> columns;
-//
-//             SharedPtr<String> table_entry_dir;
-//             table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
-//
-//             for (const auto &column_def_json : table_entry_json["column_definition"]) {
-//                 SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
-//                 i64 column_id = column_def_json["column_id"];
-//                 String column_name = column_def_json["column_name"];
-//
-//                 std::set<ConstraintType> constraints;
-//                 if (column_def_json.contains("constraints")) {
-//                     for (const auto &column_constraint : column_def_json["constraints"]) {
-//                         ConstraintType constraint = column_constraint;
-//                         constraints.emplace(constraint);
-//                     }
-//                 }
-//
-//                 String comment;
-//                 if (column_def_json.contains("column_comment")) {
-//                     comment = column_def_json["column_comment"];
-//                 }
-//
-//                 SharedPtr<ParsedExpr> default_expr = nullptr;
-//                 if (column_def_json.contains("default")) {
-//                     default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
-//                 }
-//
-//                 SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
-//                 columns.emplace_back(column_def);
-//             }
-//
-// //      static inline SharedPtr<TableDef>
-// // Make(SharedPtr<String> schema, SharedPtr<String> table_name, SharedPtr<String> table_comment, Vector<SharedPtr<ColumnDef>> columns) {
-// //      return MakeShared<TableDef>(std::move(schema), std::move(table_name), std::move(table_comment), std::move(columns));
-// //   }
-//
-//             SharedPtr<TableDef> table_def = TableDef::Make(, table_name)
-//
-//
-//             status = AddNewTable(db_meta, table_id_str, table_begin_ts, table_end_ts, , table_meta);
-//             if (!status.ok()) {
-//                 return status;
-//             }
-//
-//             if (table_entry_json.contains("segments")) {
-//                 for (auto& segment_json : table_entry_json["segments"]) {
-//                     status = TransformCatalogSegment();
-//                     if (!status.ok()) {
-//                         return status;
-//                     }
-//                 }
-//             }
-//
-//             if (table_entry_json.contains("table_indexes")) {
-//                 for (auto& index_json : table_entry_json["table_indexes"]) {
-//                     status = TransformCatalogTableIndex();
-//                     if (!status.ok()) {
-//                         return status;
-//                     }
-//                 }
-//             }
-//             break;
-//         }
-//     }
+Status NewCatalog::TransformCatalogTable(Optional<DBMeeta> &db_meta, const nlohmann::json &table_meta_json, KVInstance *kv_instance) {
+    //     String table_name = table_meta_json["table_name"];
+    //     if (table_meta_json.contains("table_entries")) {
+    //
+    //         for (auto& table_entry_json : table_meta_json["table_entries"]) {
+    //             bool deleted = table_entry_json["deleted"];
+    //             if (deleted) {
+    //                 continue;
+    //             }
+    //
+    //             String table_id_str;
+    //             Status status = IncrLatestID(kv_instance, table_id_str, LATEST_DATABASE_ID);
+    //             if (!status.ok()) {
+    //                 return status;
+    //             }
+    //
+    //             TxnTimeStamp table_begin_ts = table_entry_json["begin_ts"];
+    //             TxnTimeStamp table_end_ts = table_entry_json["end_ts"];
+    //
+    //             Optional<TableMeeta> table_meta;
+    //
+    //             Vector<SharedPtr<ColumnDef>> columns;
+    //
+    //             SharedPtr<String> table_entry_dir;
+    //             table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
+    //
+    //             for (const auto &column_def_json : table_entry_json["column_definition"]) {
+    //                 SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
+    //                 i64 column_id = column_def_json["column_id"];
+    //                 String column_name = column_def_json["column_name"];
+    //
+    //                 std::set<ConstraintType> constraints;
+    //                 if (column_def_json.contains("constraints")) {
+    //                     for (const auto &column_constraint : column_def_json["constraints"]) {
+    //                         ConstraintType constraint = column_constraint;
+    //                         constraints.emplace(constraint);
+    //                     }
+    //                 }
+    //
+    //                 String comment;
+    //                 if (column_def_json.contains("column_comment")) {
+    //                     comment = column_def_json["column_comment"];
+    //                 }
+    //
+    //                 SharedPtr<ParsedExpr> default_expr = nullptr;
+    //                 if (column_def_json.contains("default")) {
+    //                     default_expr = ConstantExpr::Deserialize(column_def_json["default"]);
+    //                 }
+    //
+    //                 SharedPtr<ColumnDef> column_def = MakeShared<ColumnDef>(column_id, data_type, column_name, constraints, comment, default_expr);
+    //                 columns.emplace_back(column_def);
+    //             }
+    //
+    // //      static inline SharedPtr<TableDef>
+    // // Make(SharedPtr<String> schema, SharedPtr<String> table_name, SharedPtr<String> table_comment, Vector<SharedPtr<ColumnDef>> columns) {
+    // //      return MakeShared<TableDef>(std::move(schema), std::move(table_name), std::move(table_comment), std::move(columns));
+    // //   }
+    //
+    //             SharedPtr<TableDef> table_def = TableDef::Make(, table_name)
+    //
+    //
+    //             status = AddNewTable(db_meta, table_id_str, table_begin_ts, table_end_ts, , table_meta);
+    //             if (!status.ok()) {
+    //                 return status;
+    //             }
+    //
+    //             if (table_entry_json.contains("segments")) {
+    //                 for (auto& segment_json : table_entry_json["segments"]) {
+    //                     status = TransformCatalogSegment();
+    //                     if (!status.ok()) {
+    //                         return status;
+    //                     }
+    //                 }
+    //             }
+    //
+    //             if (table_entry_json.contains("table_indexes")) {
+    //                 for (auto& index_json : table_entry_json["table_indexes"]) {
+    //                     status = TransformCatalogTableIndex();
+    //                     if (!status.ok()) {
+    //                         return status;
+    //                     }
+    //                 }
+    //             }
+    //             break;
+    //         }
+    //     }
     return Status::OK();
 }
 
@@ -524,7 +524,7 @@ Status NewCatalog::MutateTable(const String &table_key, TransactionID txn_id) {
     return Status::OK();
 }
 
-Status NewCatalog::IncreaseTableWriteCount(NewTxn *txn_ptr, const String &table_key) {
+Status NewCatalog::IncreaseTableWriteCount(const String &table_key) {
     std::lock_guard lock(mtx_);
     auto iter = table_memory_context_map_.find(table_key);
     if (iter == table_memory_context_map_.end()) {
@@ -537,15 +537,10 @@ Status NewCatalog::IncreaseTableWriteCount(NewTxn *txn_ptr, const String &table_
     }
 
     ++table_memory_context->write_txn_num_;
-    txn_ptr->IncreaseTableReferenceCount(table_key);
     return Status::OK();
 }
 
-Status NewCatalog::DecreaseTableWriteCount(NewTxn *txn_ptr, const String &table_key) {
-    if (txn_ptr->GetTableReferenceCount(table_key) == 0) {
-        // Table isn't locked
-        return Status::OK();
-    }
+Status NewCatalog::DecreaseTableWriteCount(const String &table_key, SizeT count) {
     std::lock_guard lock(mtx_);
 
     auto iter = table_memory_context_map_.find(table_key);
@@ -559,9 +554,10 @@ Status NewCatalog::DecreaseTableWriteCount(NewTxn *txn_ptr, const String &table_
     }
 
     SizeT &write_txn_num = iter->second->write_txn_num_;
-    if (write_txn_num > 0) {
-        --write_txn_num;
-        txn_ptr->DecreaseTableReferenceCount(table_key);
+    if (write_txn_num >= count) {
+        write_txn_num -= count;
+    } else {
+        UnrecoverableError(fmt::format("Attempt to reduce reference count {} by {}, of {}", write_txn_num, count, table_key));
     }
 
     if (write_txn_num == 0) {

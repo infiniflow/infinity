@@ -586,11 +586,15 @@ public:
                                   ChunkID chunk_id,
                                   Vector<String> &file_paths);
 
-    void IncreaseTableReferenceCount(const String &table_key);
-    void DecreaseTableReferenceCount(const String &table_key);
+    Status IncreaseTableReferenceCount(const String &table_key);
     SizeT GetTableReferenceCount(const String &table_key);
 
     Status Dummy();
+
+private:
+    // To record the access table reference count for release in txn committing or rollbacking phase
+    HashMap<String, SizeT> table_write_reference_count_{};
+    HashMap<String, SizeT> table_dump_index_reference_count_{};
 
 private:
     // Reference to external class
@@ -628,8 +632,6 @@ private:
 
     // ADMIN command which allowed in follower and learner
     bool allowed_in_reader_{false};
-
-    HashMap<String, SizeT> table_reference_count_{};
 
 private:
     SharedPtr<TxnContext> txn_context_ptr_{};

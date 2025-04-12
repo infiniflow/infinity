@@ -111,13 +111,13 @@ public:
     ~NewCatalog();
 
 public:
-    Status TransformCatalog(Config* config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_path_array);
+    Status TransformCatalog(Config *config_ptr, const String &full_ckp_path, const Vector<String> &delta_ckp_path_array);
     static String GetPathNameTail(const String &path);
-    static Status Init(KVStore* kv_store);
+    static Status Init(KVStore *kv_store);
 
 private:
     Status TransformCatalogDatabase(const nlohmann::json &db_meta_json, KVInstance *kv_instance);
-    Status TransformCatalogTable(Optional<DBMeeta>& DBMeta, const nlohmann::json &table_meta_json, KVInstance *kv_instance);
+    Status TransformCatalogTable(Optional<DBMeeta> &DBMeta, const nlohmann::json &table_meta_json, KVInstance *kv_instance);
     Status TransformCatalogSegment(const nlohmann::json &segment_entry_json, KVInstance *kv_instance);
     Status TransformCatalogBlock(const nlohmann::json &block_entry_json, KVInstance *kv_instance);
     Status TransformCatalogBlockColumn(const nlohmann::json &block_column_entry_json, KVInstance *kv_instance);
@@ -164,8 +164,8 @@ public:
     Status ImmutateTable(const String &table_key, TransactionID txn_id);
     Status MutateTable(const String &table_key, TransactionID txn_id);
 
-    Status IncreaseTableWriteCount(NewTxn *txn_ptr, const String &table_key);
-    Status DecreaseTableWriteCount(NewTxn *txn_ptr, const String &table_key);
+    Status IncreaseTableWriteCount(const String &table_key);
+    Status DecreaseTableWriteCount(const String &table_key, SizeT count);
     SizeT GetTableWriteCount() const;
 
 private:

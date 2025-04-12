@@ -458,7 +458,7 @@ Status NewTxn::DropTable(const String &db_name, const String &table_name, Confli
         return status;
     }
 
-    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
+    status = this->IncreaseTableReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }
@@ -504,7 +504,7 @@ Status NewTxn::RenameTable(const String &db_name, const String &old_table_name, 
         return status;
     }
 
-    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
+    status = this->IncreaseTableReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }
@@ -594,6 +594,12 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
     if (!status.ok()) {
         return status;
     }
+
+    status = this->IncreaseTableReferenceCount(table_key);
+    if (!status.ok()) {
+        return status;
+    }
+
     String index_key;
     String index_id;
     status = table_meta->GetIndexID(*index_base->index_name_, index_key, index_id);
@@ -603,11 +609,6 @@ Status NewTxn::CreateIndex(const String &db_name, const String &table_name, cons
         }
         return Status(ErrorCode::kDuplicateIndexName, MakeUnique<String>(fmt::format("Index: {} already exists", *index_base->index_name_)));
     } else if (status.code() != ErrorCode::kIndexNotExist) {
-        return status;
-    }
-
-    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
-    if (!status.ok()) {
         return status;
     }
 
@@ -640,7 +641,7 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         return status;
     }
 
-    status = new_catalog_->IncreaseTableWriteCount(this, table_key);
+    status = this->IncreaseTableReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }
@@ -652,20 +653,12 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
         if (conflict_type == ConflictType::kIgnore) {
             return Status::OK();
         }
-        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
-        if (!ref_cnt_status.ok()) {
-            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
-        }
         return status;
     }
 
     TableIndexMeeta table_index_meta(index_id, *table_meta);
     auto [index_base, index_status] = table_index_meta.GetIndexBase();
     if (!index_status.ok()) {
-        Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
-        if (!ref_cnt_status.ok()) {
-            UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
-        }
         return index_status;
     }
 
@@ -685,10 +678,6 @@ Status NewTxn::DropIndexByName(const String &db_name, const String &table_name, 
             }
         }
         if (!exist) {
-            Status ref_cnt_status = new_catalog_->DecreaseTableWriteCount(this, table_key);
-            if (!ref_cnt_status.ok()) {
-                UnrecoverableError(fmt::format("Can't decrease table reference count: {}, cause: {}", table_name, status.message()));
-            }
             return Status::ColumnNotExist(column_name);
         }
     }
@@ -1985,11 +1974,6 @@ void NewTxn::PostCommit() {
             case WalCommandType::APPEND: {
                 if (!this->IsReplay()) {
                     auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                    Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                    }
-
                     Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(cmd->table_key_);
                     if (!mem_index_status.ok()) {
                         UnrecoverableError(
@@ -1999,23 +1983,11 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::IMPORT: {
-                if (!this->IsReplay()) {
-                    auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
-                    Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                    }
-                }
+                //                auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::DELETE: {
-                if (!this->IsReplay()) {
-                    auto *cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
-                    Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                    }
-                }
+                //                auto *cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::CHECKPOINT: {
@@ -2028,37 +2000,19 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::DROP_TABLE: {
-                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
-                }
+                //                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::RENAME_TABLE: {
-                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->old_table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table");
-                }
+                //                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::CREATE_INDEX: {
-                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
-                if (!this->IsReplay()) {
-                    Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                    if (!status.ok()) {
-                        UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                    }
-                }
+                //                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::DROP_INDEX: {
-                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::ADD_COLUMNS: {
@@ -2079,10 +2033,6 @@ void NewTxn::PostCommit() {
             }
             case WalCommandType::DUMP_INDEX: {
                 auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
                 if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
                     Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
                     if (!mem_index_status.ok()) {
@@ -2092,16 +2042,22 @@ void NewTxn::PostCommit() {
                 break;
             }
             case WalCommandType::COMPACT: {
-                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
                 break;
             }
             default: {
                 break;
             }
+        }
+    }
+
+    // Restore the reference count
+    for (const auto &ref_cnt_pair : table_write_reference_count_) {
+        const auto &table_key = ref_cnt_pair.first;
+        const auto &ref_cnt = ref_cnt_pair.second;
+        Status status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Fail to increase table write count on post commit phase: {}", status.message()));
         }
     }
 }
@@ -2134,44 +2090,24 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case WalCommandType::DROP_TABLE: {
-                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdDropTable *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::RENAME_TABLE: {
-                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->old_table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdRenameTable *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::CREATE_INDEX: {
-                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdCreateIndex *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::DROP_INDEX: {
-                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdDropIndex *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::APPEND: {
                 auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table when rollback append txn");
-                }
-                status = new_catalog_->DecreaseTableReferenceCountForMemIndex(cmd->table_key_);
+                Status status = new_catalog_->DecreaseTableReferenceCountForMemIndex(cmd->table_key_);
                 if (!status.ok()) {
                     UnrecoverableError(
                         fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", status.message()));
@@ -2180,36 +2116,18 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
             }
             case WalCommandType::DELETE: {
                 auto *cmd = static_cast<WalCmdDelete *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError("Fail to unlock table when rollback delete txn");
-                }
-                status = RollbackDelete(cmd, kv_instance_.get());
+                Status status = RollbackDelete(cmd, kv_instance_.get());
                 if (!status.ok()) {
                     UnrecoverableError("Fail to rollback delete operation");
                 }
                 break;
             }
             case WalCommandType::IMPORT: {
-                auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    if (status.code() != ErrorCode::kNotFound) {
-                        // In some cases, the table may have been deleted, so the table cannot be unlocked
-                        UnrecoverableError("Fail to unlock table when rollback import txn");
-                    }
-                }
+                //                auto *cmd = static_cast<WalCmdImport *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::DUMP_INDEX: {
                 auto *cmd = static_cast<WalCmdDumpIndex *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    if (status.code() != ErrorCode::kNotFound) {
-                        // In some cases, the table may have been deleted, so the table cannot be unlocked
-                        UnrecoverableError("Fail to unlock table when rollback dump mem index txn");
-                    }
-                }
                 if (cmd->dump_cause_ == DumpIndexCause::kDumpMemIndex) {
                     Status mem_index_status = new_catalog_->UnsetMemIndexDump(cmd->table_key_);
                     if (!mem_index_status.ok()) {
@@ -2220,11 +2138,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case WalCommandType::COMPACT: {
-                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableWriteCount(this, cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdCompact *>(wal_cmd.get());
                 break;
             }
             default: {
@@ -2255,6 +2169,17 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
         return status;
     }
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
+
+    // Restore the reference count
+    for (const auto &ref_cnt_pair : table_write_reference_count_) {
+        const auto &table_key = ref_cnt_pair.first;
+        const auto &ref_cnt = ref_cnt_pair.second;
+        Status status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Fail to increase table write count on post commit phase: {}", status.message()));
+        }
+    }
+
     return Status::OK();
 }
 
@@ -2645,30 +2570,19 @@ Status NewTxn::GetChunkIndexFilePaths(const String &db_name,
     return NewCatalog::GetChunkIndexFilePaths(chunk_index_meta, file_paths);
 }
 
-void NewTxn::IncreaseTableReferenceCount(const String &table_key) {
-    ++table_reference_count_[table_key];
-    return;
-}
-
-void NewTxn::DecreaseTableReferenceCount(const String &table_key) {
-    if (table_reference_count_.find(table_key) == table_reference_count_.end()) {
-        UnrecoverableError("Table reference count not found");
+Status NewTxn::IncreaseTableReferenceCount(const String &table_key) {
+    Status status = new_catalog_->IncreaseTableWriteCount(table_key);
+    if (status.ok()) {
+        ++table_write_reference_count_[table_key];
     }
-    if (table_reference_count_[table_key] == 0) {
-        UnrecoverableError("Table reference count is zero");
-    }
-    --table_reference_count_[table_key];
-    if (table_reference_count_[table_key] == 0) {
-        table_reference_count_.erase(table_key);
-    }
-    return;
+    return status;
 }
 
 SizeT NewTxn::GetTableReferenceCount(const String &table_key) {
-    if (table_reference_count_.find(table_key) == table_reference_count_.end()) {
+    if (table_write_reference_count_.find(table_key) == table_write_reference_count_.end()) {
         return 0;
     }
-    return table_reference_count_[table_key];
+    return table_write_reference_count_[table_key];
 }
 
 Status NewTxn::Dummy() {
