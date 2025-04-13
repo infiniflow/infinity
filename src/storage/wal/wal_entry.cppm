@@ -187,7 +187,7 @@ export struct WalSegmentIndexInfo {
 
 // WalCommandType -> String
 export struct WalCmd {
-    WalCmd() {
+    WalCmd(WalCommandType type) : type_(type) {
 #ifdef INFINITY_DEBUG
         GlobalResourceUsage::IncrObjectCount("WalCmd");
 #endif
@@ -199,7 +199,7 @@ export struct WalCmd {
 #endif
     }
 
-    virtual auto GetType() const -> WalCommandType = 0;
+    auto GetType() const -> WalCommandType { return type_; }
 
     virtual auto operator==(const WalCmd &other) const -> bool { return typeid(*this) == typeid(other); }
     auto operator!=(const WalCmd &other) const -> bool { return !(*this == other); }
@@ -215,12 +215,13 @@ export struct WalCmd {
     static SharedPtr<WalCmd> ReadAdv(const char *&ptr, i32 max_bytes);
 
     static String WalCommandTypeToString(WalCommandType type);
+
+    WalCommandType type_{WalCommandType::INVALID};
 };
 
 export struct WalCmdDummy final : public WalCmd {
-    WalCmdDummy() = default;
+    WalCmdDummy() : WalCmd(WalCommandType::DUMMY) {}
 
-    WalCommandType GetType() const final { return WalCommandType::DUMMY; }
     bool operator==(const WalCmd &other) const final { return typeid(*this) == typeid(other); }
     [[nodiscard]] i32 GetSizeInBytes() const final { return 0; }
     void WriteAdv(char *&buf) const final {}
@@ -230,11 +231,11 @@ export struct WalCmdDummy final : public WalCmd {
 
 export struct WalCmdCreateDatabase final : public WalCmd {
     explicit WalCmdCreateDatabase(String db_name, String db_dir_tail, String db_comment)
-        : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)), db_comment_(std::move(db_comment)) {
+        : WalCmd(WalCommandType::CREATE_DATABASE), db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)),
+          db_comment_(std::move(db_comment)) {
         assert(!std::filesystem::path(db_dir_tail_).is_absolute());
     }
 
-    WalCommandType GetType() const final { return WalCommandType::CREATE_DATABASE; }
     bool operator==(const WalCmd &other) const final {
         const auto *other_cmd = dynamic_cast<const WalCmdCreateDatabase *>(&other);
         return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(db_dir_tail_, other_cmd->db_dir_tail_);
@@ -250,9 +251,8 @@ export struct WalCmdCreateDatabase final : public WalCmd {
 };
 
 export struct WalCmdDropDatabase final : public WalCmd {
-    explicit WalCmdDropDatabase(String db_name) : db_name_(std::move(db_name)) {}
+    explicit WalCmdDropDatabase(String db_name) : WalCmd(WalCommandType::DROP_DATABASE), db_name_(std::move(db_name)) {}
 
-    WalCommandType GetType() const final { return WalCommandType::DROP_DATABASE; }
     bool operator==(const WalCmd &other) const final {
         auto other_cmd = dynamic_cast<const WalCmdDropDatabase *>(&other);
         return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_);
@@ -267,9 +267,8 @@ export struct WalCmdDropDatabase final : public WalCmd {
 
 export struct WalCmdCreateTable final : public WalCmd {
     WalCmdCreateTable(String db_name, String table_dir_tail, const SharedPtr<TableDef> &table_def)
-        : db_name_(std::move(db_name)), table_dir_tail_(std::move(table_dir_tail)), table_def_(table_def) {}
+        : WalCmd(WalCommandType::CREATE_TABLE), db_name_(std::move(db_name)), table_dir_tail_(std::move(table_dir_tail)), table_def_(table_def) {}
 
-    WalCommandType GetType() const final { return WalCommandType::CREATE_TABLE; }
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -282,9 +281,9 @@ export struct WalCmdCreateTable final : public WalCmd {
 };
 
 export struct WalCmdDropTable final : public WalCmd {
-    WalCmdDropTable(const String &db_name, const String &table_name) : db_name_(db_name), table_name_(table_name) {}
+    WalCmdDropTable(const String &db_name, const String &table_name)
+        : WalCmd(WalCommandType::DROP_TABLE), db_name_(db_name), table_name_(table_name) {}
 
-    WalCommandType GetType() const final { return WalCommandType::DROP_TABLE; }
     bool operator==(const WalCmd &other) const final {
         auto other_cmd = dynamic_cast<const WalCmdDropTable *>(&other);
         return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_);
@@ -305,15 +304,15 @@ export struct WalCmdDropTable final : public WalCmd {
 
 export struct WalCmdCreateIndex final : public WalCmd {
     WalCmdCreateIndex(String db_name, String table_name, String index_dir_tail_, SharedPtr<IndexBase> index_base)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_dir_tail_(std::move(index_dir_tail_)),
-          index_base_(std::move(index_base)) {
+        : WalCmd(WalCommandType::CREATE_INDEX), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
+          index_dir_tail_(std::move(index_dir_tail_)), index_base_(std::move(index_base)) {
         assert(!std::filesystem::path(index_dir_tail_).is_absolute());
     }
 
     WalCmdCreateIndex(String db_name, String table_name, SharedPtr<IndexBase> index_base)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_base_(std::move(index_base)) {}
+        : WalCmd(WalCommandType::CREATE_INDEX), db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_base_(std::move(index_base)) {
+    }
 
-    WalCommandType GetType() const final { return WalCommandType::CREATE_INDEX; }
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -334,9 +333,8 @@ export struct WalCmdCreateIndex final : public WalCmd {
 
 export struct WalCmdDropIndex final : public WalCmd {
     WalCmdDropIndex(const String &db_name, const String &table_name, const String &index_name)
-        : db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
+        : WalCmd(WalCommandType::DROP_INDEX), db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
 
-    virtual WalCommandType GetType() const final { return WalCommandType::DROP_INDEX; }
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -357,9 +355,8 @@ export struct WalCmdDropIndex final : public WalCmd {
 
 export struct WalCmdImport final : public WalCmd {
     WalCmdImport(String db_name, String table_name, WalSegmentInfo &&segment_info)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_info_(std::move(segment_info)) {}
+        : WalCmd(WalCommandType::IMPORT), db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_info_(std::move(segment_info)) {}
 
-    WalCommandType GetType() const final { return WalCommandType::IMPORT; }
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -378,9 +375,8 @@ export struct WalCmdImport final : public WalCmd {
 
 export struct WalCmdAppend final : public WalCmd {
     WalCmdAppend(String db_name, String table_name, const SharedPtr<DataBlock> &block)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), block_(block) {}
+        : WalCmd(WalCommandType::APPEND), db_name_(std::move(db_name)), table_name_(std::move(table_name)), block_(block) {}
 
-    WalCommandType GetType() const final { return WalCommandType::APPEND; }
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -399,9 +395,8 @@ export struct WalCmdAppend final : public WalCmd {
 
 export struct WalCmdDelete final : public WalCmd {
     WalCmdDelete(String db_name, String table_name, const Vector<RowID> &row_ids)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), row_ids_(row_ids) {}
+        : WalCmd(WalCommandType::DELETE), db_name_(std::move(db_name)), table_name_(std::move(table_name)), row_ids_(row_ids) {}
 
-    WalCommandType GetType() const override { return WalCommandType::DELETE; }
     bool operator==(const WalCmd &other) const final;
     [[nodiscard]] i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -427,10 +422,10 @@ export struct WalCmdSetSegmentStatusSealed final : public WalCmd {
                                  SegmentID segment_id,
                                  String segment_filter_binary_data,
                                  Vector<Pair<BlockID, String>> block_filter_binary_data)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
-          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+        : WalCmd(WalCommandType::SET_SEGMENT_STATUS_SEALED), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
+          segment_id_(segment_id), segment_filter_binary_data_(std::move(segment_filter_binary_data)),
+          block_filter_binary_data_(std::move(block_filter_binary_data)) {}
 
-    WalCommandType GetType() const final { return WalCommandType::SET_SEGMENT_STATUS_SEALED; }
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -453,10 +448,10 @@ export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
                                        SegmentID segment_id,
                                        String segment_filter_binary_data,
                                        Vector<Pair<BlockID, String>> block_filter_binary_data)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_id_(segment_id),
-          segment_filter_binary_data_(std::move(segment_filter_binary_data)), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+        : WalCmd(WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
+          segment_id_(segment_id), segment_filter_binary_data_(std::move(segment_filter_binary_data)),
+          block_filter_binary_data_(std::move(block_filter_binary_data)) {}
 
-    WalCommandType GetType() const final { return WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA; }
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -474,10 +469,10 @@ export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
 
 export struct WalCmdCheckpoint final : public WalCmd {
     WalCmdCheckpoint(i64 max_commit_ts, bool is_full_checkpoint, String catalog_path, String catalog_name)
-        : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path), catalog_name_(catalog_name) {
+        : WalCmd(WalCommandType::CHECKPOINT), max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path),
+          catalog_name_(catalog_name) {
         assert(!std::filesystem::path(catalog_path_).is_absolute());
     }
-    virtual WalCommandType GetType() const final { return WalCommandType::CHECKPOINT; }
     virtual bool operator==(const WalCmd &other) const final;
     virtual i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -492,10 +487,9 @@ export struct WalCmdCheckpoint final : public WalCmd {
 
 export struct WalCmdCompact final : public WalCmd {
     WalCmdCompact(String db_name, String table_name, Vector<WalSegmentInfo> new_segment_infos, Vector<SegmentID> deprecated_segment_ids)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), new_segment_infos_(std::move(new_segment_infos)),
-          deprecated_segment_ids_(std::move(deprecated_segment_ids)) {}
+        : WalCmd(WalCommandType::COMPACT), db_name_(std::move(db_name)), table_name_(std::move(table_name)),
+          new_segment_infos_(std::move(new_segment_infos)), deprecated_segment_ids_(std::move(deprecated_segment_ids)) {}
 
-    WalCommandType GetType() const final { return WalCommandType::COMPACT; }
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -515,9 +509,9 @@ export struct WalCmdCompact final : public WalCmd {
 
 export struct WalCmdOptimize final : public WalCmd {
     WalCmdOptimize(String db_name, String table_name, String index_name, Vector<UniquePtr<InitParameter>> params)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), params_(std::move(params)) {}
+        : WalCmd(WalCommandType::OPTIMIZE), db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)),
+          params_(std::move(params)) {}
 
-    WalCommandType GetType() const final { return WalCommandType::OPTIMIZE; }
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -534,7 +528,8 @@ enum class DumpIndexCause { kImport, kCompact, kCreateIndex, kOptimizeIndex, kRe
 
 export struct WalCmdDumpIndex final : public WalCmd {
     WalCmdDumpIndex(String db_name, String table_name, String index_name, SegmentID segment_id)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id) {}
+        : WalCmd(WalCommandType::DUMP_INDEX), db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)),
+          segment_id_(segment_id) {}
 
     WalCmdDumpIndex(String db_name,
                     String table_name,
@@ -542,10 +537,9 @@ export struct WalCmdDumpIndex final : public WalCmd {
                     SegmentID segment_id,
                     Vector<WalChunkIndexInfo> chunk_infos,
                     Vector<ChunkID> deprecate_ids)
-        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id),
-          chunk_infos_(std::move(chunk_infos)), deprecate_ids_(std::move(deprecate_ids)) {}
+        : WalCmd(WalCommandType::DUMP_INDEX), db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)),
+          segment_id_(segment_id), chunk_infos_(std::move(chunk_infos)), deprecate_ids_(std::move(deprecate_ids)) {}
 
-    WalCommandType GetType() const final { return WalCommandType::DUMP_INDEX; }
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -569,9 +563,8 @@ export struct WalCmdDumpIndex final : public WalCmd {
 
 export struct WalCmdRenameTable : public WalCmd {
     WalCmdRenameTable(String db_name, String table_name, String new_table_name)
-        : db_name_(db_name), table_name_(table_name), new_table_name_(new_table_name) {}
+        : WalCmd(WalCommandType::RENAME_TABLE), db_name_(db_name), table_name_(table_name), new_table_name_(new_table_name) {}
 
-    WalCommandType GetType() const final { return WalCommandType::RENAME_TABLE; }
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -590,9 +583,8 @@ export struct WalCmdRenameTable : public WalCmd {
 
 export struct WalCmdAddColumns : public WalCmd {
     WalCmdAddColumns(String db_name, String table_name, Vector<SharedPtr<ColumnDef>> column_defs)
-        : db_name_(db_name), table_name_(table_name), column_defs_(std::move(column_defs)) {}
+        : WalCmd(WalCommandType::ADD_COLUMNS), db_name_(db_name), table_name_(table_name), column_defs_(std::move(column_defs)) {}
 
-    WalCommandType GetType() const final { return WalCommandType::ADD_COLUMNS; }
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
@@ -607,9 +599,8 @@ export struct WalCmdAddColumns : public WalCmd {
 
 export struct WalCmdDropColumns : public WalCmd {
     WalCmdDropColumns(String db_name, String table_name, Vector<String> column_names)
-        : db_name_(db_name), table_name_(table_name), column_names_(std::move(column_names)) {}
+        : WalCmd(WalCommandType::DROP_COLUMNS), db_name_(db_name), table_name_(table_name), column_names_(std::move(column_names)) {}
 
-    WalCommandType GetType() const final { return WalCommandType::DROP_COLUMNS; }
     bool operator==(const WalCmd &other) const final;
     i32 GetSizeInBytes() const final;
     void WriteAdv(char *&buf) const final;
