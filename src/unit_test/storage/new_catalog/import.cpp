@@ -6347,8 +6347,8 @@ TEST_P(TestImport, test_import_and_optimize_index) {
 
     //    t1      import      commit (success)
     //    |----------|---------|
-    //                            |----------------------|----------|
-    //                           t2                  compact  commit (success)
+    //                            |----------------------|---------------|
+    //                           t2                  optimize index  commit (success)
     {
         PrepareForCompactAndOptimize();
 
@@ -6375,236 +6375,226 @@ TEST_P(TestImport, test_import_and_optimize_index) {
         EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
     }
 
-    //    //    t1      import      commit (success)
-    //    //    |----------|---------|
-    //    //                    |------------------|----------------|
-    //    //                    t2             compact (fail)    rollback
-    //    {
-    //        PrepareForCompact();
-    //
-    //        // Import 1 segment, each segments contains two blocks
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
-    //                                                      make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        // compact
-    //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        //        new_txn_mgr->PrintAllKeyValue();
-    //
-    //        status = txn2->Compact(*db_name, *table_name, {0, 1});
-    //        EXPECT_FALSE(status.ok());
-    //        status = new_txn_mgr->RollBackTxn(txn2);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        CheckTable({0, 1, 2});
-    //
-    //        DropDB();
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //    t1      import                       commit (success)
-    //    //    |----------|--------------------------------|
-    //    //                    |-----------------------|-------------------------|
-    //    //                    t2                  compact (fail)          rollback (success)
-    //    {
-    //        PrepareForCompact();
-    //
-    //        // Import 1 segment, each segments contains two blocks
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
-    //                                                      make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        // compact
-    //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //        status = txn2->Compact(*db_name, *table_name, {0, 1});
-    //        EXPECT_FALSE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->RollBackTxn(txn2);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        CheckTable({0, 1, 2});
-    //
-    //        DropDB();
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //    t1      import                                   commit (success)
-    //    //    |----------|-----------------------------------------------|
-    //    //                    |-------------|-----------------------|
-    //    //                    t2        compact (fail)    rollback (success)
-    //    {
-    //        PrepareForCompact();
-    //
-    //        // Import 1 segment, each segments contains two blocks
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
-    //                                                      make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-    //        Status status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        // compact
-    //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //        status = txn2->Compact(*db_name, *table_name, {0, 1});
-    //        EXPECT_FALSE(status.ok());
-    //        status = new_txn_mgr->RollBackTxn(txn2);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        CheckTable({0, 1, 2});
-    //
-    //        DropDB();
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //    t1                                      import                                    commit (success)
-    //    //    |------------------------------------------|------------------------------------------|
-    //    //                    |----------------------|------------------------------|
-    //    //                    t2                compact                     commit (success)
-    //    {
-    //        PrepareForCompact();
-    //
-    //        // Import 1 segment, each segments contains two blocks
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //
-    //        // compact
-    //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //        Status status = txn2->Compact(*db_name, *table_name, {0, 1});
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
-    //                                                      make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_FALSE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn2);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        CheckTable({2});
-    //
-    //        DropDB();
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //    t1                                                   import                                   commit (success)
-    //    //    |------------------------------------------------------|------------------------------------------|
-    //    //                    |----------------------|------------|
-    //    //                    t2                  compact commit (success)
-    //    {
-    //        PrepareForCompact();
-    //
-    //        // Import 1 segment, each segments contains two blocks
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //
-    //        // compact
-    //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //        Status status = txn2->Compact(*db_name, *table_name, {0, 1});
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn2);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
-    //                                                      make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_FALSE(status.ok());
-    //
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        CheckTable({2});
-    //
-    //        DropDB();
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //                                                  t1                  import                                   commit (success)
-    //    //                                                  |--------------------|------------------------------------------|
-    //    //                    |----------------------|---------------|
-    //    //                    t2                  drop index   commit (success)
-    //    {
-    //        PrepareForCompact();
-    //
-    //        // compact
-    //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //        Status status = txn2->Compact(*db_name, *table_name, {0, 1});
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        // Import 1 segment, each segments contains two blocks
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //
-    //        status = new_txn_mgr->CommitTxn(txn2);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
-    //                                                      make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_FALSE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        CheckTable({2});
-    //
-    //        DropDB();
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
-    //
-    //    //                                                           t1                  import                             commit (success)
-    //    //                                                          |--------------------|------------------------------------------|
-    //    //                    |-----------------|------------|
-    //    //                    t2           drop index   commit (success)
-    //    {
-    //        PrepareForCompact();
-    //
-    //        // compact
-    //        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("compact"), TransactionType::kNormal);
-    //        Status status = txn2->Compact(*db_name, *table_name, {0, 1});
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn2);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        // Import 1 segment, each segments contains two blocks
-    //        auto *txn3 = new_txn_mgr->BeginTxn(MakeUnique<String>("import"), TransactionType::kNormal);
-    //        Vector<SharedPtr<DataBlock>> input_blocks1 = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz")),
-    //                                                      make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
-    //        status = txn3->Import(*db_name, *table_name, input_blocks1);
-    //        EXPECT_TRUE(status.ok());
-    //        status = new_txn_mgr->CommitTxn(txn3);
-    //        EXPECT_TRUE(status.ok());
-    //
-    //        CheckTable({2, 3});
-    //
-    //        DropDB();
-    //
-    //        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
-    //        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
-    //    }
+    //    t1      import      commit (success)
+    //    |----------|---------|
+    //                    |------------------|----------------|
+    //                    t2            optimize index     commit
+    {
+        PrepareForCompactAndOptimize();
+
+        // Import 1 segment with 1 block
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import")), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        Status status = txn1->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({3});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      import                       commit (success)
+    //    |----------|--------------------------------|
+    //                    |-----------------------|-------------------------|
+    //                    t2                  optimize index          commit (success)
+    {
+        PrepareForCompactAndOptimize();
+
+        // Import 1 segment with 1 block
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import")), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        Status status = txn1->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({3});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1      import                                   commit (success)
+    //    |----------|-----------------------------------------------|
+    //                    |-------------|-----------------------|
+    //                    t2        optimize index         commit (success)
+    {
+        PrepareForCompactAndOptimize();
+
+        // Import 1 segment with 1 block
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import")), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        Status status = txn1->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({3});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1                                      import                                    commit (success)
+    //    |------------------------------------------|------------------------------------------|
+    //                    |----------------------|------------------------------|
+    //                    t2                optimize index                  commit (success)
+    {
+        PrepareForCompactAndOptimize();
+
+        // Import 1 segment with 1 block
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import")), TransactionType::kNormal);
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        status = txn1->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({3});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //    t1                                                   import                                   commit (success)
+    //    |------------------------------------------------------|------------------------------------------|
+    //                    |--------------------|------------|
+    //                    t2              optimize index   commit (success)
+    {
+        PrepareForCompactAndOptimize();
+
+        // Import 1 segment with 1 block
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import")), TransactionType::kNormal);
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        status = txn1->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({3});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                                                  t1                  import                                   commit (success)
+    //                                                  |--------------------|------------------------------------------|
+    //                    |----------------------|---------------|
+    //                    t2                  optimize index   commit (success)
+    {
+        PrepareForCompactAndOptimize();
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+
+        // Import 1 segment with 1 block
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import")), TransactionType::kNormal);
+
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        status = txn1->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({3});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
+
+    //                                                           t1                  import                             commit (success)
+    //                                                          |--------------------|------------------------------------------|
+    //                    |-----------------|------------|
+    //                    t2           optimize index   commit (success)
+    {
+        PrepareForCompactAndOptimize();
+
+        // optimize index
+        auto *txn2 = new_txn_mgr->BeginTxn(MakeUnique<String>("optimize index"), TransactionType::kNormal);
+        Status status = txn2->OptimizeIndex(*db_name, *table_name, *index_name1, 0);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn2);
+        EXPECT_TRUE(status.ok());
+
+        // Import 1 segment with 1 block
+        auto *txn1 = new_txn_mgr->BeginTxn(MakeUnique<String>(fmt::format("import")), TransactionType::kNormal);
+        Vector<SharedPtr<DataBlock>> input_blocks = {make_input_block(Value::MakeInt(1), Value::MakeVarchar("abcdefghijklmnopqrstuvwxyz"))};
+        status = txn1->Import(*db_name, *table_name, input_blocks);
+        EXPECT_TRUE(status.ok());
+        status = new_txn_mgr->CommitTxn(txn1);
+        EXPECT_TRUE(status.ok());
+
+        CheckTable({3});
+
+        DropDB();
+
+        NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
+        EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
+    }
 
     RemoveDbDirs();
 }
