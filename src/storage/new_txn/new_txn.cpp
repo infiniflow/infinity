@@ -1972,14 +1972,7 @@ void NewTxn::PostCommit() {
         WalCommandType command_type = wal_cmd->GetType();
         switch (command_type) {
             case WalCommandType::APPEND: {
-                if (!this->IsReplay()) {
-                    auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                    Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(cmd->table_key_);
-                    if (!mem_index_status.ok()) {
-                        UnrecoverableError(
-                            fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-                    }
-                }
+                //                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::IMPORT: {
@@ -2051,13 +2044,23 @@ void NewTxn::PostCommit() {
         }
     }
 
-    // Restore the reference count
+    // Restore the table write reference count
     for (const auto &ref_cnt_pair : table_write_reference_count_) {
         const auto &table_key = ref_cnt_pair.first;
         const auto &ref_cnt = ref_cnt_pair.second;
         Status status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
         if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to increase table write count on post commit phase: {}", status.message()));
+            UnrecoverableError(fmt::format("Fail to decrease table write count on post commit phase: {}", status.message()));
+        }
+    }
+
+    // Restore the mem index reference count
+    for (const auto &ref_cnt_pair : mem_index_reference_count_) {
+        const auto &table_key = ref_cnt_pair.first;
+        const auto &ref_cnt = ref_cnt_pair.second;
+        Status status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key, ref_cnt);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post commit phase: {}", status.message()));
         }
     }
 }
@@ -2106,12 +2109,7 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 break;
             }
             case WalCommandType::APPEND: {
-                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
-                Status status = new_catalog_->DecreaseTableReferenceCountForMemIndex(cmd->table_key_);
-                if (!status.ok()) {
-                    UnrecoverableError(
-                        fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", status.message()));
-                }
+                //                auto *cmd = static_cast<WalCmdAppend *>(wal_cmd.get());
                 break;
             }
             case WalCommandType::DELETE: {
@@ -2170,13 +2168,23 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
     }
     txn_store_.Rollback(txn_context_ptr_->txn_id_, abort_ts);
 
-    // Restore the reference count
+    // Restore the table write reference count
     for (const auto &ref_cnt_pair : table_write_reference_count_) {
         const auto &table_key = ref_cnt_pair.first;
         const auto &ref_cnt = ref_cnt_pair.second;
-        Status status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
+        status = new_catalog_->DecreaseTableWriteCount(table_key, ref_cnt);
         if (!status.ok()) {
-            UnrecoverableError(fmt::format("Fail to increase table write count on post commit phase: {}", status.message()));
+            UnrecoverableError(fmt::format("Fail to decrease table write count on post rollback phase: {}", status.message()));
+        }
+    }
+
+    // Restore the mem index reference count
+    for (const auto &ref_cnt_pair : mem_index_reference_count_) {
+        const auto &table_key = ref_cnt_pair.first;
+        const auto &ref_cnt = ref_cnt_pair.second;
+        status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key, ref_cnt);
+        if (!status.ok()) {
+            UnrecoverableError(fmt::format("Fail to decrease mem index reference count on post rollback phase: {}", status.message()));
         }
     }
 
@@ -2583,6 +2591,21 @@ SizeT NewTxn::GetTableReferenceCount(const String &table_key) {
         return 0;
     }
     return table_write_reference_count_[table_key];
+}
+
+Status NewTxn::IncreaseMemIndexReferenceCount(const String &table_key) {
+    Status status = new_catalog_->IncreaseTableReferenceCountForMemIndex(table_key);
+    if (status.ok()) {
+        ++mem_index_reference_count_[table_key];
+    }
+    return status;
+}
+
+SizeT NewTxn::GetMemIndexReferenceCount(const String &table_key) {
+    if (mem_index_reference_count_.find(table_key) == mem_index_reference_count_.end()) {
+        return 0;
+    }
+    return mem_index_reference_count_[table_key];
 }
 
 Status NewTxn::Dummy() {

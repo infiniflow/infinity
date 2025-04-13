@@ -563,6 +563,7 @@ Status NewCatalog::DecreaseTableWriteCount(const String &table_key, SizeT count)
     if (write_txn_num == 0) {
         table_memory_context_map_.erase(table_key);
     }
+
     return Status::OK();
 }
 
@@ -679,7 +680,7 @@ Status NewCatalog::IncreaseTableReferenceCountForMemIndex(const String &table_ke
     return Status::OK();
 }
 
-Status NewCatalog::DecreaseTableReferenceCountForMemIndex(const String &table_key) {
+Status NewCatalog::DecreaseTableReferenceCountForMemIndex(const String &table_key, SizeT count) {
     std::unique_lock lock(mem_index_mtx_);
     auto iter = table_lock_for_mem_index_.find(table_key);
     if (iter == table_lock_for_mem_index_.end()) {
@@ -691,8 +692,14 @@ Status NewCatalog::DecreaseTableReferenceCountForMemIndex(const String &table_ke
         UnrecoverableError(fmt::format("Table key: {} is dumping mem index", table_key));
     }
 
-    --table_lock_for_mem_index->append_count_;
-    if (table_lock_for_mem_index->append_count_ == 0 and !table_lock_for_mem_index->dumping_mem_index_) {
+    SizeT &append_count = table_lock_for_mem_index->append_count_;
+    if (append_count >= count) {
+        append_count -= count;
+    } else {
+        UnrecoverableError(fmt::format("Attempt to reduce reference count {} by {}, of {}", append_count, count, table_key));
+    }
+
+    if (append_count == 0) {
         table_lock_for_mem_index_.erase(table_key);
     }
 

@@ -589,12 +589,15 @@ public:
     Status IncreaseTableReferenceCount(const String &table_key);
     SizeT GetTableReferenceCount(const String &table_key);
 
+    Status IncreaseMemIndexReferenceCount(const String &table_key);
+    SizeT GetMemIndexReferenceCount(const String &table_key);
+
     Status Dummy();
 
 private:
     // To record the access table reference count for release in txn committing or rollbacking phase
     HashMap<String, SizeT> table_write_reference_count_{};
-    HashMap<String, SizeT> table_dump_index_reference_count_{};
+    HashMap<String, SizeT> mem_index_reference_count_{};
 
 private:
     // Reference to external class

@@ -125,13 +125,13 @@ TEST_P(NewCatalogTest, test_table_mem_index) {
     status = new_catalog->SetMemIndexDump(table_key);
     EXPECT_FALSE(status.ok());
 
-    status = new_catalog->DecreaseTableReferenceCountForMemIndex(table_key);
+    status = new_catalog->DecreaseTableReferenceCountForMemIndex(table_key, 1);
     EXPECT_TRUE(status.ok());
 
     ref_count = new_catalog->GetTableReferenceCountForMemIndex(table_key);
     EXPECT_EQ(ref_count, 1);
 
-    status = new_catalog->DecreaseTableReferenceCountForMemIndex(table_key);
+    status = new_catalog->DecreaseTableReferenceCountForMemIndex(table_key, 1);
     EXPECT_TRUE(status.ok());
 
     ref_count = new_catalog->GetTableReferenceCountForMemIndex(table_key);

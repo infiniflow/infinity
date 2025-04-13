@@ -191,7 +191,7 @@ public:
     Status DropMemIndexByMemIndexKey(const String &mem_index_key);
 
     Status IncreaseTableReferenceCountForMemIndex(const String &table_key);
-    Status DecreaseTableReferenceCountForMemIndex(const String &table_key);
+    Status DecreaseTableReferenceCountForMemIndex(const String &table_key, SizeT count);
     Status SetMemIndexDump(const String &table_key);
     Status UnsetMemIndexDump(const String &table_key);
     bool IsMemIndexDump(const String &table_key);

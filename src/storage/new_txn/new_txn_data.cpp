@@ -387,18 +387,13 @@ Status NewTxn::Append(const String &db_name, const String &table_name, const Sha
         return status;
     }
 
-    status = new_catalog_->IncreaseTableReferenceCountForMemIndex(table_key);
+    status = this->IncreaseMemIndexReferenceCount(table_key);
     if (!status.ok()) {
         return status;
     }
 
     status = this->IncreaseTableReferenceCount(table_key);
     if (!status.ok()) {
-        Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key);
-        if (!mem_index_status.ok()) {
-            UnrecoverableError(
-                fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-        }
         return status;
     }
 
@@ -452,11 +447,6 @@ Status NewTxn::AppendInner(const String &db_name,
             String err_msg = fmt::format("Attempt to insert different column count data block into transaction table store");
             LOG_ERROR(err_msg);
 
-            Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-            }
             return Status::ColumnCountMismatch(err_msg);
         }
 
@@ -466,11 +456,6 @@ Status NewTxn::AppendInner(const String &db_name,
                                          column_defs_validation->size());
             LOG_ERROR(err_msg);
 
-            Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-            }
             return Status::ColumnCountMismatch(err_msg);
         }
 
@@ -481,11 +466,6 @@ Status NewTxn::AppendInner(const String &db_name,
                 String err_msg = fmt::format("Attempt to insert different type data into transaction table store");
                 LOG_ERROR(err_msg);
 
-                Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key);
-                if (!mem_index_status.ok()) {
-                    UnrecoverableError(
-                        fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-                }
                 return Status::DataTypeMismatch(column_types.back()->ToString(), input_block->column_vectors[col_id]->data_type()->ToString());
             }
             if (*column_types.back() != *(*column_defs_validation)[col_id]->type()) {
@@ -495,11 +475,6 @@ Status NewTxn::AppendInner(const String &db_name,
                                              (*column_defs_validation)[col_id]->type()->ToString());
                 LOG_ERROR(err_msg);
 
-                Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(table_key);
-                if (!mem_index_status.ok()) {
-                    UnrecoverableError(
-                        fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-                }
                 return Status::DataTypeMismatch(column_types.back()->ToString(), (*column_defs_validation)[col_id]->type()->ToString());
             }
         }
@@ -1361,12 +1336,6 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
     if (append_state == nullptr) {
         status = txn_table_store->Append(append_cmd->block_);
         if (!status.ok()) {
-            Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-            }
-
             return status;
         }
         append_state = txn_table_store->append_state();
@@ -1382,12 +1351,6 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
     status = table_meta.GetUnsealedSegmentID(unsealed_segment_id);
     if (!status.ok()) {
         if (status.code() != ErrorCode::kNotFound) {
-            Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-            }
-
             return status;
         }
         // SegmentID next_segment_id = 0;
@@ -1411,23 +1374,11 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
         // }
         status = NewCatalog::AddNewSegment1(table_meta, commit_ts, segment_meta);
         if (!status.ok()) {
-            Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-            }
-
             return status;
         }
         SegmentID segment_id = segment_meta->segment_id();
         status = table_meta.SetUnsealedSegmentID(segment_id);
         if (!status.ok()) {
-            Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-            }
-
             return status;
         }
     } else {
@@ -1458,24 +1409,12 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
     Vector<BlockID> *block_ids_ptr = nullptr;
     std::tie(block_ids_ptr, status) = segment_meta->GetBlockIDs1();
     if (!status.ok()) {
-        Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-        if (!mem_index_status.ok()) {
-            UnrecoverableError(
-                fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-        }
-
         return status;
     }
     Optional<BlockMeta> block_meta;
     if (block_ids_ptr->empty()) {
         status = NewCatalog::AddNewBlock1(*segment_meta, commit_ts, block_meta);
         if (!status.ok()) {
-            Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-            }
-
             return status;
         }
     } else {
@@ -1514,12 +1453,6 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
             // }
             status = NewCatalog::AddNewSegment1(table_meta, commit_ts, segment_meta);
             if (!status.ok()) {
-                Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-                if (!mem_index_status.ok()) {
-                    UnrecoverableError(
-                        fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-                }
-
                 return status;
             }
 
@@ -1535,12 +1468,6 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
             // }
             status = NewCatalog::AddNewBlock1(*segment_meta, commit_ts, block_meta);
             if (!status.ok()) {
-                Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-                if (!mem_index_status.ok()) {
-                    UnrecoverableError(
-                        fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-                }
-
                 return status;
             }
         } else if (block_full) {
@@ -1556,12 +1483,6 @@ Status NewTxn::CommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_insta
             // }
             status = NewCatalog::AddNewBlock1(*segment_meta, commit_ts, block_meta);
             if (!status.ok()) {
-                Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-                if (!mem_index_status.ok()) {
-                    UnrecoverableError(
-                        fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-                }
-
                 return status;
             }
         }
@@ -1597,12 +1518,6 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
         }
         status = this->AppendInBlock(*block_meta, range.start_offset_, range.row_count_, data_block, range.data_block_offset_);
         if (!status.ok()) {
-            Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-            if (!mem_index_status.ok()) {
-                UnrecoverableError(
-                    fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-            }
-
             return status;
         }
     }
@@ -1611,12 +1526,6 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
         {
             status = table_meta.GetIndexIDs(index_id_strs, nullptr);
             if (!status.ok()) {
-                Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-                if (!mem_index_status.ok()) {
-                    UnrecoverableError(
-                        fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-                }
-
                 return status;
             }
         }
@@ -1625,12 +1534,6 @@ Status NewTxn::PostCommitAppend(const WalCmdAppend *append_cmd, KVInstance *kv_i
             TableIndexMeeta table_index_meta(index_id_str, table_meta);
             status = this->AppendIndex(table_index_meta, append_state->append_ranges_);
             if (!status.ok()) {
-                Status mem_index_status = new_catalog_->DecreaseTableReferenceCountForMemIndex(append_cmd->table_key_);
-                if (!mem_index_status.ok()) {
-                    UnrecoverableError(
-                        fmt::format("Fail to decrease table reference count for mem index on post commit phase: {}", mem_index_status.message()));
-                }
-
                 return status;
             }
         }
