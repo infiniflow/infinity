@@ -70,15 +70,15 @@ import constant_expr;
 
 using namespace infinity;
 
-class NewCheckpointInternalTest : public NewReplayTest {
+class TestTxnCheckpointInternalTest : public NewReplayTest {
 public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         NewCheckpointInternalTest,
-                         ::testing::Values(NewCheckpointInternalTest::NEW_CONFIG_PATH, NewCheckpointInternalTest::NEW_VFS_OFF_CONFIG_PATH));
+                         TestTxnCheckpointInternalTest,
+                         ::testing::Values(TestTxnCheckpointInternalTest::NEW_CONFIG_PATH, TestTxnCheckpointInternalTest::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(NewCheckpointInternalTest, test_checkpoint0) {
+TEST_P(TestTxnCheckpointInternalTest, test_checkpoint0) {
     SharedPtr<String> db_name = std::make_shared<String>("db1");
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
     auto column_def2 = std::make_shared<ColumnDef>(1, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());

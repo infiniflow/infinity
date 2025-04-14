@@ -68,15 +68,15 @@ import index_filter_evaluators;
 import index_emvb;
 import constant_expr;
 
-class ReplayIndexTest : public NewReplayTest {
+class TestTxnReplayIndex : public NewReplayTest {
 public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ReplayIndexTest,
-                         ::testing::Values(ReplayIndexTest::NEW_CONFIG_PATH, ReplayIndexTest::NEW_VFS_OFF_CONFIG_PATH));
+                         TestTxnReplayIndex,
+                         ::testing::Values(TestTxnReplayIndex::NEW_CONFIG_PATH, TestTxnReplayIndex::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(ReplayIndexTest, test_replay_append_with_index) {
+TEST_P(TestTxnReplayIndex, test_replay_append_with_index) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -437,7 +437,7 @@ TEST_P(ReplayIndexTest, test_replay_append_with_index) {
     });
 }
 
-TEST_P(ReplayIndexTest, test_populate_index) {
+TEST_P(TestTxnReplayIndex, test_populate_index) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("db1");

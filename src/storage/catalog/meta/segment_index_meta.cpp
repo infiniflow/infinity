@@ -237,6 +237,13 @@ Status SegmentIndexMeta::GetMemIndex(SharedPtr<MemIndex> &mem_index) {
         }
     }
 
+    // append -> dump -> clear memindex -> new txn { append -> mem index(visible) -> put rocksdb has_mem_index before commit rocksdb.
+    // At same time, another full text commit thread will commit mem index, since rocksdb isn't commit has_mem_index flag, the memindex will be removed below following code.
+    if(!has_mem_index) {
+        mem_index = MakeShared<MemIndex>();
+        return Status::OK();
+    }
+
     NewCatalog *new_catalog = InfinityContext::instance().storage()->new_catalog();
     String mem_index_key = GetSegmentIndexTag("mem_index");
     Status status = new_catalog->GetMemIndex(mem_index_key, mem_index);

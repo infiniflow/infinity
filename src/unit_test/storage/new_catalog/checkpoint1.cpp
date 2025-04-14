@@ -70,7 +70,7 @@ import constant_expr;
 
 using namespace infinity;
 
-class NewCheckpointTest : public NewReplayTest {
+class TestTxnCheckpointTest : public NewReplayTest {
 protected:
     void SetUp() override {
         NewReplayTest::SetUp();
@@ -91,10 +91,10 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         NewCheckpointTest,
-                         ::testing::Values(NewCheckpointTest::NEW_CONFIG_NOWAL_PATH, NewCheckpointTest::NEW_VFS_OFF_CONFIG_NOWAL_PATH));
+                         TestTxnCheckpointTest,
+                         ::testing::Values(TestTxnCheckpointTest::NEW_CONFIG_NOWAL_PATH, TestTxnCheckpointTest::NEW_VFS_OFF_CONFIG_NOWAL_PATH));
 
-TEST_P(NewCheckpointTest, checkpoint_and_create_db) {
+TEST_P(TestTxnCheckpointTest, checkpoint_and_create_db) {
     Status status;
     {
         {
@@ -226,7 +226,7 @@ TEST_P(NewCheckpointTest, checkpoint_and_create_db) {
     // }
 }
 
-TEST_P(NewCheckpointTest, checkpoint_and_create_table) {
+TEST_P(TestTxnCheckpointTest, checkpoint_and_create_table) {
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
 
     Status status;

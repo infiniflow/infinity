@@ -45,13 +45,13 @@ import segment_index_meta;
 
 using namespace infinity;
 
-class TestLockTable : public BaseTestParamStr {};
+class TestTxnLockTable : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestLockTable,
+                         TestTxnLockTable,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestLockTable, lock_table) {
+TEST_P(TestTxnLockTable, lock_table) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -715,7 +715,7 @@ TEST_P(TestLockTable, lock_table) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, lock_table_and_lock_table) {
+TEST_P(TestTxnLockTable, lock_table_and_lock_table) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -891,7 +891,7 @@ TEST_P(TestLockTable, lock_table_and_lock_table) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, lock_table_and_add_column) {
+TEST_P(TestTxnLockTable, lock_table_and_add_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -1097,7 +1097,7 @@ TEST_P(TestLockTable, lock_table_and_add_column) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, lock_table_and_drop_column) {
+TEST_P(TestTxnLockTable, lock_table_and_drop_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -1301,7 +1301,7 @@ TEST_P(TestLockTable, lock_table_and_drop_column) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, lock_table_and_create_index) {
+TEST_P(TestTxnLockTable, lock_table_and_create_index) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -1638,7 +1638,7 @@ TEST_P(TestLockTable, lock_table_and_create_index) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, lock_table_and_drop_index) {
+TEST_P(TestTxnLockTable, lock_table_and_drop_index) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -2016,7 +2016,7 @@ TEST_P(TestLockTable, lock_table_and_drop_index) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, lock_table_and_import) {
+TEST_P(TestTxnLockTable, lock_table_and_import) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -2398,7 +2398,7 @@ TEST_P(TestLockTable, lock_table_and_import) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, lock_table_and_append) {
+TEST_P(TestTxnLockTable, lock_table_and_append) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -2751,7 +2751,7 @@ TEST_P(TestLockTable, lock_table_and_append) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, lock_table_and_delete) {
+TEST_P(TestTxnLockTable, lock_table_and_delete) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -3221,7 +3221,7 @@ TEST_P(TestLockTable, lock_table_and_delete) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, lock_table_and_compact) {
+TEST_P(TestTxnLockTable, lock_table_and_compact) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     SharedPtr<String> db_name = std::make_shared<String>("db1");
@@ -3545,7 +3545,7 @@ TEST_P(TestLockTable, lock_table_and_compact) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestLockTable, test_lock_table_and_optimize_index) {
+TEST_P(TestTxnLockTable, test_lock_table_and_optimize_index) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

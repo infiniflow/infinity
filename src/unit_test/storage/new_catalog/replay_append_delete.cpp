@@ -52,15 +52,15 @@ import mem_index;
 import index_base;
 import buffer_obj;
 
-class ReplayAppendTest : public NewReplayTest {
+class TestTxnReplayAppend : public NewReplayTest {
 public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ReplayAppendTest,
-                         ::testing::Values(ReplayAppendTest::NEW_CONFIG_PATH, ReplayAppendTest::NEW_VFS_OFF_CONFIG_PATH));
+                         TestTxnReplayAppend,
+                         ::testing::Values(TestTxnReplayAppend::NEW_CONFIG_PATH, TestTxnReplayAppend::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(ReplayAppendTest, test_append0) {
+TEST_P(TestTxnReplayAppend, test_append0) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("db1");
@@ -164,7 +164,7 @@ TEST_P(ReplayAppendTest, test_append0) {
     }
 }
 
-TEST_P(ReplayAppendTest, test_replay_append_delete) {
+TEST_P(TestTxnReplayAppend, test_replay_append_delete) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -274,7 +274,7 @@ TEST_P(ReplayAppendTest, test_replay_append_delete) {
     }
 }
 
-TEST_P(ReplayAppendTest, test_replay_append_with_index0) {
+TEST_P(TestTxnReplayAppend, test_replay_append_with_index0) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");

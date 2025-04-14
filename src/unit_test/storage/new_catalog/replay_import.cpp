@@ -51,15 +51,15 @@ import statement_common;
 import mem_index;
 import index_base;
 
-class ReplayImportTest : public NewReplayTest {
+class TestTxnReplayImport : public NewReplayTest {
 public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ReplayImportTest,
-                         ::testing::Values(ReplayImportTest::NEW_CONFIG_PATH, ReplayImportTest::NEW_VFS_OFF_CONFIG_PATH));
+                         TestTxnReplayImport,
+                         ::testing::Values(TestTxnReplayImport::NEW_CONFIG_PATH, TestTxnReplayImport::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(ReplayImportTest, test_import0) {
+TEST_P(TestTxnReplayImport, test_import0) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");
@@ -187,7 +187,7 @@ TEST_P(ReplayImportTest, test_import0) {
     }
 }
 
-TEST_P(ReplayImportTest, test_import_with_index) {
+TEST_P(TestTxnReplayImport, test_import_with_index) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");

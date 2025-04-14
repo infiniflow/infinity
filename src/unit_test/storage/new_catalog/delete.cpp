@@ -47,15 +47,15 @@ import index_secondary;
 
 using namespace infinity;
 
-class TestDelete : public BaseTestParamStr {
+class TestTxnDelete : public BaseTestParamStr {
 public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestDelete,
+                         TestTxnDelete,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestDelete, test_delete) {
+TEST_P(TestTxnDelete, test_delete) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -194,7 +194,7 @@ TEST_P(TestDelete, test_delete) {
     }
 }
 
-TEST_P(TestDelete, test_delete_multiple_blocks) {
+TEST_P(TestTxnDelete, test_delete_multiple_blocks) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     SharedPtr<String> db_name = std::make_shared<String>("db1");
@@ -304,7 +304,7 @@ TEST_P(TestDelete, test_delete_multiple_blocks) {
     }
 }
 
-TEST_P(TestDelete, test_delete_and_drop_db) {
+TEST_P(TestTxnDelete, test_delete_and_drop_db) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -608,7 +608,7 @@ TEST_P(TestDelete, test_delete_and_drop_db) {
     }
 }
 
-TEST_P(TestDelete, test_delete_and_drop_table) {
+TEST_P(TestTxnDelete, test_delete_and_drop_table) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -940,7 +940,7 @@ TEST_P(TestDelete, test_delete_and_drop_table) {
     }
 }
 
-TEST_P(TestDelete, test_delete_and_add_column) {
+TEST_P(TestTxnDelete, test_delete_and_add_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -1612,7 +1612,7 @@ TEST_P(TestDelete, test_delete_and_add_column) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDelete, test_delete_and_drop_column) {
+TEST_P(TestTxnDelete, test_delete_and_drop_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -2253,7 +2253,7 @@ TEST_P(TestDelete, test_delete_and_drop_column) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDelete, test_delete_and_rename) {
+TEST_P(TestTxnDelete, test_delete_and_rename) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -2881,7 +2881,7 @@ TEST_P(TestDelete, test_delete_and_rename) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDelete, test_delete_and_create_index) {
+TEST_P(TestTxnDelete, test_delete_and_create_index) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -3525,7 +3525,7 @@ TEST_P(TestDelete, test_delete_and_create_index) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDelete, test_delete_and_drop_index) {
+TEST_P(TestTxnDelete, test_delete_and_drop_index) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -4225,7 +4225,7 @@ TEST_P(TestDelete, test_delete_and_drop_index) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDelete, test_delete_and_import) {
+TEST_P(TestTxnDelete, test_delete_and_import) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -4993,7 +4993,7 @@ TEST_P(TestDelete, test_delete_and_import) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDelete, test_delete_and_append) {
+TEST_P(TestTxnDelete, test_delete_and_append) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -5744,7 +5744,7 @@ TEST_P(TestDelete, test_delete_and_append) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDelete, test_delete_and_delete) {
+TEST_P(TestTxnDelete, test_delete_and_delete) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -6320,7 +6320,7 @@ TEST_P(TestDelete, test_delete_and_delete) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDelete, test_delete_and_compact) {
+TEST_P(TestTxnDelete, test_delete_and_compact) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -6753,7 +6753,7 @@ TEST_P(TestDelete, test_delete_and_compact) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDelete, test_delete_and_optimize_index) {
+TEST_P(TestTxnDelete, test_delete_and_optimize_index) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

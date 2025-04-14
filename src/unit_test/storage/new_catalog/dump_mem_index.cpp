@@ -55,13 +55,13 @@ import constant_expr;
 
 using namespace infinity;
 
-class TestDumpMemIndex : public BaseTestParamStr {};
+class TestTxnDumpMemIndex : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestDumpMemIndex,
+                         TestTxnDumpMemIndex,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestDumpMemIndex, dump_and_drop_db) {
+TEST_P(TestTxnDumpMemIndex, dump_and_drop_db) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -577,7 +577,7 @@ TEST_P(TestDumpMemIndex, dump_and_drop_db) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_drop_table) {
+TEST_P(TestTxnDumpMemIndex, dump_and_drop_table) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -1126,7 +1126,7 @@ TEST_P(TestDumpMemIndex, dump_and_drop_table) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_add_column) {
+TEST_P(TestTxnDumpMemIndex, dump_and_add_column) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -1735,7 +1735,7 @@ TEST_P(TestDumpMemIndex, dump_and_add_column) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_drop_column) {
+TEST_P(TestTxnDumpMemIndex, dump_and_drop_column) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -2348,7 +2348,7 @@ TEST_P(TestDumpMemIndex, dump_and_drop_column) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_rename_table) {
+TEST_P(TestTxnDumpMemIndex, dump_and_rename_table) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -2916,7 +2916,7 @@ TEST_P(TestDumpMemIndex, dump_and_rename_table) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_create_index) {
+TEST_P(TestTxnDumpMemIndex, dump_and_create_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -3202,7 +3202,7 @@ TEST_P(TestDumpMemIndex, dump_and_create_index) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_drop_index) {
+TEST_P(TestTxnDumpMemIndex, dump_and_drop_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -3770,7 +3770,7 @@ TEST_P(TestDumpMemIndex, dump_and_drop_index) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_import) {
+TEST_P(TestTxnDumpMemIndex, dump_and_import) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -4546,7 +4546,7 @@ TEST_P(TestDumpMemIndex, dump_and_import) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_append) {
+TEST_P(TestTxnDumpMemIndex, dump_and_append) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -5196,7 +5196,7 @@ TEST_P(TestDumpMemIndex, dump_and_append) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_delete) {
+TEST_P(TestTxnDumpMemIndex, dump_and_delete) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -5818,7 +5818,7 @@ TEST_P(TestDumpMemIndex, dump_and_delete) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_lock_table) {
+TEST_P(TestTxnDumpMemIndex, dump_and_lock_table) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -6504,7 +6504,7 @@ TEST_P(TestDumpMemIndex, dump_and_lock_table) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, dump_and_dump) {
+TEST_P(TestTxnDumpMemIndex, dump_and_dump) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -7007,7 +7007,7 @@ TEST_P(TestDumpMemIndex, dump_and_dump) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, test_dump_index_and_optimize_index) {
+TEST_P(TestTxnDumpMemIndex, test_dump_index_and_optimize_index) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -7394,7 +7394,7 @@ TEST_P(TestDumpMemIndex, test_dump_index_and_optimize_index) {
     RemoveDbDirs();
 }
 
-TEST_P(TestDumpMemIndex, test_dump_index_and_compact) {
+TEST_P(TestTxnDumpMemIndex, test_dump_index_and_compact) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

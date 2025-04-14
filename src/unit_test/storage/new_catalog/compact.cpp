@@ -69,7 +69,7 @@ import constant_expr;
 
 using namespace infinity;
 
-class TestCompact : public BaseTestParamStr {
+class TestTxnCompact : public BaseTestParamStr {
 protected:
     void SetUp() override {
         BaseTestParamStr::SetUp();
@@ -156,10 +156,10 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestCompact,
+                         TestTxnCompact,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestCompact, compact_and_drop_db) {
+TEST_P(TestTxnCompact, compact_and_drop_db) {
     Status status;
     {
         PrepareForCompact();
@@ -294,7 +294,7 @@ TEST_P(TestCompact, compact_and_drop_db) {
     }
 }
 
-TEST_P(TestCompact, compact_and_drop_table) {
+TEST_P(TestTxnCompact, compact_and_drop_table) {
     Status status;
     {
         PrepareForCompact();
@@ -441,7 +441,7 @@ TEST_P(TestCompact, compact_and_drop_table) {
     }
 }
 
-TEST_P(TestCompact, compact_and_add_columns) {
+TEST_P(TestTxnCompact, compact_and_add_columns) {
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
     default_varchar->str_value_ = strdup("");
     auto column_def3 =
@@ -716,7 +716,7 @@ TEST_P(TestCompact, compact_and_add_columns) {
     }
 }
 
-TEST_P(TestCompact, compact_and_drop_columns) {
+TEST_P(TestTxnCompact, compact_and_drop_columns) {
     auto CheckTable = [&] {
         Vector<ColumnID> column_idxes = {0};
 
@@ -925,7 +925,7 @@ TEST_P(TestCompact, compact_and_drop_columns) {
     }
 }
 
-TEST_P(TestCompact, compact_and_rename_table) {
+TEST_P(TestTxnCompact, compact_and_rename_table) {
     Status status;
     auto new_table_name = std::make_shared<std::string>("tb2");
 
@@ -1144,7 +1144,7 @@ TEST_P(TestCompact, compact_and_rename_table) {
     }
 }
 
-TEST_P(TestCompact, compact_and_compact) {
+TEST_P(TestTxnCompact, compact_and_compact) {
     auto CheckTable = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
@@ -1265,7 +1265,7 @@ TEST_P(TestCompact, compact_and_compact) {
     }
 }
 
-TEST_P(TestCompact, compact_and_create_index) {
+TEST_P(TestTxnCompact, compact_and_create_index) {
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
 
@@ -1477,7 +1477,7 @@ TEST_P(TestCompact, compact_and_create_index) {
     }
 }
 
-TEST_P(TestCompact, compact_and_drop_index) {
+TEST_P(TestTxnCompact, compact_and_drop_index) {
     auto index_name1 = std::make_shared<std::string>("index1");
     auto index_def1 = IndexSecondary::Make(index_name1, MakeShared<String>(), "file_name", {column_def1->name()});
 

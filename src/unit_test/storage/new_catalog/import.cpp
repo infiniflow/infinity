@@ -49,13 +49,13 @@ import create_index_info;
 
 using namespace infinity;
 
-class TestImport : public BaseTestParamStr {};
+class TestTxnImport : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestImport,
+                         TestTxnImport,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestImport, test_import1) {
+TEST_P(TestTxnImport, test_import1) {
 
     using namespace infinity;
 
@@ -191,7 +191,7 @@ TEST_P(TestImport, test_import1) {
     }
 }
 
-TEST_P(TestImport, test_import_with_index) {
+TEST_P(TestTxnImport, test_import_with_index) {
 
     using namespace infinity;
 
@@ -316,7 +316,7 @@ TEST_P(TestImport, test_import_with_index) {
     check_index(*index_name2);
 }
 
-TEST_P(TestImport, test_insert_and_import) {
+TEST_P(TestTxnImport, test_insert_and_import) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -455,7 +455,7 @@ TEST_P(TestImport, test_insert_and_import) {
     }
 }
 
-TEST_P(TestImport, test_import_drop_db) {
+TEST_P(TestTxnImport, test_import_drop_db) {
 
     using namespace infinity;
 
@@ -993,7 +993,7 @@ TEST_P(TestImport, test_import_drop_db) {
     }
 }
 
-TEST_P(TestImport, test_import_drop_table) {
+TEST_P(TestTxnImport, test_import_drop_table) {
 
     using namespace infinity;
 
@@ -1585,7 +1585,7 @@ TEST_P(TestImport, test_import_drop_table) {
     }
 }
 
-TEST_P(TestImport, test_import_add_columns) {
+TEST_P(TestTxnImport, test_import_add_columns) {
 
     using namespace infinity;
 
@@ -2244,7 +2244,7 @@ TEST_P(TestImport, test_import_add_columns) {
     }
 }
 
-TEST_P(TestImport, test_import_drop_columns) {
+TEST_P(TestTxnImport, test_import_drop_columns) {
 
     using namespace infinity;
 
@@ -2847,7 +2847,7 @@ TEST_P(TestImport, test_import_drop_columns) {
     }
 }
 
-TEST_P(TestImport, test_import) {
+TEST_P(TestTxnImport, test_import) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -2987,7 +2987,7 @@ TEST_P(TestImport, test_import) {
     EXPECT_EQ(new_catalog->GetTableWriteCount(), 0);
 }
 
-TEST_P(TestImport, test_import_append_table) {
+TEST_P(TestTxnImport, test_import_append_table) {
 
     using namespace infinity;
 
@@ -3624,7 +3624,7 @@ TEST_P(TestImport, test_import_append_table) {
     }
 }
 
-TEST_P(TestImport, test_import_import_table) {
+TEST_P(TestTxnImport, test_import_import_table) {
 
     using namespace infinity;
 
@@ -4097,7 +4097,7 @@ TEST_P(TestImport, test_import_import_table) {
     RemoveDbDirs();
 }
 
-TEST_P(TestImport, test_import_rename) {
+TEST_P(TestTxnImport, test_import_rename) {
     using namespace infinity;
 
     std::shared_ptr<ConstantExpr> default_int = std::make_shared<ConstantExpr>(LiteralType::kInteger);
@@ -4511,7 +4511,7 @@ TEST_P(TestImport, test_import_rename) {
     RemoveDbDirs();
 }
 
-TEST_P(TestImport, test_import_and_create_index) {
+TEST_P(TestTxnImport, test_import_and_create_index) {
 
     using namespace infinity;
 
@@ -5156,7 +5156,7 @@ TEST_P(TestImport, test_import_and_create_index) {
     RemoveDbDirs();
 }
 
-TEST_P(TestImport, test_import_and_drop_index) {
+TEST_P(TestTxnImport, test_import_and_drop_index) {
 
     using namespace infinity;
 
@@ -5826,7 +5826,7 @@ TEST_P(TestImport, test_import_and_drop_index) {
     RemoveDbDirs();
 }
 
-TEST_P(TestImport, test_import_and_compact) {
+TEST_P(TestTxnImport, test_import_and_compact) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -6195,7 +6195,7 @@ TEST_P(TestImport, test_import_and_compact) {
     RemoveDbDirs();
 }
 
-TEST_P(TestImport, test_import_and_optimize_index) {
+TEST_P(TestTxnImport, test_import_and_optimize_index) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

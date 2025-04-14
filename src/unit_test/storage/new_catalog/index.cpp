@@ -49,13 +49,13 @@ import statement_common;
 
 using namespace infinity;
 
-class TestIndex : public BaseTestParamStr {};
+class TestTxnIndex : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestIndex,
+                         TestTxnIndex,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestIndex, index_test1) {
+TEST_P(TestTxnIndex, index_test1) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -139,7 +139,7 @@ TEST_P(TestIndex, index_test1) {
     }
 }
 
-TEST_P(TestIndex, index_test2) {
+TEST_P(TestTxnIndex, index_test2) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -219,7 +219,7 @@ TEST_P(TestIndex, index_test2) {
     }
 }
 
-TEST_P(TestIndex, create_index_and_drop_db) {
+TEST_P(TestTxnIndex, create_index_and_drop_db) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -524,7 +524,7 @@ TEST_P(TestIndex, create_index_and_drop_db) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, create_index_and_drop_table) {
+TEST_P(TestTxnIndex, create_index_and_drop_table) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -869,7 +869,7 @@ TEST_P(TestIndex, create_index_and_drop_table) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, create_index_create_index) {
+TEST_P(TestTxnIndex, create_index_create_index) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -1125,7 +1125,7 @@ TEST_P(TestIndex, create_index_create_index) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, create_index_add_column) {
+TEST_P(TestTxnIndex, create_index_add_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -1524,7 +1524,7 @@ TEST_P(TestIndex, create_index_add_column) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, create_index_drop_column) {
+TEST_P(TestTxnIndex, create_index_drop_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -1906,7 +1906,7 @@ TEST_P(TestIndex, create_index_drop_column) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, create_index_rename_table) {
+TEST_P(TestTxnIndex, create_index_rename_table) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -2404,7 +2404,7 @@ TEST_P(TestIndex, create_index_rename_table) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, drop_index_and_drop_db) {
+TEST_P(TestTxnIndex, drop_index_and_drop_db) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -2716,7 +2716,7 @@ TEST_P(TestIndex, drop_index_and_drop_db) {
     }
 }
 
-TEST_P(TestIndex, drop_index_and_drop_table) {
+TEST_P(TestTxnIndex, drop_index_and_drop_table) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -3059,7 +3059,7 @@ TEST_P(TestIndex, drop_index_and_drop_table) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, create_index_and_drop_index) {
+TEST_P(TestTxnIndex, create_index_and_drop_index) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -3232,7 +3232,7 @@ TEST_P(TestIndex, create_index_and_drop_index) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, drop_index_and_drop_index) {
+TEST_P(TestTxnIndex, drop_index_and_drop_index) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -3426,7 +3426,7 @@ TEST_P(TestIndex, drop_index_and_drop_index) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, drop_index_add_column) {
+TEST_P(TestTxnIndex, drop_index_add_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -3824,7 +3824,7 @@ TEST_P(TestIndex, drop_index_add_column) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, drop_index_drop_column) {
+TEST_P(TestTxnIndex, drop_index_drop_column) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -4208,7 +4208,7 @@ TEST_P(TestIndex, drop_index_drop_column) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestIndex, drop_index_and_rename_table) {
+TEST_P(TestTxnIndex, drop_index_and_rename_table) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 

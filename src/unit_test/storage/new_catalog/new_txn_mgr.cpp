@@ -25,11 +25,11 @@ import extra_ddl_info;
 
 using namespace infinity;
 
-class NewTxnManagerTest : public NewBaseTestNoParam {
+class TestTxnManagerTest : public NewBaseTestNoParam {
 public:
 };
 
-TEST_F(NewTxnManagerTest, test_ts) {
+TEST_F(TestTxnManagerTest, test_ts) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     SharedPtr<String> db_name = std::make_shared<String>("db1");
 
@@ -136,7 +136,7 @@ TEST_F(NewTxnManagerTest, test_ts) {
     EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
 }
 
-TEST_F(NewTxnManagerTest, test_parallel_ts) {
+TEST_F(TestTxnManagerTest, test_parallel_ts) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     SharedPtr<String> db_name = std::make_shared<String>("db1");
 
@@ -173,7 +173,7 @@ TEST_F(NewTxnManagerTest, test_parallel_ts) {
     EXPECT_EQ(new_txn_mgr->CurrentTS(), new_txn_mgr->PrepareCommitTS());
 }
 
-TEST_F(NewTxnManagerTest, test_check_txns) {
+TEST_F(TestTxnManagerTest, test_check_txns) {
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
     Status status;
     Vector<NewTxn *> check_txns;

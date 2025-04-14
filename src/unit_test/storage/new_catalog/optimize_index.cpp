@@ -69,7 +69,7 @@ import constant_expr;
 
 using namespace infinity;
 
-class TestOptimizeIndex : public BaseTestParamStr {
+class TestTxnOptimizeIndex : public BaseTestParamStr {
 protected:
     void SetUp() override {
         BaseTestParamStr::SetUp();
@@ -184,10 +184,10 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestOptimizeIndex,
+                         TestTxnOptimizeIndex,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestOptimizeIndex, optimize_index_and_drop_db) {
+TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_db) {
     Status status;
     {
         PrepareForOptimizeIndex();
@@ -323,7 +323,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_drop_db) {
     }
 }
 
-TEST_P(TestOptimizeIndex, optimize_index_and_drop_table) {
+TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_table) {
     Status status;
     {
         PrepareForOptimizeIndex();
@@ -471,7 +471,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_drop_table) {
     }
 }
 
-TEST_P(TestOptimizeIndex, optimize_index_and_drop_index) {
+TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_index) {
     Status status;
     {
         PrepareForOptimizeIndex();
@@ -619,7 +619,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_drop_index) {
     }
 }
 
-TEST_P(TestOptimizeIndex, optimize_index_and_optimize_index) {
+TEST_P(TestTxnOptimizeIndex, optimize_index_and_optimize_index) {
     auto CheckTable = [&] {
         auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check table"), TransactionType::kNormal);
 
@@ -753,7 +753,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_optimize_index) {
     }
 }
 
-TEST_P(TestOptimizeIndex, optimize_index_and_dump_index) {
+TEST_P(TestTxnOptimizeIndex, optimize_index_and_dump_index) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {
@@ -913,7 +913,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_dump_index) {
     }
 }
 
-TEST_P(TestOptimizeIndex, optimize_index_and_add_column) {
+TEST_P(TestTxnOptimizeIndex, optimize_index_and_add_column) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {
@@ -1138,7 +1138,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_add_column) {
     }
 }
 
-TEST_P(TestOptimizeIndex, optimize_index_and_drop_column) {
+TEST_P(TestTxnOptimizeIndex, optimize_index_and_drop_column) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {
@@ -1348,7 +1348,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_drop_column) {
     }
 }
 
-TEST_P(TestOptimizeIndex, optimize_index_and_rename_table) {
+TEST_P(TestTxnOptimizeIndex, optimize_index_and_rename_table) {
     auto PrepareForOptimizeAndDumpIndex = [&] {
         PrepareForOptimizeIndex();
         {
@@ -1542,7 +1542,7 @@ TEST_P(TestOptimizeIndex, optimize_index_and_rename_table) {
     }
 }
 
-TEST_P(TestOptimizeIndex, optimize_index_and_compact_table) {
+TEST_P(TestTxnOptimizeIndex, optimize_index_and_compact_table) {
     auto PrepareForCompactAndOptimize = [&] {
         {
             auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db"), TransactionType::kNormal);

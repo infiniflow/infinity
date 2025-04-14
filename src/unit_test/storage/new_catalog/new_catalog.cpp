@@ -69,13 +69,13 @@ import constant_expr;
 
 using namespace infinity;
 
-class NewCatalogTest : public BaseTestParamStr {};
+class TestTxnNewCatalog : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         NewCatalogTest,
+                         TestTxnNewCatalog,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(NewCatalogTest, test_block_lock) {
+TEST_P(TestTxnNewCatalog, test_block_lock) {
     using namespace infinity;
 
     NewCatalog *new_catalog = infinity::InfinityContext::instance().storage()->new_catalog();
@@ -107,7 +107,7 @@ TEST_P(NewCatalogTest, test_block_lock) {
     }
 }
 
-TEST_P(NewCatalogTest, test_table_mem_index) {
+TEST_P(TestTxnNewCatalog, test_table_mem_index) {
     using namespace infinity;
     String db_id_str = "0";
 

@@ -73,13 +73,13 @@ import constant_expr;
 
 using namespace infinity;
 
-class TestAlter : public BaseTestParamStr {};
+class TestTxnAlter : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestAlter,
+                         TestTxnAlter,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestAlter, add_column0) {
+TEST_P(TestTxnAlter, add_column0) {
     using namespace infinity;
 
     std::shared_ptr<ConstantExpr> default_varchar = std::make_shared<ConstantExpr>(LiteralType::kString);
@@ -205,7 +205,7 @@ TEST_P(TestAlter, add_column0) {
     }
 }
 
-TEST_P(TestAlter, drop_column0) {
+TEST_P(TestTxnAlter, drop_column0) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

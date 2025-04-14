@@ -35,13 +35,13 @@ import db_meeta;
 
 using namespace infinity;
 
-class TestTable : public BaseTestParamStr {};
+class TestTxnTable : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestTable,
+                         TestTxnTable,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestTable, table_test1) {
+TEST_P(TestTxnTable, table_test1) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -98,7 +98,7 @@ TEST_P(TestTable, table_test1) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTable, table_test2) {
+TEST_P(TestTxnTable, table_test2) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -151,7 +151,7 @@ TEST_P(TestTable, table_test2) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTable, createtable_createtable) {
+TEST_P(TestTxnTable, createtable_createtable) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -388,7 +388,7 @@ TEST_P(TestTable, createtable_createtable) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTable, createdb_createtable_test) {
+TEST_P(TestTxnTable, createdb_createtable_test) {
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
 
@@ -742,7 +742,7 @@ TEST_P(TestTable, createdb_createtable_test) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTable, createtable_dropdb_test) {
+TEST_P(TestTxnTable, createtable_dropdb_test) {
     using namespace infinity;
     // Conflict between drop db and create table
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -1090,7 +1090,7 @@ TEST_P(TestTable, createtable_dropdb_test) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTable, dropdb_droptable_test) {
+TEST_P(TestTxnTable, dropdb_droptable_test) {
     using namespace infinity;
 
     // Conflict between drop db and drop table
@@ -1290,7 +1290,7 @@ TEST_P(TestTable, dropdb_droptable_test) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTable, createtable_droptable_test) {
+TEST_P(TestTxnTable, createtable_droptable_test) {
     using namespace infinity;
 
     // Conflict between drop db and drop table
@@ -1673,7 +1673,7 @@ TEST_P(TestTable, createtable_droptable_test) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTable, droptable_droptable_test) {
+TEST_P(TestTxnTable, droptable_droptable_test) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -1956,7 +1956,7 @@ TEST_P(TestTable, droptable_droptable_test) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestTable, rename_table_test) {
+TEST_P(TestTxnTable, rename_table_test) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

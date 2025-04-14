@@ -69,13 +69,13 @@ import constant_expr;
 
 using namespace infinity;
 
-class TestIndexInternal : public BaseTestParamStr {};
+class TestTxnIndexInternal : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestIndexInternal,
+                         TestTxnIndexInternal,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestIndexInternal, test_index0) {
+TEST_P(TestTxnIndexInternal, test_index0) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -277,7 +277,7 @@ TEST_P(TestIndexInternal, test_index0) {
     });
 }
 
-TEST_P(TestIndexInternal, test_index) {
+TEST_P(TestTxnIndexInternal, test_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -667,7 +667,7 @@ TEST_P(TestIndexInternal, test_index) {
     });
 }
 
-TEST_P(TestIndexInternal, test_populate_index0) {
+TEST_P(TestTxnIndexInternal, test_populate_index0) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -799,7 +799,7 @@ TEST_P(TestIndexInternal, test_populate_index0) {
     });
 }
 
-TEST_P(TestIndexInternal, test_populate_index) {
+TEST_P(TestTxnIndexInternal, test_populate_index) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

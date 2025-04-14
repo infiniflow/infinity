@@ -22,13 +22,13 @@ import kv_store;
 
 using namespace infinity;
 
-class KVStoreTest : public BaseTestParamStr {};
+class TestTxnKVStoreTest : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         KVStoreTest,
+                         TestTxnKVStoreTest,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(KVStoreTest, kv_store0) {
+TEST_P(TestTxnKVStoreTest, kv_store0) {
     using namespace infinity;
 
     UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
@@ -66,7 +66,7 @@ TEST_P(KVStoreTest, kv_store0) {
     EXPECT_TRUE(status.ok());
 }
 
-TEST_P(KVStoreTest, kv_store1) {
+TEST_P(TestTxnKVStoreTest, kv_store1) {
     using namespace infinity;
 
     // Test multi-version
@@ -135,7 +135,7 @@ TEST_P(KVStoreTest, kv_store1) {
     EXPECT_TRUE(status.ok());
 }
 
-TEST_P(KVStoreTest, kv_store2) {
+TEST_P(TestTxnKVStoreTest, kv_store2) {
     using namespace infinity;
 
     // Test disable WAL
@@ -229,7 +229,7 @@ TEST_P(KVStoreTest, kv_store2) {
     }
 }
 
-TEST_P(KVStoreTest, kv_store3) {
+TEST_P(TestTxnKVStoreTest, kv_store3) {
     using namespace infinity;
 
     // Test disable WAL
@@ -283,7 +283,7 @@ TEST_P(KVStoreTest, kv_store3) {
     }
 }
 
-TEST_P(KVStoreTest, kv_store4) {
+TEST_P(TestTxnKVStoreTest, kv_store4) {
     using namespace infinity;
 
     // Backup
@@ -348,7 +348,7 @@ TEST_P(KVStoreTest, kv_store4) {
     }
 }
 
-TEST_P(KVStoreTest, kv_store5) {
+TEST_P(TestTxnKVStoreTest, kv_store5) {
     using namespace infinity;
 
     //    using rocksdb::DestroyDB;
@@ -435,7 +435,7 @@ TEST_P(KVStoreTest, kv_store5) {
     }
 }
 
-TEST_P(KVStoreTest, kv_store6) {
+TEST_P(TestTxnKVStoreTest, kv_store6) {
     using namespace infinity;
     UniquePtr<KVStore> kv_store = MakeUnique<KVStore>();
     kv_store->Init("/tmp/rocksdb_transaction_example");

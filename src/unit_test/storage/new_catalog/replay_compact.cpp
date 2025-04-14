@@ -51,15 +51,15 @@ import statement_common;
 import mem_index;
 import index_base;
 
-class ReplayCompactTest : public NewReplayTest {
+class TestTxnReplayCompact : public NewReplayTest {
 public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         ReplayCompactTest,
-                         ::testing::Values(ReplayCompactTest::NEW_CONFIG_PATH, ReplayCompactTest::NEW_VFS_OFF_CONFIG_PATH));
+                         TestTxnReplayCompact,
+                         ::testing::Values(TestTxnReplayCompact::NEW_CONFIG_PATH, TestTxnReplayCompact::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(ReplayCompactTest, test_compact0) {
+TEST_P(TestTxnReplayCompact, test_compact0) {
     using namespace infinity;
 
     new_txn_mgr->PrintAllKeyValue();
@@ -170,7 +170,7 @@ TEST_P(ReplayCompactTest, test_compact0) {
     }
 }
 
-TEST_P(ReplayCompactTest, test_compact_with_index) {
+TEST_P(TestTxnReplayCompact, test_compact_with_index) {
     using namespace infinity;
 
     new_txn_mgr->PrintAllKeyValue();

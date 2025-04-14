@@ -47,15 +47,15 @@ import index_base;
 
 using namespace infinity;
 
-class TestAppend : public BaseTestParamStr {
+class TestTxnAppend : public BaseTestParamStr {
 public:
 };
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestAppend,
+                         TestTxnAppend,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestAppend, test_append0) {
+TEST_P(TestTxnAppend, test_append0) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -151,7 +151,7 @@ TEST_P(TestAppend, test_append0) {
     }
 }
 
-TEST_P(TestAppend, test_append1) {
+TEST_P(TestTxnAppend, test_append1) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -311,7 +311,7 @@ TEST_P(TestAppend, test_append1) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append2) {
+TEST_P(TestTxnAppend, test_append2) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -520,7 +520,7 @@ TEST_P(TestAppend, test_append2) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_drop_db) {
+TEST_P(TestTxnAppend, test_append_drop_db) {
     using namespace infinity;
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -922,7 +922,7 @@ TEST_P(TestAppend, test_append_drop_db) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_drop_table) {
+TEST_P(TestTxnAppend, test_append_drop_table) {
     using namespace infinity;
 
     auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
@@ -1376,7 +1376,7 @@ TEST_P(TestAppend, test_append_drop_table) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_add_column) {
+TEST_P(TestTxnAppend, test_append_add_column) {
     using namespace infinity;
 
     std::shared_ptr<ConstantExpr> default_int = std::make_shared<ConstantExpr>(LiteralType::kInteger);
@@ -1895,7 +1895,7 @@ TEST_P(TestAppend, test_append_add_column) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_drop_column) {
+TEST_P(TestTxnAppend, test_append_drop_column) {
     using namespace infinity;
 
     std::shared_ptr<ConstantExpr> default_int = std::make_shared<ConstantExpr>(LiteralType::kInteger);
@@ -2378,7 +2378,7 @@ TEST_P(TestAppend, test_append_drop_column) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_rename) {
+TEST_P(TestTxnAppend, test_append_rename) {
     using namespace infinity;
 
     std::shared_ptr<ConstantExpr> default_int = std::make_shared<ConstantExpr>(LiteralType::kInteger);
@@ -2853,7 +2853,7 @@ TEST_P(TestAppend, test_append_rename) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_append) {
+TEST_P(TestTxnAppend, test_append_append) {
     using namespace infinity;
 
     std::shared_ptr<ConstantExpr> default_int = std::make_shared<ConstantExpr>(LiteralType::kInteger);
@@ -3550,7 +3550,7 @@ TEST_P(TestAppend, test_append_append) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_append_concurrent) {
+TEST_P(TestTxnAppend, test_append_append_concurrent) {
     using namespace infinity;
 
     std::shared_ptr<ConstantExpr> default_int = std::make_shared<ConstantExpr>(LiteralType::kInteger);
@@ -3733,7 +3733,7 @@ TEST_P(TestAppend, test_append_append_concurrent) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_and_create_index) {
+TEST_P(TestTxnAppend, test_append_and_create_index) {
 
     using namespace infinity;
 
@@ -4254,7 +4254,7 @@ TEST_P(TestAppend, test_append_and_create_index) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_and_drop_index) {
+TEST_P(TestTxnAppend, test_append_and_drop_index) {
 
     using namespace infinity;
 
@@ -4819,7 +4819,7 @@ TEST_P(TestAppend, test_append_and_drop_index) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_and_compact) {
+TEST_P(TestTxnAppend, test_append_and_compact) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -5153,7 +5153,7 @@ TEST_P(TestAppend, test_append_and_compact) {
     RemoveDbDirs();
 }
 
-TEST_P(TestAppend, test_append_and_optimize_index) {
+TEST_P(TestTxnAppend, test_append_and_optimize_index) {
 
     using namespace infinity;
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

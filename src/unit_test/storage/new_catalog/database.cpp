@@ -31,13 +31,13 @@ import db_meeta;
 
 using namespace infinity;
 
-class TestDatabase : public BaseTestParamStr {};
+class TestTxnDatabase : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TestDatabase,
+                         TestTxnDatabase,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TestDatabase, createdb_createdb_test) {
+TEST_P(TestTxnDatabase, createdb_createdb_test) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -329,7 +329,7 @@ TEST_P(TestDatabase, createdb_createdb_test) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestDatabase, db_test2) {
+TEST_P(TestTxnDatabase, db_test2) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -354,7 +354,7 @@ TEST_P(TestDatabase, db_test2) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestDatabase, db_test3) {
+TEST_P(TestTxnDatabase, db_test3) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -394,7 +394,7 @@ TEST_P(TestDatabase, db_test3) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestDatabase, db_test4) {
+TEST_P(TestTxnDatabase, db_test4) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -442,7 +442,7 @@ TEST_P(TestDatabase, db_test4) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestDatabase, dropdb_dropdb_test) {
+TEST_P(TestTxnDatabase, dropdb_dropdb_test) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();
@@ -632,7 +632,7 @@ TEST_P(TestDatabase, dropdb_dropdb_test) {
     new_txn_mgr->PrintAllKeyValue();
 }
 
-TEST_P(TestDatabase, createdb_dropdb_test) {
+TEST_P(TestTxnDatabase, createdb_dropdb_test) {
     using namespace infinity;
 
     NewTxnManager *new_txn_mgr = infinity::InfinityContext::instance().storage()->new_txn_manager();

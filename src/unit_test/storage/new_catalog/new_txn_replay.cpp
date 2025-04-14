@@ -80,13 +80,13 @@ import buffer_handle;
 
 using namespace infinity;
 
-class NewTxnReplayTest : public NewReplayTest {};
+class TestTxnReplayTest : public NewReplayTest {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         NewTxnReplayTest,
-                         ::testing::Values(NewTxnReplayTest::NEW_CONFIG_PATH, NewTxnReplayTest::NEW_VFS_OFF_CONFIG_PATH));
+                         TestTxnReplayTest,
+                         ::testing::Values(TestTxnReplayTest::NEW_CONFIG_PATH, TestTxnReplayTest::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(NewTxnReplayTest, test_replay_create_db) {
+TEST_P(TestTxnReplayTest, test_replay_create_db) {
     using namespace infinity;
 
     {
@@ -110,7 +110,7 @@ TEST_P(NewTxnReplayTest, test_replay_create_db) {
     }
 }
 
-TEST_P(NewTxnReplayTest, test_replay_create_db2) {
+TEST_P(TestTxnReplayTest, test_replay_create_db2) {
     using namespace infinity;
 
     {
@@ -153,7 +153,7 @@ TEST_P(NewTxnReplayTest, test_replay_create_db2) {
     }
 }
 
-TEST_P(NewTxnReplayTest, test_replay_create_table) {
+TEST_P(TestTxnReplayTest, test_replay_create_table) {
     using namespace infinity;
 
     SharedPtr<String> db_name = std::make_shared<String>("default_db");

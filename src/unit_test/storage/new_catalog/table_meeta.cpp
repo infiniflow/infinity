@@ -35,13 +35,13 @@ import table_meeta;
 
 using namespace infinity;
 
-class TableMeetaTest : public BaseTestParamStr {};
+class TestTxnTableMeeta : public BaseTestParamStr {};
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
-                         TableMeetaTest,
+                         TestTxnTableMeeta,
                          ::testing::Values(BaseTestParamStr::NEW_CONFIG_PATH, BaseTestParamStr::NEW_VFS_OFF_CONFIG_PATH));
 
-TEST_P(TableMeetaTest, table_meeta) {
+TEST_P(TestTxnTableMeeta, table_meeta) {
     using namespace infinity;
 
     Status status;
