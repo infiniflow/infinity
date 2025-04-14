@@ -45,9 +45,7 @@ public:
 
     void TearDown() override {}
 
-    void test_print() {
-        std::cerr << "some OK\n";
-    }
+    void test_print() { std::cerr << "some OK\n"; }
 
     void Init() {
         std::string config_path_str = GetParam();
@@ -71,7 +69,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          TransformMeta,
-                         ::testing::Values(TransformMeta::NEW_CONFIG_PATH/*, TransformMeta::NEW_VFS_OFF_CONFIG_PATH*/));
+                         ::testing::Values(TransformMeta::NEW_CONFIG_PATH, TransformMeta::NEW_VFS_OFF_CONFIG_PATH));
 
 TEST_P(TransformMeta, transform_meta00) {
     UniquePtr<Config> config_ptr = MakeUnique<Config>();
@@ -91,29 +89,26 @@ TEST_P(TransformMeta, transform_meta00) {
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
 
-        Init();
-        NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    Init();
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
 
-        auto* txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
-        {
-            Optional<DBMeeta> db_meta;
-            status = txn->GetDBMeta("db1", db_meta);
-            EXPECT_TRUE(status.ok());
-        }
-
-        {
-            Optional<DBMeeta> db_meta;
-            status = txn->GetDBMeta("default_db", db_meta);
-            EXPECT_TRUE(status.ok());
-        }
-
-        status = new_txn_mgr->CommitTxn(txn);
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("db1", db_meta);
         EXPECT_TRUE(status.ok());
+    }
 
-        UnInit();
-    //} catch (...) {
-   //     UnInit();
-   // }
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("default_db", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    UnInit();
 }
 
 // TEST_P(TransformMeta, transform_meta01) {
