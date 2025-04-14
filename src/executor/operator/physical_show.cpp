@@ -3654,13 +3654,41 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
 }
 
 void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorState *show_operator_state) {
-    auto txn = query_context->GetTxn();
-
-    auto [table_entry, table_status] = txn->GetTableByName(db_name_, *object_name_);
-    if (!table_status.ok()) {
-        show_operator_state->status_ = table_status.clone();
-        RecoverableError(table_status);
-        return;
+    Vector<SharedPtr<TableIndexInfo>> table_index_info_list;
+    Status status;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxn *txn = query_context->GetNewTxn();
+        Vector<String> index_names;
+        status = txn->ListIndex(db_name_, *object_name_, index_names);
+        if (!status.ok()) {
+            show_operator_state->status_ = status.clone();
+            RecoverableError(status);
+        }
+        for (const auto &index_name : index_names) {
+            auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, *object_name_, index_name);
+            if (!status.ok()) {
+                show_operator_state->status_ = status.clone();
+                RecoverableError(status);
+            }
+            table_index_info_list.push_back(table_index_info);
+        }
+    } else {
+        Txn *txn = query_context->GetTxn();
+        auto [table_entry, table_status] = txn->GetTableByName(db_name_, *object_name_);
+        if (!table_status.ok()) {
+            show_operator_state->status_ = table_status.clone();
+            RecoverableError(table_status);
+        }
+        auto map_guard = table_entry->IndexMetaMap();
+        for (const auto &[index_name, index_meta] : *map_guard) {
+            auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, *object_name_, index_name);
+            if (!table_status.ok()) {
+                show_operator_state->status_ = table_status.clone();
+                RecoverableError(table_status);
+            }
+            table_index_info_list.push_back(table_index_info);
+        }
     }
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -3668,38 +3696,28 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
 
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>>
-        column_types{varchar_type, varchar_type, varchar_type, bigint_type, varchar_type, varchar_type, varchar_type, varchar_type};
+        column_types{varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type, varchar_type};
     SizeT row_count = 0;
     output_block_ptr->Init(column_types);
 
     {
-        auto map_guard = table_entry->IndexMetaMap();
-        for (const auto &[index_name, index_meta] : *map_guard) {
+        for (const auto &table_index_info : table_index_info_list) {
             if (output_block_ptr.get() == nullptr) {
                 output_block_ptr = DataBlock::MakeUniquePtr();
                 output_block_ptr->Init(column_types);
             }
 
-            auto [table_index_entry, status] = index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-            if (!status.ok()) {
-                // Index isn't found.
-                continue;
-            }
-
-            const IndexBase *index_base = table_index_entry->index_base();
-            String index_column_name = index_base->column_name();
-            u64 index_column_id = table_entry->GetColumnIdByName(index_column_name);
             SizeT column_id = 0;
             {
                 // Append index name to the first column
-                Value value = Value::MakeVarchar(index_name);
+                Value value = Value::MakeVarchar(*table_index_info->index_name_);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
             ++column_id;
             {
                 // Append index_comment to output
-                String comment = *index_base->index_comment_;
+                String comment = *table_index_info->index_comment_;
                 Value value = Value::MakeVarchar(comment);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -3707,46 +3725,36 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             ++column_id;
             {
                 // Append index method type to the second column
-                Value value = Value::MakeVarchar(IndexInfo::IndexTypeToString(index_base->index_type_));
+                Value value = Value::MakeVarchar(*table_index_info->index_type_);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
             ++column_id;
             {
                 // Append index column id
-                Value value = Value::MakeBigInt(index_column_id);
+                Value value = Value::MakeVarchar(*table_index_info->index_column_ids_);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
             ++column_id;
             {
                 // Append index column names to the third column
-                String column_names;
-                SizeT idx = 0;
-                for (auto &column_name : index_base->column_names_) {
-                    column_names += column_name;
-                    if (idx < index_base->column_names_.size() - 1) {
-                        column_names += ",";
-                    }
-                    idx++;
-                }
-                Value value = Value::MakeVarchar(column_names);
+                Value value = Value::MakeVarchar(*table_index_info->index_column_names_);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
             ++column_id;
             {
                 // Append index path
-                Value value = Value::MakeVarchar(*table_index_entry->index_dir());
+                Value value = Value::MakeVarchar(*table_index_info->index_entry_dir_);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
             ++column_id;
             {
                 // Append Index segment
-                SizeT segment_count = table_entry->segment_map().size();
-                SizeT index_segment_count = table_index_entry->index_by_segment().size();
-                String result_value = fmt::format("{}/{}", index_segment_count, segment_count);
+                SizeT segment_index_count = table_index_info->segment_index_count_;
+                String result_value = fmt::format("{}", segment_index_count);
                 Value value = Value::MakeVarchar(result_value);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -3754,8 +3762,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
             ++column_id;
             {
                 // Append index other parameters to the fourth column
-                String other_parameters = index_base->BuildOtherParamsString();
-                Value value = Value::MakeVarchar(other_parameters);
+                Value value = Value::MakeVarchar(*table_index_info->index_other_params_);
                 ValueExpression value_expr(value);
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
             }
