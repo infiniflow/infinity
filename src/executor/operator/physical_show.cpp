@@ -89,6 +89,7 @@ import txn_state;
 import snapshot_brief;
 import command_statement;
 import chunk_index_meta;
+import new_txn_manager;
 
 namespace infinity {
 
@@ -5552,6 +5553,12 @@ void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperator
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        Status status = Status::NotSupport("Show memindex is not supported in new catalog since BGMemIndexTracer has not yet been ported.");
+        RecoverableError(status);
+    }
+
     BGMemIndexTracer *mem_index_tracer = query_context->storage()->memindex_tracer();
     Txn *txn = query_context->GetTxn();
     Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo(txn);
@@ -5794,8 +5801,15 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    TxnManager *txn_manager = query_context->storage()->txn_manager();
-    Vector<TxnInfo> txn_info_array = txn_manager->GetTxnInfoArray();
+    Vector<TxnInfo> txn_info_array;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxnManager *new_txn_manager = query_context->storage()->new_txn_manager();
+        txn_info_array = new_txn_manager->GetTxnInfoArray();
+    } else {
+        TxnManager *txn_manager = query_context->storage()->txn_manager();
+        txn_info_array = txn_manager->GetTxnInfoArray();
+    }
     for (const auto &txn_info : txn_info_array) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -5834,9 +5848,15 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
 }
 
 void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state) {
-
-    TxnManager *txn_manager = query_context->storage()->txn_manager();
-    UniquePtr<TxnInfo> txn_info = txn_manager->GetTxnInfoByID(*txn_id_);
+    UniquePtr<TxnInfo> txn_info = nullptr;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxnManager *new_txn_manager = query_context->storage()->new_txn_manager();
+        txn_info = new_txn_manager->GetTxnInfoByID(*txn_id_);
+    } else {
+        TxnManager *txn_manager = query_context->storage()->txn_manager();
+        txn_info = txn_manager->GetTxnInfoByID(*txn_id_);
+    }
     if (txn_info.get() == nullptr) {
         Status status = Status::TransactionNotFound(*txn_id_);
         RecoverableError(status);
@@ -5909,11 +5929,20 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
 }
 
 void PhysicalShow::ExecuteShowTransactionHistory(QueryContext *query_context, ShowOperatorState *operator_state) {
-    Txn *txn = query_context->GetTxn();
-    //    txn->AddOperation(MakeShared<String>("ShowTransactionHistory"));
-    TransactionID this_txn_id = txn->TxnID();
-    TxnManager *txn_manager = query_context->storage()->txn_manager();
-    Vector<SharedPtr<TxnContext>> txn_context_histories = txn_manager->GetTxnContextHistories();
+    Vector<SharedPtr<TxnContext>> txn_context_histories;
+    TransactionID this_txn_id;
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        NewTxnManager *new_txn_manager = query_context->storage()->new_txn_manager();
+        txn_context_histories = new_txn_manager->GetTxnContextHistories();
+        NewTxn *txn = query_context->GetNewTxn();
+        this_txn_id = txn->TxnID();
+    } else {
+        TxnManager *txn_manager = query_context->storage()->txn_manager();
+        txn_context_histories = txn_manager->GetTxnContextHistories();
+        Txn *txn = query_context->GetTxn();
+        this_txn_id = txn->TxnID();
+    }
 
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -6164,6 +6193,11 @@ void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperato
 }
 
 void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperatorState *operator_state) {
+    bool use_new_catalog = query_context->global_config()->UseNewCatalog();
+    if (use_new_catalog) {
+        Status status = Status::NotSupport("Show catalogs is not supported in new catalog since RocksDB has replaced catalog files.");
+        RecoverableError(status);
+    }
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
