@@ -134,13 +134,30 @@ TEST_P(TransformMeta, transform_meta01) {
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
-    std::cout << String("All store key and value: ") << std::endl;
-    std::cout << kv_store_ptr->ToString() << std::endl;
-    std::cout << String(" -------------- ") << std::endl;
-
     kv_store_ptr->Uninit();
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("db1", db_meta);
+        EXPECT_TRUE(!status.ok());
+    }
+
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("default_db", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    UnInit();
 }
 
 TEST_P(TransformMeta, transform_meta02) {
@@ -156,11 +173,37 @@ TEST_P(TransformMeta, transform_meta02) {
     Vector<String> delta_ckp_path_array;
     new_catalog_ptr->TransformCatalog(config_ptr.get(), full_ckp_path, delta_ckp_path_array);
 
-    std::cout << String("All store key and value: ") << std::endl;
-    std::cout << kv_store_ptr->ToString() << std::endl;
-    std::cout << String(" -------------- ") << std::endl;
-
     kv_store_ptr->Uninit();
     kv_store_ptr.reset();
     new_catalog_ptr.reset();
+
+    Init();
+
+    NewTxnManager *new_txn_mgr = InfinityContext::instance().storage()->new_txn_manager();
+    auto *txn = new_txn_mgr->BeginTxn(MakeUnique<String>("create db1"), TransactionType::kNormal);
+    {
+        status = txn->CreateDatabase("db1", ConflictType::kError, MakeShared<String>());
+        EXPECT_TRUE(status.ok());
+
+        status = new_txn_mgr->CommitTxn(txn);
+        EXPECT_TRUE(status.ok());
+    }
+
+    txn = new_txn_mgr->BeginTxn(MakeUnique<String>("check db"), TransactionType::kNormal);
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("db1", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    {
+        Optional<DBMeeta> db_meta;
+        status = txn->GetDBMeta("default_db", db_meta);
+        EXPECT_TRUE(status.ok());
+    }
+
+    status = new_txn_mgr->CommitTxn(txn);
+    EXPECT_TRUE(status.ok());
+
+    UnInit();
 }
